@@ -40,6 +40,8 @@ Setup holds the TotalMix address `127.0.0.1`, the send port `7001` and the recei
 
 The engine listens on UDP `9001`–`9004`, bound to `127.0.0.1`, and reads only what comes from the TotalMix address. `netstat -an | findstr 900` shows the four ports.
 
+While nothing has come on remote 4 for 3 s, the engine asks TotalMix for its values (`/sendall 2`, `/sendstate`) once a second; TotalMix always answers `/sendstate`. Two requests in a row unanswered mean TotalMix is out of touch (remote 4 switched off, or TotalMix closed); a link's first 3 s are a grace, as TotalMix may be slow to answer at a start. When it is heard again the Console reads `ASSUMED` until a Sync or a load's read-back has read the desk (2026-10-01). Every start on the real TotalMix makes a Console saved as `VERIFIED` read `ASSUMED` too, as TotalMix may have changed while the app was closed (the owner, 2026-10-02).
+
 What the app never does:
 
 - It never loads a TotalMix snapshot by itself. `/snapshot/load/N` goes out only at the operator's second press on the slot, and only from a studio build; the desk is then read back. It never stores a snapshot (`/snapshot/save` is never sent) and renames nothing: snapshots and names are TotalMix's (2026-10-01).
@@ -56,13 +58,14 @@ Measured on the studio's desk (2026-09), for whoever probes by hand or reads a l
 - A dump gives a fader in dB, never as a position. `/sendsubmix 2` sends nothing for a mix with no send above −65 dB. `/sendall 2` is 3,100 to 3,500 messages.
 - `/output/0/volume` in a dump is the level after dim (−20 dB), so the fader is set before dim is switched off.
 - TotalMix sends to a remote only while it hears from it. A command marked `(f)` in RME's table ignores a value under 0.5.
+- Remote 4 switched off for about 30 s while a send was moved in TotalMix, then on again: the move did not reach the app until a Sync (the walk, 2026-10-01).
 - Playback 1/2 is Windows' sound and 3/4 is vMix's. The preamps are inputs 9 to 12, and which of them has 48 V on changes: compare with the state read before, never with "off".
 - The desk's reference state is TotalMix's own snapshot `Mix 1`: Main Out at 0 dB, dim off. It is loaded in TotalMix, or at a second press on its slot in the Console; the app never loads it by itself, and the assistant never loads it.
-- TotalMix reports each of its eight snapshots on `/snapshot/load/N` (N from 1): 0 off, 2 active, 3 changed since it was loaded. It takes only `1` there. Whether it reports a load to the remote that sent it is read on the walk; the app marks the slot itself after the read-back when it does not.
+- TotalMix reports each of its eight snapshots on `/snapshot/load/N` (N from 1): 0 off, 2 active, 3 changed since it was loaded. It takes only `1` there. It reports a load to the remote that sent it too, 40 to 60 ms after (the walk, 2026-10-01); the app would mark the slot itself after the read-back if it did not.
 - 48 V does not switch when a TotalMix snapshot loads (the owner, 2026-10-01).
 - TotalMix's OSC carries no snapshot names. A studio build on the real console reads them from TotalMix's own settings file, `%LOCALAPPDATA%\TotalMixFX\last.<device>.xml` (`SnapshotName 0` to `7`; here `last.FirefaceUFXIII1.xml`), which TotalMix writes when it closes, so a name changed in TotalMix shows after TotalMix has closed once. Development builds and tests never read the file.
-- A channel's name comes in TotalMix's dumps as `/input|playback|output/<ch>/name`, and the Console shows it. A channel TotalMix sends no name for keeps the app's.
-- The OSC library reads a string only as UTF-8. A datagram it cannot read is lost, and in a bundle so is everything after the element it stopped at.
+- A channel's name comes in TotalMix's dumps as `/input|playback|output/<ch>/name`, and the Console shows it. A channel nobody named carries TotalMix's own name (`AN 1/2`, `ADAT 1/2`), never an empty one, and a stereo pair has one name, on its left channel (the walk, 2026-10-01).
+- TotalMix writes OSC strings, the channels' names, in Windows-1252: `BÖÖM` arrives as `42 D6 D6 4D`, and a dump packs a channel's report in one bundle (2026-10-01). The OSC library reads a string only as UTF-8, so the engine reads again what it refused: a string as UTF-8, else as Windows-1252. An element neither reading can read is skipped and logged, and the rest of the bundle is read. A name whose Windows-1252 bytes happen to be valid UTF-8 (`Ö€` is `D6 80`) is read as UTF-8 and shows another letter; no name in use comes near it.
 
 What `engine.log` says of TotalMix, for the walk (2026-10-01):
 
@@ -71,6 +74,8 @@ What `engine.log` says of TotalMix, for the walk (2026-10-01):
 - `TotalMix's device:` the name on `/status/device` the first time the link hears it, and again when it changes, with the names file that name points to.
 - `Sync's read-back carried …` (or `The read-back after loading …`): every channel name the dump carried, quoted as TotalMix sent it, channels counted from 0.
 - `TotalMix sent N datagrams … that could not be read in full`: a warning at once, then once a minute at most, with the bytes where the reading stopped.
+- `The Console reads assumed until a Sync: Studio Control has not read the desk since it started.`: at each start of the hardware link on the real TotalMix with the Console last `VERIFIED` or `ASSUMED`.
+- `TotalMix went quiet on remote 4` (or `has not been heard on remote 4` since the start): a warning once two requests for its values went unanswered. `TotalMix heard on remote 4 … again after N s quiet` (or `for the first time, N s after the link began listening`), then `In the 3 s after TotalMix was heard again … it sent N control values`: about 3,000 or more means it answered the request for its values; none means it did not, and only a Sync reads the desk.
 
 ## Lights
 
@@ -110,7 +115,7 @@ Bitfocus Companion 5.0.6, on this PC, drives the Stream Deck+. Its connection `S
 - `RECALL` and the SCENE dial's push fade as the Lighting page's recall does, with the page's Fade (saved, 2026-10-03; until then the deck recalled at once). Into the preview a recall loads at once.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own (`deck_raw`, `deck_displays`, `deck_age`).
-- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
+- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A request whose answer could not be written (Companion closed the connection, as at a Full Reset & Import) is one line a minute at most for each kind of failure; the next line of that kind counts those between. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
 - Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:

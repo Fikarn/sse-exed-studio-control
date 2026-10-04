@@ -6,10 +6,11 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 1. Start TotalMix FX and Companion, and vMix when the cameras are used.
 2. Start the verified build: `Studio Control.cmd` in the builds folder. It opens fullscreen on the studio display, on the page last used. (Until the first build is verified there, the studio's build is the one in `release\native\windows\` in the repository.)
-3. Read the header's lamps. `Lighting`, `Audio`, `Prompter` and `Surface` should be green and read `ready`. `Cameras` reads `not set up` until the links to the cameras are built. `Prompter` reads `not connected` while the Prompter XL is unplugged.
-4. Look up any other word under [When something goes wrong](#when-something-goes-wrong).
-5. If `Lighting` reads `held`, nothing reaches the rig. Look at the Lighting page and its `DMX monitor`: that is what the rig will get. Then set `Light outputs` to `ARMED` in Setup / Support.
-6. Press a key on the Stream Deck and watch the screen follow. No lamp shows whether the deck answers.
+3. On Audio's Console press `Sync from TotalMix`: after every start the Console reads `ASSUMED` until it has read the desk, and its meters wait.
+4. Read the header's lamps. `Lighting`, `Audio`, `Prompter` and `Surface` should be green and read `ready`. `Cameras` reads `not set up` until the links to the cameras are built. `Prompter` reads `not connected` while the Prompter XL is unplugged.
+5. Look up any other word under [When something goes wrong](#when-something-goes-wrong).
+6. If `Lighting` reads `held`, nothing reaches the rig. Look at the Lighting page and its `DMX monitor`: that is what the rig will get. Then set `Light outputs` to `ARMED` in Setup / Support.
+7. Press a key on the Stream Deck and watch the screen follow. No lamp shows whether the deck answers.
 
 ## The screen
 
@@ -64,22 +65,24 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **Groups.** A row's `⋯` shows only some groups (Talent, Line, Bed, FX, Remote); the heading then says which, and `Show all` brings every strip back.
 - **Plate.** The whole strip, without scrolling: its preamp (an input's), the other mixes it feeds (a row's `⋯` makes that mix the target) and its meter. Each section's `⋯` holds its switches. The equaliser, the Low Cut and the dynamics are set in TotalMix.
 - **Solo and clip.** The latch slot names the soloed strips, with `Clear all`; a clip latches beside it, with `Clear`.
-- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot twice (`LOAD?`) to load it in TotalMix; the Console then reads the desk. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
+- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot, then again while it reads `LOAD?`, to load it in TotalMix; the Console then reads the desk. A double-click only arms it. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
 - **The page's `⋯`** holds `Sync from TotalMix`, which reads the desk and changes nothing on it, `Run audio probe`, `Clear clips`, `Peak hold`, `Reset peaks` and `Open Setup`.
 
 The state display reads `VERIFIED` when the probe has passed, meter data arrives and the desk has been read. Otherwise:
 
-| State           | It means                                  | Way out                 |
-| --------------- | ----------------------------------------- | ----------------------- |
-| `SYNC NEEDED`   | The desk is unread since the link changed | `Sync from TotalMix`    |
-| `ASSUMED`       | A change was not confirmed in 1.5 s       | `Sync from TotalMix`    |
-| `NOT VERIFIED`  | Probe not run; every control locked       | `Run audio probe`       |
-| `STALE`         | No meter data for half a second           | `Run audio probe`       |
-| `OFFLINE`       | Probe failed, or no meter data for 2 s    | `Run audio probe`       |
-| `DISCONNECTED`  | TotalMix reports the UFX III gone         | Check its USB and power |
-| `ACTION FAILED` | The last action failed                    | Any action that works   |
+| State           | It means                                                                                    | Way out                 |
+| --------------- | ------------------------------------------------------------------------------------------- | ----------------------- |
+| `SYNC NEEDED`   | The desk is unread since the link changed                                                   | `Sync from TotalMix`    |
+| `ASSUMED`       | The app has just started, TotalMix was out of touch, or a change was not confirmed in 1.5 s | `Sync from TotalMix`    |
+| `NOT VERIFIED`  | Probe not run; every control locked                                                         | `Run audio probe`       |
+| `STALE`         | No meter data for half a second                                                             | `Run audio probe`       |
+| `OFFLINE`       | Probe failed, or no meter data for 2 s                                                      | `Run audio probe`       |
+| `DISCONNECTED`  | TotalMix reports the UFX III gone                                                           | Check its USB and power |
+| `ACTION FAILED` | The last action failed                                                                      | Any action that works   |
 
 The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never runs the probe by itself: `OFFLINE` stays after TotalMix is back, until you press `Run audio probe`. If it keeps failing, check TotalMix against [HARDWARE.md](HARDWARE.md).
+
+TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. When TotalMix was out of touch the state display says so and for how long, until the next action. After every start of the hardware link, a restart by itself, `Restart the hardware link…` and a database restore included, a Console that was `VERIFIED` or `ASSUMED` reads `ASSUMED` until the first Sync or load, as TotalMix may have changed meanwhile; its meters wait until then.
 
 ## Teleprompter
 
@@ -176,7 +179,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 
 **Recent actions** lists the last eight actions that changed what a device receives, and who did each: `Screen`, `Stream Deck`, `Console` (a switch thrown at TotalMix) or `Start-up`. Faders and dials are not listed.
 
-**`Restart the hardware link…`** asks first. The link and the deck drop for a few seconds; TotalMix and the lights keep their state.
+**`Restart the hardware link…`** asks first. The link and the deck drop for a few seconds; TotalMix and the lights keep their state, and the Console reads `ASSUMED` until `Sync from TotalMix`.
 
 ## When something goes wrong
 
@@ -202,7 +205,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | Wrong display                | It opened where it was last | `Reset the window layout`             |
 | Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
 
-The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, which takes the newest database backup, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs held.
+The hardware link restarts by itself after a stop, three times in five minutes; the Console then reads `ASSUMED` until `Sync from TotalMix`. At the recovery screen only a database backup restores: `Restore latest`, which takes the newest database backup, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs held.
 
 Closing asks first. It resets and recalls nothing: TotalMix keeps its state, the light output stops and the fixtures hold their last levels.
 

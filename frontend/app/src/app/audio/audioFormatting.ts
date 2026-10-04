@@ -239,6 +239,12 @@ function formatAudioActionFailureTitle(snapshot: AudioSnapshot | null) {
     .trim();
 }
 
+// The hardware link's codes whose sentence says why the desk is assumed:
+// TotalMix was out of touch on remote 4, or the desk has not been read since
+// Studio Control started. (The unconfirmed changes' sentence names TotalMix's
+// own channel numbers, so the general one stands for it.)
+const ASSUMED_REASON_CODES = new Set(["AUDIO_CONSOLE_OUT_OF_TOUCH", "AUDIO_CONSOLE_UNREAD_SINCE_START"]);
+
 export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatusDescriptor {
   const lastActionFailed = String(snapshot?.lastActionStatus ?? "idle") === "failed";
   const meteringSource = String(snapshot?.meteringSource ?? snapshot?.adapterMode ?? "").toLowerCase();
@@ -270,14 +276,21 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.status ?? "not-verified") === "attention") {
+    // An assumed desk's sentence asks for a Sync, which an unreachable desk
+    // refuses: it is not this state's sentence.
+    const unreachableMessage =
+      typeof snapshot?.lastActionMessage === "string" &&
+      snapshot.lastActionMessage.trim().length > 0 &&
+      !ASSUMED_REASON_CODES.has(String(snapshot?.lastActionCode ?? ""))
+        ? snapshot.lastActionMessage
+        : null;
     return {
       bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
       warningBody:
-        typeof snapshot?.lastActionMessage === "string" && snapshot.lastActionMessage.trim().length > 0
-          ? snapshot.lastActionMessage
-          : "Audio may still pass, but the app cannot see or change the desk right now. Run the audio probe to check the link.",
+        unreachableMessage ??
+        "Audio may still pass, but the app cannot see or change the desk right now. Run the audio probe to check the link.",
       warningCode: null,
       warningTitle: "CONSOLE UNREACHABLE",
     };
@@ -323,11 +336,22 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.consoleStateConfidence ?? "unknown") === "assumed") {
+    // 2026-10-01 (the walk): when the hardware link says the desk is assumed
+    // because TotalMix was out of touch, or (2026-10-02) because it has not
+    // been read since the start, its sentence is the one shown.
+    const reason =
+      lastActionFailed &&
+      ASSUMED_REASON_CODES.has(String(snapshot?.lastActionCode ?? "")) &&
+      typeof snapshot?.lastActionMessage === "string" &&
+      snapshot.lastActionMessage.trim().length > 0
+        ? snapshot.lastActionMessage
+        : null;
     return {
       bannerEligible: true,
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
       warningBody:
+        reason ??
         "Showing the last state the desk confirmed. Press Sync from TotalMix to pull the current state before trusting the faders.",
       warningCode: null,
       warningTitle: "STATE ASSUMED",

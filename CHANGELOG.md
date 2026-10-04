@@ -8,6 +8,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- After every start the Console reads `ASSUMED` until `Sync from TotalMix`, as TotalMix may have changed while the app was closed; it read `VERIFIED` from before (#284).
+- After TotalMix has been out of touch (its remote 4 switched off, or TotalMix closed), the Console reads `ASSUMED` once TotalMix answers again, says for how long, and asks for `Sync from TotalMix`; it read `VERIFIED` with values TotalMix no longer held (#284).
 - The plate's equaliser and Low Cut leave the Console: they went to TotalMix over its old page-2 commands, whose on/off only flipped TotalMix's switch, which could land on another mic, and which nothing read back. Set the EQ in TotalMix. The plate is now the preamp, the other mixes and the meter (#302).
 - The plate's dynamics leave the Console: the compressor and the gate were only kept by the app and never reached TotalMix, whose dynamics are one compressor and expander per input (#301).
 - The sends' modes leave the Console: Pre fader, Mute send, Link L+R and Solo send were only kept by the app and never reached TotalMix, which has none of them per send. A strip's `S` is unchanged (#300).
@@ -121,6 +123,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Fixed
 
+- A channel name with a letter beyond ASCII (`ö`) shows on the Console, and that channel's mute, gain and other values arrive with it; such a name lost the channel's whole report (#284).
+- The daily database backup is written a day after the last one; every start of the app wrote one more, so restarts pushed older days out of the 14 kept (#284).
 - A Stream Deck key is answered before the displays the deck asked for just before it, and sixteen places are kept for keys when the deck's link is busy. `engine.log` gets a line a minute about the deck's link while the prompter plays, or when the link was slow or busy (#291).
 - `shell.log` names every screen's refresh rate, also when one changes, and warns when a screen runs below 50 Hz: a copy of the main screen at 30 Hz made the prompter's text scroll unevenly (#292).
 - The prompter's text no longer steps back when a press and the glass's own read cross, or after the hardware link restarts: the glass and the Teleprompter's copy draw only the newest place, and glide over a small correction (#289, #290).
