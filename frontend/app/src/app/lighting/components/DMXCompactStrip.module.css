@@ -1,7 +1,9 @@
+/* The compact DMX strip (the page ⋯'s "DMX strip"): over the plot well's foot,
+   on the design system's tokens. */
+
 .shell {
   align-items: center;
-  background: var(--color-bg-deep);
-  border-top: 1px solid var(--color-bg-stroke);
+  background: var(--material-well);
   display: flex;
   flex-shrink: 0;
   gap: 8px;
@@ -11,42 +13,37 @@
 }
 
 .label {
-  color: var(--color-brand-text-muted);
+  color: var(--text-text3);
   flex-shrink: 0;
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .label strong {
-  color: var(--color-brand-text-primary);
-  font-weight: 700;
+  color: var(--text-text);
+  font-weight: var(--font-weight-bold);
 }
 
 .count {
-  color: var(--color-brand-text-secondary);
+  color: var(--text-text2);
   margin-left: 4px;
 }
 
 .stale {
-  color: var(--color-brand-yellow);
+  color: var(--role-yellow-text);
 }
 
 .empty {
-  color: var(--color-brand-text-muted);
+  color: var(--text-text3);
   flex: 1 1 auto;
-  font-family: var(--font-family-ui);
-  font-size: var(--font-size-tick);
-  font-style: italic;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
   text-align: center;
 }
 
 .canvas {
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
+  background: var(--material-key);
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
   cursor: pointer;
   display: block;
   flex: 1 1 0;
@@ -56,82 +53,70 @@
 }
 
 .canvas:hover {
-  border-color: var(--color-bg-border);
+  border-color: var(--material-line2);
 }
 
 .expandButton,
 .closeButton {
   appearance: none;
   align-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-ctl);
-  color: var(--color-brand-text-muted);
+  background: var(--material-well);
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  color: var(--text-text2);
   cursor: pointer;
   display: inline-flex;
   flex-shrink: 0;
-  height: 22px;
+  height: 28px;
   justify-content: center;
   padding: 0;
-  transition:
-    background var(--motion-duration-exit) ease,
-    color var(--motion-duration-exit) ease,
-    border-color var(--motion-duration-exit) ease;
-  width: 22px;
+  width: 28px;
 }
 
 .expandButton:hover,
 .closeButton:hover {
-  background: var(--color-bg-strong);
-  border-color: var(--color-bg-stroke);
-  color: var(--color-brand-text-primary);
+  background: var(--material-hover);
+  color: var(--text-text);
 }
 
 .expandButton:focus-visible,
 .closeButton:focus-visible {
-  outline: 2px solid var(--color-brand-green);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Tooltip — fixed position over the strip; its anchor is the cursor x/y
-   so it tracks the hovered channel naturally. Z-index sits above the
-   strip but below dialogs / portals. */
+/* The hovered channel's note, at the pointer: a floating layer. */
 .tooltip {
-  background: var(--color-bg-deep);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  box-shadow: var(--shadow-md);
-  color: var(--color-brand-text-primary);
+  background: var(--material-raise);
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  box-shadow: var(--elevation-float);
+  color: var(--text-text);
   display: flex;
   flex-direction: column;
-  font-family: var(--font-family-ui);
-  font-size: var(--font-size-tick);
+  font: var(--font-weight-regular) var(--font-size-label) / 1.3 var(--font-family-ui);
   gap: 2px;
   padding: 6px 8px;
   pointer-events: none;
   position: fixed;
   white-space: nowrap;
-  z-index: 100;
+  z-index: var(--z-tooltip);
 }
 
 .tooltipChannel {
-  color: var(--color-brand-green);
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
+  color: var(--role-green-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .tooltipLight {
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
 }
 
 .tooltipLabel {
-  color: var(--color-brand-text-muted);
+  color: var(--text-text3);
 }
 
 .tooltipValue {
-  color: var(--color-brand-text-secondary);
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
+  color: var(--text-text2);
+  font-variant-numeric: tabular-nums;
 }

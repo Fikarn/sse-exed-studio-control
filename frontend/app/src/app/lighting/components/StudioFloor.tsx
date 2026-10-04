@@ -4,12 +4,14 @@ export interface StudioFloorProps {
   layout: StudioLayout;
 }
 
-const WALL_COLOR = "var(--color-studio-wall)";
-const WALL_STROKE = "var(--color-studio-wall-stroke)";
-const FLOOR_COLOR = "var(--color-bg-deep)";
-const TEXT_MUTED = "var(--color-brand-text-faint)";
-const ELEMENT_FILL = "var(--color-studio-element)";
-const ELEMENT_STROKE = "var(--color-studio-element-stroke)";
+// The visual overhaul's Lighting page (2026-10-04): the room in the plot's
+// neutral inks; the bench's and the cameras' names are drawn by the plot's
+// overlay at one size (`StagePlotOverlay`), not here in centimetres.
+const WALL_COLOR = "var(--material-line2)";
+const WALL_STROKE = "var(--text-text4)";
+const FLOOR_COLOR = "var(--material-floor)";
+const ELEMENT_FILL = "var(--material-key)";
+const ELEMENT_STROKE = "var(--material-line2)";
 
 export function StudioFloor({ layout }: StudioFloorProps) {
   const widthCm = layout.roomWidthMeters * 100;
@@ -18,7 +20,15 @@ export function StudioFloor({ layout }: StudioFloorProps) {
   return (
     <g aria-hidden="true">
       <rect x={0} y={0} width={widthCm} height={depthCm} style={{ fill: FLOOR_COLOR }} />
-      <rect x={0} y={0} width={widthCm} height={depthCm} fill="none" style={{ stroke: WALL_STROKE, strokeWidth: 2 }} />
+      <rect
+        x={0}
+        y={0}
+        width={widthCm}
+        height={depthCm}
+        fill="none"
+        vectorEffect="non-scaling-stroke"
+        style={{ stroke: WALL_STROKE, strokeWidth: 1 }}
+      />
       {layout.walls.backdrop ? (
         <rect x={0} y={0} width={widthCm} height={20} opacity={0.5} style={{ fill: WALL_COLOR }} />
       ) : null}
@@ -37,7 +47,7 @@ export function StudioFloor({ layout }: StudioFloorProps) {
               : 8
           }
           strokeDasharray="6 4"
-          style={{ fill: FLOOR_COLOR, stroke: "var(--color-stage-door-stroke)", strokeWidth: 1 }}
+          style={{ fill: FLOOR_COLOR, stroke: ELEMENT_STROKE, strokeWidth: 1 }}
         />
       ) : null}
       {layout.walls.controlBoothWindow ? (
@@ -65,15 +75,6 @@ export function StudioFloor({ layout }: StudioFloorProps) {
               transform={`translate(${element.xMeters * 100 - w / 2}, ${element.yMeters * 100 - d / 2})`}
             >
               <rect width={w} height={d} rx={4} style={{ fill: ELEMENT_FILL, stroke: ELEMENT_STROKE }} />
-              <text
-                x={w / 2}
-                y={d / 2 + 4}
-                fontSize={12}
-                textAnchor="middle"
-                style={{ fill: TEXT_MUTED, fontFamily: "var(--font-family-ui)" }}
-              >
-                {element.label}
-              </text>
             </g>
           );
         }
@@ -86,20 +87,8 @@ export function StudioFloor({ layout }: StudioFloorProps) {
         >
           <polygon
             points="-10,8 10,8 0,-12"
-            style={{
-              fill: "var(--color-studio-camera-fill)",
-              stroke: "var(--color-studio-camera-stroke)",
-              strokeWidth: 1,
-            }}
+            style={{ fill: ELEMENT_FILL, stroke: "var(--text-text3)", strokeWidth: 1 }}
           />
-          <text
-            y={20}
-            fontSize={12}
-            textAnchor="middle"
-            style={{ fill: TEXT_MUTED, fontFamily: "var(--font-family-ui)" }}
-          >
-            {camera.label}
-          </text>
         </g>
       ))}
     </g>

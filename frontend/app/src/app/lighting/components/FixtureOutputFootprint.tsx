@@ -121,7 +121,7 @@ export function FixtureOutputFootprint({
                   x2={x}
                   y1={34}
                   y2={rectHeight + 18}
-                  stroke="var(--color-brand-green)"
+                  stroke="var(--role-green-text)"
                   strokeWidth={0.7}
                 />
               );
@@ -138,8 +138,8 @@ export function FixtureOutputFootprint({
             letterSpacing={0}
             pointerEvents="none"
             style={{
-              fill: hasPhotometricSamples ? "var(--color-brand-green)" : "var(--color-brand-text-muted)",
-              fontFamily: "var(--font-family-mono)",
+              fill: hasPhotometricSamples ? "var(--role-green-text)" : "var(--text-text3)",
+              fontFamily: "var(--font-family-ui)",
             }}
           >
             {label}
@@ -187,7 +187,7 @@ export function FixtureOutputFootprint({
           x2={0}
           y1={0}
           y2={length}
-          stroke="var(--color-stage-beam-line)"
+          stroke="var(--text-text3)"
           strokeOpacity={renderMode === "rig" ? 0.28 : 0.5}
           strokeWidth={0.9}
         />
@@ -202,8 +202,8 @@ export function FixtureOutputFootprint({
           letterSpacing={0}
           pointerEvents="none"
           style={{
-            fill: hasPhotometricSamples ? "var(--color-brand-green)" : "var(--color-brand-text-muted)",
-            fontFamily: "var(--font-family-mono)",
+            fill: hasPhotometricSamples ? "var(--role-green-text)" : "var(--text-text3)",
+            fontFamily: "var(--font-family-ui)",
           }}
         >
           {label}

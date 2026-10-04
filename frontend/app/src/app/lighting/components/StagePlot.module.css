@@ -1,58 +1,57 @@
+/* The visual overhaul's Lighting page (2026-10-04): the plot is one flat well
+   (DESIGN.md §5), its rulers in bands along the top and the left edge, the
+   room in the rest. No gradient, no vignette: the light in the room is the
+   only colour on it, and PREVIEW is the well's blue keyline (the bay's). */
+
 .plotShell {
   position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: 24px minmax(0, 1fr);
   width: 100%;
   height: 100%;
-  background:
-    radial-gradient(circle at top, var(--color-brand-dark-green-ambient), transparent 55%), var(--color-bg-deep);
+  background: var(--material-well);
   overflow: hidden;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
 }
 
-.plotShell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 65%, var(--color-stage-vignette) 100%);
-  z-index: 1;
+.rulerTop {
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
 }
 
-.plotShellPatch {
-  /* Visual dimming is handled by .plotToneOverlay so patch entry avoids
-     animating a full-surface CSS filter over the SVG scene. */
+.rulerLeft {
+  grid-column: 1;
+  grid-row: 2;
+  overflow: hidden;
 }
 
-.plotShellPreview {
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--color-warning-500) 20%, transparent), transparent 50%),
-    radial-gradient(circle at top, var(--color-brand-dark-green-ambient), transparent 55%), var(--color-bg-deep);
+.ruler {
+  display: block;
+  overflow: visible;
 }
 
-.plotShellPreview::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: var(--color-warning-500);
-  box-shadow: var(--shadow-glow-amber);
-  pointer-events: none;
-  z-index: 3;
+.rulerMajor {
+  stroke: var(--text-text3);
+  stroke-width: 1;
 }
 
-.plotToneOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(180deg, var(--color-stage-tone-overlay-soft), var(--color-stage-tone-overlay-strong));
-  transition: opacity var(--motion-duration-normal) var(--motion-easing-standard);
+.rulerMinor {
+  stroke: var(--text-text4);
+  stroke-width: 1;
 }
 
-.plotShellPatch .plotToneOverlay {
-  opacity: 1;
+.rulerText {
+  fill: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
+}
+
+.plotArea {
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
 }
 
 .plotSvg {
@@ -60,9 +59,7 @@
   height: 100%;
   display: block;
   position: relative;
-  z-index: 0;
-  /* Default cursor: crosshair signals "drag to marquee-select". Pan moved to
-     middle-mouse-button in Wave 26 so the grab affordance no longer applies. */
+  /* Crosshair: drag to select with a box. Pan is the middle button. */
   cursor: crosshair;
   touch-action: none;
 }
@@ -75,49 +72,80 @@
   cursor: crosshair;
 }
 
+/* The names, in the screen's pixels over the picture (`StagePlotOverlay`). */
+.labels {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.label,
+.labelStrong,
+.labelFixed,
+.labelDetail {
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-tick);
+  paint-order: stroke;
+  stroke: var(--material-well);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.label {
+  font-weight: var(--font-weight-regular);
+  fill: var(--text-text2);
+}
+
+.labelStrong {
+  font-weight: var(--font-weight-bold);
+  fill: var(--text-text);
+}
+
+.labelFixed {
+  font-weight: var(--font-weight-regular);
+  fill: var(--text-text3);
+}
+
+.labelDetail {
+  font-weight: var(--font-weight-regular);
+  fill: var(--text-text2);
+}
+
+.leader {
+  stroke: var(--text-text3);
+  stroke-width: 1;
+}
+
+.leaderDot {
+  fill: var(--text-text3);
+}
+
 .plotEmpty {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   pointer-events: none;
-  z-index: 3;
 }
 
 .plotEmpty > * {
   pointer-events: auto;
-  max-width: 320px;
-  /* Slice 9 (system §5): a plate at the drawer's level, not glass. */
-  background: var(--elevation-plate-fill);
-  box-shadow: var(--elevation-plate), var(--elevation-float);
-  border-radius: var(--radius-key);
 }
 
-/* Slot positioning for the design-system PlotPill primitive (top-left). */
-.plotPillSlot {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  z-index: 2;
-  pointer-events: none;
-  transform: translateX(-50%);
+.plotEmptyTitle {
+  margin: 0;
+  font: var(--font-weight-bold) var(--font-size-word) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
 }
 
-.plotPillLabel {
-  font-family: var(--font-family-mono);
-  /* LGS-07 — scale with operator density like the adjacent StagePlotControls
-     (was a fixed 10px; --operator-font-size-xs carries --operator-ui-scale-factor). */
-  font-size: var(--operator-font-size-xs, var(--font-size-tick));
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-}
-
-.plotPillName {
-  font-family: var(--font-family-ui);
-  font-weight: 700;
-  font-size: var(--operator-font-size-lg, 13px);
+.plotEmptyText {
+  margin: 0;
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text3);
 }
 
 .liveGhostLayer {
@@ -126,21 +154,8 @@
 
 .liveGhostShape {
   fill: none;
-  stroke: var(--color-brand-text-secondary);
+  stroke: var(--text-text2);
   stroke-width: 1.4;
   stroke-dasharray: 4 3;
   vector-effect: non-scaling-stroke;
-}
-
-/* Slot positioning for the design-system PlotMeta column (top-right). */
-.plotOverlaysSlot {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  pointer-events: none;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
 }

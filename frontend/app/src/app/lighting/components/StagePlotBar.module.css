@@ -1,0 +1,136 @@
+/* The visual overhaul's Lighting page (2026-10-04): the bar under the plot,
+   56 px, always there, so the plot never changes height. Groups of keys on
+   one line; the selection takes the room the others leave. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: none;
+  height: 56px;
+  min-width: 0;
+}
+
+.selection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.summary {
+  flex: none;
+  font: var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+.summary strong {
+  color: var(--text-text);
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  background: var(--material-key);
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.chipLamp {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.chipName {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipRemove {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-base);
+  background: var(--material-key);
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-ui);
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  background: var(--material-hover);
+  color: var(--text-text);
+}
+
+.chipRemove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.more,
+.moreAnchor {
+  display: inline-flex;
+  flex: none;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.view {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.zoom {
+  min-width: 56px;
+  text-align: center;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text2);
+}
+
+.views {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+/* An empty view reads quieter than a saved one; a press on it does nothing. */
+.emptyView {
+  border-style: dashed;
+  color: var(--text-text3);
+  cursor: default;
+}

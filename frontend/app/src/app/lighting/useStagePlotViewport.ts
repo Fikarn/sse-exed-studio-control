@@ -11,7 +11,10 @@ const CLICK_PX_THRESHOLD = 4;
 // localStorage. Empty slots stay null so consumers can render a "save" hint.
 // Animation easing matches `reset()` so recall feels familiar.
 export const VIEW_BOOKMARK_SLOT_COUNT = 3;
-const BOOKMARK_STORAGE_KEY = "app.lighting.stagePlotViewBookmarks";
+// The visual overhaul (2026-10-04): the plot's picture lost the 56 cm strip
+// over the room that held the labels, so a view saved before would land 56 cm
+// off; the saved views start again under a new name.
+const BOOKMARK_STORAGE_KEY = "app.lighting.stagePlotViews.2026-10";
 const BOOKMARK_ANIMATION_MS = 200;
 
 interface ViewportState {
@@ -21,9 +24,12 @@ interface ViewportState {
   zoomMode: StagePlotZoomMode;
 }
 
-export type StagePlotZoomMode = "fitRoom" | "fillDesk" | "actual" | "fitContent";
+/** Frame the rig, or fit the room. "Fill screen" (which stretched the room out
+ *  of shape) and "100 %" (the room fitted, as Fit room) went with the visual
+ *  overhaul (2026-10-04); a mode stored as either reads as Fit room. */
+export type StagePlotZoomMode = "fitRoom" | "fitContent";
 
-const IDENTITY: ViewportState = { zoom: 1, panX: 0, panY: 0, zoomMode: "fillDesk" };
+const IDENTITY: ViewportState = { zoom: 1, panX: 0, panY: 0, zoomMode: "fitRoom" };
 
 // DENSITY-04/LIG-02 ("frame to populated bounds"): the `fitContent` mode frames
 // the actual rig (fixtures + talent marks + set) instead of the full empty room.
@@ -102,6 +108,10 @@ export interface StagePlotViewport {
   svgRef: RefObject<SVGSVGElement | null>;
   transform: string;
   zoom: number;
+  /** The pan in the picture's units (cm), for the overlay that draws the
+   *  rulers and the names in the screen's pixels. */
+  panX: number;
+  panY: number;
   zoomMode: StagePlotZoomMode;
   isPanning: boolean;
   onPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
@@ -112,8 +122,6 @@ export interface StagePlotViewport {
   zoomOut: () => void;
   reset: () => void;
   fitRoom: () => void;
-  fillDesk: () => void;
-  actualSize: () => void;
   /** DENSITY-04 — frame the populated rig. Pass the precomputed fit transform
    *  (see `computeContentFitTransform`); animates to it + persists the mode. */
   fitContent: (target: StagePlotFitTransform) => void;
@@ -154,7 +162,7 @@ function readBookmarks(): ViewBookmarks {
       const panX = typeof candidate.panX === "number" ? candidate.panX : null;
       const panY = typeof candidate.panY === "number" ? candidate.panY : null;
       if (zoom === null || panX === null || panY === null) return null;
-      const zoomMode = isStagePlotZoomMode(candidate.zoomMode) ? candidate.zoomMode : "fillDesk";
+      const zoomMode = isStagePlotZoomMode(candidate.zoomMode) ? candidate.zoomMode : "fitRoom";
       // Defensive clamp so a corrupted blob can't drive the viewport out of bounds.
       const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
       return { zoom: clampedZoom, panX, panY, zoomMode };
@@ -176,7 +184,7 @@ function writeBookmarks(next: ViewBookmarks): void {
 const EMPTY_BOOKMARKS: ViewBookmarks = Object.freeze([null, null, null]);
 
 function isStagePlotZoomMode(value: unknown): value is StagePlotZoomMode {
-  return value === "fitRoom" || value === "fillDesk" || value === "actual" || value === "fitContent";
+  return value === "fitRoom" || value === "fitContent";
 }
 
 function zoomModeStorageKey(scope: string) {
@@ -199,7 +207,7 @@ function writeStoredZoomMode(scope: string, mode: StagePlotZoomMode): void {
 }
 
 export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}): StagePlotViewport {
-  const { defaultZoomMode = "fillDesk", onBackgroundClick, storageScope = "default" } = options;
+  const { defaultZoomMode = "fitRoom", onBackgroundClick, storageScope = "default" } = options;
   const svgRef = useRef<SVGSVGElement | null>(null);
   const initialState = { ...IDENTITY, zoomMode: readStoredZoomMode(storageScope, defaultZoomMode) };
   const [state, setState] = useState<ViewportState>(initialState);
@@ -401,8 +409,6 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   );
 
   const fitRoom = useCallback(() => setZoomMode("fitRoom"), [setZoomMode]);
-  const fillDesk = useCallback(() => setZoomMode("fillDesk"), [setZoomMode]);
-  const actualSize = useCallback(() => setZoomMode("actual"), [setZoomMode]);
 
   // fitContent cannot reuse setZoomMode (which always animates to IDENTITY) — the
   // consumer (StagePlot, which owns the rig geometry + room dims) computes the fit
@@ -457,6 +463,8 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     svgRef,
     transform: `translate(${state.panX} ${state.panY}) scale(${state.zoom})`,
     zoom: state.zoom,
+    panX: state.panX,
+    panY: state.panY,
     zoomMode: state.zoomMode,
     isPanning,
     onPointerDown,
@@ -467,8 +475,6 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     zoomOut,
     reset,
     fitRoom,
-    fillDesk,
-    actualSize,
     fitContent,
     viewBookmarks,
     saveViewBookmark,

@@ -6,10 +6,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Pencil, Sparkles, Trash2 } from "lucide-react";
-
-import { ContextMenu, type ContextMenuItem } from "@sse/design-system";
-
 import type { FixtureMounting } from "../fixtureMounting";
 import type { FixtureVisualModel, StagePlotRenderMode } from "../fixtureVisuals";
 import { lightingFixtureColor } from "../lightingHelpers";
@@ -61,13 +57,9 @@ export interface FixtureMarkerProps {
   onPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
   /** Optional commit callback when the selected marker's rotate handle is dragged. */
   onRotationCommit?: (id: string, rotationDegrees: number) => void;
-  /** Right-click "Rename" — selects the fixture for inspection and triggers
-   *  the inspector's inline rename. Parent owns the signal plumbing. */
-  onRequestRename?: (id: string) => void;
-  /** Right-click "Identify" — fires an identify burst on the fixture. */
-  onIdentify?: (id: string, name: string) => void;
-  /** Right-click "Delete" — parent shows the confirm dialog. */
-  onRequestDelete?: (id: string, name: string) => void;
+  /** A right-click on the marker: the plot opens the fixture's menu (the
+   *  shared builder, the same as the plate title's ⋯) at the pointer. */
+  onOpenMenu?: (id: string, at: { x: number; y: number }) => void;
   /** Live drag callback for the parent's smart-guide layer. Fires on every
    *  pointermove past the click threshold with the in-flight (xMeters, yMeters)
    *  in studio coordinates. */
@@ -89,22 +81,14 @@ export interface FixtureMarkerProps {
 const BAR_WIDTH = 4;
 const BAR_HEIGHT = 24;
 
-const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
-const SELECTED_STROKE = "var(--color-brand-green)";
-const HIGHLIGHT_OVERLAY_STROKE = "var(--color-warning-500)";
-const GHOST_STROKE = "var(--color-fixture-ghost-stroke)";
-
-// Visual overhaul A, Slice 10 (system §5, §10): the plot is a well — black and
-// backlit in every theme — so its labels take the display inks, not the theme's
-// plate inks (Bone's muted ink read 1.7:1 on the plot floor). A label also
-// falls across whatever the rig is making, and a beam pool is any colour at
-// all, so each label sits on a chip of the plot's own floor. That is what
-// makes a fixture name readable over a lit pool instead of readable only over
-// the floor.
-const LABEL_NAME_FILL = "var(--display-text)";
-const LABEL_META_FILL = "var(--display-text2)";
-// JetBrains Mono advances 0.6 em, so a chip's width follows from the string.
-const labelChipWidth = (text: string, fontSize: number) => text.length * fontSize * 0.6 + 10;
+// The visual overhaul's Lighting page (2026-10-04): selection is the Beige
+// keyline (DESIGN.md §4), a Highlight or a Solo latched on the fixture is
+// Yellow, and the marker draws no name: the plot's overlay sets every name at
+// one size whatever the zoom (`StagePlotOverlay`).
+const SHELL_STROKE = "var(--text-text3)";
+const SELECTED_STROKE = "var(--accent)";
+const HIGHLIGHT_OVERLAY_STROKE = "var(--role-yellow-line)";
+const GHOST_STROKE = "var(--text-text3)";
 
 const MOUNTING_SHORT_LABEL: Record<FixtureMounting, string> = {
   bar: "bar",
@@ -167,15 +151,12 @@ export function FixtureMarker({
   onSelect,
   onPositionCommit,
   onRotationCommit,
-  onRequestRename,
-  onIdentify,
-  onRequestDelete,
+  onOpenMenu,
   onDragMove,
   onDragEnd,
   onRotationMove,
   onRotationEnd,
 }: FixtureMarkerProps) {
-  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const color = lightingFixtureColor(cct, on);
   const dotOpacity = on ? Math.max(0.3, intensity / 100) : 0.18;
 
@@ -200,16 +181,6 @@ export function FixtureMarker({
   // try/catch fallback for older engines. Retained intentionally per
   // audit-fix-plan #29 / Wave 21 finding #30.
   const [keyboardFocused, setKeyboardFocused] = useState(false);
-
-  // Per the v6 prototype: name + meta lines sit above the marker, not rotated
-  // with the fixture body. Uppercase styling lives in CSS so the aria-label
-  // can reuse the original mixed-case name for screen readers (closes #35).
-  const displayName = name.length > 18 ? `${name.slice(0, 17)}…` : name;
-  const intensityLabel = on ? `${Math.round(intensity)} %` : "OFF";
-  const metaLabel = `${intensityLabel} · ${Math.round(cct)} K · ${MOUNTING_SHORT_LABEL[mounting]}`;
-
-  const nameOffsetY = -Math.max(16, visual.body.height / 2 + 14);
-  const metaOffsetY = nameOffsetY - 14;
 
   const draggable = Boolean(onPositionCommit);
   const renderX = ghost?.x ?? centerX;
@@ -482,8 +453,6 @@ export function FixtureMarker({
 
   const intensityWord = on ? `${Math.round(intensity)} percent` : "off";
   const ariaLabel = `Fixture ${name}, ${intensityWord}, ${Math.round(cct)} kelvin, ${MOUNTING_SHORT_LABEL[mounting]} mount, ${roundedDegrees(rotationDegrees)} degrees`;
-  const labelVisible =
-    selected || pointerHovered || keyboardFocused || identifying || highlightOverlay || chipHovered || ghost !== null;
 
   // Enter or Space presses the focused marker, as a click does (D6).
   const handleKeyDown = (event: ReactKeyboardEvent<SVGGElement>) => {
@@ -493,39 +462,14 @@ export function FixtureMarker({
     }
   };
 
+  // A right-click opens the fixture's menu, and only it: the plot's own menu
+  // (its background's) does not open under it.
   const handleContextMenu = (event: ReactMouseEvent<SVGGElement>) => {
-    if (!onRequestRename && !onIdentify && !onRequestDelete) return;
+    if (!onOpenMenu) return;
     event.preventDefault();
     event.stopPropagation();
-    setMenuPos({ x: event.clientX, y: event.clientY });
+    onOpenMenu(id, { x: event.clientX, y: event.clientY });
   };
-
-  const menuItems: ContextMenuItem[] = [];
-  if (onRequestRename) {
-    menuItems.push({
-      id: "rename",
-      label: "Rename",
-      icon: Pencil,
-      onSelect: () => onRequestRename(id),
-    });
-  }
-  if (onIdentify) {
-    menuItems.push({
-      id: "identify",
-      label: "Identify (1.2 s burst)",
-      icon: Sparkles,
-      onSelect: () => onIdentify(id, name),
-    });
-  }
-  if (onRequestDelete) {
-    menuItems.push({
-      id: "delete",
-      label: "Delete fixture…",
-      icon: Trash2,
-      tone: "danger",
-      onSelect: () => onRequestDelete(id, name),
-    });
-  }
 
   return (
     <>
@@ -571,10 +515,7 @@ export function FixtureMarker({
             />
           </g>
         ) : null}
-        <g
-          transform={`translate(${renderX}, ${renderY}) rotate(${rotationRenderDegrees})`}
-          filter="url(#sse-fixture-shadow)"
-        >
+        <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationRenderDegrees})`} data-marker-body="">
           <rect
             x={-hitWidth / 2}
             y={-hitHeight / 2}
@@ -590,8 +531,8 @@ export function FixtureMarker({
             <circle
               r={ringRadius(visual, 4)}
               fill="none"
-              strokeDasharray="4 3"
-              style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
+              vectorEffect="non-scaling-stroke"
+              style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
             />
           ) : null}
           {/* Wave 29 — Highlight / Solo target ring. Sustained (not
@@ -626,7 +567,7 @@ export function FixtureMarker({
               cx={0}
               cy={-rotateHandleRadius}
               r={5}
-              fill="var(--color-bg-canvas)"
+              fill="var(--material-well)"
               pointerEvents="all"
               style={{ stroke: SELECTED_STROKE, strokeWidth: 1.4 }}
             />
@@ -663,7 +604,7 @@ export function FixtureMarker({
             width={BAR_WIDTH}
             height={BAR_HEIGHT}
             rx={1.2}
-            style={{ fill: "var(--color-bg-soft)", stroke: SHELL_STROKE, strokeWidth: 0.6 }}
+            style={{ fill: "var(--material-key)", stroke: SHELL_STROKE, strokeWidth: 0.6 }}
             opacity={0.65}
           />
           {intensityBarFillFrac > 0 ? (
@@ -724,53 +665,6 @@ export function FixtureMarker({
             <animate attributeName="opacity" values="1;0.3;1" dur="0.4s" repeatCount="3" />
           </circle>
         ) : null}
-        {labelVisible ? (
-          <>
-            <rect
-              x={renderX - labelChipWidth(displayName, 12) / 2}
-              y={renderY + nameOffsetY - 11}
-              width={labelChipWidth(displayName, 12)}
-              height={15}
-              rx={4}
-              fill="var(--material-well)"
-              fillOpacity={0.86}
-              pointerEvents="none"
-            />
-            <text
-              x={renderX}
-              y={renderY + nameOffsetY}
-              textAnchor="middle"
-              fontSize={12}
-              fontWeight={700}
-              letterSpacing={0}
-              pointerEvents="none"
-              style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
-            >
-              {displayName}
-            </text>
-            <rect
-              x={renderX - labelChipWidth(metaLabel, 12) / 2}
-              y={renderY + metaOffsetY - 11}
-              width={labelChipWidth(metaLabel, 12)}
-              height={15}
-              rx={4}
-              fill="var(--material-well)"
-              fillOpacity={0.86}
-              pointerEvents="none"
-            />
-            <text
-              x={renderX}
-              y={renderY + metaOffsetY}
-              textAnchor="middle"
-              fontSize={12}
-              letterSpacing={0}
-              pointerEvents="none"
-              style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
-            >
-              {metaLabel}
-            </text>
-          </>
-        ) : null}
         {/* F4 — live position chip during drag. Renders the in-flight meters
             offset down-right from the ghost so it follows the cursor without
             occluding the marker. Sits inside the rotated viewport <g> so
@@ -783,7 +677,7 @@ export function FixtureMarker({
               width={70}
               height={18}
               rx={3}
-              style={{ fill: "var(--color-bg-canvas)", stroke: SELECTED_STROKE, strokeWidth: 0.8 }}
+              style={{ fill: "var(--material-well)", stroke: SELECTED_STROKE, strokeWidth: 0.8 }}
             />
             <text
               x={ghost.x + 47}
@@ -791,7 +685,7 @@ export function FixtureMarker({
               textAnchor="middle"
               fontSize={12}
               fontWeight={700}
-              style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
+              style={{ fill: "var(--text-text)", fontFamily: "var(--font-family-ui)" }}
             >
               {(ghost.x / 100).toFixed(1)} m, {(ghost.y / 100).toFixed(1)} m
             </text>
@@ -805,7 +699,7 @@ export function FixtureMarker({
               width={42}
               height={18}
               rx={3}
-              style={{ fill: "var(--color-bg-canvas)", stroke: SELECTED_STROKE, strokeWidth: 0.8 }}
+              style={{ fill: "var(--material-well)", stroke: SELECTED_STROKE, strokeWidth: 0.8 }}
             />
             <text
               x={renderX + 33}
@@ -813,22 +707,13 @@ export function FixtureMarker({
               textAnchor="middle"
               fontSize={12}
               fontWeight={700}
-              style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
+              style={{ fill: "var(--text-text)", fontFamily: "var(--font-family-ui)" }}
             >
               {roundedDegrees(rotationGhost)}°
             </text>
           </g>
         ) : null}
       </g>
-      {menuPos && menuItems.length > 0 ? (
-        <ContextMenu
-          x={menuPos.x}
-          y={menuPos.y}
-          items={menuItems}
-          onClose={() => setMenuPos(null)}
-          ariaLabel={`Fixture ${name} actions`}
-        />
-      ) : null}
     </>
   );
 }
