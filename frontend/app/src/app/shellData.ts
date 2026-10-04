@@ -1,6 +1,5 @@
 import type {
   AudioChannelSnapshot,
-  AudioDynamicsSnapshot,
   AudioEqSnapshot,
   AudioConsoleSnapshotSlot,
   AudioMixTargetSnapshot,
@@ -153,7 +152,6 @@ export interface AudioChannelEntry {
   solo: boolean;
   stereo: boolean;
   eq: AudioEqSnapshot;
-  dynamics: AudioDynamicsSnapshot;
 }
 
 export interface AudioMixTargetEntry {
@@ -430,7 +428,6 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
     solo: c.solo,
     stereo: c.stereo,
     eq: c.eq,
-    dynamics: c.dynamics,
   }));
 }
 

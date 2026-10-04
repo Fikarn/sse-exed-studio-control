@@ -69,8 +69,8 @@ export async function expectAudioInspectorPanelsFit(page: Page) {
 
   // The visual overhaul's Console pull request. Old: a plate taller than its
   // column passed when it could scroll. New: the plate fits its 1320 px and
-  // never scrolls. Reason: DESIGN.md §1, nothing scrolls; the plate's EQ and
-  // dynamics are tables with their editing in popovers now.
+  // never scrolls. Reason: DESIGN.md §1, nothing scrolls; the plate's EQ is a
+  // table with its editing in popovers now.
   expect(
     metrics.scrollHeight <= metrics.clientHeight + 1,
     `the plate scrolls or clips (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
@@ -117,7 +117,7 @@ export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx 
 // `audio-plate-section-`.
 export async function revealPlateSection(
   page: Page,
-  section: "preamp" | "send" | "eq" | "dynamics" | "meter" | "channel" | "output"
+  section: "preamp" | "send" | "eq" | "meter" | "channel" | "output"
 ) {
   const target = page.locator(`[data-plate-section="${section}"]`);
   await expect(target).toBeAttached();

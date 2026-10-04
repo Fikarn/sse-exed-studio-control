@@ -49,7 +49,6 @@ declare global {
 }
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[0];
 type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 type AudioSettingsUpdate = Parameters<ShellStore["updateAudioSettings"]>[0];
@@ -300,12 +299,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
-  const updateChannelDynamics = useLiveCallback((request: AudioDynamicsUpdate) => {
-    void performAction(`audio-channel-dynamics-${request.channelId}`, async () => {
-      await store.updateAudioChannelDynamics(request);
-    });
-  });
-
   const updateMixTarget = useLiveCallback((request: AudioMixTargetUpdate) => {
     void performAction(`audio-output-${request.mixTargetId}`, async () => {
       await store.updateAudioMixTarget(request);
@@ -435,7 +428,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
             onTogglePeakHold={togglePeakHold}
             onTogglePhantom={togglePhantom}
             onUpdateChannel={updateChannel}
-            onUpdateChannelDynamics={updateChannelDynamics}
             onUpdateChannelEq={updateChannelEq}
             onUpdateMixTarget={updateMixTarget}
             peakHoldEnabled={peakHoldEnabled}
