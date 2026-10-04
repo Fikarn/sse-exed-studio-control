@@ -336,8 +336,6 @@ export function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
     const mixTargetId = asString(mixTarget.id);
     for (const channel of channels) {
       if (asBoolean(channel.mute, false)) continue;
-      const sendMode = asRecord(asRecord(channel.sendModes)?.[mixTargetId]);
-      if (asBoolean(sendMode?.mute, false)) continue;
       const mixLevels = asRecord(channel.mixLevels) ?? {};
       const sendLevel = clampNumber(asNumber(mixLevels[mixTargetId], asNumber(channel.fader, 0)), 0, 1);
       if (sendLevel <= 0.01) continue;

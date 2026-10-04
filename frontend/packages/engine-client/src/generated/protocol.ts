@@ -8,7 +8,6 @@ export const REQUEST_METHODS = [
   "audio.channel.update",
   "audio.channel.dynamics.update",
   "audio.channel.eq.update",
-  "audio.channel.send.update",
   "audio.clip.clear",
   "audio.mixTarget.update",
   "audio.settings.update",

@@ -16,7 +16,6 @@ import type { MutableFixtureState } from "./state";
 export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "audio.channel.dynamics.update",
   "audio.channel.eq.update",
-  "audio.channel.send.update",
   "audio.channel.update",
   "audio.mixTarget.update",
   "audio.settings.update",
@@ -300,21 +299,6 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
       return enabled === null
         ? []
         : [audio("dynamics", name, `Dynamics (${text(params, ["section"]) ?? "section"}) ${onOff(enabled)}: ${name}`)];
-    }
-    case "audio.channel.send.update": {
-      const name = text(result, ["name"]) ?? "Channel";
-      const output = text(params, ["mixTargetId"]) ?? "output";
-      return (
-        [
-          ["mute", "send-mute", "Send mute"],
-          ["solo", "send-solo", "Send solo"],
-          ["preFader", "send-pre-fader", "Send pre-fader"],
-          ["linkStereo", "send-link", "Send stereo link"],
-        ] as const
-      ).flatMap(([key, action, label]) => {
-        const on = flag(params, key);
-        return on === null ? [] : [audio(action, name, `${label} ${onOff(on)}: ${name} to ${output}`)];
-      });
     }
     case "audio.snapshot.load": {
       // A slot TotalMix saved no name for is named by its number; the rows never say "snapshot".

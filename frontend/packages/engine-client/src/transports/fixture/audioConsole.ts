@@ -106,14 +106,6 @@ export function buildAudioDynamics() {
   };
 }
 
-export function buildAudioSendModes() {
-  return {
-    "audio-mix-main": { preFader: false, mute: false, linkStereo: true, solo: false },
-    "audio-mix-phones-a": { preFader: false, mute: false, linkStereo: true, solo: false },
-    "audio-mix-phones-b": { preFader: false, mute: false, linkStereo: true, solo: false },
-  } satisfies JsonObject;
-}
-
 /** TotalMix's slots, `/snapshot/load/1` to `/snapshot/load/8` (`SNAPSHOT_SLOTS`). */
 export const CONSOLE_SNAPSHOT_SLOTS = 8;
 
@@ -221,7 +213,6 @@ export function buildAudioChannel(
     autoSet: options.autoSet === true,
     eq: buildAudioEq(),
     dynamics: buildAudioDynamics(),
-    sendModes: buildAudioSendModes(),
   };
 }
 

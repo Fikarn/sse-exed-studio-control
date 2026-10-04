@@ -167,12 +167,6 @@ describe("the fixture double's action log", () => {
       [row("audio", "dynamics", "Host", "Dynamics (gate) on: Host")],
     ],
     [
-      "audio.channel.send.update",
-      { channelId: "audio-input-9", mixTargetId: "audio-mix-phones-a", mute: true },
-      { name: "Host" },
-      [row("audio", "send-mute", "Host", "Send mute on: Host to audio-mix-phones-a")],
-    ],
-    [
       "audio.snapshot.load",
       { slot: 2 },
       { loaded: true, slot: 2, name: "Interview" },

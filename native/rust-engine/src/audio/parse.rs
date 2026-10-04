@@ -269,32 +269,6 @@ pub fn parse_audio_dynamics_update_request(
     })
 }
 
-pub fn parse_audio_send_mode_update_request(
-    params: &Value,
-) -> Result<AudioSendModeUpdateRequest, String> {
-    let channel_id = required_trimmed_string(params, "channelId")?;
-    let mix_target_id = required_trimmed_string(params, "mixTargetId")?;
-    let pre_fader = optional_bool(params.get("preFader"), "preFader")?;
-    let mute = optional_bool(params.get("mute"), "mute")?;
-    let link_stereo = optional_bool(params.get("linkStereo"), "linkStereo")?;
-    let solo = optional_bool(params.get("solo"), "solo")?;
-
-    if pre_fader.is_none() && mute.is_none() && link_stereo.is_none() && solo.is_none() {
-        return Err(String::from(
-            "audio.channel.send.update requires one or more supported fields",
-        ));
-    }
-
-    Ok(AudioSendModeUpdateRequest {
-        channel_id,
-        mix_target_id,
-        pre_fader,
-        mute,
-        link_stereo,
-        solo,
-    })
-}
-
 pub(super) fn optional_level(
     value: Option<&Value>,
     field_name: &str,

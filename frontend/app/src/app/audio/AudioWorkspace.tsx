@@ -51,7 +51,6 @@ declare global {
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[0];
 type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
-type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 type AudioSettingsUpdate = Parameters<ShellStore["updateAudioSettings"]>[0];
 
@@ -307,12 +306,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
-  const updateChannelSendMode = useLiveCallback((request: AudioSendModeUpdate) => {
-    void performAction(`audio-channel-send-${request.channelId}-${request.mixTargetId}`, async () => {
-      await store.updateAudioChannelSendMode(request);
-    });
-  });
-
   const updateMixTarget = useLiveCallback((request: AudioMixTargetUpdate) => {
     void performAction(`audio-output-${request.mixTargetId}`, async () => {
       await store.updateAudioMixTarget(request);
@@ -444,7 +437,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
             onUpdateChannel={updateChannel}
             onUpdateChannelDynamics={updateChannelDynamics}
             onUpdateChannelEq={updateChannelEq}
-            onUpdateChannelSendMode={updateChannelSendMode}
             onUpdateMixTarget={updateMixTarget}
             peakHoldEnabled={peakHoldEnabled}
             peakHoldResetToken={peakHoldResetToken}
@@ -472,7 +464,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onSelectChannelGroup={selectChannelGroup}
           onTogglePhantom={togglePhantom}
           onUpdateChannel={updateChannel}
-          onUpdateChannelSendMode={updateChannelSendMode}
           setDraftValue={setDraftValue}
           viewModel={viewModel}
         />

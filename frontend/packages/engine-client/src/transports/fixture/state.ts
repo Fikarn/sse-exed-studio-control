@@ -18,7 +18,6 @@ import {
   buildDefaultAudioSnapshot,
   normalizeAudioEq,
   buildAudioDynamics,
-  buildAudioSendModes,
   normalizeConsoleSnapshots,
   refreshAudioCapabilities,
 } from "./audioConsole";
@@ -747,7 +746,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
       pad: false,
       eq: normalizeAudioEq(asRecord(channel.eq)),
       dynamics: asRecord(channel.dynamics) ?? buildAudioDynamics(),
-      sendModes: asRecord(channel.sendModes) ?? buildAudioSendModes(),
     }));
   audioSnapshotRecord.mixTargets = asArray(audioSnapshotRecord.mixTargets)
     .map((entry) => asRecord(entry))

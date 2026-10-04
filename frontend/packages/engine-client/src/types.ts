@@ -220,15 +220,6 @@ export interface AudioDynamicsUpdateRequest {
   makeupDb?: number;
 }
 
-export interface AudioSendModeUpdateRequest {
-  channelId: string;
-  mixTargetId: string;
-  preFader?: boolean;
-  mute?: boolean;
-  linkStereo?: boolean;
-  solo?: boolean;
-}
-
 export interface AudioMixTargetUpdateRequest {
   mixTargetId: string;
   volume?: number;
@@ -611,7 +602,6 @@ export interface ShellStore {
   updateAudioChannel(request: AudioChannelUpdateRequest): Promise<JsonValue>;
   updateAudioChannelEq(request: AudioEqUpdateRequest): Promise<JsonValue>;
   updateAudioChannelDynamics(request: AudioDynamicsUpdateRequest): Promise<JsonValue>;
-  updateAudioChannelSendMode(request: AudioSendModeUpdateRequest): Promise<JsonValue>;
   updateAudioMixTarget(request: AudioMixTargetUpdateRequest): Promise<JsonValue>;
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;

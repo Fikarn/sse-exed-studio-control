@@ -37,6 +37,37 @@ impl Drop for TestDir {
     }
 }
 
+// 2026-10-04 (the owner's decision): the per-send modes are gone. They were
+// kept in the channels' saved state (`sendModes`) and never reached TotalMix.
+// A channel map written with them still reads whole, every other field kept,
+// and the field is not written again.
+#[test]
+fn saved_channel_state_with_the_old_send_modes_still_reads() {
+    let mut settings = HashMap::new();
+    settings.insert(
+        String::from(AUDIO_CHANNEL_STATE_KEY),
+        String::from(
+            r#"{"audio-input-9":{"gain":41,"mute":true,"phantom":true,"mixLevels":{"audio-mix-main":0.5},"sendModes":{"audio-mix-main":{"preFader":true,"mute":true,"linkStereo":false,"solo":true}}}}"#,
+        ),
+    );
+
+    let snapshot = read_audio_snapshot(&settings);
+    let host = snapshot
+        .channels
+        .iter()
+        .find(|channel| channel.id == "audio-input-9")
+        .expect("the first front preamp");
+    assert_eq!(host.gain, 41, "the rest of the saved channel is read");
+    assert!(host.mute && host.phantom);
+
+    let stored = super::helpers::read_channel_state_map(&settings);
+    assert_eq!(stored["audio-input-9"].gain, 41);
+    let written = serde_json::to_string(&stored["audio-input-9"]).expect("the state serializes");
+    assert!(!written.contains("sendModes"), "{written}");
+    let served = serde_json::to_string(host).expect("the snapshot serializes");
+    assert!(!served.contains("sendModes"), "{served}");
+}
+
 // D26 (2026-09-28): talkback is gone, and what the build before wrote is still
 // read. The mix targets' saved state carries a `talkback` field; it is read
 // past, and nothing writes it again. The builds before 2026-10-01 kept
@@ -682,10 +713,6 @@ fn meter_test_channel(
         auto_set: false,
         eq: default_audio_eq_snapshot(),
         dynamics: default_audio_dynamics_snapshot(),
-        send_modes: HashMap::from([(
-            String::from("audio-mix-main"),
-            default_audio_send_mode_snapshot(),
-        )]),
     }
 }
 
@@ -1670,8 +1697,9 @@ fn a_phones_fader_edit_leaves_the_main_fader_alone() {
 // reported. The dynamics and send-mode edits and the clip clear did not take
 // it, so a flush committed between their read and their write was undone. The lock is held
 // here on the test's thread; each edit, run on a second one, must wait for it.
+// (The send-mode edit went on 2026-10-04 with the send modes.)
 #[test]
-fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
+fn dynamics_and_clip_edits_wait_for_the_audio_state_lock() {
     let test_dir = TestDir::new("channel-edits-take-the-lock");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
@@ -1683,7 +1711,7 @@ fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
     )
     .expect("probe state should persist");
 
-    for edit in ["dynamics", "send mode", "clip clear"] {
+    for edit in ["dynamics", "clip clear"] {
         let guard = super::helpers::lock_audio_state();
         let (sender, receiver) = std::sync::mpsc::channel();
         let db_path = test_dir.db_path();
@@ -1703,24 +1731,11 @@ fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
                     },
                 )
                 .map(|_| ())
-            } else if edit == "clip clear" {
+            } else {
                 clear_audio_clips(
                     db_path.as_path(),
                     &AudioClipClearRequest {
                         channel_id: Some(String::from("audio-input-9")),
-                    },
-                )
-                .map(|_| ())
-            } else {
-                update_audio_channel_send_mode(
-                    db_path.as_path(),
-                    &AudioSendModeUpdateRequest {
-                        channel_id: String::from("audio-playback-7-8"),
-                        mix_target_id: String::from("audio-mix-phones-b"),
-                        pre_fader: Some(true),
-                        mute: None,
-                        link_stereo: None,
-                        solo: None,
                     },
                 )
                 .map(|_| ())

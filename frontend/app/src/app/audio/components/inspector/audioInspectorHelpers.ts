@@ -14,7 +14,6 @@ import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 export type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 export type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[0];
 export type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
-export type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 export type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 export type SelectedAudioChannel = NonNullable<AudioWorkspaceViewModel["selectedChannel"]>;
 export type AudioEqBand = SelectedAudioChannel["eq"]["bands"][number];

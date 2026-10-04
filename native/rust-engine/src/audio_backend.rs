@@ -1,6 +1,6 @@
 use crate::audio::{
-    default_audio_dynamics_snapshot, default_audio_eq_snapshot, default_audio_send_mode_snapshot,
-    AudioChannelSnapshot, AudioChannelUpdateRequest, AudioEqUpdateRequest, AudioMixTargetSnapshot,
+    default_audio_dynamics_snapshot, default_audio_eq_snapshot, AudioChannelSnapshot,
+    AudioChannelUpdateRequest, AudioEqUpdateRequest, AudioMixTargetSnapshot,
     AudioMixTargetUpdateRequest,
 };
 use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
@@ -651,7 +651,6 @@ fn simulated_channel(
         auto_set: false,
         eq: default_audio_eq_snapshot(),
         dynamics: default_audio_dynamics_snapshot(),
-        send_modes: default_send_modes(),
     }
 }
 
@@ -672,23 +671,6 @@ fn clear_mix_target_meter(mix_target: &mut AudioMixTargetSnapshot) {
     mix_target.peak_hold = 0.0;
     mix_target.peak_hold_left = 0.0;
     mix_target.peak_hold_right = 0.0;
-}
-
-fn default_send_modes() -> HashMap<String, crate::audio::AudioSendModeSnapshot> {
-    HashMap::from([
-        (
-            String::from("audio-mix-main"),
-            default_audio_send_mode_snapshot(),
-        ),
-        (
-            String::from("audio-mix-phones-a"),
-            default_audio_send_mode_snapshot(),
-        ),
-        (
-            String::from("audio-mix-phones-b"),
-            default_audio_send_mode_snapshot(),
-        ),
-    ])
 }
 
 fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame {

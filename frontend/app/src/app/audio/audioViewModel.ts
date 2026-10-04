@@ -111,8 +111,6 @@ export interface AudioWorkspaceViewModel {
     eq: boolean;
     masterView: boolean;
     pfl: boolean;
-    prePostSend: boolean;
-    soloSend: boolean;
   };
   visibleStripCount: number;
   viewMode: "submix" | "master";
@@ -581,8 +579,6 @@ export function buildAudioViewModel({
       eq: !capabilities.canEditProcessing,
       masterView: !capabilities.canUseMasterView,
       pfl: true,
-      prePostSend: false,
-      soloSend: false,
     },
     visibleStripCount,
     viewMode,

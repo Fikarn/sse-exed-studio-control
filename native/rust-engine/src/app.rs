@@ -9,11 +9,10 @@ use crate::audio::{
     clear_all_audio_solo, clear_audio_clips, load_audio_console_snapshot,
     parse_audio_channel_update_request, parse_audio_clip_clear_request,
     parse_audio_dynamics_update_request, parse_audio_eq_update_request,
-    parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
-    parse_audio_settings_update_request, parse_audio_snapshot_load_request, read_audio_snapshot,
-    sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
-    update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
-    update_audio_settings, AudioCommandError,
+    parse_audio_mix_target_update_request, parse_audio_settings_update_request,
+    parse_audio_snapshot_load_request, read_audio_snapshot, sync_audio_console,
+    update_audio_channel, update_audio_channel_dynamics, update_audio_channel_eq,
+    update_audio_mix_target, update_audio_settings, AudioCommandError,
 };
 use crate::bootstrap::{bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths};
 use crate::cameras::{
@@ -480,12 +479,6 @@ impl EngineApp {
                 parse_audio_dynamics_update_request,
                 update_audio_channel_dynamics,
                 "channel-dynamics-updated",
-            ),
-            "audio.channel.send.update" => self.dispatch_audio_mutate(
-                request,
-                parse_audio_send_mode_update_request,
-                update_audio_channel_send_mode,
-                "channel-send-updated",
             ),
             "audio.mixTarget.update" => self.dispatch_audio_mutate(
                 request,

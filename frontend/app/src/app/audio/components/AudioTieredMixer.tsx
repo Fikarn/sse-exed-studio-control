@@ -24,7 +24,6 @@ import { AudioChannelLane } from "./AudioMixerLane";
 // changes.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 
 export interface AudioTieredMixerProps {
   arm: UseArmResult;
@@ -42,7 +41,6 @@ export interface AudioTieredMixerProps {
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   setDraftValue: (key: string, value: number) => void;
   viewModel: AudioWorkspaceViewModel;
 }
@@ -74,7 +72,6 @@ function AudioTier({
   onSelectChannelGroup,
   onTogglePhantom,
   onUpdateChannel,
-  onUpdateChannelSendMode,
   setDraftValue,
   tier,
   viewModel,
@@ -225,13 +222,11 @@ function AudioTier({
                 lockedReason={lockedReason}
                 menuLock={menuLock}
                 meterEmpty={viewModel.meterSimulationState === "gated"}
-                mixTargets={viewModel.mixTargets}
                 onClearClip={onClearClip}
                 onResetToUnity={onResetToUnity}
                 onSelect={onSelectChannel}
                 onTogglePhantom={onTogglePhantom}
                 onUpdateChannel={onUpdateChannel}
-                onUpdateChannelSendMode={onUpdateChannelSendMode}
                 setDraftValue={setDraftValue}
                 selected={channel.id === viewModel.selectedChannelId}
                 selectedMixTarget={viewModel.selectedMixTarget}
