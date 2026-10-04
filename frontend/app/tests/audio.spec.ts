@@ -387,7 +387,7 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   await expect(assumedDisplay).toContainText("ASSUMED");
   // Slice 8 (system §9): the hardware is the desk; "the console" is this
   // workspace. The sentence also names the key that gets the operator out.
-  await expect(assumedDisplay).toContainText(/showing the last state the desk confirmed/i);
+  await expect(assumedDisplay).toContainText(/the strips may not match totalmix/i);
   await expect(assumedDisplay).toContainText(/press sync from totalmix/i);
 
   await openFixture(page, "audio-not-verified");

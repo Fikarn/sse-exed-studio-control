@@ -352,7 +352,10 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       tone: "attention" satisfies StatusToneLike,
       warningBody:
         reason ??
-        "Showing the last state the desk confirmed. Press Sync from TotalMix to pull the current state before trusting the faders.",
+        // 2026-10-04. Old: "Showing the last state the desk confirmed." New:
+        // the strips may not match TotalMix. Reason: after a change TotalMix
+        // did not confirm, the strips show what the app sent.
+        "The strips may not match TotalMix. Press Sync from TotalMix to pull the current state before trusting the faders.",
       warningCode: null,
       warningTitle: "STATE ASSUMED",
     };

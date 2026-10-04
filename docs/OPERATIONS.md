@@ -80,6 +80,8 @@ The state display reads `VERIFIED` when the probe has passed, meter data arrives
 | `DISCONNECTED`  | TotalMix reports the UFX III gone                                                           | Check its USB and power |
 | `ACTION FAILED` | The last action failed                                                                      | Any action that works   |
 
+A change counts as confirmed when TotalMix reports it; a send or a solo turned off also counts when TotalMix's list of that mix leaves it out, as TotalMix lists no send at or below −65 dB. A change TotalMix does not report reads `ASSUMED`. One TotalMix reports with another value goes back to TotalMix's value: the desk wins, and for a switch `Recent actions` shows it as a change at TotalMix.
+
 The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never runs the probe by itself: `OFFLINE` stays after TotalMix is back, until you press `Run audio probe`. If it keeps failing, check TotalMix against [HARDWARE.md](HARDWARE.md).
 
 TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. When TotalMix was out of touch the state display says so and for how long, until the next action. After every start of the hardware link, a restart by itself, `Restart the hardware link…` and a database restore included, a Console that was `VERIFIED` or `ASSUMED` reads `ASSUMED` until the first Sync or load, as TotalMix may have changed meanwhile; its meters wait until then.
