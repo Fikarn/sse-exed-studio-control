@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { type StudioTalentMark, STUDIO_LAYOUT } from "../studioLayout";
-import { sceneMatchesFixtures } from "../lightingDrift";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import { useStagePlotViewport } from "../useStagePlotViewport";
 import { asRecord } from "../../shellData";
@@ -207,10 +206,6 @@ export function useLightingFixtureEditor({
   }, [fixtures, fixtureValuePreviews, sceneRenderPreview]);
 
   const stagePlotActiveScene = sceneRenderPreview ?? activeScene;
-  const stagePlotSceneModified = useMemo(() => {
-    if (!stagePlotActiveScene) return false;
-    return !sceneMatchesFixtures(stagePlotFixtures, stagePlotActiveScene, lightingFixtureCatalogSnapshot);
-  }, [lightingFixtureCatalogSnapshot, stagePlotActiveScene, stagePlotFixtures]);
 
   const handleTalentMarkPositionCommit = useLiveCallback(async (id: string, xMeters: number, yMeters: number) => {
     const nextMarks = displayedTalentMarks.map((mark) =>
@@ -952,7 +947,6 @@ export function useLightingFixtureEditor({
     setBulkFixtureValuePreview,
     stagePlotFixtures,
     stagePlotActiveScene,
-    stagePlotSceneModified,
     handleTalentMarkPositionCommit,
     handleMarqueeSelect,
     handleSelectFixture,

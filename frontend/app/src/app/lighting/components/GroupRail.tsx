@@ -1,11 +1,18 @@
-import { Plus } from "lucide-react";
+import { useState } from "react";
 import { DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
-import { EmptyState } from "@sse/design-system";
+import { Key, type MenuContent } from "@sse/design-system";
 
-import { GroupChip } from "./GroupChip";
-import styles from "./LightingRail.module.css";
+import type { LightingMenu } from "../lightingMenus";
+import { GroupKey } from "./GroupKey";
+import styles from "./GroupRail.module.css";
+
+// The visual overhaul's Lighting page (2026-10-04): the groups as keys, two
+// to a row, eight at a time; more come in pages, so the column never scrolls.
+// A new group is the ＋ in the section's head.
+
+const PER_PAGE = 8;
 
 export interface GroupRailEntry {
   id: string;
@@ -24,14 +31,12 @@ export interface GroupRailProps {
   searchQuery?: string;
   onTogglePower: (id: string, on: boolean) => void;
   onClearSearch?: () => void;
-  onInspectGroup?: (groupId: string) => void;
-  onCreateGroup?: () => void;
-  onRequestRenameGroup?: (groupId: string) => void;
-  onRequestDeleteGroup?: (groupId: string, groupName: string) => void;
-  /** Drag-to-reorder handler. When omitted, chips aren't sortable. */
+  /** Drag-to-reorder handler. When omitted, the keys aren't sortable. */
   onReorderGroup?: (groupId: string, beforeGroupId: string | null) => void;
-  /** Set color tag handler — both `null` (clear) and `0..7` (set). */
   onSetGroupColor?: (groupId: string, colorIndex: number | null) => void;
+  /** Each key's menu; `colour` asks the key for its swatches. */
+  buildMenu: (group: GroupRailEntry, ask: { colour: () => void }) => LightingMenu;
+  arm: MenuContent["arm"];
 }
 
 export function GroupRail({
@@ -39,124 +44,116 @@ export function GroupRail({
   searchQuery = "",
   onTogglePower,
   onClearSearch,
-  onInspectGroup,
-  onCreateGroup,
-  onRequestRenameGroup,
-  onRequestDeleteGroup,
   onReorderGroup,
   onSetGroupColor,
+  buildMenu,
+  arm,
 }: GroupRailProps) {
   const needle = searchQuery.trim().toLowerCase();
-  const filteredGroups = needle ? groups.filter((group) => group.name.toLowerCase().includes(needle)) : groups;
+  const filtered = needle ? groups.filter((group) => group.name.toLowerCase().includes(needle)) : groups;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const [page, setPage] = useState(0);
+  const shownPage = Math.min(page, pageCount - 1);
+  const shown = filtered.slice(shownPage * PER_PAGE, shownPage * PER_PAGE + PER_PAGE);
+  const [colourRequests, setColourRequests] = useState<Record<string, number>>({});
 
-  // dnd-kit sensors mirror SceneRail (Wave 23.B/C):
-  // - PointerSensor with 8 px activation so a plain click still toggles power.
-  // - KeyboardSensor for accessibility (Tab → Space pickup → arrows → Space drop).
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
   const sortable = Boolean(onReorderGroup) && !needle;
-  const sortableIds = filteredGroups.map((group) => group.id);
+  const allIds = filtered.map((group) => group.id);
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (!onReorderGroup) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const fromIndex = sortableIds.indexOf(String(active.id));
-    const toIndex = sortableIds.indexOf(String(over.id));
+    const fromIndex = allIds.indexOf(String(active.id));
+    const toIndex = allIds.indexOf(String(over.id));
     if (fromIndex < 0 || toIndex < 0) return;
-    // Same "reorder before id" translation as SceneRail — the dragged group
-    // is inserted such that the next group (if any) becomes the anchor.
-    const newOrder = arrayMove(sortableIds, fromIndex, toIndex);
-    const draggedNewIdx = newOrder.indexOf(String(active.id));
-    const beforeId = draggedNewIdx + 1 < newOrder.length ? newOrder[draggedNewIdx + 1]! : null;
-    onReorderGroup(String(active.id), beforeId);
+    // "Insert before id", as for the scenes.
+    const order = arrayMove(allIds, fromIndex, toIndex);
+    const at = order.indexOf(String(active.id));
+    onReorderGroup(String(active.id), at + 1 < order.length ? order[at + 1]! : null);
   };
 
-  const createButton = onCreateGroup ? (
-    <button
-      type="button"
-      className={styles.groupChipAdd}
-      onClick={onCreateGroup}
-      aria-label="Create a new lighting group"
-    >
-      <Plus aria-hidden="true" size={13} strokeWidth={1.75} />
-      <span>New group</span>
-    </button>
-  ) : null;
-
   if (groups.length === 0) {
-    // F10 — empty state CTA. Use EmptyState's structured `action` prop so the
-    // primary "Create first group" affordance is consistent across rails.
-    // The legacy "+ New group" button is kept below as a secondary affordance
-    // for parity with the populated-state footer.
-    return (
-      <div className={styles.groupGrid}>
-        {onCreateGroup ? (
-          <EmptyState
-            icon={Plus}
-            title="No groups yet"
-            message="Create your first group to organize fixtures and toggle them together."
-            action={{ label: "Create group", onClick: onCreateGroup, icon: Plus }}
-          />
-        ) : (
-          <p className={styles.empty}>No groups yet. Add fixtures to groups via the inspector.</p>
-        )}
-      </div>
-    );
+    return <p className={styles.empty}>No groups yet. A group switches its fixtures together.</p>;
   }
 
-  if (needle && filteredGroups.length === 0) {
+  if (needle && filtered.length === 0) {
     return (
       <p className={styles.empty}>
         No groups match “{searchQuery}”.
         {onClearSearch ? (
-          <>
-            {" "}
-            <button type="button" className={styles.emptyAction} onClick={onClearSearch}>
-              Clear search
-            </button>
-          </>
+          <Key size="small" onClick={onClearSearch}>
+            Clear search
+          </Key>
         ) : null}
       </p>
     );
   }
 
-  const railBody = (
-    <div className={styles.groupGrid} role="list" aria-label="Lighting groups">
-      {filteredGroups.map((group) => (
-        <div key={group.id} role="listitem">
-          <GroupChip
+  const grid = (
+    <div className={styles.grid} role="list" aria-label="Lighting groups">
+      {shown.map((group) => (
+        <div key={group.id} role="listitem" className={styles.item}>
+          <GroupKey
             id={group.id}
             name={group.name}
             fixtureCount={group.fixtureCount}
             on={group.on}
             level={group.level}
             drifted={group.drifted}
-            levelDelta={group.levelDelta}
             colorIndex={group.colorIndex ?? null}
             sortable={sortable}
             onTogglePower={onTogglePower}
-            onInspect={onInspectGroup}
-            onRequestRename={onRequestRenameGroup}
-            onRequestDelete={onRequestDeleteGroup}
+            menu={buildMenu(group, {
+              colour: () => setColourRequests((current) => ({ ...current, [group.id]: (current[group.id] ?? 0) + 1 })),
+            })}
+            arm={arm}
+            colourRequest={colourRequests[group.id] ?? 0}
             onSetColor={onSetGroupColor}
           />
         </div>
       ))}
-      {!needle && createButton ? <div role="listitem">{createButton}</div> : null}
     </div>
   );
 
-  if (!sortable) return railBody;
-
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
-        {railBody}
-      </SortableContext>
-    </DndContext>
+    <div className={styles.rail}>
+      {sortable ? (
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext items={shown.map((group) => group.id)} strategy={rectSortingStrategy}>
+            {grid}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        grid
+      )}
+      {pageCount > 1 ? (
+        <div className={styles.pager}>
+          <Key
+            size="small"
+            aria-label="Previous page of groups"
+            disabled={shownPage === 0}
+            onClick={() => setPage(Math.max(0, shownPage - 1))}
+          >
+            ‹
+          </Key>
+          <span className={styles.pageWord}>
+            {shownPage + 1} / {pageCount}
+          </span>
+          <Key
+            size="small"
+            aria-label="Next page of groups"
+            disabled={shownPage >= pageCount - 1}
+            onClick={() => setPage(Math.min(pageCount - 1, shownPage + 1))}
+          >
+            ›
+          </Key>
+        </div>
+      ) : null}
+    </div>
   );
 }

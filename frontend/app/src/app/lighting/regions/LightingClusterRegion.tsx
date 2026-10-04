@@ -1,5 +1,7 @@
 import { ShellRegion } from "@sse/design-system";
 import { LightingCluster } from "../components/LightingCluster";
+import { lightingArmedWords } from "../editor/useLightingArming";
+import { buildGroupMenu, buildSceneMenu } from "../lightingMenus";
 import type { LightingEditor } from "../useLightingEditor";
 
 const clockFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -11,9 +13,16 @@ function clockLabel(isoTime: string | null) {
   return Number.isNaN(date.getTime()) ? null : clockFormat.format(date);
 }
 
-/** The shell's cluster region: the rig's state, its keys, and the scene and group rails. */
+function sceneFacts(scene: { fixtureStates: ReadonlyArray<{ on: boolean; cct: number }> }) {
+  const lit = scene.fixtureStates.filter((state) => state.on);
+  if (lit.length === 0) return "all off";
+  return `${lit.length} on · ${Math.round(lit.reduce((sum, state) => sum + state.cct, 0) / lit.length)} K`;
+}
+
+/** The shell's cluster region: the rig's state, its keys, and the scenes and groups. */
 export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
-  const { lightingDmxMonitorSnapshot, store } = editor.props;
+  const { lightingDmxMonitorSnapshot, lightingSnapshot, store } = editor.props;
+  const { arm } = editor;
   const {
     bridgeIp,
     bridgeReachable,
@@ -21,49 +30,41 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
     bridgeSilentSince,
     bridgeUniverse,
     fixtures,
-    highlightActive,
     outputsHeld,
     previewMode,
     scenes,
-    soloActive,
     previewTargetSceneId,
   } = editor.rig;
   const {
     grandMasterDraft,
     railGroupEntries,
     handleGrandMasterChange,
+    handleEmergencyCut,
     handleToggleAllPower,
     handleToggleGroupPower,
     handleReorderGroup,
     handleSetGroupColor,
+    handleDeleteGroup,
     handleUndo,
   } = editor.rigControls;
-  const {
-    selectedFixtureIds,
-    handleIdentifyFind,
-    findRunning,
-    handleStopFind,
-    handleToggleHighlight,
-    handleToggleSolo,
-    stagePlotActiveScene,
-  } = editor.fixtureEditor;
+  const { handleToggleHighlight, handleToggleSolo, stagePlotActiveScene } = editor.fixtureEditor;
   const {
     lastSavedLabel,
     previewDirty,
     recallFadeMs,
     effectiveSceneModified,
-    activeScene,
+    stateScene,
+    sceneState,
     recentToolbarScenes,
     handleRecallScene,
     handleDiscardPreview,
     setRecallFadeMs,
     handleResaveScene,
+    handleDeleteScene,
     activeSceneId,
     handleSaveScene,
     handleTogglePreview,
     liveActiveSceneId,
-    modifiedSceneId,
-    displayedSceneThumbs,
     handleReorderScene,
     handlePinScene,
     handleRenameScene,
@@ -77,17 +78,25 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
     busyActions,
     searchQuery,
     requestAddFixture,
-    requestEmergencyCut,
     setDmxMonitorOpen,
+    dmxStripOn,
+    setDmxStripOn,
     setSearchQuery,
     handleTogglePatch,
-    setConfirmDeleteScene,
     handleInspectGroup,
     setCreateGroupOpen,
     requestInlineRename,
-    setConfirmDeleteGroup,
     undoStack,
   } = editor.session;
+  const patchMode = uiMode === "patch";
+  const patchReason = patchMode ? "leave Patch first" : null;
+  const highlightIds = new Set(lightingSnapshot?.highlightFixtureIds ?? []);
+  const soloIds = new Set(lightingSnapshot?.soloFixtureIds ?? []);
+  const nameOf = (ids: ReadonlySet<string>) =>
+    (lightingSnapshot?.fixtures ?? []).filter((fixture) => ids.has(fixture.id)).map((fixture) => fixture.name);
+  // The live scene's word on the rig, as the deck's RECALL says it.
+  const liveWord = sceneState === "live" ? "on rig" : sceneState === "unsaved" ? "unsaved" : null;
+
   return (
     <ShellRegion region="cluster">
       <LightingCluster
@@ -101,14 +110,10 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
         fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
         fixtureTotal={fixtures.length}
         grandMaster={grandMasterDraft}
-        groups={railGroupEntries}
-        hasSelection={selectedFixtureIds.size > 0}
-        findRunning={findRunning}
         undoLabel={undoStack.nextLabel}
         undoBusy={busyActions.has("undo")}
-        highlightActive={highlightActive}
-        lastRecalledLabel={lastSavedLabel ?? null}
-        patchMode={uiMode === "patch"}
+        lastSavedLabel={lastSavedLabel ?? null}
+        patchMode={patchMode}
         previewBusy={
           busyActions.has("preview-mode") || busyActions.has("preview-discard") || busyActions.has("scene-resave")
         }
@@ -116,77 +121,100 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
         previewMode={previewMode}
         recallFadeMs={recallFadeMs}
         sceneModified={effectiveSceneModified}
-        sceneName={activeScene?.name ?? null}
-        scenes={scenes}
+        sceneName={stateScene?.name ?? null}
+        arm={arm}
+        armedWords={arm.armed ? lightingArmedWords(arm.armed, lightingSnapshot) : null}
+        highlightNames={nameOf(highlightIds)}
+        soloNames={nameOf(soloIds)}
+        onToggleHighlight={() => void handleToggleHighlight()}
+        onToggleSolo={() => void handleToggleSolo()}
         recentScenes={recentToolbarScenes}
         searchQuery={searchQuery}
-        soloActive={soloActive}
         onRecallRecentScene={(sceneId) => void handleRecallScene(sceneId)}
         onAddFixture={requestAddFixture}
+        onCreateGroup={() => setCreateGroupOpen(true)}
         onDiscardPreview={() => void handleDiscardPreview()}
-        onEmergencyCut={requestEmergencyCut}
+        onEmergencyCut={() => void handleEmergencyCut()}
         onGrandMasterChange={handleGrandMasterChange}
-        onIdentifyFind={() => void handleIdentifyFind()}
-        onStopFind={() => void handleStopFind()}
         onUndo={() => void handleUndo()}
         onOpenDmxMonitor={() => setDmxMonitorOpen(true)}
+        dmxStripOn={dmxStripOn}
+        onToggleDmxStrip={() => setDmxStripOn((current) => !current)}
         onOpenSetup={() => void store.setWorkspace("setup")}
         onRecallFadeMsChange={setRecallFadeMs}
         onResaveScene={() => void handleResaveScene()}
-        onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
-        onSaveScene={handleSaveScene}
+        onRevertScene={liveActiveSceneId ? () => void handleRecallScene(liveActiveSceneId) : undefined}
+        onSaveScene={() => void handleSaveScene()}
         onSearchChange={setSearchQuery}
         onToggleAllPower={(on) => void handleToggleAllPower(on)}
         onTogglePatch={handleTogglePatch}
         onTogglePreview={() => void handleTogglePreview()}
-        onToggleHighlight={() => void handleToggleHighlight()}
-        onToggleSolo={() => void handleToggleSolo()}
         sceneRailProps={{
-          activeSceneId: liveActiveSceneId,
-          selectedSceneId: stagePlotActiveScene?.id ?? activeSceneId,
-          modifiedSceneId,
-          previewSceneId: previewMode ? previewTargetSceneId : null,
+          scenes,
+          liveSceneId: liveActiveSceneId,
+          liveWord,
           previewMode,
-          sceneThumbs: displayedSceneThumbs,
+          previewSceneId: previewMode ? previewTargetSceneId : null,
+          selectedSceneId: stagePlotActiveScene?.id ?? activeSceneId,
           searchQuery,
-          onRecall: handleRecallScene,
-          onAddScene: uiMode === "patch" ? undefined : handleSaveScene,
           onClearSearch: () => setSearchQuery(""),
-          onReorderScene: uiMode === "patch" ? undefined : handleReorderScene,
-          onPinScene: uiMode === "patch" ? undefined : handlePinScene,
-          onRenameScene: uiMode === "patch" ? undefined : handleRenameScene,
+          onRecall: (sceneId) => void handleRecallScene(sceneId),
+          onReorderScene: (sceneId, beforeSceneId) => void handleReorderScene(sceneId, beforeSceneId),
+          onRenameScene: handleRenameScene,
           renamingSceneIds,
-          onRequestDeleteScene:
-            uiMode === "patch" ? undefined : (id: string, name: string) => setConfirmDeleteScene({ id, name }),
-          onSetSceneColor:
-            uiMode === "patch"
-              ? undefined
-              : (sceneId: string, colorIndex: number | null) => void handleSetSceneColor(sceneId, colorIndex),
-          onHoverPreview: uiMode === "patch" ? undefined : handleHoverPreview,
-          onHoverPreviewClear: uiMode === "patch" ? undefined : handleHoverPreviewClear,
+          onSetSceneColor: (sceneId, colorIndex) => void handleSetSceneColor(sceneId, colorIndex),
+          onHoverPreview: patchMode ? undefined : handleHoverPreview,
+          onHoverPreviewClear: patchMode ? undefined : handleHoverPreviewClear,
+          buildMenu: (scene, ask) => {
+            const live = scene.id === liveActiveSceneId;
+            const isPreviewScene = previewMode && scene.id === previewTargetSceneId;
+            return buildSceneMenu({
+              scene,
+              detail: sceneFacts(scene),
+              word: previewMode ? (isPreviewScene ? "preview" : null) : live ? liveWord : null,
+              previewMode,
+              lockedReason: patchReason,
+              saveIntoReason: previewMode
+                ? isPreviewScene
+                  ? null
+                  : "load it into the preview first"
+                : !live
+                  ? "recall it first"
+                  : sceneState === "unsaved"
+                    ? null
+                    : "the rig holds it",
+              onRecall: () => void handleRecallScene(scene.id),
+              onSaveInto: () => void handleResaveScene(scene.id),
+              onRename: ask.rename,
+              onPin: (pinned) => void handlePinScene(scene.id, pinned),
+              onColour: ask.colour,
+              onDelete: () => void handleDeleteScene(scene.id),
+              testIdPrefix: `lighting-scene-menu-${scene.id}`,
+            });
+          },
         }}
         groupRailProps={{
+          groups: railGroupEntries,
           onTogglePower: handleToggleGroupPower,
           searchQuery,
           onClearSearch: () => setSearchQuery(""),
-          onInspectGroup: uiMode === "patch" ? undefined : handleInspectGroup,
-          onCreateGroup: uiMode === "patch" ? undefined : () => setCreateGroupOpen(true),
-          onRequestRenameGroup:
-            uiMode === "patch"
-              ? undefined
-              : (groupId: string) => {
-                  handleInspectGroup(groupId);
-                  requestInlineRename("group", groupId);
-                },
-          onRequestDeleteGroup:
-            uiMode === "patch"
-              ? undefined
-              : (groupId: string, groupName: string) => setConfirmDeleteGroup({ id: groupId, name: groupName }),
-          onReorderGroup: uiMode === "patch" ? undefined : handleReorderGroup,
-          onSetGroupColor:
-            uiMode === "patch"
-              ? undefined
-              : (groupId: string, colorIndex: number | null) => void handleSetGroupColor(groupId, colorIndex),
+          onReorderGroup: patchMode ? undefined : handleReorderGroup,
+          onSetGroupColor: (groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex),
+          buildMenu: (group, ask) =>
+            buildGroupMenu({
+              group,
+              detail: `${group.fixtureCount} fixture${group.fixtureCount === 1 ? "" : "s"}${group.on ? ` · ${group.level} %` : " · off"}`,
+              lockedReason: patchReason,
+              onTogglePower: () => handleToggleGroupPower(group.id, !group.on),
+              onInspect: () => handleInspectGroup(group.id),
+              onRename: () => {
+                handleInspectGroup(group.id);
+                requestInlineRename("group", group.id);
+              },
+              onColour: ask.colour,
+              onDelete: () => void handleDeleteGroup(group.id, group.name),
+              testIdPrefix: `lighting-group-menu-${group.id}`,
+            }),
         }}
       />
     </ShellRegion>

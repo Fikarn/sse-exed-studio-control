@@ -28,15 +28,15 @@ export function lightingStatusTone(status: unknown) {
 
 export function lightingFixtureColor(cct: number, on: boolean) {
   if (!on) {
-    return "var(--color-brand-text-faint)";
+    return "var(--text-text4)";
   }
-  if (cct <= 2900) return "var(--color-cct-2700)";
-  if (cct <= 3500) return "var(--color-cct-3200)";
-  if (cct <= 4100) return "var(--color-cct-3800)";
-  if (cct <= 4700) return "var(--color-cct-4400)";
-  if (cct <= 5300) return "var(--color-cct-5000)";
-  if (cct <= 6000) return "var(--color-cct-5600)";
-  return "var(--color-cct-6500)";
+  if (cct <= 2900) return "var(--signal-cct-2700)";
+  if (cct <= 3500) return "var(--signal-cct-3200)";
+  if (cct <= 4100) return "var(--signal-cct-3800)";
+  if (cct <= 4700) return "var(--signal-cct-4400)";
+  if (cct <= 5300) return "var(--signal-cct-5000)";
+  if (cct <= 6000) return "var(--signal-cct-5600)";
+  return "var(--signal-cct-6500)";
 }
 
 // Hex equivalents of the CCT-ramp tokens, for off-DOM contexts (e.g. inline

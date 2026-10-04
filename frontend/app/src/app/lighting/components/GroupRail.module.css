@@ -1,0 +1,125 @@
+/* The visual overhaul's Lighting page (2026-10-04): the groups as keys, two
+   to a row. A key is a face with a 1 px edge (DESIGN.md §5), lit green with
+   black ink while the group is on, its ⋯ beside it. */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.item {
+  min-width: 0;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 48px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  background: var(--material-key);
+  color: var(--text-text);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
+}
+
+.key:hover:not([data-on="true"]) {
+  border-color: var(--text-text4);
+}
+
+.key:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.key[data-on="true"] {
+  background: var(--role-green-fill);
+  border-color: var(--role-green-fill);
+  color: var(--role-green-ink);
+}
+
+.cell[data-dragging] .key {
+  cursor: grabbing;
+}
+
+.colour {
+  flex: none;
+  align-self: stretch;
+  width: 4px;
+  margin: 10px 0;
+  border-radius: var(--radius-base);
+  background: var(--group-colour, var(--material-key));
+}
+
+.key[data-on="true"] .colour {
+  background: var(--group-colour, var(--role-green-fill));
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: var(--font-weight-bold) var(--font-size-body) / 1.2 var(--font-family-ui);
+}
+
+.level {
+  flex: none;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+.key[data-on="true"] .level {
+  color: var(--role-green-ink);
+}
+
+.drift {
+  font-weight: var(--font-weight-bold);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 36px;
+}
+
+.pageWord {
+  min-width: 56px;
+  text-align: center;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 0;
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text3);
+}

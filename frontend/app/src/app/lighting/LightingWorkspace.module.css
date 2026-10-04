@@ -1,101 +1,30 @@
-/* The shell (overhaul 3): the bay draws no margin, so the page keeps its own. */
+/* The visual overhaul's Lighting page (2026-10-04): the bay. The shell draws
+   no margin in it, so the page keeps the gutter; inside it the plot's well
+   and the bar under it, one fixed column: the plot never changes height. */
 .shell {
   display: flex;
   flex-direction: column;
+  gap: var(--chrome-studio-gutter);
   height: 100%;
-  padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
+  padding: var(--chrome-studio-gutter);
   background: var(--material-bg);
   color: var(--text-text);
   font-family: var(--font-family-ui);
   min-height: 0;
 }
 
-.modeStripWrapper {
-  flex: 0 0 0;
-  height: 0;
-  overflow: hidden;
-  transition:
-    flex-basis var(--motion-duration-normal) var(--motion-easing-standard),
-    height var(--motion-duration-normal) var(--motion-easing-standard);
-}
-
-.modeStripWrapperOpen {
-  flex-basis: 40px;
-  height: 40px;
-}
-
-/* Wave 31 — docked strip stack between body and health bar. Each strip
-   handles its own height transition (collapsed = 0 px, open = its own
-   height). The body's `flex: 1 1 auto` reclaims any space the stack
-   gives back, so when both strips are collapsed the body grows to fill
-   the full window minus toolbar + health bar — no empty bar at the
-   bottom. */
-.bottomStripStack {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-/* Wave 31 — DMX strip wrapper (collapsible). Same 0 ↔ 60 px transition
-   pattern as the SelectionChipStrip's shell so the layout slides
-   smoothly when the toggle flips. */
-.dmxStripWrapper {
-  flex-shrink: 0;
-  height: 0;
-  overflow: hidden;
-  transition: height var(--motion-duration-normal) var(--motion-easing-standard);
-}
-
-.dmxStripWrapperOpen {
-  height: 60px;
-}
-
-.dmxStripContent {
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity var(--motion-duration-normal) var(--motion-easing-standard),
-    transform var(--motion-duration-normal) var(--motion-easing-standard);
-}
-
-.dmxStripWrapperOpen .dmxStripContent {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dmxStripWrapper,
-  .dmxStripContent,
-  .modeStripWrapper {
-    transition: none;
-  }
-}
-
-/* Visual overhaul A, Slice 5: the rail is the shell's cluster. The shell
-   (overhaul 3): the plate is the shell's too, so the body is the plot alone. */
-.body {
-  flex: 1 1 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* Visual overhaul A, Slice 5: the plot is the bay's screen — the room, backlit,
-   at the size it is rendered. The blue keyline says the operator is editing
-   offline; the lock note says the bridge is not answering. */
+/* The plot's well: the room, backlit. The blue keyline says the operator is
+   editing offline; the lock note says what the bridge has not done. */
 .stage {
   position: relative;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  min-height: var(--operator-stage-min-height, 480px);
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-screen);
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  box-shadow: var(--elevation-well);
   overflow: hidden;
 }
 
@@ -105,14 +34,26 @@
 
 .stageLockNote {
   position: absolute;
-  top: 10px;
-  left: 12px;
-  z-index: 4;
-  padding: 2px 8px;
-  border-radius: var(--radius-ctl);
-  background: var(--material-panel-top);
+  top: 32px;
+  left: 52px;
+  padding: 4px 8px;
+  border-radius: var(--radius-base);
+  background: var(--material-well);
   color: var(--role-coral-text);
-  font: 700 var(--font-size-label) / 1.4 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--font-size-label) / 1.4 var(--font-family-ui);
+  pointer-events: none;
+}
+
+/* The compact DMX strip, while it is shown: over the well's foot, so the
+   plot keeps its height. */
+.dmxStrip {
+  position: absolute;
+  left: 40px;
+  right: 0;
+  bottom: 0;
+  height: 60px;
+  border-top: 1px solid var(--material-line2);
+  background: var(--material-well);
 }
 
 .connectingState {
@@ -126,17 +67,14 @@
 }
 
 .connectingTitle {
-  font-family: var(--font-family-ui);
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--color-brand-text-primary);
+  font: var(--font-weight-bold) var(--font-size-head) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
   margin: 0;
 }
 
 .connectingHint {
-  font-family: var(--font-family-ui);
-  font-size: 12px;
-  color: var(--color-brand-text-muted);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text3);
   margin: 0;
   max-width: 340px;
   text-align: center;

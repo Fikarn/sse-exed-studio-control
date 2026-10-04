@@ -1,14 +1,12 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { getSceneThumbs, asRecord } from "../../shellData";
-import { fixtureStatesEqual, fixtureHasCctControl, sceneMatchesFixtures } from "../lightingDrift";
+import { asRecord } from "../../shellData";
+import { sceneMatchesFixtures } from "../lightingDrift";
 import { useUnsavedChangesGuard } from "../useUnsavedScenePrompt";
 import type { LightingSceneSnapshot, LightingSceneFixtureSnapshot } from "@sse/engine-client";
 import { formatLightingRelativeTime } from "../lightingHelpers";
 import { useLiveCallback } from "../../shared/useLiveCallback";
-import { renderSceneThumbnailDataUri, withSceneThumbUpserted, withSceneThumbRemoved } from "../sceneThumbnails";
 import { UndoRefusedError } from "../useUndoStack";
 import { rigNow } from "../undoTargets";
-import { lightingUndoMemory } from "../lightingUndoMemory";
 import {
   RECENT_SCENE_LIMIT,
   pushUndoOutcomeToast,
@@ -18,9 +16,9 @@ import {
 import type { LightingRig } from "./useLightingRig";
 import type { LightingSession } from "./useLightingSession";
 
-/** Scenes: which one is active, whether the rig has drifted from it, the
- *  unsaved-changes guard, preview mode, thumbnails, the hover preview, and
- *  save / re-save / delete / reorder / pin / recall. */
+/** Scenes: which one is active, whether the rig has drifted from it (the
+ *  hardware link's word), the unsaved-changes guard, preview mode, the hover
+ *  preview, and save / re-save / delete / reorder / pin / recall. */
 export function useLightingSceneEditor({
   props,
   rig,
@@ -30,36 +28,18 @@ export function useLightingSceneEditor({
   rig: LightingRig;
   session: LightingSession;
 }) {
-  const { appSnapshot, store, lightingFixtureCatalogSnapshot, lightingSnapshot } = props;
+  const { store, lightingFixtureCatalogSnapshot, lightingSnapshot } = props;
   const {
     sceneEntries,
     persistedSelectedSceneId,
     previewMode,
     previewTargetSceneId,
     scenes,
-    fixtureEntries,
     fixtures,
-    liveFixtures,
     bridgeReachable,
   } = rig;
   const { startBusy, toast, finishBusy, uiMode, undoStack, undoTargets, busyActions, reportError } = session;
   const [sceneRenderPreviewId, setSceneRenderPreviewId] = useState<string | null>(null);
-
-  const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
-
-  // Shared by every visit to the page, so an undo step taken on an earlier
-  // visit writes the thumbnails as they are now (2026-09-29).
-  const sceneThumbsRef = lightingUndoMemory(store).sceneThumbs;
-  useEffect(() => {
-    sceneThumbsRef.current = sceneThumbs;
-  }, [sceneThumbs, sceneThumbsRef]);
-  const persistSceneThumbs = useCallback(
-    async (next: Record<string, string>) => {
-      sceneThumbsRef.current = next;
-      await store.setLightingSceneThumbs(next);
-    },
-    [sceneThumbsRef, store]
-  );
 
   // The Fade is the hardware link's, saved (2026-10-03): the Stream Deck's
   // RECALL fades with it too, so the page shows and sets the one value.
@@ -173,33 +153,26 @@ export function useLightingSceneEditor({
     () => scenes.find((scene) => scene.id === activeSceneId) ?? null,
     [scenes, activeSceneId]
   );
+  const liveScene = useMemo(
+    () => scenes.find((scene) => scene.id === liveActiveSceneId) ?? null,
+    [scenes, liveActiveSceneId]
+  );
 
-  // Drift detection: compare fixture state against the active scene's saved
-  // fixtureStates. Modified id is the active scene id when drift is detected.
-  const isSceneModified = useMemo(() => {
-    if (!activeScene) return false;
-    return !fixtureStatesEqual(
-      fixtureEntries.map((fixture) => ({
-        id: fixture.id,
-        intensity: fixture.intensity,
-        cct: fixture.cct,
-        on: fixture.on,
-        hasCctControl: fixtureHasCctControl(fixture, lightingFixtureCatalogSnapshot),
-        controlValues: fixture.controlValues,
-      })),
-      activeScene.fixtureStates.map((state) => ({
-        fixtureId: state.fixtureId,
-        intensity: state.intensity,
-        cct: state.cct,
-        on: state.on,
-        controlValues: state.controlValues,
-      }))
-    );
-  }, [activeScene, fixtureEntries, lightingFixtureCatalogSnapshot]);
-
-  const previewDirty = previewMode && ((lightingSnapshot?.previewDirty ?? false) || isSceneModified);
-  const effectiveSceneModified = previewMode ? previewDirty : isSceneModified;
-  const modifiedSceneId = !previewMode && isSceneModified && activeSceneId ? activeSceneId : null;
+  // The visual overhaul's Lighting page (2026-10-04): whether the rig has left
+  // its scene is the hardware link's word (`sceneState`, decided once for the
+  // screen and the deck's RECALL): the rig as a running fade will leave it,
+  // without the highlight, solo and identify overlays, against the scene last
+  // put on the rig. Until then the page compared the fixtures itself, overlays
+  // and a fade's middle included, against the scene last clicked, so it could
+  // say UNSAVED where the deck said ON RIG. In preview the word is the
+  // hardware link's `previewDirty`: edits made in the preview.
+  const sceneState = lightingSnapshot?.sceneState ?? "none";
+  const rigLeftScene = !previewMode && sceneState === "unsaved";
+  const previewDirty = previewMode && lightingSnapshot?.previewDirty === true;
+  const effectiveSceneModified = previewMode ? previewDirty : rigLeftScene;
+  const modifiedSceneId = rigLeftScene ? liveActiveSceneId : null;
+  /** The scene the state display speaks of: the preview's, else the rig's. */
+  const stateScene = previewMode ? activeScene : liveScene;
 
   // Unsaved-changes guard. When the active scene is drifted, intercept any
   // workspace switch (the header's tabs, Setup's keys) with a confirmation
@@ -363,15 +336,6 @@ export function useLightingSceneEditor({
         const sceneTarget = undoTargets.created("scene", createdId);
         // I6 — the newly-saved scene heads the search field's Recent list.
         pushRecentScene(createdId);
-        // Pull the fresh scene from the result so we render its true saved
-        // state (the snapshot may not have updated yet).
-        const fixtureStatesRecord = Array.isArray(created?.fixtureStates) ? created!.fixtureStates : [];
-        const dataUri = renderSceneThumbnailDataUri({
-          fixtures,
-          fixtureStates: fixtureStatesRecord as unknown as LightingSceneSnapshot["fixtureStates"],
-        });
-        const next = withSceneThumbUpserted(sceneThumbsRef.current, createdId, dataUri);
-        await persistSceneThumbs(next);
         setLastSavedAt(new Date());
         // Push undo: deleting the just-created scene. Once undone the entry
         // is gone; there is no redo (new pages program, Slice 3, decision 5).
@@ -393,8 +357,6 @@ export function useLightingSceneEditor({
             }
             await store.deleteLightingScene(sceneId);
             undoTargets.deleted(sceneTarget);
-            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
-            await persistSceneThumbs(cleared);
           },
         });
       }
@@ -415,29 +377,19 @@ export function useLightingSceneEditor({
     }
   });
 
-  const handleResaveScene = useLiveCallback(async () => {
-    if (!activeScene) return;
+  // "Save changes" writes the rig into the scene the rig holds (the hardware
+  // link's live scene), or the preview into the preview's scene: until
+  // 2026-10-04 it wrote into the scene last clicked, which a refused recall
+  // could leave as some other scene than the one on the rig.
+  const handleResaveScene = useLiveCallback(async (overrideSceneId?: string) => {
+    const target =
+      (typeof overrideSceneId === "string" ? scenes.find((scene) => scene.id === overrideSceneId) : null) ?? stateScene;
+    if (!target) return;
     startBusy("scene-resave");
     try {
-      const sceneId = activeScene.id;
-      const sceneName = activeScene.name;
-      // Use the new lighting.scene.update IPC with captureCurrentState — no
-      // more delete+recreate dance, scene id stays stable so any persisted
-      // references (sceneThumbs cache, lastRecalled flag) keep working.
+      const sceneId = target.id;
+      const sceneName = target.name;
       await store.updateLightingScene({ sceneId, captureCurrentState: true });
-      // Refresh the cached thumbnail with the freshly captured state.
-      const liveStates = fixtures.map((fixture) => ({
-        fixtureId: fixture.id,
-        intensity: fixture.intensity,
-        cct: fixture.cct,
-        on: fixture.on,
-      })) as unknown as LightingSceneSnapshot["fixtureStates"];
-      const dataUri = renderSceneThumbnailDataUri({
-        fixtures,
-        fixtureStates: liveStates,
-      });
-      const nextThumbs = withSceneThumbUpserted(sceneThumbsRef.current, sceneId, dataUri);
-      await persistSceneThumbs(nextThumbs);
       setLastSavedAt(new Date());
       toast.push({ message: `Scene '${sceneName}' updated.`, tone: "ok" });
     } catch (error) {
@@ -466,12 +418,6 @@ export function useLightingSceneEditor({
           })) satisfies LightingSceneFixtureSnapshot[],
           colorIndex: target.colorIndex ?? null,
           pinned: target.pinned,
-          thumbDataUri:
-            sceneThumbs[sceneId] ??
-            renderSceneThumbnailDataUri({
-              fixtures: liveFixtures,
-              fixtureStates: target.fixtureStates,
-            }),
         }
       : null;
     // The scene and the fixtures its states name, followed through the ids an
@@ -484,8 +430,6 @@ export function useLightingSceneEditor({
     try {
       await store.deleteLightingScene(sceneId);
       undoTargets.deleted(sceneTarget);
-      const next = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
-      await persistSceneThumbs(next);
       if (targetSnapshot) {
         undoStack.push({
           label: `Delete scene ${targetSnapshot.name}`,
@@ -515,13 +459,6 @@ export function useLightingSceneEditor({
               if (targetSnapshot.pinned) {
                 await store.pinLightingScene(restoredId, true);
               }
-              const withoutDeletedThumb = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
-              const restoredThumbs = withSceneThumbUpserted(
-                withoutDeletedThumb,
-                restoredId,
-                targetSnapshot.thumbDataUri
-              );
-              await persistSceneThumbs(restoredThumbs);
             }
           },
         });
@@ -583,10 +520,11 @@ export function useLightingSceneEditor({
     // hovered scene during the 200 ms mouseleave grace window after the
     // recall flips activeSceneId.
     cancelHoverPreviewSync();
-    // Show the scene in the inspector immediately — even if the recall IPC
-    // is rejected by the engine (e.g. pre-probe state), the operator still
-    // sees what the scene contains. The recall IPC drives the actual rig.
-    setSceneRenderPreviewId(sceneId);
+    // Show the scene on the plate at once, even when the recall is refused
+    // (the bridge has not passed its probe): the operator still sees what the
+    // scene holds. The plot draws the scene's look only once its recall went
+    // out (2026-10-04): a refused recall leaves the rig, and the plot, as they
+    // were.
     setInspectorSelectedSceneId(sceneId);
     if (!bridgeReachable && !previewMode) {
       // Skip the IPC entirely when the bridge is unreachable — the engine
@@ -601,6 +539,7 @@ export function useLightingSceneEditor({
     }
     const busyKey = `scene:${sceneId}`;
     startBusy(busyKey);
+    setSceneRenderPreviewId(sceneId);
     try {
       await store.recallLightingScene(sceneId, previewMode ? 0 : recallFadeMs);
       toast.push({
@@ -612,29 +551,12 @@ export function useLightingSceneEditor({
         tone: "ok",
       });
     } catch (error) {
+      setSceneRenderPreviewId(null);
       reportError(error, "Scene recall failed.");
     } finally {
       finishBusy(busyKey);
     }
   });
-
-  // Per plan §3.3: prefer the cached thumb; fall back to a live render for
-  // scenes without an entry yet. The fallback runs on render — write-backs
-  // only happen on user-initiated save / re-save / delete to avoid an
-  // infinite snapshot ↔ effect loop when the transport doesn't echo the
-  // upserted blob back into the next snapshot.
-  const displayedSceneThumbs = useMemo(() => {
-    if (scenes.length === 0) return sceneThumbs;
-    const result: Record<string, string> = { ...sceneThumbs };
-    for (const scene of scenes) {
-      if (result[scene.id]) continue;
-      result[scene.id] = renderSceneThumbnailDataUri({
-        fixtures: liveFixtures,
-        fixtureStates: scene.fixtureStates,
-      });
-    }
-    return result;
-  }, [scenes, sceneThumbs, liveFixtures]);
 
   // Per-id rename-busy set surfaced to the rail so each scene tile shows the
   // InlineRename busy treatment only for its own in-flight commit (parallel
@@ -657,6 +579,9 @@ export function useLightingSceneEditor({
     handleHoverPreview,
     handleHoverPreviewClear,
     liveActiveSceneId,
+    liveScene,
+    sceneState,
+    stateScene,
     activeSceneId,
     activeScene,
     previewDirty,
@@ -679,7 +604,6 @@ export function useLightingSceneEditor({
     handleReorderScene,
     handlePinScene,
     handleRecallScene,
-    displayedSceneThumbs,
     renamingSceneIds,
     lastSavedLabel,
   };

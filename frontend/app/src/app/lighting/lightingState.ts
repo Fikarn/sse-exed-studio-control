@@ -18,7 +18,8 @@ export interface LightingStateInput {
   channelCount: number;
   fixtureOnCount: number;
   fixtureTotal: number;
-  lastRecalledLabel: string | null;
+  /** When the page last saved a scene, on the studio's clock. */
+  lastSavedLabel: string | null;
   /** The light outputs are held: the hardware link sends the rig nothing. */
   outputsHeld?: boolean;
   previewDirty: boolean;
@@ -33,7 +34,7 @@ export interface LightingState {
   tone: StateDisplayTone;
   /** The sentence under the word: what is true, in the operator's words. */
   sentence: string;
-  /** The line under the sentence: the scene, the rig, the counts. */
+  /** The line under the sentence: the scene, and when it was saved. */
   meta: string;
   /** True while the rig refuses writes: every rig control is outlined. */
   locked: boolean;
@@ -46,10 +47,7 @@ export function deriveLightingState({
   bridgeReachable,
   bridgeAnswering = null,
   bridgeSilentLabel = null,
-  channelCount,
-  fixtureOnCount,
-  fixtureTotal,
-  lastRecalledLabel,
+  lastSavedLabel,
   outputsHeld = false,
   previewDirty,
   previewMode,
@@ -58,20 +56,26 @@ export function deriveLightingState({
   universe,
 }: LightingStateInput): LightingState {
   const target = bridgeIp.trim() ? `${bridgeIp} · universe ${universe}` : `universe ${universe}`;
-  const rig = `${fixtureOnCount} of ${fixtureTotal} fixtures on`;
-  const scene = sceneName
-    ? `Scene ${sceneName}${lastRecalledLabel ? ` · recalled ${lastRecalledLabel}` : ""}`
+  // The visual overhaul (2026-10-04): the line names the scene and when it was
+  // saved; how many fixtures are on is the LIGHTING key's, the channels the
+  // footer's.
+  const meta = sceneName
+    ? `Scene ${sceneName}${lastSavedLabel ? ` · saved ${lastSavedLabel}` : ""}`
     : "No scene recalled";
-  const meta = `${scene} · ${rig} · ${channelCount} channels`;
 
+  // UNREACHABLE is the probe's word: the bridge has not passed Setup's probe
+  // (or its address changed since). The hardware link refuses a recall then,
+  // and the page locks LIGHTING, the grand master and the Save row with it;
+  // the rest still reaches the rig, CUT ALL first. Until 2026-10-04 the
+  // sentence said nothing pressed would reach the rig, which was not so.
   if (!bridgeReachable) {
     return {
       word: "UNREACHABLE",
       tone: "error",
-      sentence: `The bridge at ${target} is not answering, so nothing you press will reach the rig.`,
+      sentence: `The bridge at ${target} has not passed its probe, so recalls are refused.`,
       meta,
       locked: true,
-      lockNote: "locked · bridge unreachable",
+      lockNote: "locked · the bridge has not passed its probe",
     };
   }
 

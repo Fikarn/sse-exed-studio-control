@@ -23,7 +23,7 @@ export function useLightingRigControls({
   const { lightingSnapshot, store } = props;
   const { groups, fixtureEntries, previewMode } = rig;
   const { startBusy, toast, finishBusy, uiMode, selectedGroupId, setSelectedGroupId, reportError, undoStack } = session;
-  const { activeScene } = sceneEditor;
+  const { liveScene, sceneState } = sceneEditor;
 
   const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
   const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
@@ -48,9 +48,13 @@ export function useLightingRigControls({
   // Group rail entries: GroupRailEntry needs id/name/fixtureCount/on/level/drifted.
   // - level: average intensity across the group's currently-on fixtures (0 when
   //   the group is fully off).
-  // - drifted: any of the group's fixtures has live state diverging from the
-  //   active scene's saved state (intensity/cct/on). Yellow signal in the chip.
+  // - drifted: while the hardware link says the rig has left its scene
+  //   (`sceneState` "unsaved", 2026-10-04), any of the group's fixtures whose
+  //   state differs from that scene's saved state. An overlay or a fade's
+  //   middle never counts, as the hardware link's word does not count them.
+  const reference = sceneState === "unsaved" ? liveScene : null;
   const railGroupEntries = useMemo(() => {
+    const activeScene = reference;
     const sceneStateById = new Map(activeScene?.fixtureStates.map((state) => [state.fixtureId, state]) ?? []);
     return groups.map((group) => {
       const groupFixtures = fixtureEntries.filter((fixture) => fixture.groupId === group.id);
@@ -93,7 +97,7 @@ export function useLightingRigControls({
         colorIndex: group.colorIndex,
       };
     });
-  }, [groups, fixtureEntries, activeScene]);
+  }, [groups, fixtureEntries, reference]);
 
   const handleCreateGroup = useLiveCallback(async (name: string) => {
     startBusy("group-create");

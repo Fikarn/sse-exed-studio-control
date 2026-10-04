@@ -22,10 +22,6 @@ import { UndoHistory } from "./useUndoStack";
 export interface LightingUndoMemory {
   history: UndoHistory;
   targets: UndoTargets;
-  /** The scenes' thumbnails as last written, shared by every visit to the
-   *  page: a step taken on an earlier visit writes them from here, not from
-   *  what that visit last saw. */
-  sceneThumbs: { current: Record<string, string> };
 }
 
 const memories = new WeakMap<ShellStore, LightingUndoMemory>();
@@ -37,7 +33,6 @@ export function lightingUndoMemory(store: ShellStore): LightingUndoMemory {
   const memory: LightingUndoMemory = {
     history: new UndoHistory(),
     targets: new UndoTargets(),
-    sceneThumbs: { current: {} },
   };
   let restoreCount = store.getSnapshot().restoreCount;
   let rig = store.getSnapshot().lightingSnapshot;
