@@ -65,7 +65,7 @@ The surface is the brand's Dark Green pulled almost to black: a trace of hue, no
 | Coral       | #FF7D55 | **error and hazard**: `OFFLINE`, `UNREACHABLE`, 48 V on, `REC`, a clip; the word and edge of a destructive command                                                 |
 | Burgundy    | #671919 | **armed**: the one armed form, a Burgundy fill with Beige text, "press again" and a countdown bar                                                                  |
 | Blue        | #3A87E5 | **information**: `PREVIEW`, a cue in a script                                                                                                                      |
-| Beige       | #EDEBD1 | **selection**: one 2 px keyline on the strip, fixture, script, camera, tab or step; the tooltip                                                                    |
+| Beige       | #EDEBD1 | **selection**: one 2 px keyline on the strip, fixture, script, camera, tab or step, and on a setting's current choice (a frame rate, the view); the tooltip        |
 | Beige Light | #F6F5E8 | the main ink; the primary command key's fill (black text)                                                                                                          |
 | Dark Green  | #004932 | the plate's title plate, the one brand moment on a working page; the deck's page keys                                                                              |
 
