@@ -56,88 +56,35 @@ interface MeterColors {
   zoneAmber: string;
 }
 
-// DP2 (2026-06-04 Console polish): the design's fixed dBFS caution zone is a
-// literal amber, NOT a token — the audio theme maps every --audio-meter-warn /
-// -hot token onto the single cream tone (no amber token exists), so the
-// prototype hardcodes oklch(80% 0.155 82) for the caution band between the
-// cream safe zone and the red clip cap. Fixed across all three themes by design
-// (the zone map is an absolute-dBFS instrument scale, not a themed surface).
-const METER_ZONE_AMBER = "oklch(80% 0.155 82)";
-
 type GradientCache = Map<string, CanvasGradient>;
 
 function cssColor(style: CSSStyleDeclaration, name: string, fallback: string) {
   return style.getPropertyValue(name).trim() || fallback;
 }
 
-// DP2 (2026-06-04 Console polish): the design's meter zones bloom between bands
-// with CSS color-mix() stops (e.g. mix(over, amber, 50%)). Canvas gradients take
-// concrete colour strings, so we resolve each themed colour (hex / oklch / rgb)
-// to sRGB once and mix in sRGB to reproduce `color-mix(in srgb, …)`. A reused
-// 1×1 scratch context turns any CSS colour string into [r,g,b,a]; the result is
-// memoised per colour string (theme swaps produce a small fixed set).
-let colorResolverCtx: CanvasRenderingContext2D | null = null;
-const resolvedColorCache = new Map<string, [number, number, number, number]>();
-
-function resolveColor(color: string): [number, number, number, number] {
-  const cached = resolvedColorCache.get(color);
-  if (cached) return cached;
-
-  if (!colorResolverCtx) {
-    const scratch = document.createElement("canvas");
-    scratch.width = 1;
-    scratch.height = 1;
-    colorResolverCtx = scratch.getContext("2d", { willReadFrequently: true });
-  }
-
-  let rgba: [number, number, number, number] = [0, 0, 0, 1];
-  if (colorResolverCtx) {
-    colorResolverCtx.clearRect(0, 0, 1, 1);
-    colorResolverCtx.fillStyle = "#000";
-    colorResolverCtx.fillStyle = color;
-    colorResolverCtx.fillRect(0, 0, 1, 1);
-    const data = colorResolverCtx.getImageData(0, 0, 1, 1).data;
-    rgba = [data[0], data[1], data[2], data[3] / 255];
-  }
-  resolvedColorCache.set(color, rgba);
-  return rgba;
-}
-
-// Reproduces CSS `color-mix(in srgb, a (amount*100)%, b)` — amount is the weight
-// of `a`. Returns an rgba() string the canvas gradient can consume.
-function mixColor(a: string, b: string, amount: number): string {
-  const [ar, ag, ab, aa] = resolveColor(a);
-  const [br, bg, bb, ba] = resolveColor(b);
-  const weight = Math.max(0, Math.min(1, amount));
-  const r = Math.round(ar * weight + br * (1 - weight));
-  const g = Math.round(ag * weight + bg * (1 - weight));
-  const bl = Math.round(ab * weight + bb * (1 - weight));
-  const alpha = aa * weight + ba * (1 - weight);
-  return `rgba(${r}, ${g}, ${bl}, ${alpha})`;
-}
-
+// The visual overhaul's Console pull request: the meters draw the design
+// system's signal ramp (DESIGN.md §4): green to −18 dBFS, yellow to −3,
+// coral above, flat and with hard stops, as the design system's Meter does;
+// a 2 px peak tick; a held clip in coral. The names are read from the page's
+// root, where the tokens declare them; the fallbacks are the palette's.
 function readColors(root: HTMLElement): MeterColors {
   const style = getComputedStyle(root);
+  const low = cssColor(style, "--signal-meter-low", "#99BA92");
+  const mid = cssColor(style, "--signal-meter-mid", "#F2DE6F");
+  const over = cssColor(style, "--signal-meter-over", "#FF7D55");
+  const well = cssColor(style, "--material-well", "#040706");
   return {
-    amber: cssColor(style, "--audio-meter-warn", "#f1c95f"),
-    // DP2: the recessed-trough bg tone — used to tint the −18 dBFS nominal line
-    // so it reads on the lit fill in every theme (dark line on the cream
-    // Studio/Graphite bodies; light line on Bone's dark-brown fill).
-    bg: cssColor(style, "--audio-meter-bg", "#050608"),
-    clip: cssColor(style, "--audio-clip", "#ff4b4b"),
-    green: cssColor(style, "--audio-meter-low-hot", "#62d979"),
-    hot: cssColor(style, "--audio-meter-hot", "#ff9f43"),
-    over: cssColor(style, "--audio-meter-over", "#ff4b4b"),
-    // C09(b): desaturated orange-red intermediate for the transient over band,
-    // distinct from both the saturated clip-red and the amber peak-warning
-    // outline. C09(c): theme-aware keyline tone for the peak-hold tick.
-    overTone: cssColor(style, "--meter-over-tone", "#e8743a"),
-    peak: cssColor(style, "--audio-meter-peak-hold", "#f8f1a5"),
-    peakEdge: cssColor(style, "--meter-peak-edge", "#2a2418"),
-    rms: cssColor(style, "--audio-meter-low", "#39c46b"),
-    // DP2: fixed-amber caution band (see METER_ZONE_AMBER) — a constant, not a
-    // token, so it stays identical across Studio / Graphite / Bone.
-    zoneAmber: METER_ZONE_AMBER,
+    amber: mid,
+    bg: well,
+    clip: cssColor(style, "--role-coral-text", over),
+    green: low,
+    hot: mid,
+    over,
+    overTone: over,
+    peak: cssColor(style, "--signal-peak", "#C5C7B9"),
+    peakEdge: well,
+    rms: low,
+    zoneAmber: mid,
   };
 }
 
@@ -215,14 +162,14 @@ function meterBodyGradient(
   const key = gradientKey("body", rect, colors);
   const cached = gradients.get(key);
   if (cached) return cached;
+  // Top = 0 dBFS: coral above −3 dBFS (the top 5 %), yellow to −18 (30 %),
+  // green below, hard stops (DESIGN.md §4).
   const gradient = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.height);
   gradient.addColorStop(0, colors.over);
-  gradient.addColorStop(0.04, colors.over);
-  gradient.addColorStop(0.065, mixColor(colors.over, colors.zoneAmber, 0.5));
-  gradient.addColorStop(0.09, colors.zoneAmber);
-  gradient.addColorStop(0.16, colors.zoneAmber);
-  gradient.addColorStop(0.27, mixColor(colors.zoneAmber, colors.green, 0.5));
-  gradient.addColorStop(0.35, colors.green);
+  gradient.addColorStop(0.05, colors.over);
+  gradient.addColorStop(0.05, colors.zoneAmber);
+  gradient.addColorStop(0.3, colors.zoneAmber);
+  gradient.addColorStop(0.3, colors.green);
   gradient.addColorStop(1, colors.green);
   gradients.set(key, gradient);
   return gradient;
@@ -242,14 +189,13 @@ function miniMeterGradient(
   const key = gradientKey("mini", rect, colors);
   const cached = gradients.get(key);
   if (cached) return cached;
+  // Left to right: green to −18 dBFS (70 %), yellow to −3 (95 %), coral above.
   const gradient = ctx.createLinearGradient(rect.x, 0, rect.x + rect.width, 0);
   gradient.addColorStop(0, colors.green);
-  gradient.addColorStop(0.62, colors.green);
-  gradient.addColorStop(0.73, mixColor(colors.green, colors.zoneAmber, 0.45));
-  gradient.addColorStop(0.8, colors.zoneAmber);
-  gradient.addColorStop(0.88, colors.zoneAmber);
-  gradient.addColorStop(0.925, mixColor(colors.zoneAmber, colors.over, 0.55));
-  gradient.addColorStop(0.96, colors.over);
+  gradient.addColorStop(0.7, colors.green);
+  gradient.addColorStop(0.7, colors.zoneAmber);
+  gradient.addColorStop(0.95, colors.zoneAmber);
+  gradient.addColorStop(0.95, colors.over);
   gradient.addColorStop(1, colors.over);
   gradients.set(key, gradient);
   return gradient;
@@ -276,52 +222,6 @@ function drawMeterBody(
 
   ctx.fillStyle = meterBodyGradient(ctx, rect, colors, gradients);
   ctx.fillRect(x, y, width, height);
-}
-
-// DP2 (2026-06-04 Console polish): cylindrical glass body + recessed top edge.
-// The design paints these as a CSS ::before over the fill, but the z-index-8
-// canvas covers the track, so the sheen has to be a canvas overlay. Two soft
-// layers: a short top-edge shadow (recessed lip) + a left-light / right-dark
-// (or top-light / bottom-dark for the horizontal master) lens highlight, so the
-// lit bar reads as a glass tube instead of a flat slab. Anchored to the full
-// track rect so the sheen stays put as level moves; alpha-only, so it tints the
-// zone colours rather than recolouring them. Mirrors .meterTrack::before.
-function drawVerticalGlassOverlay(ctx: CanvasRenderingContext2D, rect: MeterRect) {
-  const inset = 2;
-  const x = rect.x + inset;
-  const y = rect.y + inset;
-  const width = Math.max(1, rect.width - inset * 2);
-  const height = Math.max(1, rect.height - inset * 2);
-
-  const edge = ctx.createLinearGradient(0, y, 0, y + height);
-  edge.addColorStop(0, "rgba(0, 0, 0, 0.24)");
-  edge.addColorStop(0.07, "rgba(0, 0, 0, 0)");
-  ctx.fillStyle = edge;
-  ctx.fillRect(x, y, width, height);
-
-  const sheen = ctx.createLinearGradient(x, 0, x + width, 0);
-  sheen.addColorStop(0, "rgba(255, 255, 255, 0.09)");
-  sheen.addColorStop(0.26, "rgba(255, 255, 255, 0)");
-  sheen.addColorStop(0.58, "rgba(0, 0, 0, 0)");
-  sheen.addColorStop(1, "rgba(0, 0, 0, 0.14)");
-  ctx.fillStyle = sheen;
-  ctx.fillRect(x, y, width, height);
-}
-
-function drawHorizontalGlassOverlay(ctx: CanvasRenderingContext2D, rect: MeterRect) {
-  const edge = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.height);
-  edge.addColorStop(0, "rgba(0, 0, 0, 0.26)");
-  edge.addColorStop(0.24, "rgba(0, 0, 0, 0)");
-  ctx.fillStyle = edge;
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-
-  const sheen = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.height);
-  sheen.addColorStop(0, "rgba(255, 255, 255, 0.16)");
-  sheen.addColorStop(0.32, "rgba(255, 255, 255, 0.04)");
-  sheen.addColorStop(0.55, "rgba(0, 0, 0, 0)");
-  sheen.addColorStop(1, "rgba(0, 0, 0, 0.16)");
-  ctx.fillStyle = sheen;
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 }
 
 function drawPeakLine(ctx: CanvasRenderingContext2D, rect: MeterRect, dbfs: number, colors: MeterColors) {
@@ -396,7 +296,6 @@ function drawMiniMeter(
   // meters already use; the cluster's bar keeps the horizontal treatment below.
   if (geometry.orientation === "vertical") {
     drawMeterBody(ctx, rect, bodyDbfs, colors, gradients);
-    drawVerticalGlassOverlay(ctx, rect);
     drawNominalReference(ctx, rect, colors);
     if (Number.isFinite(peakDbfs) && peakDbfs > METER_FLOOR_DBFS) {
       drawPeakLine(ctx, rect, peakDbfs, colors);
@@ -415,10 +314,6 @@ function drawMiniMeter(
     ctx.fillStyle = miniMeterGradient(ctx, rect, colors, gradients);
     ctx.fillRect(rect.x, rect.y, width, rect.height);
   }
-
-  // DP2 (2026-06-04 Console polish): cylindrical glass sheen over the lit master
-  // bar so it reads as a lens, not a sticker (mirrors .masterTrack::before).
-  drawHorizontalGlassOverlay(ctx, rect);
 
   // DP2: nominal (−18 dBFS) reference tinted from the trough bg so it reads on
   // the fill in every theme — same treatment as the vertical meters.
@@ -471,11 +366,9 @@ function drawStereoMeter(
   }
   // DP2: glass sheen over each fill, then the nominal line + peak on top so the
   // instrument references stay crisp above the subtle lens highlight.
-  drawVerticalGlassOverlay(ctx, left);
   drawNominalReference(ctx, left, colors);
   drawPeakLine(ctx, left, entry.peakLeftDbfs, colors);
   if (right) {
-    drawVerticalGlassOverlay(ctx, right);
     drawNominalReference(ctx, right, colors);
     drawPeakLine(ctx, right, geometry.mirrorRight ? entry.peakLeftDbfs : entry.peakRightDbfs, colors);
   }

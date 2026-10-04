@@ -139,12 +139,12 @@ export function AudioStereoMeter({
       ) : null}
       <div className={styles.meterPair}>
         <span className={styles.meterTrack} data-meter-track="left" data-tone={meterTone(liveLeft, liveClip)}>
-          <span className={styles.meterFill} data-meter-fill="left" data-side="left" />
+          <span className={styles.meterFill} data-meter-fill="left" data-side="left" data-signal="meter" />
           <span className={styles.meterNominal} data-meter-reference="nominal" />
           <span className={styles.meterPeak} data-meter-peak="left" data-side="left" />
         </span>
         <span className={styles.meterTrack} data-meter-track="right" data-tone={meterTone(liveRight, liveClip)}>
-          <span className={styles.meterFill} data-meter-fill="right" data-side="right" />
+          <span className={styles.meterFill} data-meter-fill="right" data-side="right" data-signal="meter" />
           <span className={styles.meterNominal} data-meter-reference="nominal" />
           <span className={styles.meterPeak} data-meter-peak="right" data-side="right" />
         </span>

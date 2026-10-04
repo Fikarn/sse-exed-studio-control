@@ -1,0 +1,81 @@
+/* The Console's outputs block (visual overhaul, the Console; graft 1): DIM and
+   MONO, then one row per output. A row is the target key, the level, M and
+   the ⋯ on one line, the fader under them and the meter under the fader. */
+
+.outputs {
+  flex: none;
+}
+
+.lockNote {
+  font-weight: 700;
+  color: var(--role-yellow-text);
+}
+
+.lockNote[data-tone="error"] {
+  color: var(--role-coral-text);
+}
+
+.monitorRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 152px minmax(0, 1fr) 48px 28px;
+  grid-template-rows: 48px 28px 16px;
+  column-gap: 8px;
+  row-gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.targetKey {
+  grid-area: 1 / 1;
+  width: 100%;
+  justify-content: center;
+}
+
+/* The output's name keeps its case: PT Sans, one line. */
+.targetName {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.level {
+  grid-area: 1 / 2;
+  padding-right: 0;
+}
+
+.muteKey {
+  grid-area: 1 / 3;
+  width: 48px;
+  padding: 0;
+}
+
+.menu {
+  grid-area: 1 / 4;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.fader {
+  grid-area: 2 / 1 / 3 / 5;
+}
+
+.meter {
+  grid-area: 3 / 1 / 4 / 5;
+  height: 16px;
+}

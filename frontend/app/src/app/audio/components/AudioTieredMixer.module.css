@@ -1,239 +1,170 @@
-/* AudioTieredMixer module — visual overhaul A, Slice 4b (system §2, §7).
- *
- * The bay carries three tiers side by side — Inputs, Playback, Outputs — each
- * a column of strips under its own head, with a hairline between them so the
- * eye finds the three groups. The tiers are sized by what they hold: a strip is
- * a fixed 120 px, so a tier is as wide as its strips and the bay spends what is
- * left on the widest one.
- */
+/* The bay's tiers (visual overhaul, the Console). The bay is 1680 px and the
+   page keeps a 16 px margin in it, so the tiers have 1648 px: Inputs is the
+   40 px scale gutter and 4 strips, Playback the gutter and 6, at 150 px a
+   strip and 4 px between, and a hairline between the tiers in 28 px. The
+   strips' rows are declared here once, for the strips and the gutters. */
 
 .tieredMixer {
+  --console-strip-width: 150px;
+  --console-strip-gap: 4px;
+  --console-gutter: 40px;
+  --console-strip-rows: 28px 40px 48px 28px minmax(0, 1fr);
+  --console-strip-row-gap: 8px;
+  --console-strip-padding: 8px 6px;
+
   position: relative;
-  flex: 1 1 auto;
   display: flex;
-  gap: 0;
+  height: 100%;
   min-height: 0;
-  /* Slice 10: never wider than the bay gives it, so the three tiers are made
-     to share what there is instead of running off the canvas' right edge. */
   max-width: 100%;
-  /* Visual overhaul A, Slice 10: no horizontal padding here, only the bay's.
-     The shell (overhaul 3): the bay is 1680 px and the page keeps a 16 px
-     margin in it, so the tiers have 1648 px: 4 + 6 + 3 strips at 120 px, 4 px
-     between them and 24 px per hairline divider. Any more and the Outputs tier
-     is squeezed below its lanes and the canvas clips what spills. */
   padding: 16px 0;
 }
 
-.mixerTier {
-  position: relative;
-  z-index: 2;
+.tier {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: none;
   min-height: 0;
   min-width: 0;
 }
 
-.mixerTier + .mixerTier {
-  margin-left: 12px;
-  padding-left: 11px;
+.tier + .tier {
+  margin-left: 13px;
+  padding-left: 14px;
   border-left: 1px solid var(--material-line);
 }
 
-.outputTier {
-  flex: 1;
-}
-
-.tierLabel {
+/* The tier's head: a section head (DESIGN.md §7) that also pages the banks.
+   Laid out at zero width and filled to the tier, it never sets the tier's
+   width: the strips do. */
+.head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-  height: 24px;
-  padding: 0 2px;
-  cursor: pointer;
-  /* Visual overhaul A, Slice 10: a tier is as wide as its strips (the note at
-     the top of this file), so the head must not be what sets that width. A
-     head carrying a lock note ran 170 px wider than the four strips under it,
-     and those 170 px came off the Outputs tier — whose lanes the canvas then
-     clipped, so Phones B could not be read at all. Laid out at zero width and
-     then filled to the tier, the head reads the width the strips decide. */
+  align-items: center;
+  gap: 12px;
   width: 0;
   min-width: 100%;
-  overflow: hidden;
-}
-
-.tierHeaderLead {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.tierTitle {
-  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
-  color: var(--text-text);
-  flex: none;
-}
-
-/* New pages program, Slice 3 (decision 3): the Inputs heading's Previous bank
-   and Next bank keys (the design system's 24 px icon buttons). They never
-   shrink, and the heading that carries them centres its line instead of
-   aligning baselines, so the 24 px keys and the 24 px chips both fill the
-   24 px head without being cut at the top or the bottom. */
-.tierBankKeys {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-}
-
-.tierLabel[data-bank-keys],
-.tierLabel[data-bank-keys] .tierHeaderLead {
-  align-items: center;
-}
-
-.tierDetail {
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--text-text2);
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* The lock note stands on the tier the hand is reaching for. */
-.tierLockNote {
-  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--role-yellow-text);
-  /* Visual overhaul A, Slice 10: a tier is as wide as its strips (the note at
-     the top of this file), so nothing in its head may set that width. This note
-     would not shrink, so a head carrying one ran 170 px wider than the four
-     strips under it — and those 170 px came off the Outputs tier, which then
-     clipped Phones B off the canvas entirely. It shrinks now, and says so with
-     an ellipsis; the same sentence is on the state display beside it. */
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.tierLockNote[data-tone="error"] {
-  color: var(--role-coral-text);
-}
-
-.tierChipRow {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-}
-
-.tierChip {
-  min-height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--material-line2);
-  border-radius: var(--radius-ctl);
-  background: transparent;
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  height: 34px;
+  border-bottom: 2px solid var(--material-line2);
   cursor: pointer;
 }
 
-.tierChip[data-active="true"] {
-  border-color: var(--role-yellow-line);
-  background: var(--role-yellow-fill-top);
-  color: var(--role-yellow-text);
+.title {
+  flex: none;
+  font: 700 var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+  color: var(--text-text);
+  white-space: nowrap;
 }
 
-.tierMeterEyebrow {
+.bank {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  flex: 0 1 auto;
-  min-width: 0;
+  gap: 4px;
+  flex: none;
   cursor: default;
 }
 
-.tierMeterSimChip {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  font-weight: 400;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: var(--radius-ctl);
-  background: var(--bg-2);
-  color: var(--fg-3);
-  border: 1px solid var(--line);
+.bankReadout {
+  display: inline-block;
+  min-width: 48px;
+  text-align: center;
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text2);
+}
+
+.detail {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
 }
 
-.tierPeakHoldSwitch {
+/* The lock note stands on the tier the hand is reaching for. */
+.lockNote {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  color: var(--role-yellow-text);
+}
+
+.lockNote[data-tone="error"] {
+  color: var(--role-coral-text);
+}
+
+.filter {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-text2);
+}
+
+.actions {
   display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-ctl);
-  background: var(--bg-2);
+  margin-left: auto;
+  flex: none;
+  cursor: default;
 }
 
-/* Segmented control: the Hold/Reset options compose the shared
-   `.segmentedToggle` reset (see AudioWorkspace) and keep their mono caption
-   geometry + neutral active treatment local. */
-.tierPeakHoldOption {
-  composes: segmentedToggle from "../AudioWorkspace.module.css";
-  border: 0;
-  background: transparent;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  line-height: 1;
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 4px 8px;
-  border-radius: var(--radius-ctl);
-  transition:
-    background var(--motion-duration-exit) var(--easing),
-    color var(--motion-duration-exit) var(--easing);
-}
-
-.tierPeakHoldOption:hover {
-  color: var(--fg);
-}
-
-.tierPeakHoldOption[data-active="true"],
-.tierPeakHoldOption[aria-pressed="true"] {
-  background: var(--bg-elev);
-  color: var(--fg);
-}
-
-.tierLaneGrid,
-.outputLaneGrid {
+.body {
   display: flex;
-  /* The shell (overhaul 3): 4 px between strips, Atrium's 120 px pitch, so the
-     three tiers fit the 1648 px a 1680 px bay leaves inside its margin. */
-  gap: 4px;
-  align-items: stretch;
+  gap: var(--console-strip-gap);
   flex: 1;
   min-height: 0;
+}
+
+/* The gutter has the strip's rows and box, so its scale stands on the
+   grooves' travel (the groove's travel is 14 px inside its box). */
+.gutter {
+  width: var(--console-gutter);
+  flex: none;
+  display: grid;
+  grid-template-rows: var(--console-strip-rows);
+  row-gap: var(--console-strip-row-gap);
+  padding: 8px 0;
+  border: 2px solid transparent;
+}
+
+.scale {
+  grid-row: 5;
+  position: relative;
+  margin: 14px 0;
+}
+
+.scaleMark {
+  position: absolute;
+  right: 2px;
+  transform: translateY(50%);
+  padding: 1px 3px;
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text3);
+  white-space: nowrap;
+}
+
+.lanes {
+  display: flex;
+  gap: var(--console-strip-gap);
+  min-height: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
-.tierLaneGrid::-webkit-scrollbar,
-.outputLaneGrid::-webkit-scrollbar {
-  height: 6px;
+.tier[data-size="inputs"] .lanes {
+  width: calc(4 * var(--console-strip-width) + 3 * var(--console-strip-gap));
 }
 
-.tierLaneGrid::-webkit-scrollbar-thumb,
-.outputLaneGrid::-webkit-scrollbar-thumb {
-  background: var(--line-2);
-  border-radius: var(--radius-ctl);
+.tier[data-size="playback"] .lanes {
+  width: calc(6 * var(--console-strip-width) + 5 * var(--console-strip-gap));
 }
 
 .emptyTier {
@@ -241,9 +172,6 @@
   display: grid;
   place-items: center;
   padding: 32px;
-  color: var(--audio-caption-muted);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font: 400 var(--font-size-body) / 1.3 var(--font-family-ui);
+  color: var(--text-text3);
 }

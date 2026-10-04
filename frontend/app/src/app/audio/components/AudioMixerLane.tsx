@@ -1,77 +1,32 @@
-import { useMemo, type MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { Key, LampWord, Readout } from "@sse/design-system";
+import { ArmKey, Groove, Key, MenuButton, Meter, Readout, type UseArmResult } from "@sse/design-system";
 
 import styles from "./AudioMixerLane.module.css";
-import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
+import { AudioGainEntryDialog, AudioLevelEntryDialog, clampPreampGain } from "./AudioEntryDialogs";
+import { audioPhantomKey } from "../audioArming";
+import { AUDIO_ARM_TIMEOUT_MS, AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
-import { formatAudioDb } from "../audioFormatting";
+import { AUDIO_FADER_TICKS } from "../audioFaderScale";
+import { AUDIO_FADER_UNITY, AUDIO_FADER_UNITY_SNAP, formatAudioDb, meterFill } from "../audioFormatting";
 import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLevel } from "../audioViewModel";
+import { buildChannelMenu } from "./audioChannelMenu";
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
-import { AudioStripFader } from "./AudioStripFader";
-import { AudioStripGainKey } from "./AudioStripGainKey";
 
-// Visual overhaul A, Slice 4b (system §7 "Strip", plan Slice 4): every strip
-// reads in the desk's order — name, the value it is set to, what feeds it, the
-// two keys pressed during a take, then the fader block. Everything read or
-// pressed sits within one glance of the name; only the fader block grows.
+// The strip (visual overhaul, the Console): the name on one line, the level it
+// sends into the mix target, M and S, the tools row (48 V and the preamp's gain
+// on an input, the strip's ⋯ at its end), then the fader and its meter in the
+// rest of the height. The scale is printed once per tier, in the gutter
+// beside the first strip, on the same rows. Every other command is in the
+// strip's menu: its ⋯, or a right-click on the strip, opens the same menu.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
+type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 
-function inputPreampNumber(channelId: string) {
-  const raw = Number(channelId.match(/\d+/g)?.at(-1) ?? 1);
-  if (!Number.isFinite(raw)) return 1;
-  return raw >= 9 ? raw - 8 : raw;
-}
-
-// The line under the strip's name: what the desk says this strip is. Inputs
-// name their preamp and its input type, playback and outputs their format.
-function channelSubtitle(channel: AudioChannelEntry) {
-  if (audioChannelSupportsGain(channel)) {
-    return `Preamp ${inputPreampNumber(channel.id)} · ${channel.instrument ? "Hi-Z" : "mic"}`;
-  }
-  const group = getAudioChannelGroup(channel);
-  return `${channel.stereo ? "Stereo" : "Mono"}${group ? ` · ${group}` : ""}`;
-}
-
-function outputSubtitle(mixTarget: AudioMixTargetEntry) {
-  if (mixTarget.role === "phones-a") return "Cue A";
-  if (mixTarget.role === "phones-b") return "Cue B";
-  if (mixTarget.role === "main-out") return "Monitor bus";
-  return "Line out";
-}
-
-function outputTag(mixTarget: AudioMixTargetEntry) {
-  if (mixTarget.role === "phones-a") return "cue A";
-  if (mixTarget.role === "phones-b") return "cue B";
-  if (mixTarget.role === "main-out") return "monitor";
-  return "line";
-}
-
-export function AudioChannelLane({
-  actionsAllowed,
-  armedActionKey,
-  channel,
-  clearDraftValueLater,
-  commitChannelContinuous,
-  draftStore,
-  feeding,
-  getDraftValue,
-  lockedReason,
-  meterEmpty,
-  onClearClip,
-  onOpenContextMenu,
-  onSelect,
-  onTogglePhantom,
-  onUpdateChannel,
-  otherSends,
-  setDraftValue,
-  selected,
-  selectedMixTargetId,
-}: {
+export interface AudioChannelLaneProps {
   actionsAllowed: boolean;
+  arm: UseArmResult;
   armedActionKey: string | null;
   channel: AudioChannelEntry;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
@@ -80,18 +35,49 @@ export function AudioChannelLane({
   feeding: boolean;
   getDraftValue: (key: string, fallback: number) => number;
   lockedReason?: string;
+  /** The menu's short reason for a locked item ("desk NOT VERIFIED"); null when unlocked. */
+  menuLock: string | null;
   /** No metering is arriving: the well carries its reference and nothing else. */
   meterEmpty?: boolean;
+  mixTargets: readonly AudioMixTargetEntry[];
   onClearClip: (channelId: string) => void;
-  onOpenContextMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
+  onResetToUnity: (channelId: string) => void;
   onSelect: (channelId: string) => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  otherSends: readonly { id: string; name: string; level: number }[];
+  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   setDraftValue: (key: string, value: number) => void;
   selected: boolean;
-  selectedMixTargetId: string | null;
-}) {
+  selectedMixTarget: AudioMixTargetEntry | null;
+}
+
+export function AudioChannelLane({
+  actionsAllowed,
+  arm,
+  armedActionKey,
+  channel,
+  clearDraftValueLater,
+  commitChannelContinuous,
+  draftStore,
+  feeding,
+  getDraftValue,
+  lockedReason,
+  menuLock,
+  meterEmpty,
+  mixTargets,
+  onClearClip,
+  onResetToUnity,
+  onSelect,
+  onTogglePhantom,
+  onUpdateChannel,
+  onUpdateChannelSendMode,
+  setDraftValue,
+  selected,
+  selectedMixTarget,
+}: AudioChannelLaneProps) {
+  const stripRef = useRef<HTMLElement | null>(null);
+  const [entry, setEntry] = useState<"level" | "gain" | null>(null);
+  const selectedMixTargetId = selectedMixTarget?.id ?? null;
   const sendDraftKey = `channel:${channel.id}:send:${selectedMixTargetId ?? "none"}`;
   const sendLevel = useAudioControlDraftValue(
     draftStore,
@@ -102,14 +88,47 @@ export function AudioChannelLane({
   const gain = useAudioControlDraftValue(draftStore, gainDraftKey, getDraftValue(gainDraftKey, channel.gain));
   const supportsPreamp = audioChannelSupportsGain(channel);
   const group = getAudioChannelGroup(channel);
-  const phantomArmKey = `phantom:${channel.id}:${!channel.phantom}`;
+  const phantomArmKey = audioPhantomKey(channel.id, !channel.phantom);
+  const phantomArmed = armedActionKey === phantomArmKey;
   const throttledSendCommit = useMemo(
     () => createThrottledCommit<AudioChannelUpdate>(commitChannelContinuous, AUDIO_THROTTLE_FADER_MS),
     [commitChannelContinuous]
   );
+  const commitSend = (value: number) => {
+    setDraftValue(sendDraftKey, value);
+    throttledSendCommit.schedule({
+      channelId: channel.id,
+      fader: value,
+      mixTargetId: selectedMixTargetId ?? undefined,
+    });
+    throttledSendCommit.flush();
+    clearDraftValueLater(sendDraftKey);
+  };
+  const commitGain = (next: number) => {
+    setDraftValue(gainDraftKey, next);
+    commitChannelContinuous({ channelId: channel.id, gain: next });
+    clearDraftValueLater(gainDraftKey);
+  };
+
+  const menu = buildChannelMenu({
+    channel,
+    gain,
+    sendLevel,
+    selectedMixTarget,
+    mixTargets,
+    menuLock,
+    onRequestLevel: () => setEntry("level"),
+    onRequestGain: () => setEntry("gain"),
+    onResetToUnity,
+    onClearClip,
+    onUpdateChannel,
+    onUpdateChannelSendMode,
+    testIdPrefix: `audio-lane-menu-${channel.id}`,
+  });
 
   return (
     <article
+      ref={stripRef}
       className={styles.strip}
       data-audio-channel-id={channel.id}
       data-clip={channel.clip}
@@ -121,89 +140,28 @@ export function AudioChannelLane({
       data-selected={selected}
       data-testid={`audio-strip-${channel.id}`}
       onClick={() => onSelect(channel.id)}
-      onContextMenuCapture={(event) => onOpenContextMenu(event, channel.id)}
     >
-      <div className={styles.stripHead}>
-        <span className={styles.stripName} data-testid={`audio-lane-name-${channel.id}`}>
-          {channel.name}
-        </span>
-        <span className={styles.stripSub}>{channelSubtitle(channel)}</span>
-      </div>
+      <span className={styles.name} data-testid={`audio-lane-name-${channel.id}`}>
+        {channel.name}
+      </span>
 
       <Readout
-        className={styles.stripReadout}
-        value={formatAudioDb(sendLevel)}
+        className={styles.readout}
+        size="readout"
+        value={formatAudioDb(sendLevel).replace(/ dB$/, "")}
+        unit="dB"
         empty={!feeding && !channel.mute}
         testId={`audio-lane-readout-${channel.id}`}
       />
 
-      <div className={styles.stripPre}>
-        {supportsPreamp ? (
-          <>
-            {/* 48 V is the one control on the strip that can damage a source,
-                so it is a hazard key: it arms, then applies. */}
-            <Key
-              mode="hazard"
-              cap="48 V"
-              lit={channel.phantom}
-              data-armed={armedActionKey === phantomArmKey ? "true" : "false"}
-              data-control="phantom"
-              locked={!actionsAllowed}
-              reason={lockedReason}
-              size="small"
-              take
-              testId={`audio-lane-phantom-${channel.id}`}
-              aria-label={`${channel.phantom ? "Switch off" : "Switch on"} 48 V on ${channel.name}`}
-              aria-pressed={channel.phantom}
-              title={`48 V phantom ${channel.phantom ? "on" : "off"} — press twice to change it`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onTogglePhantom({
-                  channelId: channel.id,
-                  channelName: channel.name,
-                  phantom: !channel.phantom,
-                });
-              }}
-            />
-            <AudioStripGainKey
-              channelId={channel.id}
-              disabled={!actionsAllowed}
-              gain={gain}
-              label={`${channel.name} preamp gain`}
-              lockedReason={lockedReason}
-              onCommit={(nextGain) => {
-                setDraftValue(gainDraftKey, nextGain);
-                commitChannelContinuous({ channelId: channel.id, gain: nextGain });
-                clearDraftValueLater(gainDraftKey);
-              }}
-              onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
-            />
-          </>
-        ) : (
-          <>
-            <span className={styles.stripTag}>{channel.stereo ? "stereo" : "mono"}</span>
-            <span className={styles.stripSends} data-testid={`audio-lane-sends-${channel.id}`}>
-              {otherSends.map((send) => (
-                <span key={send.id} className={styles.stripSendRow}>
-                  <span>{send.name}</span>
-                  <b>{formatAudioDb(send.level)}</b>
-                </span>
-              ))}
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Visual overhaul B: no tooltip on M and S. They are take-time keys with
-          take-time keys above (48 V, gain) and below (the fader), and their
-          names already say "Mute <name>" (DESIGN.md §9). */}
-      <div className={styles.stripKeys}>
+      <div className={styles.keys}>
         <Key
           mode="toggle"
           cap="M"
           engaged={channel.mute}
           locked={!actionsAllowed}
           reason={lockedReason}
+          size="large"
           take
           className={styles.stripKey}
           data-control="mute"
@@ -221,6 +179,7 @@ export function AudioChannelLane({
           engaged={channel.solo}
           locked={!actionsAllowed}
           reason={lockedReason}
+          size="large"
           take
           className={styles.stripKey}
           data-control="solo"
@@ -234,178 +193,123 @@ export function AudioChannelLane({
         />
       </div>
 
-      {channel.clip ? (
-        <Key
-          mode="danger"
-          cap="Clip"
-          className={styles.stripClip}
-          size="small"
-          testId={`audio-lane-clip-${channel.id}`}
-          aria-label={`Clear clip for ${channel.name}`}
-          title="Clear clip hold"
-          onClick={(event) => {
-            event.stopPropagation();
-            onClearClip(channel.id);
+      <div className={styles.tools}>
+        {supportsPreamp ? (
+          <>
+            {/* 48 V is the one control on the strip that can damage a source,
+                so it is a hazard key: it arms, then applies. */}
+            <ArmKey
+              armed={phantomArmed}
+              hazard
+              lit={channel.phantom}
+              armedWord={channel.phantom ? "48 V OFF?" : "48 V ON?"}
+              timeoutMs={AUDIO_ARM_TIMEOUT_MS}
+              countdownTestId={`audio-lane-phantom-countdown-${channel.id}`}
+              cap={phantomArmed ? undefined : "48 V"}
+              className={styles.phantomKey}
+              data-control="phantom"
+              locked={!actionsAllowed}
+              reason={lockedReason}
+              size="small"
+              take
+              testId={`audio-lane-phantom-${channel.id}`}
+              aria-label={`${channel.phantom ? "Switch off" : "Switch on"} 48 V on ${channel.name}`}
+              aria-pressed={channel.phantom}
+              title={`48 V phantom ${channel.phantom ? "on" : "off"} — press twice to change it`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onTogglePhantom({ channelId: channel.id, channelName: channel.name, phantom: !channel.phantom });
+              }}
+            />
+            {phantomArmed ? null : (
+              <span
+                className={styles.gain}
+                data-control="gain"
+                data-channel={channel.id}
+                data-testid={`audio-lane-gain-${channel.id}`}
+                aria-label={`${channel.name} preamp gain ${clampPreampGain(gain)} dB`}
+              >
+                {clampPreampGain(gain)}
+                <span className={styles.unit}> dB</span>
+              </span>
+            )}
+          </>
+        ) : null}
+        <span
+          className={styles.menu}
+          // A press on the ⋯ opens the menu and does not select the strip, as
+          // a right-click does not.
+          onClick={(event) => event.stopPropagation()}
+        >
+          <MenuButton
+            buttonLabel={`${channel.name} menu`}
+            buttonTestId={`audio-lane-menu-${channel.id}`}
+            contextTarget={stripRef}
+            size="sm"
+            menu={{ ...menu, arm }}
+          />
+        </span>
+      </div>
+
+      <div className={styles.fader}>
+        <Groove
+          label={`${channel.name} send level`}
+          locked={!actionsAllowed}
+          onChange={(value) => {
+            setDraftValue(sendDraftKey, value);
+            throttledSendCommit.schedule({
+              channelId: channel.id,
+              fader: value,
+              mixTargetId: selectedMixTargetId ?? undefined,
+            });
+          }}
+          onCommit={commitSend}
+          onRequestTypedEntry={actionsAllowed ? () => setEntry("level") : undefined}
+          snapUnity
+          take
+          ticks={AUDIO_FADER_TICKS}
+          unity={AUDIO_FADER_UNITY}
+          unitySnap={AUDIO_FADER_UNITY_SNAP}
+          value={sendLevel}
+          valueText={formatAudioDb(sendLevel)}
+        />
+        <Meter
+          className={styles.meter}
+          clip={channel.clip}
+          empty={meterEmpty}
+          label={`${channel.name} meter`}
+          level={meterFill(channel.meterLeft)}
+          levelRight={channel.stereo ? meterFill(channel.meterRight) : undefined}
+          meterId={channel.id}
+          meterKind="channel"
+          peak={meterFill(channel.peakHoldLeft)}
+          peakRight={channel.stereo ? meterFill(channel.peakHoldRight) : undefined}
+          testId={`audio-lane-meter-${channel.id}`}
+        />
+      </div>
+
+      {entry === "level" ? (
+        <AudioLevelEntryDialog
+          title={`Set ${channel.name} send level`}
+          value={sendLevel}
+          onCancel={() => setEntry(null)}
+          onConfirm={(next) => {
+            setEntry(null);
+            commitSend(next);
           }}
         />
       ) : null}
-
-      <AudioStripFader
-        clip={channel.clip}
-        disabled={!actionsAllowed}
-        empty={meterEmpty}
-        label={`${channel.name} send level`}
-        level={channel.meterLeft}
-        levelRight={channel.stereo ? channel.meterRight : undefined}
-        meterId={channel.id}
-        meterKind="channel"
-        meterLabel={`${channel.name} meter`}
-        onCommit={(value) => {
-          setDraftValue(sendDraftKey, value);
-          throttledSendCommit.schedule({
-            channelId: channel.id,
-            fader: value,
-            mixTargetId: selectedMixTargetId ?? undefined,
-          });
-          throttledSendCommit.flush();
-          clearDraftValueLater(sendDraftKey);
-        }}
-        onPreview={(value) => {
-          setDraftValue(sendDraftKey, value);
-          throttledSendCommit.schedule({
-            channelId: channel.id,
-            fader: value,
-            mixTargetId: selectedMixTargetId ?? undefined,
-          });
-        }}
-        peak={channel.peakHoldLeft}
-        peakRight={channel.stereo ? channel.peakHoldRight : undefined}
-        value={sendLevel}
-      />
-    </article>
-  );
-}
-
-export function AudioOutputLane({
-  actionsAllowed,
-  clearDraftValueLater,
-  commitMixTargetContinuous,
-  draftStore,
-  getDraftValue,
-  lockedReason,
-  meterEmpty,
-  mixTarget,
-  onSelect,
-  onUpdateMixTarget,
-  setDraftValue,
-  selected,
-}: {
-  actionsAllowed: boolean;
-  clearDraftValueLater: (key: string, delayMs?: number) => void;
-  commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
-  draftStore: AudioControlDraftStore;
-  getDraftValue: (key: string, fallback: number) => number;
-  lockedReason?: string;
-  meterEmpty?: boolean;
-  mixTarget: AudioMixTargetEntry;
-  onSelect: (mixTargetId: string) => void;
-  onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
-  setDraftValue: (key: string, value: number) => void;
-  selected: boolean;
-}) {
-  const isMainOut = mixTarget.role === "main-out";
-  const volumeDraftKey = `mixTarget:${mixTarget.id}:volume`;
-  const volume = useAudioControlDraftValue(draftStore, volumeDraftKey, getDraftValue(volumeDraftKey, mixTarget.volume));
-  const throttledVolumeCommit = useMemo(
-    () => createThrottledCommit<AudioMixTargetUpdate>(commitMixTargetContinuous, AUDIO_THROTTLE_FADER_MS),
-    [commitMixTargetContinuous]
-  );
-
-  return (
-    <article
-      className={styles.strip}
-      data-audio-output-id={mixTarget.id}
-      data-role={mixTarget.role}
-      data-lit={selected ? "" : undefined}
-      data-selected={selected}
-      data-testid={`audio-output-${mixTarget.id}`}
-      onClick={() => onSelect(mixTarget.id)}
-    >
-      <div className={styles.stripHead}>
-        <span className={styles.stripName} data-testid={`audio-lane-name-${mixTarget.id}`}>
-          {mixTarget.name}
-        </span>
-        <span className={styles.stripSub}>{outputSubtitle(mixTarget)}</span>
-      </div>
-
-      <Readout
-        className={styles.stripReadout}
-        value={formatAudioDb(volume)}
-        testId={`audio-lane-readout-${mixTarget.id}`}
-      />
-
-      <div className={styles.stripPre}>
-        <span className={styles.stripTag} data-active={selected} data-testid={`audio-lane-tag-${mixTarget.id}`}>
-          {selected ? "mix target" : outputTag(mixTarget)}
-        </span>
-        {/* Dim and mono are the control room's, Main Out's alone: TotalMix has
-            none for the phones, and nothing is sent for them (the owner's
-            decision, 2026-09-28). The phones' strips show no lamp for them. */}
-        {isMainOut ? (
-          <span className={styles.stripLamps} data-testid={`audio-lane-lamps-${mixTarget.id}`}>
-            <LampWord cap={false} tone={mixTarget.dim ? "attention" : "off"}>
-              dim
-            </LampWord>
-            <LampWord cap={false} tone={mixTarget.mono ? "attention" : "off"}>
-              mono
-            </LampWord>
-          </span>
-        ) : null}
-      </div>
-
-      <div className={styles.stripKeys}>
-        <Key
-          mode="toggle"
-          cap="M"
-          engaged={mixTarget.mute}
-          locked={!actionsAllowed}
-          reason={lockedReason}
-          take
-          className={styles.stripKey}
-          data-control="mute"
-          data-active={mixTarget.mute}
-          aria-label={`Mute ${mixTarget.name}`}
-          aria-pressed={mixTarget.mute}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateMixTarget({ mixTargetId: mixTarget.id, mute: !mixTarget.mute });
+      {entry === "gain" ? (
+        <AudioGainEntryDialog
+          title={`Set ${channel.name} preamp gain`}
+          gain={gain}
+          onCancel={() => setEntry(null)}
+          onConfirm={(next) => {
+            setEntry(null);
+            commitGain(next);
           }}
         />
-      </div>
-
-      <AudioStripFader
-        disabled={!actionsAllowed}
-        empty={meterEmpty}
-        label={`${mixTarget.name} output level`}
-        level={mixTarget.meterLeft}
-        levelRight={isMainOut && mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight}
-        meterId={mixTarget.id}
-        meterKind="mixTarget"
-        meterLabel={`${mixTarget.name} meter`}
-        onCommit={(value) => {
-          setDraftValue(volumeDraftKey, value);
-          throttledVolumeCommit.schedule({ mixTargetId: mixTarget.id, volume: value });
-          throttledVolumeCommit.flush();
-          clearDraftValueLater(volumeDraftKey);
-        }}
-        onPreview={(value) => {
-          setDraftValue(volumeDraftKey, value);
-          throttledVolumeCommit.schedule({ mixTargetId: mixTarget.id, volume: value });
-        }}
-        peak={mixTarget.peakHoldLeft}
-        peakRight={mixTarget.peakHoldRight}
-        value={volume}
-      />
+      ) : null}
     </article>
   );
 }

@@ -1,57 +1,55 @@
-import { useMemo, type CSSProperties } from "react";
+import { useMemo } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import {
-  Key,
-  Latch,
-  LatchSlot,
-  MenuButton,
-  Meter,
-  Readout,
-  Section,
-  Segmented,
-  Slider,
-  StateDisplay,
-  type MenuEntry,
-} from "@sse/design-system";
+import { Key, Latch, LatchSlot, MenuButton, StateDisplay, type MenuEntry, type UseArmResult } from "@sse/design-system";
 
 import styles from "./AudioCluster.module.css";
-import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
-import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
-import { createThrottledCommit } from "../audioContinuousControls";
-import { dbfsToMeterPercent, formatAudioDb, formatAudioTimestamp, meterFill } from "../audioFormatting";
 import type { AudioArmedAction } from "../audioArming";
+import { type AudioControlDraftStore } from "../audioControlDraftStore";
+import { formatAudioTimestamp, type AudioFeedbackTone } from "../audioFormatting";
+import type { AudioLoadReport } from "../audioLoadReport";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
+import { AudioOutputs } from "./AudioOutputs";
 import { AudioSnapshotKeys } from "./AudioSnapshotKeys";
 
-// Visual overhaul A, Slice 4 (plan D1, D5, D6, D8; console-a-states): the
-// Console's cluster — the fixed left column the operator's hand learns once.
-// The state display is first and never moves; below it the take-time keys
-// (dim and mono, Main Out's whatever the mix target, the mix target, the main
-// level, the master meter),
-// the snapshot keys (TotalMix's eight, since 2026-10-01) and the standing
-// actions. Arming renders in the display and on the key, so nothing else moves
-// (finding C1).
+// The Console's cluster, the fixed left column the operator's hand learns once
+// (visual overhaul, the Console). The state display is first and never moves,
+// with the page's ⋯ holding the Console's standing commands; the latch slot
+// under it; then the outputs block (DIM, MONO and the three outputs, graft 1)
+// and TotalMix's eight snapshots. What the last load read back, or a message
+// from the last action, stands at the column's foot, so nothing above it ever
+// moves and the bay never shrinks. Arming renders in the display and on the
+// key (finding C1).
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
-// The marks the mock prints under the monitor meter, in dBFS.
-const MASTER_METER_MARKS = [-60, -40, -30, -18, -12, -6, 0] as const;
+export interface AudioClusterFeedback {
+  message: string;
+  tone: AudioFeedbackTone;
+}
 
 export interface AudioClusterProps {
+  arm: UseArmResult;
   armedAction: AudioArmedAction | null;
   busyAction: string | null;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
   draftStore: AudioControlDraftStore;
+  feedback: AudioClusterFeedback | null;
   getDraftValue: (key: string, fallback: number) => number;
+  loadReport: AudioLoadReport | null;
   onClearAllSolo: () => void;
   onClearClips: () => void;
+  onDismissLoadReport: () => void;
   onLoadSnapshot: (slot: number) => void;
   onOpenSetup: () => void;
+  onResetPeakHolds: () => void;
   onRunAudioProbe: () => void;
   onSelectMixTarget: (mixTargetId: string) => void;
+  onShowOutput: (mixTargetId: string) => void;
   onSync: () => void;
+  onTogglePeakHold: () => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
+  peakHoldEnabled: boolean;
   setDraftValue: (key: string, value: number) => void;
   viewModel: AudioWorkspaceViewModel;
 }
@@ -76,31 +74,49 @@ function wayOutFor(label: string): "probe" | "sync" | "setup" | "failed" | null 
   }
 }
 
+/**
+ * The words of the state display's armed row. A strip menu's "Turn 48 V off…"
+ * arms `menu:phantom:<channel>:false` with its own words; the row names the
+ * channel, as the strip's 48 V key does.
+ */
+function armedRowWords(armed: AudioArmedAction, viewModel: AudioWorkspaceViewModel) {
+  const menuPhantom = /^menu:phantom:(.+):(true|false)$/.exec(armed.key);
+  if (menuPhantom) {
+    const channel = viewModel.channels.find((entry) => entry.id === menuPhantom[1]);
+    const on = menuPhantom[2] === "true";
+    return `Turn 48 V ${on ? "on" : "off"}${channel ? ` on ${channel.name}` : ""}`;
+  }
+  return armed.label;
+}
+
 export function AudioCluster({
+  arm,
   armedAction,
   busyAction,
   clearDraftValueLater,
   commitMixTargetContinuous,
   draftStore,
+  feedback,
   getDraftValue,
+  loadReport,
   onClearAllSolo,
   onClearClips,
+  onDismissLoadReport,
   onLoadSnapshot,
   onOpenSetup,
+  onResetPeakHolds,
   onRunAudioProbe,
   onSelectMixTarget,
+  onShowOutput,
   onSync,
+  onTogglePeakHold,
   onUpdateMixTarget,
+  peakHoldEnabled,
   setDraftValue,
   viewModel,
 }: AudioClusterProps) {
   const status = viewModel.status;
   const snapshot = viewModel.audioSnapshot;
-  const selectedMixTarget = viewModel.selectedMixTarget ?? viewModel.mixTargets[0] ?? null;
-  // Dim and mono are the control room's, Main Out's alone, whichever output
-  // is the mix target: TotalMix has none for the phones, and the deck's DIM
-  // dims Main Out too (the owner's decision, 2026-09-28).
-  const mainOut = viewModel.mixTargets.find((mixTarget) => mixTarget.role === "main-out") ?? null;
   const actionsAllowed = viewModel.actionsAllowed;
   const consoleLink = snapshot.consoleLink;
 
@@ -147,48 +163,61 @@ export function AudioCluster({
     </>
   );
 
-  const volumeDraftKey = `mixTarget:${selectedMixTarget?.id ?? "none"}:volume`;
-  const volume = useAudioControlDraftValue(
-    draftStore,
-    volumeDraftKey,
-    getDraftValue(volumeDraftKey, selectedMixTarget?.volume ?? 0)
-  );
-  const throttledVolumeCommit = useMemo(
-    () => createThrottledCommit<AudioMixTargetUpdate>(commitMixTargetContinuous, AUDIO_THROTTLE_FADER_MS),
-    [commitMixTargetContinuous]
-  );
-
-  const lockedReason = actionsAllowed ? undefined : (status.warningBody ?? `The desk is ${status.label}.`);
-  // The shell (overhaul 3): the page's ⋯ on the state display. Until the
-  // Console's own pull request it holds the Console row's commands, with the
-  // same handlers and the same locks.
+  // The page's ⋯ (the shell, overhaul 3): the Console's standing commands. Since
+  // the Console's own pull request it is their only home; the items keep the
+  // test ids the standing keys had.
   const syncLocked = !viewModel.capabilities.canSync
     ? "TotalMix cannot be read now"
     : busyAction === "audio-sync"
       ? "a sync is running"
-      : undefined;
+      : null;
+  const clearClipsLocked = !viewModel.capabilities.canClearClips
+    ? "OSC control is off"
+    : viewModel.healthStats.clippedChannels === 0
+      ? "no clip held"
+      : null;
   const pageMenu: MenuEntry[] = [
-    { id: "sync", label: "Sync from TotalMix", onSelect: onSync, disabledReason: syncLocked },
-    { id: "probe", label: "Run audio probe", onSelect: onRunAudioProbe },
+    {
+      id: "sync",
+      label: "Sync from TotalMix",
+      onSelect: onSync,
+      disabledReason: syncLocked,
+      testId: "audio-topbar-sync",
+    },
+    { id: "probe", label: "Run audio probe", onSelect: onRunAudioProbe, testId: "audio-topbar-probe" },
     {
       id: "clear-clips",
       label: "Clear clips",
-      onSelect: onClearClips,
-      disabledReason: viewModel.capabilities.canClearClips ? undefined : "no clip held",
+      onSelect: () => onClearClips(),
+      disabledReason: clearClipsLocked,
+      testId: "audio-clear-clips",
     },
-    { kind: "divider", id: "divider" },
-    { id: "setup", label: "Open Setup", onSelect: onOpenSetup },
+    { kind: "divider", id: "meters" },
+    {
+      kind: "check",
+      id: "peak-hold",
+      label: "Peak hold",
+      checked: peakHoldEnabled,
+      onCheckedChange: () => onTogglePeakHold(),
+      testId: "audio-peak-hold-toggle",
+    },
+    { id: "reset-peaks", label: "Reset peaks", onSelect: onResetPeakHolds, testId: "audio-peak-hold-reset" },
+    { kind: "divider", id: "setup-divider" },
+    { id: "setup", label: "Open Setup", onSelect: onOpenSetup, testId: "audio-topbar-setup" },
   ];
   // Slice 8 (system §9): the desk's fault code is its own field, so nothing
   // leads a sentence with it. The state display puts it in its small slot; the
   // locked reasons and tooltips read the sentence alone.
   const failureCode = status.warningCode ?? undefined;
   const stateSentence = status.warningBody ?? viewModel.appSummary;
-  const meterEmpty = viewModel.meterSimulationState === "gated";
-  const meterStale = String(snapshot.meteringState ?? "").toLowerCase() === "stale";
 
   return (
-    <div className={styles.cluster} data-testid="audio-monitor-bar" data-audio-cluster="">
+    <div
+      className={styles.cluster}
+      data-testid="audio-monitor-bar"
+      data-audio-cluster=""
+      data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
+    >
       <StateDisplay
         tone={status.tone}
         word={status.label}
@@ -199,7 +228,7 @@ export function AudioCluster({
         armed={
           armedAction
             ? {
-                text: `${armedAction.label} · press again to apply`,
+                text: `${armedRowWords(armedAction, viewModel)} · press again to apply`,
                 timeoutMs: armedAction.timeoutMs,
               }
             : null
@@ -209,7 +238,7 @@ export function AudioCluster({
           <MenuButton
             buttonLabel="Audio menu"
             buttonTestId="audio-page-menu"
-            menu={{ head: { title: "Audio" }, items: pageMenu }}
+            menu={{ head: { title: "Audio" }, items: pageMenu, arm }}
           />
         }
       />
@@ -222,8 +251,14 @@ export function AudioCluster({
           <Latch
             who="Solo"
             action={
-              <Key size="small" testId="audio-topbar-solo" onClick={onClearAllSolo} disabled={!actionsAllowed}>
-                Clear all solo
+              <Key
+                size="small"
+                testId="audio-topbar-solo"
+                aria-label="Clear all solo"
+                onClick={onClearAllSolo}
+                disabled={!actionsAllowed}
+              >
+                Clear all
               </Key>
             }
             testId="audio-solo-warning-band"
@@ -240,10 +275,10 @@ export function AudioCluster({
                 size="small"
                 testId="audio-clip-clear-clips"
                 aria-label="Clear clips"
-                onClick={onClearClips}
+                onClick={() => onClearClips()}
                 disabled={!viewModel.capabilities.canClearClips}
               >
-                Clear clips
+                Clear
               </Key>
             }
             testId="audio-clip-warning-band"
@@ -253,115 +288,19 @@ export function AudioCluster({
         ) : null}
       </LatchSlot>
 
-      <div className={styles.monitorRow}>
-        <Key
-          mode="toggle"
-          cap="Dim"
-          hint="-20 dB"
-          engaged={mainOut?.dim ?? false}
-          locked={!actionsAllowed}
-          reason={lockedReason}
-          take
-          testId="audio-monitor-dim"
-          data-active={mainOut?.dim ?? false}
-          data-control="dim"
-          onClick={() => mainOut && onUpdateMixTarget({ mixTargetId: mainOut.id, dim: !mainOut.dim })}
-        />
-        <Key
-          mode="toggle"
-          cap="Mono"
-          hint="L+R"
-          engaged={mainOut?.mono ?? false}
-          locked={!actionsAllowed}
-          reason={lockedReason}
-          take
-          testId="audio-monitor-mono"
-          data-active={mainOut?.mono ?? false}
-          data-control="mono"
-          onClick={() => mainOut && onUpdateMixTarget({ mixTargetId: mainOut.id, mono: !mainOut.mono })}
-        />
-      </div>
-
-      <span className={styles.mixTargetCaption}>Mix target · faders set sends into</span>
-      <Segmented label="Mix target" testId="audio-mix-target-group">
-        {viewModel.mixTargets.map((mixTarget) => (
-          <Key
-            key={mixTarget.id}
-            mode="segmented"
-            cap={mixTarget.name}
-            engaged={mixTarget.id === viewModel.selectedMixTargetId}
-            locked={!actionsAllowed}
-            reason={lockedReason}
-            take
-            testId={`audio-mix-target-${mixTarget.id}`}
-            aria-pressed={mixTarget.id === viewModel.selectedMixTargetId}
-            onClick={() => onSelectMixTarget(mixTarget.id)}
-          />
-        ))}
-      </Segmented>
-
-      <section className={styles.mainLevel} aria-label="Main level">
-        <div className={styles.mainLevelHead}>
-          <span className={styles.mainLevelLabel}>{selectedMixTarget?.name ?? "Main Out"}</span>
-          <span className={styles.mainLevelHint}>monitor level</span>
-        </div>
-        <Readout
-          value={selectedMixTarget ? formatAudioDb(selectedMixTarget.volume) : "—"}
-          size="hero"
-          testId="audio-main-level"
-        />
-        <Slider
-          label={`${selectedMixTarget?.name ?? "Main Out"} output level`}
-          value={volume}
-          unity={0.8172}
-          locked={!actionsAllowed || !selectedMixTarget}
-          take
-          valueText={selectedMixTarget ? formatAudioDb(volume) : undefined}
-          testId="audio-main-level-slider"
-          onChange={(value) => {
-            if (!selectedMixTarget) return;
-            setDraftValue(volumeDraftKey, value);
-            throttledVolumeCommit.schedule({ mixTargetId: selectedMixTarget.id, volume: value });
-          }}
-          onCommit={(value) => {
-            if (!selectedMixTarget) return;
-            setDraftValue(volumeDraftKey, value);
-            throttledVolumeCommit.schedule({ mixTargetId: selectedMixTarget.id, volume: value });
-            throttledVolumeCommit.flush();
-            clearDraftValueLater(volumeDraftKey);
-          }}
-        />
-        <Meter
-          label={`Monitor output meter — ${selectedMixTarget?.name ?? "Main Out"}`}
-          level={meterFill(selectedMixTarget?.meterLeft ?? 0)}
-          levelRight={meterFill(
-            selectedMixTarget
-              ? selectedMixTarget.mono
-                ? selectedMixTarget.meterLeft
-                : selectedMixTarget.meterRight
-              : 0
-          )}
-          peak={meterFill(selectedMixTarget?.peakHoldLeft ?? 0)}
-          peakRight={meterFill(selectedMixTarget?.peakHoldRight ?? 0)}
-          orientation="horizontal"
-          empty={meterEmpty}
-          stale={meterStale}
-          meterId={selectedMixTarget?.id}
-          meterKind="mixTarget"
-          className={styles.masterMeter}
-          testId="audio-monitor-master-meter"
-          style={{ "--master-meter-height": "24px" } as CSSProperties}
-        />
-        {/* The scale the operator reads the bar against — the same dBFS marks
-            the strip meters carry, placed where the mock puts them. */}
-        <div className={styles.masterMeterScale} aria-hidden="true">
-          {MASTER_METER_MARKS.map((mark) => (
-            <span key={mark} style={{ left: `${dbfsToMeterPercent(mark)}%` }}>
-              {mark}
-            </span>
-          ))}
-        </div>
-      </section>
+      <AudioOutputs
+        arm={arm}
+        clearDraftValueLater={clearDraftValueLater}
+        commitMixTargetContinuous={commitMixTargetContinuous}
+        draftStore={draftStore}
+        getDraftValue={getDraftValue}
+        onResetPeakHolds={onResetPeakHolds}
+        onSelectMixTarget={onSelectMixTarget}
+        onShowOutput={onShowOutput}
+        onUpdateMixTarget={onUpdateMixTarget}
+        setDraftValue={setDraftValue}
+        viewModel={viewModel}
+      />
 
       <AudioSnapshotKeys
         actionsAllowed={viewModel.capabilities.canRecallConsoleSnapshot}
@@ -373,32 +312,39 @@ export function AudioCluster({
         source={viewModel.consoleSnapshotSource}
       />
 
-      <Section title="Console" className={styles.actions} testId="audio-standing-actions">
-        <div className={styles.actionRow}>
-          <Key
-            size="small"
-            testId="audio-topbar-sync"
-            onClick={onSync}
-            disabled={!viewModel.capabilities.canSync || busyAction === "audio-sync"}
+      {/* 2026-10-01: a TotalMix snapshot load says what the read-back brought,
+          or, when the read-back failed after the load went out, the hardware
+          link's sentence. The column's foot is its home, so it pushes nothing. */}
+      <div className={styles.foot}>
+        {loadReport ? (
+          <div
+            className={styles.notice}
+            data-tone={loadReport.readBack ? "ok" : "attention"}
+            data-testid="audio-load-report"
+            role="status"
           >
-            Sync from TotalMix
-          </Key>
-          <Key size="small" testId="audio-topbar-probe" onClick={onRunAudioProbe}>
-            Run audio probe
-          </Key>
-          <Key
-            size="small"
-            testId="audio-clear-clips"
-            onClick={onClearClips}
-            disabled={!viewModel.capabilities.canClearClips}
-          >
-            Clear clips
-          </Key>
-          <Key size="small" testId="audio-topbar-setup" onClick={onOpenSetup}>
-            Open Setup
-          </Key>
-        </div>
-      </Section>
+            <span className={styles.noticeText}>
+              <strong>
+                {loadReport.readBack ? "Loaded" : "Sent"} {loadReport.name} {loadReport.readBack ? "in" : "to"} TotalMix
+              </strong>
+              <span>{loadReport.line}</span>
+            </span>
+            <Key
+              size="small"
+              testId="audio-load-report-dismiss"
+              aria-label="Dismiss load report"
+              onClick={onDismissLoadReport}
+            >
+              Dismiss
+            </Key>
+          </div>
+        ) : null}
+        {feedback ? (
+          <div className={styles.notice} data-tone={feedback.tone} data-testid="audio-feedback" role="status">
+            <span className={styles.noticeText}>{feedback.message}</span>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

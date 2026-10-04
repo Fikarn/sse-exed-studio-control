@@ -1,9 +1,9 @@
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
-import { useAudioMeterFrame, type AudioMeterEntry, type ShellStore } from "@sse/engine-client";
+import { useEffect, useRef, useState } from "react";
+import type { AudioMeterEntry, ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioLiveMeterReadout.module.css";
 import { INSPECTOR_DB_HYSTERESIS, INSPECTOR_READOUT_INTERVAL_MS } from "../audioConstants";
-import { formatMeterDb, formatMeterPercent, METER_OVER_DBFS, METER_PEAK_WARNING_DBFS } from "../audioFormatting";
+import { METER_OVER_DBFS, METER_PEAK_WARNING_DBFS } from "../audioFormatting";
 import {
   clampMeterDbfs,
   METER_FLOOR_DBFS,
@@ -30,19 +30,6 @@ function liveEntry(store: ShellStore, kind: MeterKind, meterId: string | null): 
   const frame = store.getAudioMeterFrame();
   if (!meterId) return null;
   return kind === "channel" ? (frame.channels[meterId] ?? null) : (frame.mixTargets[meterId] ?? null);
-}
-
-function useLiveEntry(store: ShellStore, kind: MeterKind, meterId: string | null) {
-  const frame = useAudioMeterFrame(store);
-  if (!meterId) return null;
-  return kind === "channel" ? (frame.channels[meterId] ?? null) : (frame.mixTargets[meterId] ?? null);
-}
-
-function meterPair(entry: AudioMeterEntry | null, fallbackLeft: number, fallbackRight: number) {
-  return {
-    left: entry?.meterLeft ?? fallbackLeft,
-    right: entry?.meterRight ?? fallbackRight,
-  };
 }
 
 function emptyReadoutPair(): MeterReadoutPair {
@@ -230,78 +217,4 @@ export function AudioStableMeterDbPair({
       <span data-meter-readout-side="right">{readout.right.text}</span>
     </span>
   );
-}
-
-export function AudioLiveMasterHalo({
-  fallbackLeft,
-  fallbackRight,
-  mixTargetId,
-  store,
-}: {
-  fallbackLeft: number;
-  fallbackRight: number;
-  mixTargetId: string | null;
-  store: ShellStore;
-}) {
-  const entry = useLiveEntry(store, "mixTarget", mixTargetId);
-  const { left, right } = meterPair(entry, fallbackLeft, fallbackRight);
-  const masterGlow = Math.max(left, right);
-  return (
-    <span
-      className={styles.masterHalo}
-      data-testid="audio-master-halo"
-      aria-hidden="true"
-      style={{ "--master-glow": masterGlow.toFixed(3) } as CSSProperties}
-    />
-  );
-}
-
-export function AudioLiveActiveMixMeter({
-  fallbackLeft,
-  fallbackRight,
-  selectedMixTargetId,
-  store,
-}: {
-  fallbackLeft: number;
-  fallbackRight: number;
-  selectedMixTargetId: string | null;
-  store: ShellStore;
-}) {
-  const entry = useLiveEntry(store, "mixTarget", selectedMixTargetId);
-  const { left, right } = meterPair(entry, fallbackLeft, fallbackRight);
-  return (
-    <div className={styles.canvasActiveMixMeter} aria-label="Active mix level" data-testid="audio-active-mix-meter">
-      <span>Active mix</span>
-      <i
-        data-mini-meter-id={selectedMixTargetId ?? ""}
-        data-mini-meter-kind="mixTarget"
-        data-mini-meter-side="left"
-        style={{ "--meter-level": formatMeterPercent(left) } as CSSProperties}
-      />
-      <i
-        data-mini-meter-id={selectedMixTargetId ?? ""}
-        data-mini-meter-kind="mixTarget"
-        data-mini-meter-side="right"
-        style={{ "--meter-level": formatMeterPercent(right) } as CSSProperties}
-      />
-      <strong>{formatMeterDb(Math.max(left, right))}</strong>
-    </div>
-  );
-}
-
-export function AudioLiveMeterSnapshotText({
-  children,
-  fallback,
-  kind,
-  meterId,
-  store,
-}: {
-  children: (entry: AudioMeterEntry | null) => ReactNode;
-  fallback?: ReactNode;
-  kind: MeterKind;
-  meterId: string | null;
-  store: ShellStore;
-}) {
-  useAudioMeterFrame(store);
-  return <>{children(liveEntry(store, kind, meterId)) ?? fallback ?? null}</>;
 }
