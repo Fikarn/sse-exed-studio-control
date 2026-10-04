@@ -345,10 +345,26 @@ function linkLikeRig(options: { previewMode?: boolean; highlight?: string[]; sol
     async updateLightingFixture(request: FixtureUpdate) {
       const target = fixtures.find((entry) => entry.id === request.fixtureId);
       if (!target) throw notThere(request.fixtureId);
-      const { fixtureId: _fixtureId, ...fields } = request;
+      const { fixtureId: _fixtureId, controlValues, ...fields } = request;
       Object.assign(target, Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)));
+      // Laid over the fixture's controls, intensity and cct left out
+      // (`fixtures.rs`, `normalize_fixture_control_values`).
+      if (controlValues) target.controls = { ...target.controls, ...withoutLevels(controlValues) };
       changed();
       return { fixture: snapshotOf(target) };
+    },
+    async setLightingAllPower(on: boolean) {
+      for (const entry of fixtures) entry.on = on;
+      // All off ends the overlays outside Preview (`fixtures.rs`, 2026-10-05).
+      if (!on && !(options.previewMode ?? false)) {
+        highlight = [];
+        solo = [];
+      }
+      changed();
+      return {};
+    },
+    async startLightingIdentifySequence() {
+      return {};
     },
     async deleteLightingFixture(fixtureId: string) {
       const index = fixtures.findIndex((entry) => entry.id === fixtureId);
@@ -719,6 +735,64 @@ describe("Highlight and Solo in Preview", () => {
 // Finding 19: Highlight and Solo are cleared when Lighting closes. If that
 // fails, the message is read on the page the operator went to, where there is
 // no lit key: it names the way back.
+// 2026-10-05: Delete fixture's Undo brought the fixture back without its
+// catalog controls, so an INFINIBAR's Red, Green and Blue went to their
+// defaults.
+describe("the Undo of Delete fixture", () => {
+  it("brings an INFINIBAR's colours back with it", async () => {
+    const rig = linkLikeRig();
+    render(<Harness store={rig.store} />);
+    await act(async () => {
+      await rig.store.updateLightingFixture({ fixtureId: "fixture-back", controlValues: { red: 200, green: 10 } });
+    });
+    await run((lighting) => lighting.fixtureEditor.handleDeleteFixture("fixture-back"));
+    await pressUndo();
+    expect(lastMessage()).toBe("Undid ‘Delete fixture Back’.");
+    expect(rig.fixture("Back")?.controlValues).toMatchObject({ red: 200, green: 10 });
+  });
+});
+
+// 2026-10-05: a cut outside Preview ends the identify flashes on the hardware
+// link, so the page's own Find ends with it. Before, the Find key read "Stop"
+// and the rings pulsed over a dark rig until the sequence's planned end.
+describe("a cut ends the page's Find", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const startFind = async () => {
+    await run((lighting) => lighting.fixtureEditor.handleIdentifyFind());
+    await act(async () => {
+      vi.advanceTimersByTime(10);
+    });
+    expect(editor().fixtureEditor.findRunning).toBe(true);
+    expect(editor().fixtureEditor.identifyingIds.size).toBe(1);
+  };
+
+  it("CUT ALL during a Find: the key reads Find again and no ring pulses", async () => {
+    const rig = linkLikeRig();
+    render(<Harness store={rig.store} />);
+    await startFind();
+    await run((lighting) => lighting.rigControls.handleEmergencyCut());
+    expect(editor().fixtureEditor.findRunning).toBe(false);
+    expect(editor().fixtureEditor.identifyingIds.size).toBe(0);
+  });
+
+  it("Lighting off ends it too, and Lighting on leaves it", async () => {
+    const rig = linkLikeRig();
+    render(<Harness store={rig.store} />);
+    await startFind();
+    await run((lighting) => lighting.rigControls.handleToggleAllPower(true));
+    expect(editor().fixtureEditor.findRunning).toBe(true);
+    await run((lighting) => lighting.rigControls.handleToggleAllPower(false));
+    expect(editor().fixtureEditor.findRunning).toBe(false);
+    expect(editor().fixtureEditor.identifyingIds.size).toBe(0);
+  });
+});
+
 describe("leaving Lighting while Highlight or Solo is on", () => {
   it.each([
     ["Highlight", { highlight: ["fixture-key"] }],

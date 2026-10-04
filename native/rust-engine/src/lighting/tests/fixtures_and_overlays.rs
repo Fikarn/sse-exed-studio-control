@@ -1162,3 +1162,151 @@ fn identify_sequence_respects_unreachable_bridge() {
         "first scheduled burst should overlay snapshot regardless of reachability"
     );
 }
+
+fn highlight(test_dir: &TestDir, fixture_id: &str, mode: FixtureHighlightMode) {
+    set_lighting_fixture_highlight(
+        test_dir.db_path().as_path(),
+        &LightingFixtureHighlightRequest {
+            fixture_ids: vec![String::from(fixture_id)],
+            mode,
+        },
+    )
+    .expect("the overlay should be set");
+}
+
+fn all_power(test_dir: &TestDir, on: bool) {
+    set_lighting_all_power(
+        test_dir.db_path().as_path(),
+        &LightingAllPowerRequest { on },
+    )
+    .expect("all power should succeed");
+}
+
+// A cut ends the overlays in the same write as the fixtures (2026-10-05).
+// Before, the highlight and the identify flashes were drawn over the stored
+// rig when it was read, so a highlighted or flashing fixture still went out
+// at 100 % × the grand master after CUT ALL, and a Find's waiting flashes
+// came after it. Read on the wire, not on the stored count.
+#[test]
+fn all_off_ends_the_highlight_and_the_identify_flashes_on_the_wire() {
+    let test_dir = initialize_ready_lighting("all-off-overlays");
+    highlight(
+        &test_dir,
+        "fixture-key-left",
+        FixtureHighlightMode::Highlight,
+    );
+    start_lighting_identify_sequence(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifySequenceRequest {
+            fixture_ids: vec![
+                String::from("fixture-key-right"),
+                String::from("fixture-backline-wash"),
+            ],
+            step_ms: 5000,
+            duration_ms: 5000,
+        },
+    )
+    .expect("the Find should start");
+    assert!(
+        wire_slot(&test_dir, "Key Left", "Dimmer") > 0,
+        "the highlight lights Key Left, stored off"
+    );
+    assert!(
+        wire_slot(&test_dir, "Key Right", "Dimmer") > 0,
+        "the Find's first flash lights Key Right"
+    );
+
+    all_power(&test_dir, false);
+
+    let settings = load_test_app_settings(&test_dir);
+    assert_eq!(
+        settings.get(LIGHTING_HIGHLIGHT_IDS_KEY).map(String::as_str),
+        Some("[]")
+    );
+    assert_eq!(
+        settings.get(LIGHTING_SOLO_IDS_KEY).map(String::as_str),
+        Some("[]")
+    );
+    assert_eq!(
+        settings
+            .get(LIGHTING_IDENTIFY_BURSTS_KEY)
+            .map(String::as_str),
+        Some("{}")
+    );
+    assert!(
+        active_identify_burst_ids(&settings, identify::current_unix_ms() + 6000).is_empty(),
+        "the Find's second flash, due in 5 s, is gone too"
+    );
+    let snapshot = read_lighting_snapshot(&settings);
+    assert!(snapshot.highlight_fixture_ids.is_empty());
+    assert!(snapshot.fixtures.iter().all(|fixture| !fixture.on));
+    for (name, dimmer) in wire_dimmers(&test_dir) {
+        assert_eq!(dimmer, 0, "{name} is dark on the wire");
+    }
+}
+
+// A solo lit nothing after a cut, but it stayed latched, so the next all on
+// lit only the soloed fixtures. A cut ends it.
+#[test]
+fn all_off_ends_a_solo_so_all_on_lights_the_whole_rig() {
+    let test_dir = initialize_ready_lighting("all-off-solo");
+    update_fixture_json(
+        &test_dir,
+        serde_json::json!({ "fixtureId": "fixture-key-right", "intensity": 60 }),
+    );
+    all_power(&test_dir, true);
+    highlight(&test_dir, "fixture-key-left", FixtureHighlightMode::Solo);
+    assert_eq!(
+        wire_slot(&test_dir, "Key Right", "Dimmer"),
+        0,
+        "the solo masks Key Right"
+    );
+
+    all_power(&test_dir, false);
+    all_power(&test_dir, true);
+
+    let settings = load_test_app_settings(&test_dir);
+    assert_eq!(
+        settings.get(LIGHTING_SOLO_IDS_KEY).map(String::as_str),
+        Some("[]")
+    );
+    let snapshot = read_lighting_snapshot(&settings);
+    assert!(snapshot.solo_fixture_ids.is_empty());
+    assert!(snapshot.fixtures.iter().all(|fixture| fixture.on));
+    assert!(
+        wire_slot(&test_dir, "Key Right", "Dimmer") > 0,
+        "all on lights the whole rig again"
+    );
+}
+
+// All on leaves the overlays as they are.
+#[test]
+fn all_on_leaves_the_overlays_alone() {
+    let test_dir = initialize_ready_lighting("all-on-overlays");
+    highlight(
+        &test_dir,
+        "fixture-key-left",
+        FixtureHighlightMode::Highlight,
+    );
+    identify_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyRequest {
+            fixture_id: String::from("fixture-key-right"),
+            duration_ms: Some(5000),
+        },
+    )
+    .expect("the identify burst should start");
+
+    all_power(&test_dir, true);
+
+    let settings = load_test_app_settings(&test_dir);
+    assert_eq!(
+        settings.get(LIGHTING_HIGHLIGHT_IDS_KEY).map(String::as_str),
+        Some("[\"fixture-key-left\"]")
+    );
+    assert!(
+        active_identify_burst_ids(&settings, identify::current_unix_ms())
+            .contains("fixture-key-right")
+    );
+    assert!(wire_slot(&test_dir, "Key Left", "Dimmer") > 0);
+}

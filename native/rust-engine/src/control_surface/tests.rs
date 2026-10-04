@@ -463,6 +463,51 @@ fn wire_slots(db_path: &Path) -> Vec<(u16, Vec<u8>)> {
         .collect()
 }
 
+/// Each fixture's dimmer as the wire carries it, by the fixture's name: the
+/// slot found through the DMX monitor's `Dimmer` channel.
+fn wire_dimmers(db_path: &Path) -> Vec<(String, u8)> {
+    let monitor = crate::lighting::read_lighting_dmx_monitor_snapshot(&deck_app_settings(db_path));
+    let wire = wire_slots(db_path);
+    monitor
+        .channels
+        .iter()
+        .filter(|channel| channel.label == "Dimmer")
+        .map(|channel| {
+            let (_, slots) = wire
+                .iter()
+                .find(|(universe, _)| i64::from(*universe) == channel.universe)
+                .expect("the fixture's universe is rendered");
+            (
+                channel.light_name.clone(),
+                slots[(channel.channel - 1) as usize],
+            )
+        })
+        .collect()
+}
+
+fn set_live_cct(db_path: &Path, fixture_id: &str, cct: i64) {
+    crate::lighting::update_lighting_fixture(
+        db_path,
+        &parse_lighting_fixture_update_request(&json!({
+            "fixtureId": fixture_id,
+            "cct": cct,
+        }))
+        .expect("the update should parse"),
+    )
+    .expect("the fixture should update");
+}
+
+fn select_deck_light(db_path: &Path, fixture_id: &str) {
+    set_settings_owned(
+        db_path,
+        &[(
+            String::from(SELECTED_LIGHT_ID_KEY),
+            String::from(fixture_id),
+        )],
+    )
+    .expect("the deck's light selection should persist");
+}
+
 fn set_live_fixture(db_path: &Path, fixture_id: &str, on: bool, intensity: i64) {
     crate::lighting::update_lighting_fixture(
         db_path,
@@ -585,8 +630,8 @@ fn read_lighting_snapshot_last_recall(db_path: &Path) -> Option<String> {
 }
 
 // The relative keys go through the fixture update the screen uses: the
-// reply and the LCD carry what was stored, and the fixture's own colour
-// temperature range wins over the deck's 2700–6500 K.
+// reply and the LCD carry what was stored, and `CCT` stops at the top of the
+// fixture's own range.
 #[test]
 fn deck_relative_keys_store_through_the_fixture_update() {
     let _preview_guard = crate::lighting::shared_preview_test_guard();
@@ -613,7 +658,7 @@ fn deck_relative_keys_store_through_the_fixture_update() {
             .as_i64()
             .expect("cct is a number");
     }
-    assert!(last_cct <= 6500, "{last_cct}");
+    assert_eq!(last_cct, 5600, "the top of the Astra's range");
     assert_eq!(
         live_fixture(db_path, KEY_LEFT).cct,
         last_cct,
@@ -623,7 +668,11 @@ fn deck_relative_keys_store_through_the_fixture_update() {
         read_control_surface_lcd_text(db_path, "light_cct").expect("lcd text"),
         format!("CCT\\n{last_cct} K")
     );
-    assert_eq!(light_action(db_path, "resetCct")["light"]["cct"], 4500);
+    assert_eq!(
+        light_action(db_path, "resetCct")["light"]["cct"],
+        4400,
+        "the middle of the Astra's 3200–5600 K"
+    );
     assert_eq!(
         light_action(db_path, "allOn"),
         json!({ "on": true, "preview": false })
@@ -1483,5 +1532,101 @@ fn an_arm_raises_nothing_and_another_key_ends_it() {
         events,
         vec![KeyEvent::Lighting],
         "the press that acted is heard"
+    );
+}
+
+const BACKLINE_WASH: &str = "fixture-backline-wash";
+
+// The deck's `CCT` dial (2026-10-05): a turn moves inside the selected
+// fixture's own range, not 2700–6500 K, and a push sets the middle of it
+// rounded to 100 K, as the plate's Reset does: 6000 K on the INFINIMAT
+// (2000–10000 K). Live, and in Preview on the buffer.
+#[test]
+fn deck_cct_dial_moves_inside_the_fixture_range() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("light-cct-range");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    select_deck_light(db_path, BACKLINE_WASH);
+
+    set_live_cct(db_path, BACKLINE_WASH, 8000);
+    assert_eq!(
+        light_action(db_path, "cctUp")["light"]["cct"],
+        8200,
+        "above the deck's old 6500 K"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "light_cct").expect("lcd text"),
+        "CCT\\n8200 K"
+    );
+    assert_eq!(light_action(db_path, "cctDown")["light"]["cct"], 8000);
+    set_live_cct(db_path, BACKLINE_WASH, 9900);
+    assert_eq!(light_action(db_path, "cctUp")["light"]["cct"], 10000);
+    assert_eq!(
+        light_action(db_path, "cctUp")["light"]["cct"],
+        10000,
+        "the top holds"
+    );
+    set_live_cct(db_path, BACKLINE_WASH, 2100);
+    assert_eq!(light_action(db_path, "cctDown")["light"]["cct"], 2000);
+    assert_eq!(light_action(db_path, "resetCct")["light"]["cct"], 6000);
+    assert_eq!(live_fixture(db_path, BACKLINE_WASH).cct, 6000);
+
+    select_deck_light(db_path, KEY_LEFT);
+    assert_eq!(light_action(db_path, "resetCct")["light"]["cct"], 4400);
+
+    select_deck_light(db_path, BACKLINE_WASH);
+    set_live_cct(db_path, BACKLINE_WASH, 8000);
+    set_shared_preview_mode(db_path, true);
+    let reply = light_action(db_path, "cctUp");
+    assert_eq!(reply["light"]["cct"], 8200);
+    assert_eq!(reply["preview"], true);
+    assert_eq!(light_action(db_path, "resetCct")["light"]["cct"], 6000);
+    assert_eq!(
+        lock_shared_lighting_preview().fixture_states[BACKLINE_WASH].cct,
+        6000
+    );
+    assert_eq!(
+        live_fixture(db_path, BACKLINE_WASH).cct,
+        8000,
+        "the stored value did not move"
+    );
+    set_shared_preview_mode(db_path, false);
+}
+
+// `All Off` ends a highlight on the wire (2026-10-05). The tests above count
+// the stored fixtures, which is why a highlighted fixture still lit at 100 %
+// after the cut went unseen.
+#[test]
+fn all_off_darkens_a_highlighted_fixture_on_the_wire() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("all-off-highlight");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    crate::lighting::set_lighting_fixture_highlight(
+        db_path,
+        &crate::lighting::LightingFixtureHighlightRequest {
+            fixture_ids: vec![String::from(KEY_LEFT)],
+            mode: crate::lighting::FixtureHighlightMode::Highlight,
+        },
+    )
+    .expect("highlight should succeed");
+    let lit: Vec<String> = wire_dimmers(db_path)
+        .into_iter()
+        .filter(|(_, dimmer)| *dimmer > 0)
+        .map(|(name, _)| name)
+        .collect();
+    assert!(lit.contains(&String::from("Key Left")), "{lit:?}");
+
+    assert_eq!(asked_light_action(db_path, "allOff")["did"], "switched");
+
+    for (name, dimmer) in wire_dimmers(db_path) {
+        assert_eq!(dimmer, 0, "{name} is dark on the wire");
+    }
+    assert!(
+        crate::lighting::read_lighting_snapshot(&deck_app_settings(db_path))
+            .highlight_fixture_ids
+            .is_empty(),
+        "the latch clears"
     );
 }

@@ -1086,6 +1086,31 @@ test("shows lighting DMX-unreachable posture and blackout hold", async ({ page }
   await expect(page.getByRole("button", { name: /^Fixture Key, off,/ })).toHaveAttribute("aria-pressed", "true");
 });
 
+// 2026-10-05: a cut outside Preview ends the identify flashes on the hardware
+// link, a Find's waiting ones too, and the page's Find ends with it: the key
+// reads Find again at once. Before, it read Stop over a dark rig until the
+// sequence's planned end (the page's clock is paused here, so that end never
+// comes).
+test("CUT ALL during a Find ends it: the Find key reads Find again", async ({ page }) => {
+  await page.clock.install();
+  await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+  await pausePageClock(page);
+  // All four lights, so the Find runs 1.9 s, longer than the cut's dwell.
+  await page.getByTestId("lighting-add-to-selection").click();
+  for (const name of ["Fill", "Back", "Warm wash"]) {
+    await page.getByRole("button", { name: new RegExp(`^Fixture ${name},`) }).focus();
+    await page.keyboard.press("Enter");
+  }
+  await expect(page.getByLabel("Selected fixtures", { exact: true }).getByText("4 fixtures selected")).toBeVisible();
+  const find = page.getByTestId("lighting-identify-find");
+  await find.click();
+  await expect(find).toHaveText("Stop");
+  await pressTwice(page, page.getByRole("button", { name: "Cut all fixtures to 0 %" }));
+  await expect(page.getByTestId("lighting-power-toggle")).toContainText("nothing lit");
+  await expect(find).toHaveText("Find");
+});
+
 test("frames the populated rig via the stage-plot Frame mode (DENSITY-04)", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   await expect(page.getByTestId("lighting-stage")).toBeVisible();

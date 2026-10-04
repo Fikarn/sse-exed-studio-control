@@ -17,7 +17,13 @@ export function useLightingEditor(props: LightingWorkspaceSurfaceProps) {
   const session = useLightingSession({ props, rig });
   const sceneEditor = useLightingSceneEditor({ props, rig, session });
   const fixtureEditor = useLightingFixtureEditor({ props, rig, session, sceneEditor });
-  const rigControls = useLightingRigControls({ props, rig, session, sceneEditor });
+  const rigControls = useLightingRigControls({
+    props,
+    rig,
+    session,
+    sceneEditor,
+    onRigCut: fixtureEditor.endFindAfterCut,
+  });
   // The page's one arm: the Save row, CUT ALL and every menu's "Delete …".
   const arm = useLightingArming();
   return { props, rig, session, sceneEditor, fixtureEditor, rigControls, arm };

@@ -96,6 +96,8 @@ fn fixture_levels_are_the_stored_values_with_a_finished_fade_applied() {
             on: true,
             intensity: 40,
             cct: 3200,
+            cct_min: 3200,
+            cct_max: 5600,
             previewing: false,
         }
     );
@@ -186,6 +188,8 @@ fn fixture_levels_follow_the_preview_buffer_while_previewing() {
             on: true,
             intensity: 70,
             cct: 3200,
+            cct_min: 3200,
+            cct_max: 5600,
             previewing: true,
         }
     );

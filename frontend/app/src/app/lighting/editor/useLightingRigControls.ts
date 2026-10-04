@@ -8,17 +8,21 @@ import type { LightingSession } from "./useLightingSession";
 import type { LightingSceneEditor } from "./useLightingSceneEditor";
 
 /** The rig-wide controls: groups, palettes, the grand master, all power, the
- *  emergency cut, and the Undo key. */
+ *  emergency cut, and the Undo key. `onRigCut` runs after a cut outside
+ *  Preview has gone through: the hardware link has ended the identify
+ *  flashes, the highlight and the solo, and the page ends its own Find. */
 export function useLightingRigControls({
   props,
   rig,
   session,
   sceneEditor,
+  onRigCut,
 }: {
   props: LightingWorkspaceSurfaceProps;
   rig: LightingRig;
   session: LightingSession;
   sceneEditor: LightingSceneEditor;
+  onRigCut: () => void;
 }) {
   const { lightingSnapshot, store } = props;
   const { groups, fixtureEntries, previewMode } = rig;
@@ -272,6 +276,7 @@ export function useLightingRigControls({
     startBusy("lighting-blackout");
     try {
       await store.setLightingAllPower(false);
+      if (!previewMode) onRigCut();
       toast.push({ message: previewMode ? "Preview fixtures cut." : "All fixtures cut.", tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting blackout failed.");
@@ -284,6 +289,7 @@ export function useLightingRigControls({
     startBusy("lighting-master-toggle");
     try {
       await store.setLightingAllPower(on);
+      if (!on && !previewMode) onRigCut();
       toast.push({
         message: previewMode ? `Preview fixtures ${on ? "on" : "off"}.` : on ? "Lighting resumed." : "Lighting paused.",
         tone: "ok",

@@ -730,6 +730,19 @@ export function useLightingFixtureEditor({
     }
   });
 
+  // 2026-10-05: a cut outside Preview (CUT ALL, Lighting off) ends the
+  // identify flashes on the hardware link, a Find's waiting ones too, so the
+  // page's own Find ends with it, as Stop does without its request. Before,
+  // the key read "Stop" and the rings pulsed over a dark rig until the
+  // sequence's planned end. The deck's ALL OFF does not reach these timers
+  // (ROADMAP); the page's Find lasts a few seconds at most.
+  const endFindAfterCut = useCallback(() => {
+    clearFindSequenceTimers();
+    clearFindEndTimer();
+    setIdentifyingIds(() => new Set());
+    setFindRunning(false);
+  }, [clearFindSequenceTimers, clearFindEndTimer]);
+
   // Workspace-switch cleanup. Clears highlight + solo overlays in the engine
   // and stops a running Find, its pulse timers included. Each IPC is gated on
   // whether there's anything to clear so a quiet switch doesn't burn
@@ -826,6 +839,10 @@ export function useLightingFixtureEditor({
                 spatialRotation: snapshot.spatialRotation,
                 rigZ: snapshot.rigZ ?? null,
                 beamAngleDegrees: snapshot.beamAngleDegrees ?? null,
+                // The catalog controls too (2026-10-05): without them an
+                // INFINIBAR came back with its Red, Green, Blue, FX and Speed
+                // at their defaults.
+                controlValues: { ...snapshot.controlValues },
               });
             }
           },
@@ -969,6 +986,7 @@ export function useLightingFixtureEditor({
     handleIdentifyFind,
     findRunning,
     handleStopFind,
+    endFindAfterCut,
     handleDeleteFixture,
     handleBulkTogglePower,
     handleBulkIntensityValues,

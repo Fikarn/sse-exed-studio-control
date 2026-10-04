@@ -96,6 +96,54 @@ fn scene_snapshot<'a>(snapshot: &'a LightingSnapshot, scene_id: &str) -> &'a Lig
         .expect("scene should be present")
 }
 
+/// What the wire carries right now in one fixture's channel, found by the
+/// fixture's name and the channel's label in the DMX monitor (which reads
+/// the same numbers as the sACN frames).
+fn wire_slot(test_dir: &TestDir, light_name: &str, label: &str) -> u8 {
+    let settings = load_test_app_settings(test_dir);
+    let monitor = read_lighting_dmx_monitor_snapshot(&settings);
+    let channel = monitor
+        .channels
+        .iter()
+        .find(|channel| channel.light_name == light_name && channel.label == label)
+        .unwrap_or_else(|| panic!("{light_name} should have a {label} channel"));
+    let output =
+        read_lighting_sacn_output_state(&settings).expect("a commissioned rig renders frames");
+    let frame = output
+        .frames
+        .iter()
+        .find(|frame| i64::from(frame.universe) == channel.universe)
+        .expect("the fixture's universe should be rendered");
+    frame.slots[(channel.channel - 1) as usize]
+}
+
+/// Every fixture's dimmer on the wire, by the fixture's name.
+fn wire_dimmers(test_dir: &TestDir) -> Vec<(String, u8)> {
+    let names: Vec<String> = read_lighting_snapshot(&load_test_app_settings(test_dir))
+        .fixtures
+        .into_iter()
+        .map(|fixture| fixture.name)
+        .collect();
+    names
+        .into_iter()
+        .map(|name| {
+            let slot = wire_slot(test_dir, &name, "Dimmer");
+            (name, slot)
+        })
+        .collect()
+}
+
+fn update_fixture_json(
+    test_dir: &TestDir,
+    request: serde_json::Value,
+) -> LightingFixtureUpdateResult {
+    update_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &parse_lighting_fixture_update_request(&request).expect("the update should parse"),
+    )
+    .expect("the fixture should update")
+}
+
 mod catalog_and_preview;
 mod fixtures_and_overlays;
 mod ordering;
