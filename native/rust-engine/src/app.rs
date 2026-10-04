@@ -104,6 +104,19 @@ impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
         append_log(&runtime.log_file_path, "INFO", "Hardware link started")?;
+        match crate::audio::mark_console_unread_at_start(&runtime.db_path) {
+            Ok(true) => append_log(
+                &runtime.log_file_path,
+                "INFO",
+                "The Console reads assumed until a Sync: Studio Control has not read the desk since it started.",
+            )?,
+            Ok(false) => {}
+            Err(error) => append_log(
+                &runtime.log_file_path,
+                "WARN",
+                &format!("The Console's state could not be marked unread at the start: {error:?}"),
+            )?,
+        }
         crate::audio::refresh_console_snapshot_names_at_start(&runtime.db_path);
         Ok(Self { runtime })
     }
