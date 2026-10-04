@@ -25,7 +25,7 @@ The owner asked on 2026-10-03 for the pages to look and work as one premium inst
 - [x] 1. Foundation A: the look: tokens, the PT faces and SSE Adelia, the primitives, the measures (#293)
 - [x] 2. Foundation B: menus and overlays: the menu, the ⋯, the popover, the tooltip, the context menu and the colour picker on them, the cameras' picture holes (#296)
 - [x] 3. The shell: header with the `REC` tally and the logo, footer, one plate mechanism, the latch slot on every page, the screens before ready (#298)
-- [ ] 4. Audio: the outputs in the left column, the strips, the plate without scrolling, menus and tooltips
+- [x] 4. Audio: the outputs in the left column, the strips, the plate without scrolling, menus and tooltips (#299)
 - [ ] 5. Lighting: the plot from real positions, the bar under it, scenes as rows, the plate, menus
 - [ ] 6. Cameras: the cluster, caption and plate; format and look as popovers; the values list as a popover
 - [ ] 7. Teleprompter: the take block, the look and the Prompter XL readouts in popovers, script rows with menus
@@ -37,9 +37,8 @@ The owner asked on 2026-10-03 for the pages to look and work as one premium inst
 Left by pull request 2 for the page pull requests:
 
 - Every object with a menu gets its ⋯ (`MenuButton`, with `contextTarget` for the right-click), and the right-click menus move from `ContextMenu` to it. Their "Delete …" items, which open a confirmation today, become the menu's destructive item that arms in place. The view slots' Save and Clear are right-click only today (Lighting).
-- Controls used during a take that are not yet marked `take`: the Teleprompter's paragraph rows and its Update and Clear keys, the Console's Clip key, Lighting's scene tiles and Highlight, Solo and Find. A tooltip avoids only what is marked.
+- Controls used during a take that are not yet marked `take`: the Teleprompter's paragraph rows and its Update and Clear keys, Lighting's scene tiles and Highlight, Solo and Find. A tooltip avoids only what is marked. (The Console's Clip key went with pull request 4: a clip latches in the latch slot.)
 - The Cameras values list is a dialog, so it hides the pictures: pull request 6 makes it a popover with a `listbox`.
-- The Console's arm (`useAudioArming`) is not the design system's `useArm`: a Console menu with a destructive item needs the Console on `useArm`, or an adapter, so that two keys are never armed at once (pull request 4).
 - A locked key's reason is the browser's own tooltip (`title`); DESIGN.md §9 keeps a lock's reason on screen. Each page settles it as it moves.
 
 ### The Cameras page (was Slice 9)

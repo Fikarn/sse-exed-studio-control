@@ -69,10 +69,12 @@ async function collectTextRuns(page: Page, rootSelector: string) {
         const lb = luminance(b);
         return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
       };
-      // The page ground: the first opaque body/html background, else the audio
-      // shell's own --bg token (the body is transparent in this app).
+      // The page ground: the first opaque body/html background, else the one
+      // surface's token (the body is transparent in this app). The visual
+      // overhaul's Console pull request: the Console's own --bg went with its
+      // private colours; the surface is the design system's --material-bg.
       const probe = document.createElement("span");
-      probe.style.color = "var(--bg)";
+      probe.style.color = "var(--material-bg)";
       root.appendChild(probe);
       const shellBg = parse(getComputedStyle(probe).color);
       probe.remove();
@@ -160,12 +162,16 @@ async function collectTextRuns(page: Page, rootSelector: string) {
   );
 }
 
+// The visual overhaul's Console pull request. Old: the Console's own --fg-4,
+// its hairline ink. New: the design system's --text-text4, the ink for ticks
+// and disabled items only, never text that is read. Reason: the Console's
+// private colours went; the rule is the same.
 async function readFg4(page: Page) {
   return page.evaluate(() => {
     const shell = document.querySelector<HTMLElement>('[data-testid="audio-workspace"]');
     if (!shell) return null;
     const probe = document.createElement("span");
-    probe.style.color = "var(--fg-4)";
+    probe.style.color = "var(--text-text4)";
     shell.appendChild(probe);
     const resolved = getComputedStyle(probe).color;
     probe.remove();

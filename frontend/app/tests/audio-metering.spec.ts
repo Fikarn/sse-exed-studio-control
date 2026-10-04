@@ -53,7 +53,10 @@ test("renders unclipped dBFS scale labels beside every audio meter", async ({ pa
   }
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 selected-channel");
 
-  await page.getByTestId("audio-output-audio-mix-main").click();
+  // The visual overhaul's Console pull request: an output shows on the plate
+  // from its menu in the cluster (a click on its strip in the bay did).
+  await page.getByTestId("audio-lane-menu-audio-mix-main").click();
+  await page.getByTestId("audio-output-menu-plate-audio-mix-main").click();
   await expect(page.getByTestId("audio-inspector-output-metering")).toBeVisible();
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 output inspector");
 });
@@ -77,9 +80,14 @@ test("renders live-console meter references instead of loudness readouts", async
   await openFixture(page, "audio-populated");
 
   await expect(page.getByTestId("audio-signal-canvas")).not.toContainText("LUFS");
-  await expect(page.getByTestId("audio-signal-canvas")).toContainText("SIM");
-  await expect(page.getByTestId("audio-inspector-metering")).toContainText("Nominal ref");
-  await expect(page.getByTestId("audio-inspector-metering")).toContainText("Peak warn");
+  // The visual overhaul's Console pull request. Old: a "TEST METER SIMULATION"
+  // chip on the bay and "Nominal ref" / "Peak warn" under the plate's readouts.
+  // New: the simulation is the state display's word and the footer's line;
+  // the references are the plate meter's tooltip, and the meter draws them.
+  // Reason: one fact, one home (Atrium); hints are tooltips.
+  await expect(page.getByTestId("audio-state-display")).toContainText("SIMULATED");
+  await expect(page.getByTestId("audio-plate-meter")).toContainText("the reference at −18 dBFS");
+  await expect(page.getByTestId("audio-plate-meter")).toContainText("the warning from −3 dBFS");
 
   const nominalReferences = await page
     .locator('[data-meter-component="stereo"] [data-meter-reference="nominal"]')
@@ -281,16 +289,19 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await page.clock.install();
   await openFixture(page, "audio-populated");
 
-  await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveText("TEST METER SIMULATION");
+  // The visual overhaul's Console pull request: no chip on the bay; the state
+  // display's word and the footer say the meters are simulated.
+  await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);
+  await expect(page.getByTestId("audio-state-display")).toContainText("SIMULATED");
   // 2026-05-27 redesign: the rail Trust panel is gone. The simulated metering
   // label moved to the AudioTopBar's Metering stat cell ("test simulation").
   // The rail-card "Active mix · test meters" copy is retired (no replacement
   // — the monitor bar shows only the active master meter).
   // The metering source is a footer item now (old: the top bar's stat cell).
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
-  // Slice 8 (system §9): one state, one word — the mixer chip and the plate
-  // both call meter simulation by the same name.
-  await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST METER SIMULATION");
+  // The plate's meter no longer repeats it (Atrium: the fact was printed four
+  // times).
+  await expect(page.getByTestId("audio-inspector-metering")).not.toContainText("TEST METER SIMULATION");
 
   // Visual overhaul A, Slice 4b. Old: every strip meter assertion read
   // `[data-meter-component="stereo"]` and its `--audio-meter-*` custom
@@ -404,11 +415,13 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   // now prints the scale the fader is set against, where the operator's hand
   // is; the meter's own −18 dBFS reference stays on the meter. The level is
   // still the desk's, on the same dBFS fill.
-  const hardwareMeterVars = await page.getByTestId("audio-strip-audio-input-9").evaluate((strip) => {
-    const track = strip.querySelector("[data-meter-track]");
+  // The visual overhaul's Console pull request: the fader scale is printed once
+  // per tier, in the gutter beside its first strip (it was beside every strip).
+  const hardwareMeterVars = await page.getByTestId("audio-hardware-inputs-tier").evaluate((tier) => {
+    const track = tier.querySelector('[data-testid="audio-strip-audio-input-9"] [data-meter-track]');
     return {
       left: track ? Number.parseFloat(getComputedStyle(track).getPropertyValue("--meter-level")) * 100 : Number.NaN,
-      scaleLabels: Array.from(strip.querySelectorAll("[data-fader-scale-mark]"))
+      scaleLabels: Array.from(tier.querySelectorAll("[data-fader-scale-mark]"))
         .map((entry) => entry.textContent?.trim())
         .filter(Boolean),
     };
@@ -514,15 +527,20 @@ test("supports operator peak-hold control for live audio meters", async ({ page 
   const levelReadout = page.getByTestId("audio-inspector-level-readout");
   const peakHoldReadout = page.getByTestId("audio-inspector-peak-hold-readout");
 
-  // Visual overhaul A, Slice 4c: peak hold is a key in the plate's Meter
-  // section (old: a switch on the Outputs tier header with `data-active`), so
-  // its engaged state is `aria-pressed`.
-  await expect(peakHoldToggle).toHaveAttribute("aria-pressed", "true");
+  // The visual overhaul's Console pull request. Old: peak hold was a key in the
+  // plate's Meter section, its state `aria-pressed`. New: it is a toggle in the
+  // page's ⋯ (and the plate meter's ⋯), with the key's test id, stating its
+  // value; its state is `aria-checked`. Reason: the Console row and the meter
+  // keys became the page's menu (Atrium).
+  await page.getByTestId("audio-page-menu").click();
+  await expect(peakHoldToggle).toHaveAttribute("aria-checked", "true");
   await expect(meterCanvas).toHaveAttribute("data-meter-peak-hold-enabled", "true");
   await expect(peakHoldReadout).toHaveAttribute("data-meter-peak-hold-enabled", "true");
 
   await peakHoldToggle.click();
-  await expect(peakHoldToggle).toHaveAttribute("aria-pressed", "false");
+  await page.getByTestId("audio-page-menu").click();
+  await expect(peakHoldToggle).toHaveAttribute("aria-checked", "false");
+  await page.keyboard.press("Escape");
   await expect(meterCanvas).toHaveAttribute("data-meter-peak-hold-enabled", "false");
   await expect(peakHoldReadout).toHaveAttribute("data-meter-peak-hold-enabled", "false");
   await expect
@@ -537,6 +555,7 @@ test("supports operator peak-hold control for live audio meters", async ({ page 
   const inspectorResetTokenBefore = Number(
     (await peakHoldReadout.getAttribute("data-meter-peak-hold-reset-token")) ?? "0"
   );
+  await page.getByTestId("audio-page-menu").click();
   await page.getByTestId("audio-peak-hold-reset").click();
   await expect
     .poll(async () => Number((await meterCanvas.getAttribute("data-meter-peak-hold-reset-token")) ?? "0"))

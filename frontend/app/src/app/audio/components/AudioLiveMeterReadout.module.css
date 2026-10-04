@@ -1,40 +1,5 @@
-/* Why: when metering is gated (OSC disabled, console state unverified, last
-   action failed) the canvas paint loop early-returns. The CSS fallback meter
-   bars must also stay dark so the operator never sees a simulated tick in a
-   degraded state. The warning band remains the truthful surface. The
-   `[data-canvas-metering]` data attribute lives on the operator workspace
-   root, so we scope the rule on the attribute alone — no class ancestor
-   needed. */
-[data-canvas-metering="true"] .canvasActiveMixMeter i::before,
-[data-canvas-metering="false"] .canvasActiveMixMeter i::before {
-  opacity: 0;
-}
-
-/* Why: without an explicit layout, the container falls back to block default
-   and the meter-bar `<i>` anchors collapse to zero width, so the canvas
-   painter has nothing to paint over and the eyebrow text abuts the dB readout
-   ("Active mix-28" instead of "Active mix [meters] -28 dB"). The grid below
-   carves out fixed lanes for the two L/R anchors so the overlay has a stable
-   paint target and the label, meters, and value get unambiguous spacing. */
-.canvasActiveMixMeter {
-  display: inline-grid;
-  grid-template-columns: max-content 18px 18px max-content;
-  align-items: center;
-  gap: 8px;
-}
-
-.canvasActiveMixMeter i {
-  --meter-level: 0%;
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 4px;
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: var(--audio-meter-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 72%, transparent);
-}
-
+/* The plate's live readout pair (L / R): fixed columns, so the numbers never
+   jitter as the meter moves. */
 .meterValuePair {
   display: inline-grid;
   grid-template-columns: minmax(3ch, 3ch) max-content minmax(3ch, 3ch);
@@ -50,17 +15,7 @@
 }
 
 .meterValuePair i {
-  color: var(--audio-caption-muted);
+  color: var(--text-text3);
   font-style: normal;
   text-align: center;
-}
-
-/* AudioLiveMasterHalo's glow ring. The geometry stays defined once on the
-   shell (it reads .audioShell's --accent / --master-glow), so this is a
-   passthrough compose. It previously reached the shell through
-   AudioRail.module.css; that sheet was deleted with its host when the
-   GS-AUD-44 dead-code posture closed, so the compose points at the shell
-   directly. */
-.masterHalo {
-  composes: masterHalo from "../AudioWorkspace.module.css";
 }

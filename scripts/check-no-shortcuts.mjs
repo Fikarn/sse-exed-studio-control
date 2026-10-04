@@ -67,8 +67,6 @@ export const KEY_LISTENERS = {
     "Esc cancels the armed key, and a held Enter's repeats never confirm it, registered only while a key is armed (D6)",
   "frontend/app/src/app/shared/ShellDialog.tsx":
     "Esc closes the shell's dialog (Close Studio Control?, Restart the hardware link?) wherever focus is, first in the capture phase so an armed key under it stays armed, and Tab stays inside it (D6)",
-  "frontend/app/src/app/audio/hooks/useAudioArming.ts":
-    "Esc cancels the Console's armed key (48 V, a snapshot load), and a held Enter's repeats never confirm it, registered only while one is armed (D6)",
   "frontend/app/src/app/cameras/CamerasValuesList.tsx":
     "Esc closes the list of the values a camera allows, a popup beside the plate, without a change; registered only while the list is open (D6)",
 };
@@ -95,8 +93,10 @@ export const KEY_HANDLERS = {
     "a focused slider or fader: the arrows, Home and End, and Enter for typed entry (decision 9)",
   "frontend/app/src/app/audio/components/AudioKnob.tsx":
     "a focused knob is a slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
-  "frontend/app/src/app/audio/components/AudioSliderControl.tsx":
-    "a focused send or level slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
+  "frontend/app/src/app/audio/components/inspector/AudioPlateEq.tsx":
+    "Esc on a band key in the equaliser's table closes the band's open popover, as Esc in the popover does (D6)",
+  "frontend/app/src/app/audio/components/inspector/AudioPlateDynamics.tsx":
+    "Esc on a key or a row in the dynamics table closes the processor's open popover, as Esc in the popover does (D6)",
   "frontend/app/src/app/lighting/components/FixtureMarker.tsx":
     "Enter or Space presses the focused fixture marker (D6)",
   "frontend/app/src/app/lighting/components/GroupChip.tsx":

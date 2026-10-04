@@ -1,102 +1,58 @@
-/* Visual overhaul A, Slice 4: the Console's cluster. Every value is a token;
-   the geometry is the mock's (the state display first and fixed, the take-time
-   keys under it, the snapshots and the standing actions at the bottom). */
+/* The Console's cluster (visual overhaul, the Console): the state display, the
+   latch slot, the outputs block and the snapshots from the top, each at its
+   fixed place; what the last action said stands at the foot. */
 
 .cluster {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  /* Fill the region so the standing actions can sit at the foot of the cluster
-     the way the mock pins them, with the free space above them. */
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;
   overflow: hidden;
 }
 
-/* The monitor block: Dim and Mono side by side. */
-.monitorRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  flex: none;
-}
-
-.mainLevel {
+/* The foot: it takes the room left under the snapshots, so a message that
+   comes and goes moves nothing above it. */
+.foot {
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
   flex: none;
+  min-width: 0;
 }
 
-.mainLevelHead {
+.notice {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  font: 400 var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text2);
 }
 
-.mainLevelLabel {
-  font: 700 var(--font-size-value) / 1 var(--font-family-ui);
+.notice[data-tone="attention"] {
+  border-color: var(--role-yellow-line);
+}
+
+.notice[data-tone="error"] {
+  border-color: var(--role-coral-text);
   color: var(--text-text);
 }
 
-.mainLevelHint {
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--text-text2);
-}
-
-.masterMeter {
-  height: 24px;
-  flex: none;
-}
-
-.mixTargetCaption {
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--text-text2);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  flex: none;
-}
-
-/* The dBFS marks under the monitor meter. Each mark is placed at its own
-   percentage of the bar, so the number sits over the level it names. */
-.masterMeterScale {
-  position: relative;
-  height: 12px;
-  flex: none;
-}
-
-.masterMeterScale span {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  /* Visual overhaul A, Slice 10: a bare 12 px numeral fills its own box, so
-     the only thing around the glyph is its own antialiased fringe — the gate
-     samples that fringe as the background and reads 4.4:1 where the eye reads
-     the meter's floor. A little floor around the mark is both the honest
-     reading and the measurable one (the same padding the strip fader's scale
-     marks already carry). */
-  padding: 1px 3px;
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
-  color: var(--text-text2);
-}
-
-.masterMeterScale span:first-child {
-  transform: none;
-}
-
-.masterMeterScale span:last-child {
-  transform: translateX(-100%);
-}
-
-.actions {
-  margin-top: auto;
-  flex: none;
-}
-
-.actionRow {
+.noticeText {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.noticeText strong {
+  font-weight: 700;
+  color: var(--text-text);
 }

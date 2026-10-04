@@ -37,6 +37,12 @@
     font-size: var(--font-size-body);
   }
 
+  /* A strip's readout (the Console): 28 px, read from the chair during a take. */
+  .strip {
+    height: 40px;
+    font-size: var(--font-size-readout);
+  }
+
   .hero {
     height: 64px;
     font-size: var(--font-size-display);
@@ -58,6 +64,10 @@
 
   .hero .unit {
     font-size: var(--font-size-word);
+  }
+
+  .strip .unit {
+    font-size: var(--font-size-label);
   }
 
   .doubt {

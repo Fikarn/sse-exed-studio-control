@@ -58,6 +58,12 @@ export interface AudioKnobProps {
   numericSuffix?: string;
   onCommit: (value: number) => void;
   onPreview?: (value: number) => void;
+  /**
+   * The host's typed entry. Inside a popover the knob's own dialog would sit
+   * under the popover and close it, so the host closes the popover and asks
+   * for the value itself; without it the knob opens its own dialog.
+   */
+  onRequestTypedEntry?: () => void;
   size?: number;
   step?: number;
   /** Render the value large + centred inside the dial (hero preamp style)
@@ -96,6 +102,7 @@ export function AudioKnob({
   numericSuffix,
   onCommit,
   onPreview,
+  onRequestTypedEntry,
   size = 52,
   step,
   valueInside = false,
@@ -177,7 +184,8 @@ export function AudioKnob({
       // C05: double-click opens typed entry (mirrors AudioFader). The reset
       // to the default is the typed entry's Reset key (new pages program,
       // Slice 3, decision 8), not a key held while double-clicking.
-      setNumberDialogOpen(true);
+      if (onRequestTypedEntry) onRequestTypedEntry();
+      else setNumberDialogOpen(true);
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -241,7 +249,8 @@ export function AudioKnob({
       case "Enter":
         // C05: Enter opens typed entry, mirroring the fader / strip-preamp siblings.
         event.preventDefault();
-        setNumberDialogOpen(true);
+        if (onRequestTypedEntry) onRequestTypedEntry();
+        else setNumberDialogOpen(true);
         return;
       default:
         return;
@@ -272,19 +281,26 @@ export function AudioKnob({
         tabIndex={disabled ? -1 : 0}
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-          <path d={trackPath} fill="none" stroke="var(--bg-3)" strokeWidth="3" strokeLinecap="round" />
-          <path d={fillPath} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
+          <path d={trackPath} fill="none" stroke="var(--material-line2)" strokeWidth="3" strokeLinecap="round" />
+          <path d={fillPath} fill="none" stroke="var(--role-cap-fill)" strokeWidth="3" strokeLinecap="round" />
           <line
             x1={indicatorStart.x}
             y1={indicatorStart.y}
             x2={indicatorEnd.x}
             y2={indicatorEnd.y}
-            stroke="var(--fg)"
+            stroke="var(--text-text)"
             strokeWidth="2"
             strokeLinecap="round"
           />
           {valueInside ? null : (
-            <circle cx={cx} cy={cy} r={radius * 0.3} fill="var(--bg-elev)" stroke="var(--line-2)" strokeWidth="1" />
+            <circle
+              cx={cx}
+              cy={cy}
+              r={radius * 0.3}
+              fill="var(--material-key)"
+              stroke="var(--material-line2)"
+              strokeWidth="1"
+            />
           )}
         </svg>
         {valueInside ? (

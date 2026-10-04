@@ -1,274 +1,247 @@
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { useRef } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { IconButton } from "@sse/design-system";
+import { IconButton, MenuButton, Tooltip, type MenuEntry, type UseArmResult } from "@sse/design-system";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
-import { audioLockNote } from "../audioFormatting";
-import { type AudioChannelGroupSelectionRequest, type AudioWorkspaceViewModel } from "../audioViewModel";
-import { AudioChannelLane, AudioOutputLane } from "./AudioMixerLane";
-import type { AudioChannelEntry } from "../../shellData";
+import { AUDIO_FADER_SCALE_MARKS } from "../audioFaderScale";
+import { audioLockNote, faderDbToNormalized } from "../audioFormatting";
+import {
+  type AudioChannelGroupSelectionRequest,
+  type AudioGroupTierId,
+  type AudioTierViewModel,
+  type AudioWorkspaceViewModel,
+} from "../audioViewModel";
+import { AudioChannelLane } from "./AudioMixerLane";
 
-// Visual overhaul A, Slice 4b: three tiers side by side, each one a title, the
-// line that says what it holds and where it sends, and — when the console is
-// locked — the reason, right where the operator's hand is.
+// The bay (visual overhaul, the Console): the sources only, Inputs (4 a bank)
+// and Playback (6), side by side; the outputs live in the cluster. Each tier is
+// its head (the Adelia word over the heavy rule, the bank keys on Inputs, the
+// lock reason when the console is locked, the group filter's words while one
+// is on, the tier's ⋯), then the scale gutter and the strips. The tiers keep
+// their widths whatever a bank holds, so a strip never moves when the bank
+// changes.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
+type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 
-// What a playback strip prints under its format tag: where else it is going,
-// so the operator sees the cue sends without selecting the strip.
-function otherSendsFor(
-  channel: AudioChannelEntry,
-  viewModel: AudioWorkspaceViewModel
-): { id: string; name: string; level: number }[] {
-  return viewModel.hardwareOutputs.mixTargets
-    .filter((mixTarget) => mixTarget.id !== viewModel.selectedMixTargetId)
-    .slice(0, 2)
-    .map((mixTarget) => ({
-      id: mixTarget.id,
-      name: mixTarget.shortName || mixTarget.name,
-      level: channel.mixLevels[mixTarget.id] ?? 0,
-    }));
-}
-
-export function AudioTieredMixer({
-  armedActionKey,
-  clearDraftValueLater,
-  commitChannelContinuous,
-  commitMixTargetContinuous,
-  draftStore,
-  getDraftValue,
-  onClearClip,
-  onNextBank,
-  onOpenChannelMenu,
-  onPreviousBank,
-  onSelectChannel,
-  onSelectChannelGroup,
-  onSelectOutputMixTarget,
-  onTogglePhantom,
-  setDraftValue,
-  onUpdateChannel,
-  onUpdateMixTarget,
-  viewModel,
-}: {
+export interface AudioTieredMixerProps {
+  arm: UseArmResult;
   armedActionKey: string | null;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
-  commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
+  onClearChannelGroups: (tierId: AudioGroupTierId) => void;
   onClearClip: (channelId: string) => void;
   onNextBank: () => void;
-  onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
   onPreviousBank: () => void;
+  onResetToUnity: (channelId: string) => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
-  onSelectOutputMixTarget: (mixTargetId: string) => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
-  setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
+  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
+  setDraftValue: (key: string, value: number) => void;
   viewModel: AudioWorkspaceViewModel;
-}) {
-  // New pages program, Slice 3 (decision 3): the bank keys on the Inputs
-  // heading page both rows, as `[` and `]` did. They show whenever the rows
-  // have more than one bank — on bank 1 too — and are dimmed at the first and
-  // last bank. They sit between the row's name and its bank readout, so they
-  // never move when the readout's text changes from bank to bank. Paging is not a click on the heading: nothing
-  // inside the pair (a key, a dimmed key, the gap) lets the selected strip go.
-  const bankKeys =
-    viewModel.totalBanks > 1 ? (
-      <span className={styles.tierBankKeys} data-testid="audio-bank-keys" onClick={(event) => event.stopPropagation()}>
-        <IconButton
-          data-testid="audio-bank-previous"
-          disabled={viewModel.clampedBankIndex <= 0}
-          icon={ChevronLeft}
-          label="Previous bank"
-          onClick={onPreviousBank}
-          size="sm"
-        />
-        <IconButton
-          data-testid="audio-bank-next"
-          disabled={viewModel.clampedBankIndex >= viewModel.totalBanks - 1}
-          icon={ChevronRight}
-          label="Next bank"
-          onClick={onNextBank}
-          size="sm"
-        />
-      </span>
-    ) : null;
+}
 
+export function AudioTieredMixer(props: AudioTieredMixerProps) {
+  const { viewModel } = props;
   return (
     <div className={styles.tieredMixer} data-testid="audio-tiered-mixer">
       {viewModel.sourceTiers.map((tier) => (
-        <section className={styles.mixerTier} data-testid={tier.testId} data-tier={tier.id} key={tier.id}>
-          <div
-            className={styles.tierLabel}
-            data-bank-keys={tier.id === "hardware-inputs" && bankKeys ? "" : undefined}
-            data-testid={`audio-tier-label-${tier.id}`}
-            onClick={() => onSelectChannel(null)}
-          >
-            <div className={styles.tierHeaderLead}>
-              <span className={styles.tierTitle}>{tier.label}</span>
-              {tier.id === "hardware-inputs" ? bankKeys : null}
-              {/* The heading that carries the bank keys prints the bank readout on
-                  every bank, bank 1 included, so the keys sit beside it (decision
-                  3) and the row's long description does not push "sends into
-                  Main Out" out of the heading; the other rows print their
-                  description until they are paged. */}
-              <span className={styles.tierDetail} data-testid={`audio-tier-bank-pill-${tier.id}`}>
-                {tier.channels.length > 0
-                  ? viewModel.clampedBankIndex > 0 || (tier.id === "hardware-inputs" && bankKeys)
-                    ? tier.bankReadout
-                    : tier.meta
-                  : "No sources in this bank"}
-              </span>
-              <span className={styles.tierDetail} data-testid={`audio-tier-mix-for-${tier.id}`}>
-                sends into{" "}
-                {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
-              </span>
-              {/* The console is locked: the reason stands on the tier the hand
-                  is reaching for, not only in the state display. */}
-              {viewModel.actionsAllowed ? null : (
-                <span
-                  className={styles.tierLockNote}
-                  data-tone={viewModel.status.tone === "error" ? "error" : "attention"}
-                  data-testid={`audio-tier-lock-note-${tier.id}`}
-                >
-                  {audioLockNote(viewModel.status.label)}
-                </span>
-              )}
-            </div>
-            <div className={styles.tierChipRow}>
-              {tier.chips.map((chip) => (
-                <button
-                  aria-pressed={chip.active === true}
-                  className={styles.tierChip}
-                  data-active={chip.active === true}
-                  data-chip={chip.id}
-                  data-testid={chip.testId}
-                  key={chip.id}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    // A plain click switches the chip on or off; several can
-                    // be lit (new pages program, Slice 3, decision 10).
-                    onSelectChannelGroup({
-                      group: chip.id,
-                      tierId: tier.id as AudioChannelGroupSelectionRequest["tierId"],
-                    });
-                  }}
-                  type="button"
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div
-            className={styles.tierLaneGrid}
-            data-tier={tier.id}
-            data-testid={`audio-tier-lanes-${tier.id}`}
-            onClick={(event) => {
-              if (event.target === event.currentTarget) {
-                onSelectChannel(null);
-              }
-            }}
-          >
-            {tier.channels.length > 0 ? (
-              tier.channels.map((channel) => (
-                <AudioChannelLane
-                  actionsAllowed={viewModel.actionsAllowed}
-                  armedActionKey={armedActionKey}
-                  channel={channel}
-                  clearDraftValueLater={clearDraftValueLater}
-                  commitChannelContinuous={commitChannelContinuous}
-                  draftStore={draftStore}
-                  feeding={viewModel.feedingChannelIds.includes(channel.id)}
-                  getDraftValue={getDraftValue}
-                  key={channel.id}
-                  lockedReason={viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined)}
-                  meterEmpty={viewModel.meterSimulationState === "gated"}
-                  onClearClip={onClearClip}
-                  onOpenContextMenu={onOpenChannelMenu}
-                  onSelect={onSelectChannel}
-                  onTogglePhantom={onTogglePhantom}
-                  onUpdateChannel={onUpdateChannel}
-                  otherSends={otherSendsFor(channel, viewModel)}
-                  setDraftValue={setDraftValue}
-                  selected={channel.id === viewModel.selectedChannelId}
-                  selectedMixTargetId={viewModel.selectedMixTargetId}
-                />
-              ))
-            ) : (
-              <div className={styles.emptyTier}>No {tier.shortLabel.toLowerCase()} on this bank.</div>
-            )}
-          </div>
-        </section>
+        <AudioTier key={tier.id} tier={tier} {...props} />
       ))}
-
-      <section
-        className={`${styles.mixerTier} ${styles.outputTier}`}
-        data-testid={viewModel.hardwareOutputs.testId}
-        data-tier={viewModel.hardwareOutputs.id}
-      >
-        <div
-          className={styles.tierLabel}
-          data-testid={`audio-tier-label-${viewModel.hardwareOutputs.id}`}
-          onClick={() => onSelectChannel(null)}
-        >
-          <div className={styles.tierHeaderLead}>
-            <span className={styles.tierTitle}>{viewModel.hardwareOutputs.label}</span>
-            <span className={styles.tierDetail} data-testid="audio-tier-mix-for">
-              {viewModel.hardwareOutputs.mixTargets.length} mixes · level · one is the mix the faders send into
-            </span>
-            {viewModel.actionsAllowed ? null : (
-              <span
-                className={styles.tierLockNote}
-                data-tone={viewModel.status.tone === "error" ? "error" : "attention"}
-                data-testid="audio-tier-lock-note-hardware-outputs"
-              >
-                {audioLockNote(viewModel.status.label)}
-              </span>
-            )}
-          </div>
-          {/* Visual overhaul A, Slice 4c: peak hold and Reset peaks moved to the
-              plate's Meter section, where the readouts they act on are. What
-              stays here is the word that says the meters are simulated, which
-              belongs beside the meters themselves. */}
-          <div className={styles.tierMeterEyebrow}>
-            {viewModel.meterSimulationActive ? (
-              <span
-                className={styles.tierMeterSimChip}
-                data-testid="audio-meter-simulation-chip"
-                title={viewModel.meterSimulationDetail}
-              >
-                {viewModel.meterSimulationLabel}
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <div className={styles.outputLaneGrid} data-testid="audio-tier-lanes-hardware-outputs">
-          {viewModel.hardwareOutputs.mixTargets.map((mixTarget) => (
-            <AudioOutputLane
-              actionsAllowed={viewModel.actionsAllowed}
-              clearDraftValueLater={clearDraftValueLater}
-              commitMixTargetContinuous={commitMixTargetContinuous}
-              draftStore={draftStore}
-              getDraftValue={getDraftValue}
-              key={mixTarget.id}
-              lockedReason={viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined)}
-              meterEmpty={viewModel.meterSimulationState === "gated"}
-              mixTarget={mixTarget}
-              onSelect={onSelectOutputMixTarget}
-              onUpdateMixTarget={onUpdateMixTarget}
-              setDraftValue={setDraftValue}
-              selected={mixTarget.id === viewModel.selectedMixTargetId}
-            />
-          ))}
-        </div>
-      </section>
     </div>
+  );
+}
+
+function AudioTier({
+  arm,
+  armedActionKey,
+  clearDraftValueLater,
+  commitChannelContinuous,
+  draftStore,
+  getDraftValue,
+  onClearChannelGroups,
+  onClearClip,
+  onNextBank,
+  onPreviousBank,
+  onResetToUnity,
+  onSelectChannel,
+  onSelectChannelGroup,
+  onTogglePhantom,
+  onUpdateChannel,
+  onUpdateChannelSendMode,
+  setDraftValue,
+  tier,
+  viewModel,
+}: AudioTieredMixerProps & { tier: AudioTierViewModel }) {
+  const headRef = useRef<HTMLDivElement | null>(null);
+  const tierId = tier.id as AudioGroupTierId;
+  const isInputs = tier.id === "hardware-inputs";
+  const litGroups = tier.chips.filter((chip) => chip.active);
+  const lockedReason = viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined);
+  const menuLock = viewModel.actionsAllowed ? null : `desk ${viewModel.status.label}`;
+
+  // The tier's ⋯ (Atrium): the group filter, which replaces the chips. A lit
+  // filter is said in the head's words, so a hidden strip is never a mystery.
+  const filterItems: MenuEntry[] = [
+    { kind: "label", id: "show", label: "Show" },
+    ...tier.chips.map(
+      (chip) =>
+        ({
+          kind: "check",
+          id: chip.id,
+          label: chip.label,
+          checked: chip.active === true,
+          onCheckedChange: () => onSelectChannelGroup({ group: chip.id, tierId }),
+          testId: chip.testId,
+        }) satisfies MenuEntry
+    ),
+    { kind: "divider", id: "all-divider" },
+    {
+      id: "all",
+      label: "Show all",
+      onSelect: () => onClearChannelGroups(tierId),
+      disabledReason: litGroups.length === 0 ? "nothing hidden" : null,
+      testId: `audio-tier-show-all-${tierId === "hardware-inputs" ? "inputs" : "playback"}`,
+    },
+  ];
+
+  return (
+    <section
+      className={styles.tier}
+      data-testid={tier.testId}
+      data-tier={tier.id}
+      data-size={isInputs ? "inputs" : "playback"}
+    >
+      <div
+        ref={headRef}
+        className={styles.head}
+        data-testid={`audio-tier-label-${tier.id}`}
+        // A press on the head's floor lets the selected strip go.
+        onClick={() => onSelectChannel(null)}
+      >
+        <span className={styles.title}>{tier.label}</span>
+        {isInputs && viewModel.totalBanks > 1 ? (
+          // The bank keys page both tiers (new pages program, Slice 3, decision
+          // 3). Paging is not a press on the head: nothing in the pair lets the
+          // selected strip go.
+          <span className={styles.bank} data-testid="audio-bank-keys" onClick={(event) => event.stopPropagation()}>
+            <IconButton
+              data-testid="audio-bank-previous"
+              disabled={viewModel.clampedBankIndex <= 0}
+              icon={ChevronLeft}
+              label="Previous bank"
+              onClick={onPreviousBank}
+              size="sm"
+            />
+            <Tooltip content={tier.bankReadout} placement="bottom">
+              <span className={styles.bankReadout} data-testid={`audio-tier-bank-pill-${tier.id}`}>
+                {viewModel.clampedBankIndex + 1} / {viewModel.totalBanks}
+              </span>
+            </Tooltip>
+            <IconButton
+              data-testid="audio-bank-next"
+              disabled={viewModel.clampedBankIndex >= viewModel.totalBanks - 1}
+              icon={ChevronRight}
+              label="Next bank"
+              onClick={onNextBank}
+              size="sm"
+            />
+          </span>
+        ) : null}
+        <span className={styles.detail}>
+          {viewModel.actionsAllowed ? null : (
+            // The console is locked: the reason stands on the tier the hand is
+            // reaching for, not only in the state display.
+            <span
+              className={styles.lockNote}
+              data-tone={viewModel.status.tone === "error" ? "error" : "attention"}
+              data-testid={`audio-tier-lock-note-${tier.id}`}
+            >
+              {audioLockNote(viewModel.status.label)}
+            </span>
+          )}
+          {litGroups.length > 0 ? (
+            <span className={styles.filter} data-testid={`audio-tier-filter-${tier.id}`}>
+              {litGroups.map((chip) => chip.label).join(", ")} only
+            </span>
+          ) : null}
+        </span>
+        <span className={styles.actions} onClick={(event) => event.stopPropagation()}>
+          <MenuButton
+            buttonLabel={`${tier.label} menu`}
+            buttonTestId={`audio-tier-menu-${tier.id}`}
+            contextTarget={headRef}
+            size="sm"
+            menu={{ head: { title: tier.label, detail: "group filter" }, items: filterItems, arm }}
+          />
+        </span>
+      </div>
+
+      <div className={styles.body}>
+        {/* The fader scale, once per tier, on the strips' rows. */}
+        <div className={styles.gutter} aria-hidden="true">
+          <span className={styles.scale} data-fader-scale="">
+            {AUDIO_FADER_SCALE_MARKS.map(([db, mark]) => (
+              <span
+                key={mark}
+                className={styles.scaleMark}
+                data-fader-scale-mark={mark}
+                style={{ bottom: `${(faderDbToNormalized(db) * 100).toFixed(2)}%` }}
+              >
+                {mark}
+              </span>
+            ))}
+          </span>
+        </div>
+        <div
+          className={styles.lanes}
+          data-tier={tier.id}
+          data-testid={`audio-tier-lanes-${tier.id}`}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              onSelectChannel(null);
+            }
+          }}
+        >
+          {tier.channels.length > 0 ? (
+            tier.channels.map((channel) => (
+              <AudioChannelLane
+                actionsAllowed={viewModel.actionsAllowed}
+                arm={arm}
+                armedActionKey={armedActionKey}
+                channel={channel}
+                clearDraftValueLater={clearDraftValueLater}
+                commitChannelContinuous={commitChannelContinuous}
+                draftStore={draftStore}
+                feeding={viewModel.feedingChannelIds.includes(channel.id)}
+                getDraftValue={getDraftValue}
+                key={channel.id}
+                lockedReason={lockedReason}
+                menuLock={menuLock}
+                meterEmpty={viewModel.meterSimulationState === "gated"}
+                mixTargets={viewModel.mixTargets}
+                onClearClip={onClearClip}
+                onResetToUnity={onResetToUnity}
+                onSelect={onSelectChannel}
+                onTogglePhantom={onTogglePhantom}
+                onUpdateChannel={onUpdateChannel}
+                onUpdateChannelSendMode={onUpdateChannelSendMode}
+                setDraftValue={setDraftValue}
+                selected={channel.id === viewModel.selectedChannelId}
+                selectedMixTarget={viewModel.selectedMixTarget}
+              />
+            ))
+          ) : (
+            <div className={styles.emptyTier}>No {tier.shortLabel.toLowerCase()} on this bank.</div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

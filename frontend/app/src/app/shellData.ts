@@ -184,6 +184,8 @@ export interface AudioConsoleSnapshotEntry {
   slot: number;
   /** TotalMix's saved name, or `Slot N` when it saved none (as the hardware link names it). */
   name: string;
+  /** False when the slot carries no name of its own (`Slot N`): the Console prints it quieter. */
+  named: boolean;
   state: AudioConsoleSnapshotState;
 }
 
@@ -471,6 +473,7 @@ export function getAudioConsoleSnapshots(snapshot: AudioSnapshot | null): AudioC
     return {
       slot,
       name: name ? name : `Slot ${slot}`,
+      named: Boolean(name) && name !== `Slot ${slot}`,
       state:
         entry && AUDIO_CONSOLE_SNAPSHOT_STATES.has(entry.state)
           ? (entry.state as AudioConsoleSnapshotState)

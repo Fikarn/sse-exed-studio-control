@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
-import { ContextMenu, ShellRegion, type ContextMenuItem } from "@sse/design-system";
-import { RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ShellRegion } from "@sse/design-system";
 
 import styles from "./AudioWorkspace.module.css";
-import { audioSnapshotLoadKey } from "./audioArming";
+import { audioPhantomKey, audioSnapshotLoadKey } from "./audioArming";
 import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS } from "./audioConstants";
 import { useAudioArming } from "./hooks/useAudioArming";
 import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
@@ -13,11 +12,11 @@ import { createAudioControlDraftStore } from "./audioControlDraftStore";
 import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
 import { parseAudioLoadReport, type AudioLoadReport } from "./audioLoadReport";
 import {
-  audioChannelSupportsPhase,
   buildAudioViewModel,
   toggleChannelGroupSelection,
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
+  type AudioGroupTierId,
 } from "./audioViewModel";
 import { AudioCluster } from "./components/AudioCluster";
 import { AudioFooter } from "./components/AudioFooter";
@@ -56,12 +55,6 @@ type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 type AudioSettingsUpdate = Parameters<ShellStore["updateAudioSettings"]>[0];
 
-interface AudioContextMenuState {
-  channelId: string;
-  x: number;
-  y: number;
-}
-
 const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "hardware-inputs": [],
   "software-playback": [],
@@ -79,7 +72,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
   // 2026-10-01: what the last TotalMix snapshot load read back from the desk.
   const [loadReport, setLoadReport] = useState<AudioLoadReport | null>(null);
-  const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
   const draftStoreRef = useRef<ReturnType<typeof createAudioControlDraftStore> | null>(null);
   if (!draftStoreRef.current) {
     draftStoreRef.current = createAudioControlDraftStore();
@@ -114,7 +106,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     viewModel?.consoleSnapshots.find((entry) => entry.state === "active" || entry.state === "changed")?.slot ?? null;
   // The arm hook also owns the Esc that cancels an arm (new pages program,
   // Slice 3); the Console binds no other key.
-  const { armedAction, armOrApplyAction, clearArmedAction } = useAudioArming({
+  const { arm, armedAction, armOrApplyAction, clearArmedAction } = useAudioArming({
     setFeedback,
     resetTriggers: {
       loadedSnapshotSlot,
@@ -228,8 +220,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         // The panel's heading says "in TotalMix"; the row keeps room for
         // "press again to apply".
         label: `Load ${slotName}`,
-        targetId: String(slot),
-        targetKind: "snapshot-load",
         timeoutMs: AUDIO_ARM_TIMEOUT_MS,
       },
       () => {
@@ -246,7 +236,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   });
 
   const selectChannel = useLiveCallback((channelId: string | null) => {
-    setContextMenu(null);
     updateAudioSettings({ selectedChannelId: channelId }, { selectedChannelId: channelId });
   });
 
@@ -254,8 +243,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     updateAudioSettings({ selectedMixTargetId: mixTargetId }, { selectedMixTargetId: mixTargetId });
   });
 
+  // An output's menu, "Show in the plate": the output becomes the mix target
+  // and the plate shows it, so the channel lets go.
   const selectOutputMixTarget = useLiveCallback((mixTargetId: string) => {
-    setContextMenu(null);
     updateAudioSettings(
       { selectedChannelId: null, selectedMixTargetId: mixTargetId },
       { selectedChannelId: null, selectedMixTargetId: mixTargetId }
@@ -271,6 +261,12 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     setBankIndex(0);
   });
 
+  // The tier menu's "Show all": every group of the tier again.
+  const clearChannelGroups = useLiveCallback((tierId: AudioGroupTierId) => {
+    setActiveChannelGroups((current) => ({ ...current, [tierId]: [] }));
+    setBankIndex(0);
+  });
+
   const updateChannel = useLiveCallback((request: AudioChannelUpdate) => {
     void performAction(`audio-channel-${request.channelId}`, async () => {
       await store.updateAudioChannel(request);
@@ -281,10 +277,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     ({ channelId, channelName, phantom }: { channelId: string; channelName: string; phantom: boolean }) => {
       armOrApplyAction(
         {
-          key: `phantom:${channelId}:${phantom}`,
+          key: audioPhantomKey(channelId, phantom),
           label: `${phantom ? "Enable" : "Disable"} 48 V on ${channelName}`,
-          targetId: channelId,
-          targetKind: "phantom",
           timeoutMs: AUDIO_ARM_TIMEOUT_MS,
         },
         () => updateChannel({ channelId, phantom })
@@ -364,12 +358,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
-  const openChannelContextMenu = useLiveCallback((event: ReactMouseEvent<HTMLElement>, channelId: string) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setContextMenu({ channelId, x: event.clientX, y: event.clientY });
-  });
-
   // New pages program, Slice 3 (decision 3): the Inputs heading's ‹ › keys
   // page both rows, as `[` and `]` did. Without them Line 1–8 (banks 2–3 at
   // 2560) could not be reached on screen at all.
@@ -382,81 +370,51 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     setBankIndex((current) => Math.min(maxBankIndex, current + 1));
   });
 
-  const contextMenuChannel = viewModel?.channels.find((entry) => entry.id === contextMenu?.channelId) ?? null;
-  const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
-    if (!contextMenuChannel || !viewModel) return [];
-    const canMutate = viewModel.actionsAllowed;
-    const locked = `desk ${viewModel.status.label}`;
-    const hasPhase = audioChannelSupportsPhase(contextMenuChannel);
-    return [
-      {
-        disabled: !canMutate,
-        disabledReason: locked,
-        icon: RotateCcw,
-        id: "reset-unity",
-        label: "Reset to unity",
-        onSelect: () => resetChannelFaderToUnity(contextMenuChannel.id, viewModel.selectedMixTargetId),
-      },
-      {
-        disabled: !canMutate || !hasPhase,
-        disabledReason: !canMutate ? locked : "no polarity on this channel",
-        icon: SlidersHorizontal,
-        id: "flip-polarity",
-        label: contextMenuChannel.phase ? "Restore polarity" : "Flip polarity",
-        onSelect: () => updateChannel({ channelId: contextMenuChannel.id, phase: !contextMenuChannel.phase }),
-      },
-      // No Rename (2026-10-01): the channels take TotalMix's names, and a
-      // channel is renamed in TotalMix.
-    ];
-  }, [contextMenuChannel, resetChannelFaderToUnity, updateChannel, viewModel]);
-
   if (!viewModel) {
     return (
-      <div className={`${styles.consoleTheme} ${styles.audioShell}`} data-testid="audio-workspace-loading">
-        <section className={styles.loadingPanel} data-material="plate" data-level="float">
-          <span className={styles.eyebrow}>Audio</span>
-          <h1>Loading the console…</h1>
-          <div className={styles.loadingGrid}>
-            {Array.from({ length: 16 }, (_, index) => (
-              <span key={`audio-loading-${index}`} />
-            ))}
-          </div>
+      <div className={styles.audioShell} data-testid="audio-workspace-loading">
+        <section className={styles.loadingPanel} aria-busy="true">
+          <span className={styles.loadingWord}>Loading the console…</span>
         </section>
       </div>
     );
   }
 
+  const canvasMetering = viewModel.meterSimulationState === "gated" ? "false" : "true";
+
   return (
     <div
-      className={`${styles.consoleTheme} ${styles.audioShell}`}
-      data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
+      className={styles.audioShell}
+      data-canvas-metering={canvasMetering}
       data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
       data-testid="audio-workspace"
       data-view-mode={viewModel.viewMode}
     >
-      {feedback ? (
-        <div className={styles.feedbackBanner} data-tone={feedback.tone} role="status">
-          {feedback.message}
-        </div>
-      ) : null}
-
       <ShellRegion region="cluster">
         <AudioCluster
+          arm={arm}
           armedAction={armedAction}
           busyAction={busyAction}
           clearDraftValueLater={clearDraftValueLater}
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
+          feedback={feedback}
           getDraftValue={getDraftValue}
+          loadReport={loadReport}
           onClearAllSolo={clearAllSolo}
           onClearClips={clearClips}
+          onDismissLoadReport={dismissLoadReport}
           onLoadSnapshot={loadSnapshot}
           onOpenSetup={openSetup}
+          onResetPeakHolds={resetPeakHolds}
           onRunAudioProbe={runAudioProbe}
           onSelectMixTarget={selectMixTarget}
+          onShowOutput={selectOutputMixTarget}
           onSync={syncAudio}
+          onTogglePeakHold={togglePeakHold}
           onUpdateMixTarget={updateMixTarget}
+          peakHoldEnabled={peakHoldEnabled}
           setDraftValue={setDraftValue}
           viewModel={viewModel}
         />
@@ -468,30 +426,29 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
       {/* The shell (overhaul 3): one plate mechanism for every page. */}
       <ShellRegion region="plate">
-        <div
-          className={`${styles.consoleTheme} ${styles.audioPlate}`}
-          data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
-        >
+        <div className={styles.audioPlate} data-canvas-metering={canvasMetering}>
           <AudioInspector
+            arm={arm}
             armedActionKey={armedAction?.key ?? null}
             clearDraftValueLater={clearDraftValueLater}
             commitChannelContinuous={commitChannelContinuous}
             commitChannelEqContinuous={commitChannelEqContinuous}
-            commitMixTargetContinuous={commitMixTargetContinuous}
             draftStore={draftStore}
             getDraftValue={getDraftValue}
+            onClearClip={clearClips}
             onResetPeakHolds={resetPeakHolds}
+            onResetToUnity={(channelId) => resetChannelFaderToUnity(channelId, viewModel.selectedMixTargetId)}
             onSelectMixTarget={selectMixTarget}
             onTogglePeakHold={togglePeakHold}
-            setDraftValue={setDraftValue}
+            onTogglePhantom={togglePhantom}
+            onUpdateChannel={updateChannel}
             onUpdateChannelDynamics={updateChannelDynamics}
             onUpdateChannelEq={updateChannelEq}
             onUpdateChannelSendMode={updateChannelSendMode}
-            onTogglePhantom={togglePhantom}
-            onUpdateChannel={updateChannel}
             onUpdateMixTarget={updateMixTarget}
             peakHoldEnabled={peakHoldEnabled}
             peakHoldResetToken={peakHoldResetToken}
+            setDraftValue={setDraftValue}
             store={store}
             viewModel={viewModel}
           />
@@ -500,27 +457,23 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
       <div className={styles.audioBody}>
         <AudioSignalCanvas
-          armedAction={armedAction}
+          arm={arm}
+          armedActionKey={armedAction?.key ?? null}
           clearDraftValueLater={clearDraftValueLater}
           commitChannelContinuous={commitChannelContinuous}
-          commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          onClearClips={clearClips}
+          onClearChannelGroups={clearChannelGroups}
+          onClearClip={clearClips}
           onNextBank={nextBank}
-          onOpenChannelMenu={openChannelContextMenu}
           onPreviousBank={previousBank}
-          loadReport={loadReport}
-          onDismissLoadReport={dismissLoadReport}
+          onResetToUnity={(channelId) => resetChannelFaderToUnity(channelId, viewModel.selectedMixTargetId)}
           onSelectChannel={selectChannel}
           onSelectChannelGroup={selectChannelGroup}
-          onSelectMixTarget={selectMixTarget}
-          onSelectOutputMixTarget={selectOutputMixTarget}
           onTogglePhantom={togglePhantom}
-          setDraftValue={setDraftValue}
           onUpdateChannel={updateChannel}
-          onUpdateMixTarget={updateMixTarget}
-          store={store}
+          onUpdateChannelSendMode={updateChannelSendMode}
+          setDraftValue={setDraftValue}
           viewModel={viewModel}
         />
       </div>
@@ -530,16 +483,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         peakHoldResetToken={peakHoldResetToken}
         store={store}
       />
-
-      {contextMenu && contextMenuItems.length > 0 ? (
-        <ContextMenu
-          ariaLabel={contextMenuChannel ? `${contextMenuChannel.name} actions` : "Audio channel actions"}
-          items={contextMenuItems}
-          onClose={() => setContextMenu(null)}
-          x={contextMenu.x}
-          y={contextMenu.y}
-        />
-      ) : null}
     </div>
   );
 }

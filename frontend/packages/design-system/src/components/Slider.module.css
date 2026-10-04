@@ -95,9 +95,13 @@
   }
 
   /* ---- vertical: the groove ---- */
+  /* It grows along its travel in a column (`flex: 1`) and never across it:
+     in a row the same `flex: 1` would widen it, so its width is held. */
   .groove {
     position: relative;
     width: 44px;
+    min-width: 44px;
+    max-width: 44px;
     min-height: 120px;
     flex: 1;
     cursor: ns-resize;

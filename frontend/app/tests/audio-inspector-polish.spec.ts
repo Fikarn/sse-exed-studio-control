@@ -32,11 +32,17 @@ test("tier bank pill prints the Inputs bank and the Playback description, and is
   // is paged. Old title: "renders the tier description on bank 1"; old
   // comment: the fixture "has only one bank per tier" — wrong (the S3
   // inventory, decision 3).
+  // The visual overhaul's Console pull request. Old: the pill printed "Bank 1 /
+  // 3 · ch 1-4 of 12" and the Playback heading its description ("6 ch · post ·
+  // stereo pairs"). New: "1 / 3" between the bank keys, the bank and its
+  // channels in the pill's tooltip, and no description on Playback. Reason:
+  // Atrium, "1 / 3" between the keys; the heading carried four facts.
   await openFixture(page, "audio-populated");
   const pill = page.getByTestId("audio-tier-bank-pill-hardware-inputs");
   await expect(pill).toBeVisible();
-  await expect(pill).toHaveText("Bank 1 / 3 · ch 1-4 of 12");
-  await expect(page.getByTestId("audio-tier-bank-pill-software-playback")).toContainText("post · stereo pairs");
+  await expect(pill).toHaveText("1 / 3");
+  await expect(page.getByTestId("audio-tier-label-hardware-inputs")).toContainText("Bank 1 / 3 · ch 1-4 of 12");
+  await expect(page.getByTestId("audio-tier-bank-pill-software-playback")).toHaveCount(0);
 });
 
 test("the footer carries the console link, the metering source, the last sync and the bank", async ({ page }) => {
@@ -68,7 +74,9 @@ test("a TotalMix snapshot slot shows its name and state, and a hover adds nothin
   const slot = page.getByTestId("audio-snapshot-slot-2");
   await expect(slot).toBeVisible();
   await expect(page.getByTestId("audio-snapshot-name-2")).toHaveText("Interview");
-  await expect(page.getByTestId("audio-snapshot-state-2")).toHaveText("–");
+  // The visual overhaul's Console pull request: a slot TotalMix does not hold
+  // says nothing (it said "–").
+  await expect(page.getByTestId("audio-snapshot-state-2")).toHaveText("");
   const atRest = await slot.innerText();
   await slot.hover();
   expect(await slot.innerText()).toBe(atRest);

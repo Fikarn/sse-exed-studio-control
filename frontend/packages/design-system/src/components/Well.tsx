@@ -31,8 +31,8 @@ export interface ReadoutProps extends Omit<HTMLAttributes<HTMLDivElement>, "chil
   doubt?: boolean;
   /** No signal to print: the readout prints `—`. */
   empty?: boolean;
-  /** 20 px word (default), the 40 px hero, or the 16 px value. */
-  size?: "word" | "hero" | "value";
+  /** 20 px word (default), the 28 px strip readout, the 40 px hero, or the 16 px value. */
+  size?: "word" | "readout" | "hero" | "value";
   align?: "center" | "right";
   testId?: string;
 }
@@ -50,7 +50,13 @@ export function Readout({
 }: ReadoutProps) {
   return (
     <div
-      className={[styles.readout, styles[size], styles[align], doubt ? styles.doubt : "", className]
+      className={[
+        styles.readout,
+        styles[size === "readout" ? "strip" : size],
+        styles[align],
+        doubt ? styles.doubt : "",
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
       data-well=""

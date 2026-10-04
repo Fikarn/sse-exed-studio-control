@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { openAudioTierMenu, readAudioTierGroup, toggleAudioTierGroup } from "./helpers/audio";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // New pages program, Slice 3 (D6 and the twelve decisions of 2026-09-26): the
@@ -10,7 +11,9 @@ import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 //     reached on screen);
 //   - decision 10: a plain click switches a group chip on or off, several can
 //     be lit, a lit chip stays in the heading on every bank, and a key held
-//     while clicking changes nothing;
+//     while clicking changes nothing (since the visual overhaul's Console pull
+//     request the chips are the check items of the tier's ⋯, with the chips'
+//     test ids);
 //   - decision 8: typed entry's "Reset to <default>" key, which replaces
 //     Backspace / Delete and Alt+double-click;
 //   - decision 9: a focused fader takes the arrows (one step, Shift or not),
@@ -37,16 +40,14 @@ test("the Inputs heading's bank keys page both rows, reach Line 1–8 and are di
   await expect(page.getByTestId("audio-tier-label-software-playback").getByTestId("audio-bank-next")).toHaveCount(0);
   await expect(previous).toHaveAccessibleName("Previous bank");
   await expect(next).toHaveAccessibleName("Next bank");
-  await expect(bankReadout).toHaveText("Bank 1 / 3 · ch 1-4 of 12");
-  // The readout leaves room for the mix the row sends into, in full.
-  await expect(page.getByTestId("audio-tier-mix-for-hardware-inputs")).toContainText("sends into Main Out");
-  await expect
-    .poll(() =>
-      page
-        .getByTestId("audio-tier-mix-for-hardware-inputs")
-        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
-    )
-    .toBe(true);
+  // The visual overhaul's Console pull request. Old: the readout printed "Bank
+  // 1 / 3 · ch 1-4 of 12" and the heading "sends into Main Out". New: "1 / 3"
+  // between the keys, the bank and its channels in its tooltip, and no "sends
+  // into": the lit output in the cluster is the mix target. Reason: Atrium; the
+  // heading carried four facts.
+  await expect(bankReadout).toHaveText("1 / 3");
+  await expect(inputsHeading).toContainText("Bank 1 / 3 · ch 1-4 of 12");
+  await expect(page.getByTestId("audio-tier-mix-for-hardware-inputs")).toHaveCount(0);
   await expect(footer).toContainText("1 of 3");
   await expect(previous).toBeDisabled();
   await expect(next).toBeEnabled();
@@ -57,7 +58,7 @@ test("the Inputs heading's bank keys page both rows, reach Line 1–8 and are di
   // Bank 2: Line 1 and Line 2 on the Inputs row; the Playback row pages too.
   await next.click();
   await expect(footer).toContainText("2 of 3");
-  await expect(bankReadout).toContainText("Bank 2 / 3");
+  await expect(bankReadout).toHaveText("2 / 3");
   await expect(page.getByTestId("audio-strip-audio-input-1")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-input-2")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveCount(0);
@@ -71,7 +72,7 @@ test("the Inputs heading's bank keys page both rows, reach Line 1–8 and are di
   // Bank 3: Line 5–8, and Next bank is dimmed at the last bank.
   await next.click();
   await expect(footer).toContainText("3 of 3");
-  await expect(bankReadout).toContainText("Bank 3 / 3");
+  await expect(bankReadout).toHaveText("3 / 3");
   for (const line of [5, 6, 7, 8]) {
     await expect(page.getByTestId(`audio-lane-name-audio-input-${line}`)).toHaveText(`Line ${line}`);
   }
@@ -89,10 +90,10 @@ test("the Inputs heading's bank keys page both rows, reach Line 1–8 and are di
 
   // With one bank there is nothing to page: lit to Talent, the Inputs row fits
   // one bank, and so does the Playback row, so the keys go until it is unlit.
-  await page.getByTestId("audio-tier-chip-inputs-talent").click();
+  await toggleAudioTierGroup(page, "hardware-inputs", "talent");
   await expect(footer).toContainText("all 12 strips");
   await expect(page.getByTestId("audio-bank-keys")).toHaveCount(0);
-  await page.getByTestId("audio-tier-chip-inputs-talent").click();
+  await toggleAudioTierGroup(page, "hardware-inputs", "talent");
   await expect(page.getByTestId("audio-bank-keys")).toBeVisible();
 });
 
@@ -102,52 +103,53 @@ test("a plain click lights two group chips at once, a second click turns one off
   await openFixture(page, "audio-populated");
   await expectWorkspaceMounted(page, "audio");
 
-  const fx = page.getByTestId("audio-tier-chip-playback-fx");
-  const bed = page.getByTestId("audio-tier-chip-playback-bed");
   const program = page.getByTestId("audio-strip-audio-playback-1-2");
   const fxStrip = page.getByTestId("audio-strip-audio-playback-3-4");
   const music = page.getByTestId("audio-strip-audio-playback-7-8");
   const remote = page.getByTestId("audio-strip-audio-playback-9-10");
+  const playback = "software-playback" as const;
 
-  await expect(fx).toHaveAttribute("data-active", "false");
-  await expect(bed).toHaveAttribute("data-active", "false");
+  expect(await readAudioTierGroup(page, playback, "fx")).toBe("false");
+  expect(await readAudioTierGroup(page, playback, "bed")).toBe("false");
 
-  await fx.click();
-  await expect(fx).toHaveAttribute("data-active", "true");
+  await toggleAudioTierGroup(page, playback, "fx");
+  expect(await readAudioTierGroup(page, playback, "fx")).toBe("true");
   await expect(fxStrip).toBeVisible();
   await expect(program).toHaveCount(0);
+  // A lit filter is said in the heading's words.
+  await expect(page.getByTestId("audio-tier-filter-software-playback")).toHaveText("FX only");
 
-  // A second chip lights beside the first; both groups' strips show.
-  await bed.click();
-  await expect(fx).toHaveAttribute("data-active", "true");
-  await expect(bed).toHaveAttribute("data-active", "true");
-  await expect(fx).toHaveAttribute("aria-pressed", "true");
-  await expect(bed).toHaveAttribute("aria-pressed", "true");
+  // A second group lights beside the first; both groups' strips show.
+  await toggleAudioTierGroup(page, playback, "bed");
+  expect(await readAudioTierGroup(page, playback, "fx")).toBe("true");
+  expect(await readAudioTierGroup(page, playback, "bed")).toBe("true");
+  await expect(page.getByTestId("audio-tier-filter-software-playback")).toHaveText("Bed, FX only");
   await expect(fxStrip).toBeVisible();
   await expect(program).toBeVisible();
   await expect(music).toBeVisible();
   await expect(remote).toHaveCount(0);
 
-  // A second click turns that chip off and leaves the other lit.
-  await fx.click();
-  await expect(fx).toHaveAttribute("data-active", "false");
-  await expect(bed).toHaveAttribute("data-active", "true");
+  // A second press turns that group off and leaves the other lit.
+  await toggleAudioTierGroup(page, playback, "fx");
+  expect(await readAudioTierGroup(page, playback, "fx")).toBe("false");
+  expect(await readAudioTierGroup(page, playback, "bed")).toBe("true");
   await expect(fxStrip).toHaveCount(0);
   await expect(program).toBeVisible();
 
-  // No chip lit: every strip shows.
-  await bed.click();
-  await expect(bed).toHaveAttribute("data-active", "false");
+  // No group lit: every strip shows.
+  await toggleAudioTierGroup(page, playback, "bed");
+  expect(await readAudioTierGroup(page, playback, "bed")).toBe("false");
   await expect(fxStrip).toBeVisible();
   await expect(remote).toBeVisible();
 
   // Alt+click used to invert the row's chips. A key held while clicking is a
-  // shortcut too, and it went: the click lights that one chip, no more.
-  await fx.click({ modifiers: ["Alt"] });
-  await expect(fx).toHaveAttribute("data-active", "true");
-  await expect(bed).toHaveAttribute("data-active", "false");
-  await fx.click();
-  await expect(fx).toHaveAttribute("data-active", "false");
+  // shortcut too, and it went: the press lights that one group, no more.
+  await openAudioTierMenu(page, playback);
+  await page.getByTestId("audio-tier-chip-playback-fx").click({ modifiers: ["Alt"] });
+  expect(await readAudioTierGroup(page, playback, "fx")).toBe("true");
+  expect(await readAudioTierGroup(page, playback, "bed")).toBe("false");
+  await toggleAudioTierGroup(page, playback, "fx");
+  expect(await readAudioTierGroup(page, playback, "fx")).toBe("false");
 });
 
 // Found on the slice's review: an Inputs bank holds one group here, so with
@@ -160,48 +162,54 @@ test("a lit Inputs chip stays in the heading on a bank without its strips, and a
   await openFixture(page, "audio-populated");
   await expectWorkspaceMounted(page, "audio");
 
-  const talent = page.getByTestId("audio-tier-chip-inputs-talent");
-  const line = page.getByTestId("audio-tier-chip-inputs-line");
+  const inputs = "hardware-inputs" as const;
+  const heading = page.getByTestId("audio-tier-label-hardware-inputs");
   const bankReadout = page.getByTestId("audio-tier-bank-pill-hardware-inputs");
   const next = page.getByTestId("audio-bank-next");
 
-  // Bank 2 has Line 1 and Line 2: light Line there, and the rows go back to bank 1.
+  // Bank 2 has Line 1 and Line 2: light Line there, and the rows go back to
+  // bank 1. The visual overhaul's Console pull request: the readout prints "1 /
+  // 2" and its tooltip the bank and its channels (old: one line of both).
   await next.click();
-  await expect(bankReadout).toContainText("Bank 2 / 3");
-  await line.click();
-  await expect(line).toHaveAttribute("data-active", "true");
-  await expect(bankReadout).toHaveText("Bank 1 / 2 · ch 1-4 of 6");
+  await expect(bankReadout).toHaveText("2 / 3");
+  await toggleAudioTierGroup(page, inputs, "line");
+  expect(await readAudioTierGroup(page, inputs, "line")).toBe("true");
+  await expect(bankReadout).toHaveText("1 / 2");
+  await expect(heading).toContainText("Bank 1 / 2 · ch 1-4 of 6");
 
   // Talent lights beside Line. Bank 1 holds no Line strip, and the lit Line
-  // chip stays in its heading.
-  await talent.click();
-  await expect(talent).toHaveAttribute("data-active", "true");
-  await expect(line).toHaveAttribute("data-active", "true");
-  await expect(bankReadout).toHaveText("Bank 1 / 3 · ch 1-4 of 10");
+  // group stays in the menu.
+  await toggleAudioTierGroup(page, inputs, "talent");
+  expect(await readAudioTierGroup(page, inputs, "talent")).toBe("true");
+  expect(await readAudioTierGroup(page, inputs, "line")).toBe("true");
+  await expect(heading).toContainText("Bank 1 / 3 · ch 1-4 of 10");
 
-  // A second click on Talent turns Talent off, and Line stays lit.
-  await talent.click();
-  await expect(talent).toHaveAttribute("data-active", "false");
-  await expect(line).toHaveAttribute("data-active", "true");
-  await expect(bankReadout).toHaveText("Bank 1 / 2 · ch 1-4 of 6");
+  // A second press on Talent turns Talent off, and Line stays lit.
+  await toggleAudioTierGroup(page, inputs, "talent");
+  expect(await readAudioTierGroup(page, inputs, "talent")).toBe("false");
+  expect(await readAudioTierGroup(page, inputs, "line")).toBe("true");
+  await expect(heading).toContainText("Bank 1 / 2 · ch 1-4 of 6");
 
   // Both lit again, then bank 2, which holds no Talent strip: the lit Talent
-  // chip stays, and a click on Line leaves Talent lit.
-  await talent.click();
-  await expect(bankReadout).toHaveText("Bank 1 / 3 · ch 1-4 of 10");
+  // group stays, and a press on Line leaves Talent lit.
+  await toggleAudioTierGroup(page, inputs, "talent");
+  await expect(heading).toContainText("Bank 1 / 3 · ch 1-4 of 10");
   await next.click();
-  await expect(bankReadout).toHaveText("Bank 2 / 3 · ch 5-8 of 10");
-  await expect(talent).toHaveAttribute("data-active", "true");
-  await line.click();
-  await expect(talent).toHaveAttribute("data-active", "true");
-  await expect(line).toHaveCount(0);
+  await expect(heading).toContainText("Bank 2 / 3 · ch 5-8 of 10");
+  expect(await readAudioTierGroup(page, inputs, "talent")).toBe("true");
+  await toggleAudioTierGroup(page, inputs, "line");
+  expect(await readAudioTierGroup(page, inputs, "talent")).toBe("true");
+  expect(await readAudioTierGroup(page, inputs, "line")).toBe("absent");
   // Talent alone fits one bank, so there is nothing to page.
   await expect(page.getByTestId("audio-bank-keys")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-input-1")).toHaveCount(0);
 });
 
-test("typed entry offers Reset to the default on a knob, the strip's Gain key and a fader", async ({ page }) => {
+// The visual overhaul's Console pull request. Old name: "… on a knob, the
+// strip's Gain key and a fader". New: the strip's gain is a value, and its
+// menu's "Set preamp gain…" opens the same typed entry the key did.
+test("typed entry offers Reset to the default on a knob, the strip's gain and a fader", async ({ page }) => {
   await openFixture(page, "audio-populated");
   await expectWorkspaceMounted(page, "audio");
 
@@ -220,13 +228,17 @@ test("typed entry offers Reset to the default on a knob, the strip's Gain key an
   await expect(heroGain).toHaveAttribute("aria-valuenow", "24");
   await expect(stripGain).toContainText("24 dB");
 
-  // The strip's Gain key: type 40 dB, then Reset puts it back on 24 dB.
-  await stripGain.click();
+  // The strip's gain, from its menu: type 40 dB, then Reset puts it back on 24 dB.
+  const setGain = async () => {
+    await page.getByTestId("audio-lane-menu-audio-input-9").click();
+    await page.getByTestId("audio-lane-menu-audio-input-9-gain").click();
+  };
+  await setGain();
   dialog = page.getByRole("dialog", { name: "Set Host preamp gain" });
   await dialog.getByLabel("Preamp gain").fill("40");
   await dialog.getByRole("button", { name: "Set value" }).click();
   await expect(stripGain).toContainText("40 dB");
-  await stripGain.click();
+  await setGain();
   dialog = page.getByRole("dialog", { name: "Set Host preamp gain" });
   await dialog.getByRole("button", { name: "Reset to 24 dB" }).click();
   await expect(stripGain).toContainText("24 dB");
@@ -245,7 +257,9 @@ test("typed entry offers Reset to the default on a knob, the strip's Gain key an
   await page.keyboard.press("Enter");
   dialog = page.getByRole("dialog", { name: "Set FX 3/4 send level" });
   await dialog.getByRole("button", { name: "Reset to 0 dB" }).click();
-  await expect(fxReadout).toHaveText("0.0 dB");
+  // The visual overhaul's Console pull request: unity reads "+0.0 dB", as the
+  // deck's display prints it.
+  await expect(fxReadout).toHaveText("+0.0 dB");
 });
 
 test("a focused fader takes one plain step for Shift+ArrowUp, and Home and End reach its ends", async ({ page }) => {
@@ -265,17 +279,19 @@ test("a focused fader takes one plain step for Shift+ArrowUp, and Home and End r
   await page.keyboard.press("End");
   await expect(stripFader).toHaveAttribute("aria-valuenow", "100");
 
-  // The plate's send to the same mix (the Console's own slider): aria-valuenow
-  // is 0–1 and one arrow step is 0.01.
-  const plateSend = page.getByRole("slider", { name: "FX 3/4 send to Main Out" });
-  await page.keyboard.press("Home");
-  await expect(stripFader).toHaveAttribute("aria-valuenow", "0");
-  await expect(plateSend).toHaveAttribute("aria-valuenow", "0");
+  // The visual overhaul's Console pull request. Old: the plate's send to the
+  // same mix, the Console's own slider, read 0–1. New: the plate's sends are
+  // the other mixes' (the mix target's send is the strip's fader, its one
+  // home), on the design system's slider: 0–100, one arrow step is 1.
+  await expect(page.getByRole("slider", { name: "FX 3/4 send to Main Out" })).toHaveCount(0);
+  const plateSend = page.getByRole("slider", { name: "FX 3/4 send to Phones 1" });
   await plateSend.focus();
+  await page.keyboard.press("Home");
+  await expect(plateSend).toHaveAttribute("aria-valuenow", "0");
   await page.keyboard.press("Shift+ArrowUp");
-  await expect(plateSend).toHaveAttribute("aria-valuenow", "0.01");
-  await page.keyboard.press("End");
   await expect(plateSend).toHaveAttribute("aria-valuenow", "1");
+  await page.keyboard.press("End");
+  await expect(plateSend).toHaveAttribute("aria-valuenow", "100");
   await page.keyboard.press("Home");
   await expect(plateSend).toHaveAttribute("aria-valuenow", "0");
 });

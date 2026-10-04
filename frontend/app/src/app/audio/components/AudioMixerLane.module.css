@@ -1,132 +1,115 @@
-/* Visual overhaul A, Slice 4b (system §7 "Strip"): the strip is a lifted floor
-   on the bay, not a card — a white lift in every theme, the selected one lifted
-   further and keylined in the accent. Every value is a token; the geometry is
-   the mock's (120 px wide at the studio surface, 56 px head, 40 px readout,
-   66 px preamp rows, 36 px keys, the fader block taking the rest). */
+/* The strip (visual overhaul, the Console): no box, only the selection's Beige
+   keyline. Fixed rows, the same on every strip and in the tier's scale gutter
+   (AudioTieredMixer.module.css), so the scale reads against every groove:
+   name 28 · readout 40 · M and S 48 · tools 28 · the fader in the rest. */
 
 .strip {
-  width: var(--chrome-studio-strip);
+  width: var(--console-strip-width);
   flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 8px;
+  display: grid;
+  grid-template-rows: var(--console-strip-rows);
+  row-gap: var(--console-strip-row-gap);
+  padding: var(--console-strip-padding);
   min-height: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-screen);
-  background: var(--material-strip-floor);
+  min-width: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-base);
   cursor: pointer;
 }
 
+/* Selected: the Beige keyline (DESIGN.md §4), on the key face. */
 .strip[data-selected="true"] {
   border-color: var(--accent);
-  background: var(--material-strip-floor-sel);
+  background: var(--material-key);
 }
 
-.stripHead {
-  height: 56px;
+/* Names never wrap: one line, an ellipsis if ever needed; the plate's title
+   and the menu's head carry the whole name. */
+.name {
+  align-self: center;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.stripName {
-  font: 700 var(--font-size-value) / 1.15 var(--font-family-ui);
-  color: var(--text-text);
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.stripSub {
-  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
-  color: var(--text-text2);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.stripReadout {
-  height: 40px;
-  flex: none;
-}
-
-.stripPre {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  height: 66px;
-  min-width: 0;
-}
-
-/* The tag names what the strip is; the active mix target says so in the amber
-   the program uses for engaged, as a keyline and a word — never amber ink on an
-   amber fill. */
-.stripTag {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 6px;
-  border: 1px dashed var(--material-line);
-  border-radius: var(--radius-key);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--text-text2);
-}
-
-.stripTag[data-active="true"] {
-  border-style: solid;
-  border-color: var(--role-yellow-text);
-  color: var(--role-yellow-text);
-  font-weight: 700;
-}
-
-.stripSends {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-content: start;
-  gap: 2px 6px;
-  min-width: 0;
-  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
-  color: var(--text-text2);
-}
-
-.stripSendRow {
-  display: contents;
-}
-
-.stripSendRow b {
-  font: 400 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  text-align: center;
+  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
   color: var(--text-text);
-  text-align: right;
 }
 
-.stripLamps {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: start;
-  gap: 4px 8px;
+.readout {
+  padding: 0;
 }
 
-.stripKeys {
-  display: flex;
+.keys {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
-  flex: none;
-}
-
-/* The keys share the row's width. */
-.stripKeys > * {
-  flex: 1;
   min-width: 0;
 }
 
 .stripKey {
   width: 100%;
-  min-height: 36px;
   padding: 0;
 }
 
-.stripClip {
+/* 48 V, the gain and the ⋯ share the strip's 134 px: "Playback 11/12" fills
+   the name row exactly, so the ⋯ lives here. */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The hazard key at rest and armed keeps the tools row's height: armed it is
+   one line, the question and the countdown under it. */
+.phantomKey {
+  height: 28px;
+  min-height: 28px;
   flex: none;
-  min-height: 24px;
+  gap: 6px;
+  padding: 0 6px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.gain {
+  padding-left: 2px;
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+.unit {
+  font-size: var(--font-size-tick);
+  color: var(--text-text3);
+}
+
+/* The strip's ⋯ at the tools row's end: shown on hover, while the strip is
+   selected or holds the focus, and while its menu is open. It keeps its place
+   when hidden, so nothing moves when it shows. */
+.menu {
+  display: inline-flex;
+  margin-left: auto;
+  opacity: 0;
+}
+
+.strip:hover .menu,
+.strip:focus-within .menu,
+.strip[data-selected="true"] .menu,
+.strip:has([data-open]) .menu {
+  opacity: 1;
+}
+
+.fader {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+}
+
+.meter {
+  height: 100%;
 }

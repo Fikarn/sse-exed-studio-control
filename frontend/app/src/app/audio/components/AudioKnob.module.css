@@ -1,3 +1,6 @@
+/* The Console's rotary control (visual overhaul, the Console): the arc in the
+   cap's matte light on the line, its value in PT Sans under it. */
+
 .knobWrap {
   display: flex;
   flex-direction: column;
@@ -15,16 +18,14 @@
   touch-action: none;
   display: grid;
   place-items: center;
-  outline: none;
-  border-radius: 50%;
-  transition: box-shadow var(--motion-duration-exit) var(--easing);
+  outline: 1px solid transparent;
+  outline-offset: 1px;
+  border-radius: var(--radius-pill);
 }
 
-/* C14: pre-interaction hover affordance — the knob is the one interactive
-   class with no resting signal on a tooltip-less panel. A subtle hairline ring
-   echoes the fader-cap / EQ-point hover language. */
+/* Before a press: a hairline ring says the knob answers a drag. */
 .knobWrap:not([data-disabled]) .knob:hover {
-  box-shadow: 0 0 0 1px var(--line-2);
+  outline-color: var(--material-line2);
 }
 
 .knob:focus-visible {
@@ -32,32 +33,28 @@
   outline-offset: 2px;
 }
 
+/* Locked: the design system's 55 % (DESIGN.md §4). */
 .knobWrap[data-disabled] .knob {
   cursor: not-allowed;
-  opacity: var(--control-disabled-opacity);
+  opacity: 0.55;
 }
 
 .caption {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--audio-caption-muted);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text3);
   text-align: center;
   white-space: nowrap;
 }
 
 .value {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  color: var(--fg);
+  color: var(--text-text);
   text-align: center;
   white-space: nowrap;
 }
 
-/* Hero (valueInside) mode: big value centred over the dial. */
+/* The value inside the dial (the preamp's gain). */
 .valueInside {
   position: absolute;
   inset: 0;
@@ -66,23 +63,19 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-family-ui);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.04em;
   line-height: 1;
-  color: var(--fg);
+  color: var(--text-text);
 }
 
 .valueInsideValue {
-  font-size: var(--font-size-3xl);
-  font-weight: 400;
+  font-size: var(--font-size-word);
+  font-weight: 700;
 }
 
 .valueInsideUnit {
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-  margin-top: 5px;
-  font-weight: 400;
+  font-size: var(--font-size-tick);
+  color: var(--text-text3);
+  margin-top: 4px;
 }

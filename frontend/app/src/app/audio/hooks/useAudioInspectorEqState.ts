@@ -10,13 +10,15 @@ import { AUDIO_DRAFT_CLEAR_MS, AUDIO_THROTTLE_EQ_MS } from "../audioConstants";
 import { createThrottledCommit } from "../audioContinuousControls";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 import {
+  clamp,
   eqBandId,
   eqFrequencyFromPointX,
   eqGainFromPointY,
   eqResponsePath,
   formatEqFrequency,
+  LOW_CUT_FREQUENCY_MAX,
+  LOW_CUT_FREQUENCY_MIN,
   LOW_CUT_HANDLE_ID,
-  lowCutFrequencyFromPointX,
   lowCutShadePath,
   type AudioEqBand,
   type AudioEqUpdate,
@@ -167,7 +169,12 @@ export function useAudioInspectorEqState({
 
     const rect = graph.getBoundingClientRect();
     const frequencyPercent = (event.clientX - rect.left) / Math.max(1, rect.width);
-    const frequencyHz = lowCutFrequencyFromPointX(frequencyPercent);
+    // The point is drawn on the graph's 20 Hz to 20 kHz scale, so the pointer
+    // is read on it too, and the Low Cut's range holds it (it used to spread
+    // 20 to 500 Hz over the whole width, and the point ran from the pointer).
+    const frequencyHz = Math.round(
+      clamp(eqFrequencyFromPointX(frequencyPercent), LOW_CUT_FREQUENCY_MIN, LOW_CUT_FREQUENCY_MAX)
+    );
     const frequencyKey = `channel:${selectedChannel.id}:eq:lowCut:frequency`;
     setSelectedEqBandId(LOW_CUT_HANDLE_ID);
     setDraftValue(frequencyKey, frequencyHz);

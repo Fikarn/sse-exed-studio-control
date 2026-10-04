@@ -109,8 +109,10 @@ export function formatAudioDb(value: number) {
     return AUDIO_DB_NEG_INFINITY;
   }
   const rounded = Number(db.toFixed(1));
-  const sign = rounded > 0 ? "+" : "";
-  return `${sign}${rounded.toFixed(1)} dB`;
+  // Unity reads "+0.0 dB", as the deck's display prints it (the visual
+  // overhaul's Console pull request: the deck and the screen say one thing).
+  const sign = rounded >= 0 ? "+" : "";
+  return `${sign}${Math.abs(rounded) === 0 ? "0.0" : rounded.toFixed(1)} dB`;
 }
 
 export function formatMeterDb(value: number) {
