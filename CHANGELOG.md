@@ -8,8 +8,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
-- `CUT ALL`, `LIGHTING` off and the deck's `ALL OFF` take a highlighted, soloed or flashing light off too, and end the Highlight, the Solo and a Find; a highlighted light used to stay at full after a cut. In Preview they still cut the preview only (#PRA).
-- The deck's `CCT` dial turns inside the light's own range (the INFINIMAT's 2000–10000 K, not 2700–6500 K), and a push sets the middle of it, as the plate's Reset: 6000 K on the INFINIMAT and the INFINIBAR, 4400 K on an Astra (#PRA).
+- `CUT ALL`, `LIGHTING` off and the deck's `ALL OFF` take a highlighted, soloed or flashing light off too, and end the Highlight, the Solo and a Find; a highlighted light used to stay at full after a cut. In Preview they still cut the preview only (#305).
+- The deck's `CCT` dial turns inside the light's own range (the INFINIMAT's 2000–10000 K, not 2700–6500 K), and a push sets the middle of it, as the plate's Reset: 6000 K on the INFINIMAT and the INFINIBAR, 4400 K on an Astra (#305).
 - The Lighting page is drawn anew: the plot stands at the fixtures' real places with metres on its edges and names beside the marks, and one bar under it (the selection, Highlight, Solo, Find, the zoom, views 1 to 3, the plot's `⋯`); the scenes are rows with their word (`ON RIG`, `UNSAVED`, `PREVIEW`), the plate fits without scrolling (#304).
 - A new scene is saved with the row under the scenes, `Save as a new scene`, pressed twice; the plate's `Save changes` writes into the scene the rig has left. `CUT ALL` arms at the first press and cuts at the second, within 3 s (#304).
 - Every fixture, scene, group and palette has a `⋯` (or a right-click) with the same items, and the plot's floor too; `Delete …` arms in the menu, press again, and can be undone. Patch, Preview, Add fixture and the DMX monitor are the page's `⋯` (#304).
