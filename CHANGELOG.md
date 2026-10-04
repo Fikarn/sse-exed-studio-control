@@ -8,7 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
-- A change on the Console counts as confirmed only when TotalMix reports it. One TotalMix leaves out of its answer, or does not answer at all, reads `ASSUMED` until `Sync from TotalMix`; before, it could count as confirmed while TotalMix had dropped it (a hidden channel, the right side of a linked pair) (#PR).
+- A change on the Console counts as confirmed only when TotalMix reports it, a send or solo turned off also when TotalMix's list of the mix leaves it out. A change TotalMix's answer about a channel leaves out, or that gets no answer, reads `ASSUMED` until `Sync from TotalMix`; before, it could count as confirmed though TotalMix had dropped it (the right side of a linked pair, an answer cut short) (#PR).
 - After every start the Console reads `ASSUMED` until `Sync from TotalMix`, as TotalMix may have changed while the app was closed; it read `VERIFIED` from before (#284).
 - After TotalMix has been out of touch (its remote 4 switched off, or TotalMix closed), the Console reads `ASSUMED` once TotalMix answers again, says for how long, and asks for `Sync from TotalMix`; it read `VERIFIED` with values TotalMix no longer held (#284).
 - The plate's equaliser and Low Cut leave the Console: they went to TotalMix over its old page-2 commands, whose on/off only flipped TotalMix's switch, which could land on another mic, and which nothing read back. Set the EQ in TotalMix. The plate is now the preamp, the other mixes and the meter (#302).
