@@ -811,8 +811,10 @@ test("opens typed numeric entry on a lighting intensity slider via Enter and com
 });
 
 // The review of the Lighting page's redraw (2026-10-04): the hardware link
-// takes a fixture's control map whole, so the plate sends every control with
-// the one changed. It sent the one alone, and on the INFINIBAR Green reset Red.
+// took a fixture's control map whole, and the plate sent the one control
+// changed, so on the INFINIBAR Green reset Red. The plate sends every control
+// with the one changed; since 2026-10-05 the hardware link also lays a map over
+// the one it holds, so a control left out keeps its value either way.
 test("a catalog control's commit keeps the fixture's other controls", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   await page.getByRole("button", { name: /^Fixture Back,/ }).click();

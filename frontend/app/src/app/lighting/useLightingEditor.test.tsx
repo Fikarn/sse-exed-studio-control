@@ -732,9 +732,6 @@ describe("Highlight and Solo in Preview", () => {
   });
 });
 
-// Finding 19: Highlight and Solo are cleared when Lighting closes. If that
-// fails, the message is read on the page the operator went to, where there is
-// no lit key: it names the way back.
 // 2026-10-05: Delete fixture's Undo brought the fixture back without its
 // catalog controls, so an INFINIBAR's Red, Green and Blue went to their
 // defaults.
@@ -793,6 +790,9 @@ describe("a cut ends the page's Find", () => {
   });
 });
 
+// Finding 19: Highlight and Solo are cleared when Lighting closes. If that
+// fails, the message is read on the page the operator went to, where there is
+// no lit key: it names the way back.
 describe("leaving Lighting while Highlight or Solo is on", () => {
   it.each([
     ["Highlight", { highlight: ["fixture-key"] }],

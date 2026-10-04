@@ -28,7 +28,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The bridge's network cable pulled for 15 s: Lighting reads `NOT ANSWERING`, amber, nothing is locked, and there is no `Open Setup` key. Plugged back: it clears by itself within about 10 s.
 - [ ] `CUT ALL` arms at the first press ("press again", a 3 s bar) and takes every light off at the second, as the deck's `ALL OFF`; let the bar run out once and nothing changes.
 - [ ] A `Highlight` on a fixture: the rig shows it at full, the scene's row still reads `ON RIG` and the state display does not read `UNSAVED`; `Off` in the latch slot ends it.
-- [ ] A `Highlight` on a fixture, then `CUT ALL`: the whole rig goes dark, the highlighted fixture too, and the latch slot reads `Nothing latched`. The same with a `Find` on three fixtures: no flash comes after the cut, and the Find key reads `Find` at once.
+- [ ] A `Highlight` on a fixture, then `CUT ALL`: the whole rig goes dark, the highlighted fixture too, and the latch slot reads `Nothing latched`. Then select every light and press `Find`; as soon as the first light has flashed, press `CUT ALL` twice: no light flashes after the cut (until 2026-10-05 the Find went on over the dark rig), and the Find key reads `Find` at once.
 - [ ] The INFINIMAT (Backline Wash) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
 - [ ] Two scenes saved with `Save as a new scene` (press twice) come back after a restart, named `Scene N`; a scene deleted from its `⋯` (press twice) can be undone.
 - [ ] The plot draws each fixture where it hangs in the room: Key, Fill, Back and the wash read their real places on the rulers.
