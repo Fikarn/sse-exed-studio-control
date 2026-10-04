@@ -977,6 +977,27 @@ fn a_pull_keeps_every_name_the_dump_carried_as_sent_the_last_one_winning() {
 }
 
 #[test]
+fn an_out_of_touch_mark_is_activity_until_a_flush_takes_it() {
+    let mut link = ConsoleLinkState::default();
+    assert!(!link.has_activity());
+    let mark = |secs| OutOfTouch { secs };
+    link.mark_out_of_touch(mark(31));
+    link.mark_out_of_touch(mark(5));
+    assert!(link.has_activity());
+    assert_eq!(
+        link.take_out_of_touch(),
+        Some(mark(31)),
+        "the longer quiet stays"
+    );
+    assert!(!link.has_activity());
+    assert_eq!(link.take_out_of_touch(), None);
+
+    link.mark_out_of_touch(mark(7));
+    link.reset_for_test();
+    assert_eq!(link.take_out_of_touch(), None, "a reset clears the mark");
+}
+
+#[test]
 fn the_device_s_name_is_logged_when_first_heard_and_when_it_changes() {
     let mut link = ConsoleLinkState::default();
     assert_eq!(

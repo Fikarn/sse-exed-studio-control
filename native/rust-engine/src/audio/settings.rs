@@ -213,6 +213,10 @@ pub fn update_audio_settings(
     updates.push((String::from(AUDIO_LAST_ACTION_CODE_KEY), String::new()));
     updates.push((String::from(AUDIO_LAST_ACTION_MESSAGE_KEY), summary));
 
+    // A transport change writes unknown under the state lock, so a metering
+    // flush that already read the console as known cannot write assumed after
+    // it (2026-10-01).
+    let _state_guard = transport_changed.then(lock_audio_state);
     persist_audio_state(db_path, &updates)?;
     Ok(read_audio_snapshot(&load_audio_settings(db_path)?))
 }

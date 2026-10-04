@@ -6,7 +6,7 @@ use crate::diagnostics::{append_log, log_event, LogLevel};
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_OSC};
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
-use rosc::{decoder, encoder, OscMessage, OscPacket, OscType};
+use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket};
@@ -21,6 +21,13 @@ use std::time::{Duration, Instant};
 // The metering paths of both generations stay here because they share the
 // meter state.
 mod global_commands;
+// A second reading for what the OSC library refuses in a datagram from
+// TotalMix, such as a name in Windows-1252 (the studio walk of 2026-10-01).
+mod osc_read;
+// Whether TotalMix is in touch on the Global remote (the walk of 2026-10-01).
+mod global_quiet;
+
+use global_quiet::GlobalQuiet;
 
 pub(crate) use global_commands::{
     global_channel_surface, global_channel_target, global_output_channel, global_output_mix_target,
@@ -796,20 +803,24 @@ pub fn spawn_rme_totalmix_audio_metering(
                 }
             }
 
-            if !sockets.is_empty()
+            // The Global slot's request goes out even when the classic ports
+            // could not be bound: it is how TotalMix is found out of touch.
+            if (!sockets.is_empty() || global_slot.is_some())
                 && last_keepalive_at
                     .map(|last| now.duration_since(last) >= KEEPALIVE_INTERVAL)
                     .unwrap_or(true)
             {
                 if let Some((send_host, _, _)) = bound_key.as_ref() {
                     send_slot_keepalives(&sockets, send_host);
-                    if let Some(slot) = global_slot.as_ref() {
+                    if let Some(slot) = global_slot.as_mut() {
                         let stale = slot
                             .last_rx_at
                             .map(|last| now.duration_since(last) >= GLOBAL_OSC_REFRESH_STALE)
                             .unwrap_or(true);
-                        if stale {
-                            refresh_global_slot(slot, send_host);
+                        if stale && refresh_global_slot(slot, send_host) {
+                            if let Some(line) = slot.quiet.request_sent(now) {
+                                log_event(LogLevel::Warn, &line);
+                            }
                         }
                     }
                     last_keepalive_at = Some(now);
@@ -947,11 +958,13 @@ pub(crate) fn accept_source(source: SocketAddr, expected: IpAddr) -> bool {
 /// log the tests read).
 ///
 /// It also notes the console's own datagrams that could not be read in full
-/// (`record_unread`): the OSC library refuses a string that is not UTF-8,
-/// such as a name with letters beyond ASCII written in a Windows code page,
-/// and loses the rest of a bundle with it. The first is noted at once, then
-/// one line a minute at most with the count since the last line, and the
-/// bytes where the reading stopped (the studio walk of 2026-10-01 reads it).
+/// (`record_unread`). The OSC library refuses a string that is not UTF-8,
+/// such as a name TotalMix writes in Windows-1252; since 2026-10-01 such a
+/// string is read again as Windows-1252 (`osc_read`), and the rest of its
+/// bundle is read. What is still noted is an element neither reading could
+/// read. The first is noted at once, then one line a minute at most with the
+/// count since the last line, and the bytes where the reading stopped (the
+/// studio walk of 2026-10-01 reads it).
 pub(crate) struct DroppedSourceLog {
     log_file_path: Option<PathBuf>,
     last_logged: HashMap<IpAddr, Instant>,
@@ -1191,16 +1204,17 @@ fn read_available_packets(
                         drops.record(source, slot.console, local_port_of(&slot.socket));
                         continue;
                     }
-                    match decoder::decode_udp(&buffer[..len]) {
-                        Ok((_remainder, packet)) => {
-                            if let Ok(mut state) = state.lock() {
-                                state.apply_packet(slot.bus, &packet, now_ms);
-                            }
+                    let read = osc_read::read_datagram(&buffer[..len]);
+                    if let Some(packet) = read.packet {
+                        if let Ok(mut state) = state.lock() {
+                            state.apply_packet(slot.bus, &packet, now_ms);
                         }
-                        Err(error) => log_event(
+                    }
+                    if let Some((what, _)) = read.unread {
+                        log_event(
                             LogLevel::Debug,
-                            &format!("RME TotalMix OSC decode failed: {error}"),
-                        ),
+                            &format!("RME TotalMix OSC decode failed: {what}"),
+                        );
                     }
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
@@ -1234,6 +1248,21 @@ pub(crate) struct GlobalOscSlot {
     last_rx_at: Option<Instant>,
     /// The console's address: the one source this slot reads.
     console: IpAddr,
+    /// Whether TotalMix is in touch on this remote.
+    quiet: GlobalQuiet,
+}
+
+impl GlobalOscSlot {
+    fn new(send_port: u16, socket: UdpSocket, console: IpAddr) -> Self {
+        let port = local_port_of(&socket);
+        Self {
+            send_port,
+            socket,
+            last_rx_at: None,
+            console,
+            quiet: GlobalQuiet::new(Instant::now(), port),
+        }
+    }
 }
 
 fn bind_global_slot(
@@ -1248,12 +1277,7 @@ fn bind_global_slot(
         .ok()?
         .checked_add(GLOBAL_OSC_PORT_OFFSET)?;
     let socket = bind_receive_socket(policy.bind_host, recv).ok()?;
-    Some(GlobalOscSlot {
-        send_port: send,
-        socket,
-        last_rx_at: None,
-        console: policy.console,
-    })
+    Some(GlobalOscSlot::new(send, socket, policy.console))
 }
 
 pub(crate) fn read_global_packets(
@@ -1262,6 +1286,9 @@ pub(crate) fn read_global_packets(
     now_ms: u64,
     drops: &mut DroppedSourceLog,
 ) {
+    if let Some(line) = slot.quiet.count_closed_at(Instant::now()) {
+        log_event(LogLevel::Info, &line);
+    }
     let mut buffer = [0_u8; RECEIVE_BUFFER_BYTES];
     loop {
         match slot.socket.recv_from(&mut buffer) {
@@ -1270,26 +1297,28 @@ pub(crate) fn read_global_packets(
                     drops.record(source, slot.console, local_port_of(&slot.socket));
                     continue;
                 }
-                slot.last_rx_at = Some(Instant::now());
-                match decoder::decode_udp(&buffer[..len]) {
-                    Ok((remainder, packet)) => {
-                        route_global_packet(&packet, state, now_ms);
-                        // A bundle stops at the first element it cannot read
-                        // and hands back the rest: those elements are lost.
-                        if matches!(packet, OscPacket::Bundle(_)) && !remainder.is_empty() {
-                            drops.record_unread(
-                                &format!(
-                                    "a bundle with {} of its {len} bytes left unread",
-                                    remainder.len()
-                                ),
-                                remainder,
-                            );
-                        }
+                let heard_at = Instant::now();
+                slot.last_rx_at = Some(heard_at);
+                // TotalMix back after a quiet: the console link is marked at
+                // its first datagram, so the mark is there before a Sync whose
+                // dump follows has read the desk, and the Sync's aligned comes
+                // after it. TotalMix heard for the first time since this slot
+                // was bound marks nothing: a start has made the Console
+                // assumed already (a rebind without a start, by Setup's probe,
+                // is the roadmap's open item).
+                if let Some(back) = slot.quiet.heard(heard_at) {
+                    if !back.since_start {
+                        mark_console_out_of_touch(&back);
                     }
-                    Err(error) => drops.record_unread(
-                        &format!("a datagram of {len} bytes refused ({error})"),
-                        &buffer[..len],
-                    ),
+                    log_event(LogLevel::Info, &back.line);
+                }
+                let read = osc_read::read_datagram(&buffer[..len]);
+                if let Some(packet) = read.packet {
+                    let (control, levels) = route_global_packet(&packet, state, now_ms);
+                    slot.quiet.count(control, levels);
+                }
+                if let Some((what, bytes)) = read.unread {
+                    drops.record_unread(&what, bytes);
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
@@ -1301,22 +1330,35 @@ pub(crate) fn read_global_packets(
 /// Global OSC traffic splits two ways: `/level/*` feeds the meter state,
 /// everything else (control parameters, `/status/*`, snapshot flags) feeds the
 /// console link, which decides whether it confirms one of the app's own sends
-/// or is a change to apply.
-fn route_global_packet(packet: &OscPacket, state: &Arc<Mutex<RmeTotalMixMeterState>>, now_ms: u64) {
+/// or is a change to apply. Returns how many control messages and levels the
+/// packet held.
+fn route_global_packet(
+    packet: &OscPacket,
+    state: &Arc<Mutex<RmeTotalMixMeterState>>,
+    now_ms: u64,
+) -> (u64, u64) {
     match packet {
         OscPacket::Message(message) => {
             if message.addr.starts_with("/level/") {
                 if let Ok(mut state) = state.lock() {
                     state.apply_global_message(message, now_ms);
                 }
-            } else if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
-                link.ingest(message, crate::rme_console_link::link_now_ms());
+                (0, 1)
+            } else {
+                if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
+                    link.ingest(message, crate::rme_console_link::link_now_ms());
+                }
+                (1, 0)
             }
         }
         OscPacket::Bundle(bundle) => {
+            let mut counted = (0, 0);
             for inner in &bundle.content {
-                route_global_packet(inner, state, now_ms);
+                let (control, levels) = route_global_packet(inner, state, now_ms);
+                counted.0 += control;
+                counted.1 += levels;
             }
+            counted
         }
     }
 }
@@ -1328,6 +1370,16 @@ pub(crate) fn mark_console_link_slot(bound: bool) {
     if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
         link.slot_bound = bound;
     }
+}
+
+/// TotalMix was out of touch on the Global remote and is heard again: the
+/// next flush makes the Console assumed until a Sync.
+fn mark_console_out_of_touch(back: &global_quiet::HeardAgain) {
+    let link = crate::rme_console_link::shared_console_link();
+    let mut link = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    link.mark_out_of_touch(crate::rme_console_link::OutOfTouch {
+        secs: back.quiet_for.as_secs().max(1),
+    });
 }
 
 /// Advances the console link's clocks and sends the read-backs that are due
@@ -1379,6 +1431,7 @@ pub(crate) fn flush_console_link_to_db(db_path: &std::path::Path) {
                 "connectionLost": report.connection_lost,
                 "deskUnread": report.desk_unread,
                 "slotsChanged": report.slots_changed,
+                "outOfTouch": report.out_of_touch,
             }));
         }
         Ok(_) => {}
@@ -1450,11 +1503,13 @@ impl FlushFailureLog {
 /// Re-primes the Global OSC remote when its level stream is silent. TotalMix
 /// only transmits deltas, so a fresh engine (or a static console) needs a
 /// `/sendall` to start receiving values; the send also doubles as the
-/// activity nudge that keeps the remote alive.
-fn refresh_global_slot(slot: &GlobalOscSlot, send_host: &str) {
+/// activity nudge that keeps the remote alive. Returns whether a request went
+/// out (not with no TotalMix address): an unanswered one counts towards
+/// TotalMix being out of touch.
+fn refresh_global_slot(slot: &GlobalOscSlot, send_host: &str) -> bool {
     let host = send_host.trim();
     if host.is_empty() {
-        return;
+        return false;
     }
     for (address, value) in console_pull_messages() {
         let Ok(bytes) = encoder::encode(&OscPacket::Message(OscMessage {
@@ -1465,6 +1520,7 @@ fn refresh_global_slot(slot: &GlobalOscSlot, send_host: &str) {
         };
         let _ = slot.socket.send_to(&bytes, (host, slot.send_port));
     }
+    true
 }
 
 /// `/sendall 2` (every parameter; mix nodes only above -65 dB) followed by
@@ -1536,18 +1592,30 @@ pub(crate) fn pump_global_slot_without_flush_for_test(slot: &mut GlobalOscSlot, 
 pub(crate) fn bind_test_global_slot(send_port: u16) -> GlobalOscSlot {
     let console = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let socket = bind_receive_socket(console, 0).expect("test global slot should bind");
-    GlobalOscSlot {
-        send_port,
-        socket,
-        last_rx_at: None,
-        console,
-    }
+    GlobalOscSlot::new(send_port, socket, console)
 }
 
 #[cfg(test)]
 impl GlobalOscSlot {
     pub(crate) fn local_port(&self) -> u16 {
         self.socket.local_addr().expect("slot address").port()
+    }
+
+    /// Three requests left unanswered past the start's grace: TotalMix is out
+    /// of touch until the slot next hears it.
+    pub(crate) fn declare_quiet_for_test(&mut self) {
+        let start = Instant::now();
+        // Heard once, so the quiet is a running link's, not the start's.
+        self.quiet.heard(start);
+        let declared = (3..=5)
+            .map(|second| self.quiet.request_sent(start + Duration::from_secs(second)))
+            .last()
+            .flatten();
+        assert!(declared.is_some(), "the slot should be quiet");
+    }
+
+    pub(crate) fn is_quiet_for_test(&self) -> bool {
+        self.quiet.is_quiet()
     }
 }
 
@@ -1562,12 +1630,7 @@ pub(crate) fn bind_live_global_slot_for_test(
 ) -> Option<GlobalOscSlot> {
     let policy = ReceivePolicy::for_console(IpAddr::V4(Ipv4Addr::LOCALHOST));
     let socket = bind_receive_socket(policy.bind_host, receive_port).ok()?;
-    Some(GlobalOscSlot {
-        send_port,
-        socket,
-        last_rx_at: None,
-        console: policy.console,
-    })
+    Some(GlobalOscSlot::new(send_port, socket, policy.console))
 }
 
 // TotalMix OSC banks index the *visible mixer layout*, not hardware channel

@@ -551,6 +551,14 @@ struct OutstandingRequest {
     last_reply_at_ms: Option<u64>,
 }
 
+/// TotalMix heard again after it was out of touch on the Global remote, and
+/// for how many seconds (the walk of 2026-10-01). A start needs no mark: the
+/// Console is assumed after every start until a Sync.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutOfTouch {
+    pub secs: u64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsoleLinkSummary {
     pub slot_bound: bool,
@@ -579,6 +587,9 @@ pub struct ConsoleLinkState {
     connection_lost: bool,
     reports_lost: bool,
     reports_lost_retry_at_ms: u64,
+    /// TotalMix was out of touch on the Global remote and is heard again: the
+    /// next flush makes the Console assumed.
+    out_of_touch: Option<OutOfTouch>,
     device: Option<String>,
     dsp_load: Option<f64>,
     last_echo_at_ms: Option<u64>,
@@ -1071,12 +1082,27 @@ impl ConsoleLinkState {
     }
 
     /// Whether a flush has anything to write or report: queued changes,
-    /// expired sends, a lost connection or a snapshot slot that changed.
+    /// expired sends, a lost connection, TotalMix back after being out of
+    /// touch, or a snapshot slot that changed.
     pub fn has_activity(&self) -> bool {
         !self.queued.is_empty()
             || !self.expired.is_empty()
             || self.connection_lost
+            || self.out_of_touch.is_some()
             || self.snapshot_slots_changed
+    }
+
+    /// TotalMix is heard again after it was out of touch on the Global
+    /// remote. Two quiets before a flush keep the longer.
+    pub fn mark_out_of_touch(&mut self, mark: OutOfTouch) {
+        if self.out_of_touch.is_none_or(|held| mark.secs > held.secs) {
+            self.out_of_touch = Some(mark);
+        }
+    }
+
+    /// Takes the out-of-touch mark, for the flush that writes it.
+    pub fn take_out_of_touch(&mut self) -> Option<OutOfTouch> {
+        self.out_of_touch.take()
     }
 
     /// One `/snapshot/load/N` report. Slots outside 1 to 8 and values
@@ -1284,6 +1310,7 @@ impl ConsoleLinkState {
         self.pull = None;
         self.connection_lost = false;
         self.reports_lost = false;
+        self.out_of_touch = None;
         self.snapshot_slots = [SnapshotSlotState::Unknown; SNAPSHOT_SLOTS];
         self.snapshot_slot_seqs = [0; SNAPSHOT_SLOTS];
         self.snapshot_report_seq = 0;
