@@ -1,426 +1,243 @@
-import { useRef, useState } from "react";
-import { Palette, Pencil, Play, Plus, Save, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
-  Button,
   ColorPicker,
-  ConfirmDialog,
-  IconButton,
   InlineRename,
+  Key,
+  LampWord,
+  MenuButton,
+  PlateHead,
+  Readouts,
+  Section,
   type InlineRenameHandle,
+  type MenuContent,
 } from "@sse/design-system";
-import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
+import type { LightingFixtureSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import { formatLightingRelativeTime, lightingFixtureColor } from "../lightingHelpers";
-import { LIGHTING_COLOR_TAG_PALETTE, lightingColorTagHex, lightingColorTagName } from "../lightingColorTags";
+import { LIGHTING_COLOR_TAG_PALETTE } from "../lightingColorTags";
+import type { LightingMenu } from "../lightingMenus";
+import type { SceneRowWord } from "./SceneRow";
 
 import styles from "./LightingInspector.module.css";
+
+// The visual overhaul's Lighting page (2026-10-04): a scene on the plate. Its
+// title plate (its name, its word on the rig, its ⋯: the same menu as its row
+// in the cluster, Delete scene… last, arming in place); Recall, and Save
+// changes while the rig has left it; what it holds; and the fixtures it holds,
+// each a row that opens the fixture. There is no Save as new here: a new
+// scene is the Save row's, in the cluster.
+
+const TONE = { "on rig": "ok", unsaved: "attention", preview: "info" } as const;
+const FIXTURE_ROWS = 10;
 
 export interface InspectorSceneProps {
   scene: LightingSceneSnapshot | null;
   fixtures: readonly LightingFixtureSnapshot[];
-  groups: readonly LightingGroupSnapshot[];
-  isModified: boolean;
-  isPreviewMode?: boolean;
-  /** Wave 30b — when true, the displayed scene is a hover-preview, not the
-   *  active recalled scene. Eyebrow flips to "Hover preview" to make the
-   *  transient state explicit; modified treatment is suppressed (the parent
-   *  passes `isModified={false}` in this mode anyway). */
+  /** Its word on the rig, as the deck's RECALL says it; null when it is not the rig's. */
+  word: SceneRowWord | null;
   isHoverPreview?: boolean;
-  bridgeReachable: boolean;
-  onSaveScene?: () => void;
-  onSaveSceneAs?: () => void;
+  isPreviewMode?: boolean;
+  /** Why a recall is refused (Patch, the bridge), or null. */
+  recallReason?: string | null;
+  menu: LightingMenu | null;
+  arm: MenuContent["arm"];
   onRecallScene?: (sceneId: string) => void;
-  onResaveScene?: () => void;
-  onDeleteScene?: () => void;
-  /** Inline-rename commit handler. Receives the trimmed new name. */
+  onResaveScene?: (sceneId: string) => void;
   onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
-  /** Set color tag handler. Receives `null` (clear) or `0..7` (set). */
   onSetSceneColor?: (sceneId: string, colorIndex: number | null) => void;
-  /** Select one of the scene's saved fixture states and open its fixture settings. */
   onSelectFixture?: (fixtureId: string) => void;
-  saveBusy?: boolean;
   recallBusy?: boolean;
   resaveBusy?: boolean;
-  deleteBusy?: boolean;
   renameBusy?: boolean;
-  /** When true, marks the scene's color update as in-flight. */
-  colorBusy?: boolean;
-}
-
-interface SceneStats {
-  onCount: number;
-  totalCount: number;
-  fixturesPatched: number;
-  avgIntensity: number;
-  avgCct: number;
-  groupsOn: number;
-  groupsTotal: number;
-}
-
-function computeSceneStats(
-  scene: LightingSceneSnapshot,
-  fixtures: readonly LightingFixtureSnapshot[],
-  groups: readonly LightingGroupSnapshot[]
-): SceneStats {
-  const onStates = scene.fixtureStates.filter((state) => state.on);
-  const intensitySum = onStates.reduce((sum, state) => sum + state.intensity, 0);
-  const cctSum = onStates.reduce((sum, state) => sum + state.cct, 0);
-  const fixturesPatched = fixtures.filter((fixture) => fixture.dmxStartAddress > 0).length;
-
-  // Groups-on: a group is "on" if any of its fixtures has on=true in the
-  // scene's saved state. Approximate count for the inspector header card.
-  const sceneStateById = new Map(scene.fixtureStates.map((state) => [state.fixtureId, state]));
-  const groupsOn = groups.filter((group) => {
-    const groupFixtures = fixtures.filter((fixture) => fixture.groupId === group.id);
-    return groupFixtures.some((fixture) => sceneStateById.get(fixture.id)?.on === true);
-  }).length;
-
-  return {
-    onCount: onStates.length,
-    totalCount: scene.fixtureStates.length,
-    fixturesPatched,
-    avgIntensity: onStates.length > 0 ? Math.round(intensitySum / onStates.length) : 0,
-    avgCct: onStates.length > 0 ? Math.round(cctSum / onStates.length) : 0,
-    groupsOn,
-    groupsTotal: groups.length,
-  };
+  /** The menu's Rename… and Colour…, as nonces. */
+  renameRequest?: number;
+  colourRequest?: number;
 }
 
 export function InspectorScene({
   scene,
   fixtures,
-  groups,
-  isModified,
-  isPreviewMode = false,
+  word,
   isHoverPreview = false,
-  bridgeReachable,
-  onSaveScene,
-  onSaveSceneAs,
+  isPreviewMode = false,
+  recallReason = null,
+  menu,
+  arm,
   onRecallScene,
   onResaveScene,
-  onDeleteScene,
   onRenameScene,
   onSetSceneColor,
   onSelectFixture,
-  saveBusy = false,
   recallBusy = false,
   resaveBusy = false,
-  deleteBusy = false,
   renameBusy = false,
-  colorBusy = false,
+  renameRequest = 0,
+  colourRequest = 0,
 }: InspectorSceneProps) {
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null);
   const renameRef = useRef<InlineRenameHandle | null>(null);
+  const headRef = useRef<HTMLDivElement | null>(null);
+  const [colourAt, setColourAt] = useState<{ x: number; y: number } | null>(null);
+  const seenRename = useRef(renameRequest);
+  useEffect(() => {
+    if (renameRequest === seenRename.current) return;
+    seenRename.current = renameRequest;
+    renameRef.current?.beginEdit();
+  }, [renameRequest]);
+  const seenColour = useRef(colourRequest);
+  useEffect(() => {
+    if (colourRequest === seenColour.current) return;
+    seenColour.current = colourRequest;
+    const box = headRef.current?.getBoundingClientRect();
+    if (box) setColourAt({ x: box.left + 16, y: box.bottom });
+  }, [colourRequest]);
 
   if (!scene) {
     return (
-      <div className={styles.scenePane}>
-        <div className={styles.sceneEmpty}>
-          <span className={styles.sceneEyebrow}>Active scene</span>
-          <h2 className={styles.sceneTitle}>No scene</h2>
-          <p className={styles.sceneSub}>
-            No scene is active. Use <strong>Save scene</strong> to save the current rig state as a new scene, or{" "}
-            <strong>Save as new</strong> to name it.
-          </p>
-          <div className={styles.sceneActions}>
-            {onSaveScene ? (
-              <Button
-                className={styles.sceneActionButton}
-                onClick={onSaveScene}
-                disabled={saveBusy || fixtures.length === 0}
-                variant="primary"
-                size="compact"
-                leadingVisual={<Save aria-hidden="true" size={13} strokeWidth={1.75} />}
-              >
-                Save scene
-              </Button>
-            ) : null}
-            {onSaveSceneAs ? (
-              <Button
-                className={styles.sceneActionButton}
-                onClick={onSaveSceneAs}
-                disabled={saveBusy || fixtures.length === 0}
-                variant="ghost"
-                size="compact"
-                leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={1.75} />}
-              >
-                Save as new…
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </div>
+      <PlateHead
+        title="No scene"
+        sub="Set the rig, then save it with Save as a new scene in the Scenes list."
+        testId="lighting-plate-head"
+      />
     );
   }
 
-  const stats = computeSceneStats(scene, fixtures, groups);
-  const onStateById = new Map(scene.fixtureStates.filter((state) => state.on).map((state) => [state.fixtureId, state]));
+  const lit = scene.fixtureStates.filter((state) => state.on);
+  const avgIntensity =
+    lit.length > 0 ? Math.round(lit.reduce((sum, state) => sum + state.intensity, 0) / lit.length) : 0;
+  const avgCct = lit.length > 0 ? Math.round(lit.reduce((sum, state) => sum + state.cct, 0) / lit.length) : 0;
+  const byId = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+  const held = scene.fixtureStates
+    .map((state) => ({ state, fixture: byId.get(state.fixtureId) ?? null }))
+    .filter((entry): entry is { state: (typeof scene.fixtureStates)[number]; fixture: LightingFixtureSnapshot } =>
+      Boolean(entry.fixture)
+    );
+  const shown = held.slice(0, FIXTURE_ROWS);
+  const unsaved = word === "unsaved" || (isPreviewMode && word === "preview");
+  const sub = isHoverPreview
+    ? "the scene under the pointer"
+    : word
+      ? word
+      : isPreviewMode
+        ? "not the preview's"
+        : "not on the rig";
 
   return (
-    <div className={styles.scenePane}>
-      <span className={styles.sceneEyebrow}>
-        {isPreviewMode
-          ? isModified
-            ? "Preview target · offline edits"
-            : "Preview target"
-          : isHoverPreview
-            ? "Hover preview"
-            : isModified
-              ? "Active scene · modified"
-              : "Active scene"}
-      </span>
-      <div className={styles.sceneTitleRow}>
-        <h2 className={styles.sceneTitle}>
-          {onRenameScene ? (
-            <InlineRename
-              ref={renameRef}
-              value={scene.name}
-              onCommit={(next) => onRenameScene(scene.id, next)}
-              busy={renameBusy}
-              inputAriaLabel={`Rename scene ${scene.name}`}
-              maxLength={120}
-            />
-          ) : (
-            scene.name
-          )}
-        </h2>
-        {onRenameScene ? (
-          <IconButton
-            tone="ghost"
-            size="sm"
-            icon={Pencil}
-            label={`Rename scene ${scene.name}`}
-            onClick={() => renameRef.current?.beginEdit()}
-            disabled={renameBusy}
-          />
-        ) : null}
-      </div>
-      <p className={styles.sceneSub}>
-        {stats.onCount > 0
-          ? `${stats.onCount} of ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} on at ${stats.avgIntensity} % / ${stats.avgCct} K average.`
-          : `All ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} dark in this scene.`}
-      </p>
-
-      <dl className={styles.sceneStatGrid}>
-        <div className={styles.sceneStat}>
-          <dt className={styles.sceneStatLabel}>Fixtures</dt>
-          <dd className={styles.sceneStatValue}>
-            {stats.totalCount}
-            <small> / {stats.fixturesPatched} patched</small>
-          </dd>
-        </div>
-        <div className={styles.sceneStat}>
-          <dt className={styles.sceneStatLabel}>Groups on</dt>
-          <dd className={styles.sceneStatValue}>
-            {stats.groupsOn}
-            <small> / {stats.groupsTotal}</small>
-          </dd>
-        </div>
-        {stats.onCount > 0 ? (
-          <>
-            <div className={styles.sceneStat}>
-              <dt className={styles.sceneStatLabel}>Avg intensity</dt>
-              <dd className={styles.sceneStatValue}>
-                {stats.avgIntensity}
-                <small> %</small>
-              </dd>
-            </div>
-            <div className={styles.sceneStat}>
-              <dt className={styles.sceneStatLabel}>CCT mean</dt>
-              <dd className={styles.sceneStatValue}>
-                {stats.avgCct}
-                <small> K</small>
-              </dd>
-            </div>
-          </>
-        ) : (
-          <div className={`${styles.sceneStat} ${styles.sceneStatSpan}`}>
-            <dt className={styles.sceneStatLabel}>State</dt>
-            <dd className={styles.sceneStatValue}>
-              All dark
-              <small> · no levels</small>
-            </dd>
-          </div>
-        )}
-      </dl>
-
-      {stats.onCount > 0 ? (
-        <section className={styles.sceneSection}>
-          <h3 className={styles.sceneSectionHead}>Fixtures used</h3>
-          <ul className={styles.sceneFixtureChips}>
-            {fixtures.map((fixture) => {
-              const state = onStateById.get(fixture.id);
-              if (!state) return null;
-              const swatch = lightingFixtureColor(state.cct, true);
-              const chipContent = (
-                <>
-                  <span className={styles.sceneFixtureSwatch} style={{ background: swatch }} aria-hidden="true" />
-                  <span className={styles.sceneFixtureName}>{fixture.name}</span>
-                  <span className={styles.sceneFixtureLevel}>{state.intensity} %</span>
-                </>
-              );
-
-              return (
-                <li key={fixture.id}>
-                  {onSelectFixture ? (
-                    <button
-                      type="button"
-                      className={`${styles.sceneFixtureChip} ${styles.sceneFixtureChipButton}`}
-                      onClick={() => onSelectFixture(fixture.id)}
-                      aria-label={`Open fixture settings for ${fixture.name}`}
-                      title={`Open fixture settings for ${fixture.name}`}
-                    >
-                      {chipContent}
-                    </button>
-                  ) : (
-                    <span className={styles.sceneFixtureChip}>{chipContent}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-
-      {onSetSceneColor ? (
-        <section className={styles.sceneSection}>
-          <h3 className={styles.sceneSectionHead}>Color tag</h3>
-          <div className={styles.colorRow}>
-            <button
-              type="button"
-              className={styles.colorPickerTrigger}
-              onClick={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                setColorPickerPos({ x: rect.left, y: rect.bottom + 6 });
-              }}
-              disabled={colorBusy}
-              aria-label={
-                lightingColorTagName(scene.colorIndex)
-                  ? `Change color tag (currently ${lightingColorTagName(scene.colorIndex)})`
-                  : "Set a color tag"
-              }
-            >
-              <span
-                aria-hidden="true"
-                className={styles.colorSwatch}
-                style={{ background: lightingColorTagHex(scene.colorIndex) ?? "transparent" }}
+    <>
+      <div ref={headRef}>
+        <PlateHead
+          title={
+            onRenameScene ? (
+              <InlineRename
+                ref={renameRef}
+                value={scene.name}
+                onCommit={(next) => onRenameScene(scene.id, next)}
+                busy={renameBusy}
+                inputAriaLabel={`Rename scene ${scene.name}`}
+                maxLength={120}
               />
-              <span className={styles.colorLabel}>{lightingColorTagName(scene.colorIndex) ?? "None"}</span>
-              <Palette aria-hidden="true" size={12} strokeWidth={1.75} />
-            </button>
-            {scene.colorIndex !== null ? (
-              <IconButton
-                tone="ghost"
-                size="sm"
-                icon={X}
-                label="Clear color tag"
-                onClick={() => onSetSceneColor(scene.id, null)}
-                disabled={colorBusy}
-              />
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      <section className={styles.sceneSection}>
-        <h3 className={styles.sceneSectionHead}>Last activity</h3>
-        <p className={styles.sceneProvenance}>
-          {scene.lastRecalledAt ? (
-            <>
-              Last recalled <b>{formatLightingRelativeTime(scene.lastRecalledAt)}</b>
-            </>
-          ) : (
-            <>Not yet recalled</>
-          )}
-        </p>
-      </section>
-
-      <div className={styles.sceneActions}>
-        {onRecallScene ? (
-          <Button
-            className={styles.sceneActionButton}
-            onClick={() => onRecallScene(scene.id)}
-            loading={recallBusy}
-            disabled={!bridgeReachable && !isPreviewMode}
-            variant="primary"
-            size="compact"
-            leadingVisual={<Play aria-hidden="true" size={13} strokeWidth={1.75} />}
-          >
-            {isPreviewMode ? "Load into preview" : "Recall scene"}
-          </Button>
-        ) : null}
-        {onResaveScene ? (
-          <Button
-            className={styles.sceneActionButton}
-            onClick={onResaveScene}
-            loading={resaveBusy}
-            disabled={!isModified || (!bridgeReachable && !isPreviewMode)}
-            variant="secondary"
-            size="compact"
-            leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
-          >
-            {isPreviewMode ? "Save preview" : "Save changes"}
-          </Button>
-        ) : null}
-        {onSaveSceneAs ? (
-          <Button
-            className={styles.sceneActionButton}
-            onClick={onSaveSceneAs}
-            loading={saveBusy}
-            disabled={fixtures.length === 0}
-            variant="ghost"
-            size="compact"
-            leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={1.75} />}
-          >
-            Save as new
-          </Button>
-        ) : null}
-        {onDeleteScene ? (
-          <Button
-            className={styles.sceneActionButton}
-            onClick={() => setConfirmingDelete(true)}
-            loading={deleteBusy}
-            variant="danger"
-            size="compact"
-            leadingVisual={<Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />}
-          >
-            Delete
-          </Button>
-        ) : null}
-      </div>
-
-      {confirmingDelete && onDeleteScene ? (
-        <ConfirmDialog
-          title="Delete scene?"
-          body={
-            <>
-              This permanently removes <strong>{scene.name}</strong>. Other scenes are unaffected and the live rig state
-              stays as it is.
-            </>
+            ) : (
+              scene.name
+            )
           }
-          confirmLabel="Delete scene"
-          danger
-          busy={deleteBusy}
-          onConfirm={() => {
-            setConfirmingDelete(false);
-            onDeleteScene();
-          }}
-          onCancel={() => setConfirmingDelete(false)}
+          sub={
+            word && !isHoverPreview ? (
+              <LampWord tone={TONE[word]} testId="lighting-plate-scene-word">
+                {word}
+              </LampWord>
+            ) : (
+              sub
+            )
+          }
+          action={
+            menu ? (
+              <MenuButton
+                buttonLabel={`${scene.name} menu`}
+                buttonTestId="lighting-plate-menu"
+                menu={{ ...menu, arm }}
+              />
+            ) : null
+          }
+          testId="lighting-plate-head"
         />
-      ) : null}
-      {colorPickerPos && onSetSceneColor ? (
+      </div>
+
+      <div className={styles.keyRow}>
+        <Key
+          mode="primary"
+          size="large"
+          take
+          locked={Boolean(recallReason)}
+          reason={recallReason ?? undefined}
+          disabled={recallBusy}
+          onClick={() => onRecallScene?.(scene.id)}
+        >
+          {isPreviewMode ? "Load into preview" : "Recall scene"}
+        </Key>
+        <Key
+          size="large"
+          locked={!unsaved}
+          reason={isPreviewMode ? "Nothing in the preview to save yet." : "The rig holds this scene as it was saved."}
+          disabled={resaveBusy}
+          onClick={() => onResaveScene?.(scene.id)}
+        >
+          {isPreviewMode ? "Save preview" : "Save changes"}
+        </Key>
+      </div>
+
+      <Readouts
+        data-testid="lighting-plate-scene-facts"
+        rows={[
+          { id: "fixtures", label: "Fixtures on", value: `${lit.length} of ${scene.fixtureStates.length}` },
+          { id: "intensity", label: "Average level", value: lit.length > 0 ? `${avgIntensity} %` : "all off" },
+          { id: "cct", label: "Average colour", value: lit.length > 0 ? `${avgCct} K` : "—" },
+          {
+            id: "recalled",
+            label: "Last recalled",
+            value: scene.lastRecalledAt ? formatLightingRelativeTime(scene.lastRecalledAt) : "not yet",
+          },
+        ]}
+      />
+
+      <Section title="In the scene" detail={`${held.length} fixture${held.length === 1 ? "" : "s"}`}>
+        <ul className={styles.memberList} aria-label={`Fixtures in ${scene.name}`}>
+          {shown.map(({ state, fixture }) => (
+            <li key={fixture.id}>
+              <button
+                type="button"
+                className={styles.memberRow}
+                aria-label={`Open fixture settings for ${fixture.name}`}
+                onClick={() => onSelectFixture?.(fixture.id)}
+              >
+                <span
+                  aria-hidden="true"
+                  className={styles.memberLamp}
+                  style={{ background: lightingFixtureColor(state.cct, state.on) } as CSSProperties}
+                />
+                <span className={styles.memberName}>{fixture.name}</span>
+                <span className={styles.memberValue}>
+                  {state.on ? `${Math.round(state.intensity)} % · ${Math.round(state.cct)} K` : "off"}
+                </span>
+              </button>
+            </li>
+          ))}
+          {held.length > shown.length ? (
+            <li className={styles.memberMore}>and {held.length - shown.length} more</li>
+          ) : null}
+        </ul>
+      </Section>
+
+      {colourAt && onSetSceneColor ? (
         <ColorPicker
-          x={colorPickerPos.x}
-          y={colorPickerPos.y}
+          x={colourAt.x}
+          y={colourAt.y}
           swatches={LIGHTING_COLOR_TAG_PALETTE}
-          selectedIndex={scene.colorIndex}
+          selectedIndex={scene.colorIndex ?? null}
           onSelect={(next) => onSetSceneColor(scene.id, next)}
-          onClose={() => setColorPickerPos(null)}
-          ariaLabel={`Pick a color tag for scene ${scene.name}`}
+          onClose={() => setColourAt(null)}
+          ariaLabel={`Pick a colour for scene ${scene.name}`}
         />
       ) : null}
-    </div>
+    </>
   );
 }

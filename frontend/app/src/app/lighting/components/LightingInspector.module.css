@@ -1,148 +1,127 @@
+/* The visual overhaul's Lighting page (2026-10-04): the plate, on the design
+   system's tokens. The title plate, the sections and the readouts are the
+   design system's (`PlateHead`, `Section`, `Readouts`, `ControlRow`); what is
+   here is the plate's own: its column, the key row, the placement row and its
+   fields, the palettes, the member rows and the DMX peek. It never scrolls. */
+
 .inspector {
-  --lighting-inspector-font-eyebrow: var(--operator-font-size-2xs, 9px);
-  --lighting-inspector-font-caption: var(--operator-font-size-xs, 12px);
-  --lighting-inspector-font-small: var(--operator-font-size-sm, 12px);
-  --lighting-inspector-font-body: var(--operator-font-size-md, 12px);
-  --lighting-inspector-font-strong: var(--operator-font-size-lg, 13px);
-  --lighting-inspector-font-heading: var(--operator-font-size-title-sm, 16px);
-  --lighting-inspector-font-stat: var(--operator-font-size-title-md, 18px);
-  --lighting-inspector-font-scene-title: var(--operator-font-size-title-lg, 22px);
-
-  /* The shell (overhaul 3): it fills the shell's plate, which draws its edge. */
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
+  gap: 20px;
   height: 100%;
-  gap: var(--operator-inspector-gap, 12px);
-  padding: var(--operator-inspector-padding, 12px);
-  font-family: var(--font-family-ui);
-  font-size: var(--lighting-inspector-font-body);
-  color: var(--color-brand-text-primary);
-  overflow-y: auto;
   min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+  color: var(--text-text);
+  font-family: var(--font-family-ui);
 }
 
-.tabPanel {
+.previewLine {
   display: flex;
-  flex-direction: column;
-  gap: var(--operator-inspector-section-gap, 10px);
-  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  min-height: 28px;
+  font: var(--font-weight-regular) var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
 }
 
-.compactSection {
-  gap: calc(9px * var(--operator-ui-scale-factor, 1));
-  padding: var(--operator-inspector-section-padding-y, 11px) var(--operator-inspector-section-padding-x, 12px);
-}
-
-.previewSource {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 9px 11px;
-  border: 1px solid var(--color-warning-border);
-  border-radius: var(--radius-key);
-  background: linear-gradient(
-    180deg,
-    var(--color-warning-soft) 0%,
-    color-mix(in srgb, var(--color-warning-500) 6%, transparent) 100%
-  );
-  color: var(--color-brand-text-secondary);
-  font-size: var(--font-size-tick);
-  line-height: 1.35;
-}
-
-.previewSourceEyebrow {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-warning-500);
-}
-
-.memberRow:focus-visible,
-.sceneFixtureChipButton:focus-visible,
-.groupAssignSelect:focus-visible {
-  outline: 2px solid var(--color-brand-green);
-  outline-offset: 2px;
-}
-
-.memberRow:active,
-.sceneFixtureChipButton:active {
-  transform: translateY(0);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+.keyRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 8px;
+  flex: none;
 }
 
 .empty {
   margin: 0;
-  padding: 14px 16px;
-  font-family: var(--font-family-ui);
-  font-feature-settings: "ss01", "cv01", "cv02", "cv11";
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.55;
-  color: var(--color-brand-text-secondary);
-  background: var(--color-bg-soft);
-  border-radius: var(--radius-ctl);
-  text-align: center;
-  border: 1px dashed var(--color-bg-stroke);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text3);
 }
 
-.helpText {
-  font-family: var(--font-family-ui);
-  font-feature-settings: "ss01", "cv01", "cv02", "cv11";
-  font-size: var(--font-size-tick);
-  line-height: 1.5;
-  color: var(--color-brand-text-muted);
+.attentionLine {
+  margin: 0;
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--role-yellow-text);
+}
+
+/* ---- placement: one row of readouts; the fields in a popover ---- */
+
+.placementRow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   margin: 0;
 }
 
-.actionRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.placementRow dt {
+  font: var(--font-weight-regular) var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--text-text3);
+  white-space: nowrap;
 }
 
-/* Visual overhaul A, Slice 5b: the two pools stand side by side on the plate,
-   so the palettes are a section rather than a second page of it. */
-.palettePane {
+.placementRow dd {
+  margin: 4px 0 0;
+  font: var(--font-weight-regular) var(--font-size-body) / 1.2 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text);
+  white-space: nowrap;
+}
+
+.placementFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
 
-.palettePane > .paletteStatus,
-.palettePane > .paletteNotice {
-  grid-column: 1 / -1;
+.fieldLabel {
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
 }
 
-.paletteStatus {
+.fieldInput {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.fieldInput:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.fieldInput:disabled {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.fieldsKey {
+  align-self: end;
+}
+
+/* ---- the palettes ---- */
+
+.palettesSection {
+  flex: none;
+}
+
+.palettePane {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  background: var(--color-bg-soft);
-  color: var(--color-brand-text-secondary);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  text-transform: uppercase;
-}
-
-.paletteStatus[data-preview-mode="true"] {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning-soft);
-}
-
-.paletteNotice {
-  margin: -4px 0 0;
-  color: var(--color-brand-text-secondary);
-  font-size: 12px;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .palettePool {
@@ -158,879 +137,219 @@
   gap: 8px;
 }
 
-/* The pool's "create" key is a real target too. */
-.palettePoolHeader button {
-  min-width: 24px;
-  min-height: 24px;
-}
-
 .palettePoolHeader h3 {
   margin: 0;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
+  font: var(--font-weight-bold) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
 }
 
 .paletteGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
-/* Visual overhaul A, Slice 11: the tile was one row — accent, name, five keys —
-   and the keys' column was `auto`, so on the plate's 182 px it took 184 and the
-   name column collapsed to 20 px. The name never rendered: every tile read as a
-   bare value, so "Low", "Quarter", "Half" and "Full" were invisible and the
-   operator picked a palette by its number alone. The keys sit under the name
-   now. They are 24 px targets and there are five of them, which is 144 px with
-   its padding — more than a 182 px tile can give a row that also has to carry a
-   name. */
 .paletteTile {
-  display: grid;
-  grid-template-columns: 4px minmax(0, 1fr);
-  grid-template-areas:
-    "accent main"
-    "accent actions";
-  align-items: stretch;
-  min-height: 54px;
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  background: var(--color-inset-hairline-bg);
+  position: relative;
+  min-width: 0;
+}
+
+.paletteApply {
+  width: 100%;
+  height: 56px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px 0 12px;
   overflow: hidden;
 }
 
-.paletteAccent {
-  grid-area: accent;
-  background: transparent;
-}
-
-.paletteTileMain {
-  grid-area: main;
+/* The key's label holds the name over the value. */
+.paletteApply > span {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 100%;
   min-width: 0;
-  padding: 8px 10px;
 }
 
-.paletteTileMain strong {
+/* The palette's own colour, a 4 px mark at the tile's left edge. */
+.paletteApply[data-tagged]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: var(--radius-base);
+  background: var(--palette-colour);
+}
+
+.paletteName {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-brand-text-primary);
-  font-size: 13px;
+  font: var(--font-weight-bold) var(--font-size-body) / 1.1 var(--font-family-ui);
 }
 
-.paletteTileMain span {
-  /* Visual overhaul A, Slice 8 (system §9): the number and its unit are one
-     reading — "100 %" never breaks across two lines, which used to push the
-     last tile's keys past the bottom of the plate. */
-  white-space: nowrap;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-secondary);
-}
-
-/* Visual overhaul A, Slice 5b: the palettes are on the plate at all times now,
-   so their row keys are real targets — 24 px minimum, the system's floor. */
-.paletteTileActions {
-  grid-area: actions;
-  display: flex;
+.paletteValue {
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 8px 8px;
+  gap: 6px;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
 }
 
-.paletteTileActions button {
-  min-width: 24px;
-  min-height: 24px;
+.paletteCct {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.paletteMenu {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  opacity: 0;
+}
+
+.paletteTile:hover .paletteMenu,
+.paletteTile:focus-within .paletteMenu,
+.paletteTile:has([aria-expanded="true"]) .paletteMenu {
+  opacity: 1;
 }
 
 .paletteForm {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--color-brand-green-border);
-  border-radius: var(--radius-ctl);
-  background: var(--color-brand-green-soft);
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-.paletteForm input {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  background: var(--color-bg-default);
-  color: var(--color-brand-text-primary);
-  font: var(--font-weight-regular) var(--lighting-inspector-font-body) / 1.3 var(--font-family-ui);
-  letter-spacing: 0;
-  padding: 7px 8px;
-}
-
-.paletteValueInput {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 5px;
-}
-
-.paletteValueInput span {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-muted);
-}
-
-.paletteSwatches {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 5px;
-}
-
-.paletteSwatchButton {
-  appearance: none;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 1px solid var(--color-inset-hairline-border);
-  border-radius: var(--radius-ctl);
-  cursor: pointer;
-}
-
-.paletteSwatchButton[data-active="true"] {
-  outline: 2px solid var(--color-brand-text-primary);
-  outline-offset: 1px;
-}
-
-.paletteFormActions {
+.formKeys {
   grid-column: 1 / -1;
   display: flex;
-  align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
 
-/* Scene tab — rebuilt to match the v6 prototype */
-
-.scenePane {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 4px 2px;
-}
-
-.sceneEmpty {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sceneEyebrow {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-}
-
-.sceneTitle {
-  font-family: var(--font-family-ui);
-  font-weight: 700;
-  font-size: 22px;
-  line-height: 1.15;
-  color: var(--color-brand-text-primary);
-  margin: 0;
-  letter-spacing: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.sceneTitleRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.sceneSub {
-  font-family: var(--font-family-ui);
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--color-brand-text-secondary);
-  margin: 0;
-}
-
-.sceneStatGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-  padding: 12px;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-}
-
-.sceneStat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-}
-
-.sceneStatSpan {
-  grid-column: 1 / -1;
-}
-
-.sceneStatLabel {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-}
-
-.sceneStatValue {
-  font-family: var(--font-family-ui);
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--color-brand-text-primary);
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.sceneStatValue small {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 400;
-  color: var(--color-brand-text-muted);
-  margin-left: 2px;
-}
-
-.sceneSection {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sceneSectionHead {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-  margin: 0;
-  font-weight: 700;
-}
-
-.sceneFixtureChips {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* Slice 11: 4 px of padding around a 12 px line came to 23 — one pixel under
-   the 24 px target floor (system §10). */
-.sceneFixtureChip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  gap: 6px;
-  padding: 4px 8px 4px 5px;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-family-ui);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-primary);
-}
-
-.sceneFixtureChipButton {
-  appearance: none;
-  cursor: pointer;
-  font: var(--font-weight-regular) var(--font-size-tick) / 1.1 var(--font-family-ui);
-  letter-spacing: 0;
-  text-align: left;
-  transition: border-color var(--motion-duration-exit) ease;
-}
-
-.sceneFixtureChipButton:hover {
-  border-color: var(--color-brand-green-border);
-}
-
-.sceneFixtureSwatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.sceneFixtureName {
-  font-weight: 400;
-}
-
-.sceneFixtureLevel {
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-muted);
-}
-
-.sceneProvenance {
-  font-family: var(--font-family-ui);
-  font-size: 12px;
-  color: var(--color-brand-text-secondary);
-  margin: 0;
-}
-
-.sceneActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.sceneActionButton {
-  font-family: var(--font-family-mono);
-  font-size: var(--lighting-inspector-font-caption);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-/* Fixture / Group / Patch tab — shared bits */
-
-.fixtureHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.fixtureHeaderActions {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: 7px;
-}
-
-.fixtureNameStack {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.fixtureNameRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.fixtureName {
-  font-family: var(--font-family-ui);
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--color-brand-text-primary);
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-
-.groupAssignField {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.groupAssignSelect {
-  appearance: none;
-  width: 100%;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  padding: 6px 28px 6px 10px;
-  font-family: var(--font-family-ui);
-  font-size: 12px;
-  color: var(--color-brand-text-primary);
-  cursor: pointer;
-}
-
-.groupAssignSelect:focus {
-  outline: none;
-  border-color: var(--color-brand-green-border);
-}
-
-.groupAssignSelect:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-/* LGS-04: theme-correct dropdown chevron for the bare group `<select>`. Wrap
-   only the select (the field is a flex column with a label above). The mask is
-   painted in the themed text color so it inverts correctly on the Bone theme. */
-.selectWrap {
-  position: relative;
-  display: block;
-  width: 100%;
-}
-
-.selectWrap::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  width: 12px;
-  height: 12px;
-  transform: translateY(-50%);
-  pointer-events: none;
-  background-color: var(--color-brand-text-primary);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-}
-
-.selectWrap:has(select:disabled)::after {
-  opacity: 0.6;
-}
-
-.fixtureSubline {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-secondary);
-}
-
-.factGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-
-/* Wave 30b — span a fact across both grid columns. Used by the inspector
-   color-tag row on group + (potentially future) full-width facts. */
-.factSpan {
-  grid-column: 1 / -1;
-}
-
-/* Wave 30b — color-tag row in scene + group inspector. Compact horizontal
-   layout: trigger button on the left, optional Clear icon on the right. */
-.colorRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.colorPickerTrigger {
-  align-items: center;
-  appearance: none;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  color: var(--color-brand-text-primary);
-  cursor: pointer;
-  display: inline-flex;
-  font-family: var(--font-family-ui);
-  font-size: 12px;
-  gap: 8px;
-  padding: 4px 8px;
-  transition:
-    border-color var(--motion-duration-exit) ease,
-    background var(--motion-duration-exit) ease;
-}
-
-.colorPickerTrigger:hover {
-  border-color: var(--color-bg-border);
-  background: var(--color-bg-default);
-}
-
-.colorPickerTrigger:focus-visible {
-  outline: none;
-  border-color: var(--color-brand-green-border);
-}
-
-.colorPickerTrigger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.colorSwatch {
-  border: 1px solid var(--color-inset-hairline-border-soft);
-  border-radius: var(--radius-ctl);
-  display: inline-block;
-  flex-shrink: 0;
-  height: 12px;
-  width: 12px;
-}
-
-.colorLabel {
-  font-feature-settings: normal;
-}
-
-.positionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.positionField {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.positionLabel {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-}
-
-.positionInput {
-  appearance: none;
-  width: 100%;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  color: var(--color-brand-text-primary);
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: 12px;
-  padding: 5px 8px;
-  transition:
-    border-color var(--motion-duration-exit) ease,
-    background var(--motion-duration-exit) ease;
-}
-
-.levelStack {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-
-.levelBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.levelHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.levelLabel {
-  color: var(--color-brand-text-muted);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.levelValue {
-  color: var(--color-brand-text-secondary);
-  flex: 0 0 auto;
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-}
-
-.positionInput:focus-visible {
-  outline: none;
-  border-color: var(--color-brand-green-border);
-  background: var(--color-bg-default);
-}
-
-.positionInput:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.fact {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-}
-
-.factLabel {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-}
-
-.factValue {
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: 12px;
-  color: var(--color-brand-text-primary);
-  margin: 0;
-}
-
-.sliderRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.slider {
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--color-brand-green) 0%, var(--color-brand-green-soft) 100%);
-  cursor: pointer;
-}
-
-.slider:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-brand-text-primary);
-  border: 2px solid var(--color-brand-green);
-  transition:
-    transform var(--motion-duration-exit) ease,
-    box-shadow var(--motion-duration-exit) ease;
-}
-
-.slider:hover::-webkit-slider-thumb {
-  /* Slice 9 (system §6): hover changes an edge, never a position. */
-  border-color: var(--color-brand-green);
-  box-shadow: var(--shadow-thumb-ring);
-}
-
-.slider:focus-visible {
-  outline: none;
-}
-
-.slider:focus-visible::-webkit-slider-thumb {
-  box-shadow:
-    var(--shadow-thumb-ring),
-    0 0 0 2px var(--color-brand-green);
-}
-
-/* A press may move — §6 gives a key press 100 ms — but only a press. */
-.slider:active::-webkit-slider-thumb {
-  transform: scale(1.05);
-}
-
-.slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-brand-text-primary);
-  border: 2px solid var(--color-brand-green);
-  transition:
-    transform var(--motion-duration-exit) ease,
-    box-shadow var(--motion-duration-exit) ease;
-}
-
-.slider:hover::-moz-range-thumb,
-.slider:focus-visible::-moz-range-thumb {
-  /* Slice 9 (system §6): hover changes an edge, never a position. */
-  border-color: var(--color-brand-green);
-  box-shadow: var(--shadow-thumb-ring);
-}
-
-.sliderCct {
-  background: linear-gradient(
-    90deg,
-    var(--color-cct-2700) 0%,
-    var(--color-cct-3200) 16%,
-    var(--color-cct-3800) 32%,
-    var(--color-cct-4400) 50%,
-    var(--color-cct-5000) 66%,
-    var(--color-cct-5600) 83%,
-    var(--color-cct-6500) 100%
-  );
-}
-
-.cctScale {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-  margin-top: 4px;
-}
-
-.sliderValue {
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: 13px;
-  color: var(--color-brand-green);
-  font-weight: 700;
-  min-width: 56px;
-  text-align: right;
-}
-
-/* Group members list */
+/* ---- member rows (a scene's fixtures, a group's, the selection) ---- */
 
 .memberList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--material-line);
+}
+
+.memberList > li {
+  border-bottom: 1px solid var(--material-line);
 }
 
 .memberItem {
-  position: relative;
-}
-
-.memberRow {
-  appearance: none;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  padding: 8px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  font-family: var(--font-family-ui);
-  color: var(--color-brand-text-primary);
-}
-
-.memberRow:hover {
-  border-color: var(--color-brand-green-border);
-}
-
-/* Hover-revealed remove-from-group affordance. Pinned to the right edge of
-   the member row; opacity 0 by default so the row stays clean, opacity 1
-   when the row is hovered or the button itself receives keyboard focus.
-   The button overlays the row's right padding so it doesn't shift the
-   meta column when revealed. */
-.memberRemove {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0;
-  transition: opacity var(--motion-duration-exit) var(--motion-easing-standard);
-  background: var(--color-bg-soft);
-  border-radius: var(--radius-ctl);
-  padding: 1px;
-  pointer-events: none;
-}
-
-.memberItem:hover .memberRemove,
-.memberRemove:focus-within {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.memberName {
-  font-size: 12px;
-}
-
-.memberMeta {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-muted);
-}
-
-/* Patch editor */
-
-.patchEditor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
-}
-
-.patchField {
-  display: flex;
-  flex-direction: column;
   gap: 4px;
 }
 
-.patchFieldLabel {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-base);
+  background: var(--material-bg);
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-ui);
+  text-align: left;
+  cursor: pointer;
 }
 
-.patchInput {
-  appearance: none;
-  background: var(--color-bg-default);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
-  padding: 6px 8px;
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: 12px;
-  color: var(--color-brand-text-primary);
+.memberRow:hover:not(:disabled) {
+  background: var(--material-hover);
 }
 
-.patchInput:focus {
-  outline: none;
-  border-color: var(--color-brand-green-border);
+.memberRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
-/* CONTROLS-07: hide the native number-spinner chrome. Keyboard stepping kept. */
-.patchInput::-webkit-outer-spin-button,
-.patchInput::-webkit-inner-spin-button {
-  appearance: none;
-  margin: 0;
+.memberRow:disabled {
+  cursor: default;
 }
 
-.collisionCard {
+.memberLamp {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.memberName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberValue {
+  flex: none;
+  font-size: var(--font-size-label);
+  color: var(--text-text3);
+  font-variant-numeric: tabular-nums;
+}
+
+.memberMore {
+  padding: 8px 4px;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+/* ---- several fixtures ---- */
+
+.bulkRow {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, var(--color-brand-yellow-glow) 100%);
-  border: 1px solid var(--color-brand-yellow-border);
-  border-radius: var(--radius-ctl);
 }
 
-.collisionHeader {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-yellow);
-  font-weight: 700;
+.bulkLabel {
+  font: var(--font-weight-bold) var(--font-size-body) / 1 var(--font-family-ui);
+  color: var(--text-text);
 }
 
-/* DMX peek */
+/* ---- patch ---- */
+
+.patchEditor {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.patchEditor .field {
+  flex: 1 1 auto;
+}
+
+.patchEditor .fieldInput {
+  min-height: 48px;
+}
+
+.collisionRow {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- the DMX peek ---- */
 
 .peek {
   display: flex;
@@ -1047,21 +366,26 @@
   grid-template-columns: 40px minmax(0, 1fr) auto auto;
   gap: 8px;
   align-items: center;
-  padding: 4px 6px;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
+  min-height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
 }
 
 .channelRowHighlighted {
-  border-color: var(--color-brand-green-border);
+  border-color: var(--accent);
+}
+
+.channelAddress,
+.channelLabel,
+.channelValue {
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .channelAddress {
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-secondary);
+  color: var(--text-text3);
 }
 
 .channelBar {
@@ -1071,94 +395,23 @@
 }
 
 .channelSegment {
-  height: 10px;
-  background: var(--color-bg-default);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
+  height: 8px;
+  border-radius: var(--radius-base);
+  background: var(--material-line);
 }
 
 .channelSegment[data-active="true"] {
-  background: var(--color-brand-green);
-  border-color: var(--color-brand-green-border);
+  background: var(--role-green-text);
 }
 
 .channelLabel {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-muted);
+  color: var(--text-text2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .channelValue {
-  font-family: var(--font-family-mono);
-  font-feature-settings: "tnum", "zero";
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-primary);
-  font-weight: 700;
-}
-
-.previewSourceEyebrow,
-.palettePoolHeader h3,
-.sceneEyebrow,
-.sceneStatLabel,
-.sceneSectionHead,
-.positionLabel,
-.levelLabel,
-.factLabel,
-.patchFieldLabel,
-.cctScale {
-  font-size: var(--lighting-inspector-font-eyebrow);
-}
-
-.paletteStatus,
-.paletteValueInput span,
-.sceneStatValue small,
-.sceneFixtureLevel,
-.levelValue,
-.memberMeta,
-.channelAddress,
-.channelLabel {
-  font-size: var(--lighting-inspector-font-caption);
-}
-
-.previewSource,
-.helpText,
-.paletteTileMain span,
-.sceneFixtureChip,
-.fixtureSubline,
-.collisionHeader,
-.channelValue {
-  font-size: var(--lighting-inspector-font-small);
-}
-
-.empty,
-.paletteNotice,
-.sceneSub,
-.sceneProvenance,
-.groupAssignSelect,
-.colorPickerTrigger,
-.positionInput,
-.factValue,
-.memberName,
-.patchInput {
-  font-size: var(--lighting-inspector-font-body);
-}
-
-.paletteTileMain strong,
-.sliderValue {
-  font-size: var(--lighting-inspector-font-strong);
-}
-
-.fixtureName {
-  font-size: var(--lighting-inspector-font-heading);
-}
-
-.sceneStatValue {
-  font-size: var(--lighting-inspector-font-stat);
-}
-
-.sceneTitle {
-  font-size: var(--lighting-inspector-font-scene-title);
+  color: var(--text-text);
+  font-weight: var(--font-weight-bold);
 }

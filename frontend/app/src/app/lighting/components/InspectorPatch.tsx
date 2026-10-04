@@ -1,7 +1,6 @@
 import { type ChangeEvent, type KeyboardEvent, useEffect, useState } from "react";
-import { AlertTriangle } from "lucide-react";
 
-import { Button, InspectorSection } from "@sse/design-system";
+import { Key, PlateHead, Readouts, Section, Tooltip } from "@sse/design-system";
 import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
 import type { LightingDmxChannelEntry } from "../../shellData";
@@ -34,6 +33,10 @@ export interface InspectorPatchProps {
   busy?: boolean;
 }
 
+// The visual overhaul's Lighting page (2026-10-04): a fixture while patching.
+// Its title plate and Identify; where it sits in the universe; its start
+// address, typed; a collision, with the address that fixes it; and what its
+// channels are sending now.
 export function InspectorPatch({
   fixture,
   universe,
@@ -56,11 +59,11 @@ export function InspectorPatch({
 
   if (!fixture) {
     return (
-      <InspectorSection title="Patch mode">
-        <p className={styles.empty}>
-          Choose a fixture on the stage plot to edit its DMX address. Press Patch to leave patch mode.
-        </p>
-      </InspectorSection>
+      <PlateHead
+        title="Patch"
+        sub="Choose a fixture on the plot to set its DMX address. Leave Patch from the latch under the state display."
+        testId="lighting-plate-head"
+      />
     );
   }
 
@@ -100,16 +103,17 @@ export function InspectorPatch({
     }
   };
 
+  const range =
+    fixture.dmxStartAddress < 1
+      ? "Unpatched"
+      : `${String(fixture.dmxStartAddress).padStart(3, "0")}–${String(fixture.dmxStartAddress + channelCount - 1).padStart(3, "0")}`;
+
   return (
     <>
-      <InspectorSection title="Patch">
-        <div className={styles.fixtureHeader}>
-          <div>
-            <div className={styles.fixtureName}>{fixture.name}</div>
-            <div className={styles.fixtureSubline}>
-              {fixture.type} · {lightingFixtureModeLabel(fixture, catalog)}
-            </div>
-          </div>
+      <PlateHead
+        title={fixture.name}
+        sub={`${fixture.type} · ${lightingFixtureModeLabel(fixture, catalog)}`}
+        action={
           <IdentifyBurstButton
             fixtureId={fixture.id}
             fixtureName={fixture.name}
@@ -117,43 +121,38 @@ export function InspectorPatch({
             disabled={busy}
             bridgeReachable={bridgeReachable}
           />
-        </div>
+        }
+        testId="lighting-plate-head"
+      />
 
-        <dl className={styles.factGrid}>
-          <div className={styles.fact}>
-            <dt className={styles.factLabel}>Universe</dt>
-            <dd className={styles.factValue}>U{fixture.universe ?? universe}</dd>
-          </div>
-          <div className={styles.fact}>
-            <dt className={styles.factLabel}>Range</dt>
-            <dd className={styles.factValue}>
-              {fixture.dmxStartAddress < 1
-                ? "Unpatched"
-                : `${String(fixture.dmxStartAddress).padStart(3, "0")}–${String(
-                    fixture.dmxStartAddress + channelCount - 1
-                  ).padStart(3, "0")}`}
-            </dd>
-          </div>
-          <div className={styles.fact}>
-            <dt className={styles.factLabel}>Rig height</dt>
-            <dd className={styles.factValue}>{formatLightingRigHeight(fixture.rigZ ?? undefined)}</dd>
-          </div>
-          <div className={styles.fact}>
-            <dt className={styles.factLabel}>Beam</dt>
-            <dd className={styles.factValue}>
-              {formatLightingBeamAngleValue(fixture.type, fixture.beamAngleDegrees ?? undefined)}
-            </dd>
-          </div>
-        </dl>
-      </InspectorSection>
+      <Readouts
+        rows={[
+          { id: "universe", label: "Universe", value: `U${fixture.universe ?? universe}` },
+          { id: "range", label: "Range", value: range },
+          { id: "height", label: "Rig height", value: formatLightingRigHeight(fixture.rigZ ?? undefined) },
+          {
+            id: "beam",
+            label: "Beam",
+            value: formatLightingBeamAngleValue(fixture.type, fixture.beamAngleDegrees ?? undefined),
+          },
+        ]}
+      />
 
-      <InspectorSection title="Start address">
+      <Section
+        title={
+          <Tooltip
+            content={`${lightingFixturePatchSummary(fixture.dmxStartAddress, fixture, fixture.universe ?? universe, catalog)} · the highest start is ${maxStartAddress}`}
+          >
+            <span>Start address</span>
+          </Tooltip>
+        }
+      >
         <div className={styles.patchEditor}>
-          <label className={styles.patchField}>
-            <span className={styles.patchFieldLabel}>Start channel</span>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Start channel</span>
             <input
               aria-label="Fixture patch start channel"
-              className={styles.patchInput}
+              className={styles.fieldInput}
               disabled={busy}
               inputMode="numeric"
               max={maxStartAddress}
@@ -164,54 +163,43 @@ export function InspectorPatch({
               value={draft}
             />
           </label>
-          <Button
+          <Key
+            size="large"
+            disabled={busy || draft.trim() === String(fixture.dmxStartAddress)}
             onClick={() => commit(draft)}
-            loading={busy}
-            disabled={draft.trim() === String(fixture.dmxStartAddress)}
-            variant="secondary"
-            size="compact"
           >
             Apply
-          </Button>
+          </Key>
         </div>
-        <div className={styles.helpText}>
-          {lightingFixturePatchSummary(fixture.dmxStartAddress, fixture, fixture.universe ?? universe, catalog)} · max
-          start {maxStartAddress}
-        </div>
-      </InspectorSection>
+      </Section>
 
       {patchOverlap ? (
-        <InspectorSection title="Patch collision">
-          <div className={styles.collisionCard}>
-            <div className={styles.collisionHeader}>
-              <AlertTriangle aria-hidden="true" size={14} strokeWidth={2} />
-              <span>{patchOverlap.conflictingFixtureNames.join(", ")}</span>
-            </div>
-            {patchOverlap.suggestedStartAddress !== null && patchOverlap.suggestedEndAddress !== null ? (
-              <div className={styles.actionRow}>
-                <Button
-                  onClick={() => onPatchCommit(fixture.id, patchOverlap.suggestedStartAddress!)}
+        <Section title="Patch collision" detail={patchOverlap.conflictingFixtureNames.join(", ")}>
+          {patchOverlap.suggestedStartAddress !== null && patchOverlap.suggestedEndAddress !== null ? (
+            <div className={styles.collisionRow}>
+              <Tooltip
+                content={`Free from ${String(patchOverlap.suggestedStartAddress).padStart(3, "0")} to ${String(
+                  patchOverlap.suggestedEndAddress
+                ).padStart(3, "0")}.`}
+              >
+                <Key
+                  size="large"
                   disabled={busy}
-                  variant="secondary"
-                  size="compact"
+                  onClick={() => onPatchCommit(fixture.id, patchOverlap.suggestedStartAddress!)}
                 >
                   Auto-fix to {String(patchOverlap.suggestedStartAddress).padStart(3, "0")}
-                </Button>
-                <span className={styles.helpText}>
-                  Safe range {String(patchOverlap.suggestedStartAddress).padStart(3, "0")}–
-                  {String(patchOverlap.suggestedEndAddress).padStart(3, "0")}
-                </span>
-              </div>
-            ) : (
-              <p className={styles.helpText}>
-                No free start channel is left in this universe. Free one by moving another fixture off its range.
-              </p>
-            )}
-          </div>
-        </InspectorSection>
+                </Key>
+              </Tooltip>
+            </div>
+          ) : (
+            <p className={styles.attentionLine}>
+              No free start channel is left in this universe. Free one by moving another fixture off its range.
+            </p>
+          )}
+        </Section>
       ) : null}
 
-      <InspectorSection title="DMX peek">
+      <Section title="DMX peek" detail="the levels the hardware link sends">
         <DMXPeek
           fixtureType={fixture.type}
           fixture={fixture}
@@ -220,7 +208,7 @@ export function InspectorPatch({
           channels={dmxChannels}
           stale={dmxStale}
         />
-      </InspectorSection>
+      </Section>
     </>
   );
 }
