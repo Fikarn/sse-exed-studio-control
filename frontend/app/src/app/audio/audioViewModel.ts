@@ -107,7 +107,6 @@ export interface AudioWorkspaceViewModel {
   totalBanks: number;
   unsupportedFeatures: {
     clipReset: boolean;
-    dynamics: boolean;
     eq: boolean;
     masterView: boolean;
     pfl: boolean;
@@ -575,7 +574,6 @@ export function buildAudioViewModel({
     totalBanks,
     unsupportedFeatures: {
       clipReset: !capabilities.canClearClips,
-      dynamics: !capabilities.canEditProcessing,
       eq: !capabilities.canEditProcessing,
       masterView: !capabilities.canUseMasterView,
       pfl: true,

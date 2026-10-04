@@ -36,10 +36,10 @@ import { expectWorkspaceMounted, fixtureMap, openFixture } from "./helpers/openF
 import { pausePageClock } from "./helpers/pageClock";
 
 // plan PR 4 / workstream D4: audio workspace specs split out of
-// operator-shell.spec.ts. Covers rendering, meters, snapshots, EQ +
-// dynamics, hardware preamps, layout, and the pure-logic
+// operator-shell.spec.ts. Covers rendering, meters, snapshots, EQ,
+// hardware preamps, layout, and the pure-logic
 // formatter/view-model assertions. Describe-block organization
-// (snapshots / meters / EQ-dynamics / hardware-preamp) is a follow-up
+// (snapshots / meters / EQ / hardware-preamp) is a follow-up
 // once D3 has migrated the pure-logic cases out to Vitest.
 // Production readiness S15: the metering cases moved to audio-metering.spec.ts.
 // New pages program, Slice 3 (D6): the Console binds no key of its own. The
@@ -311,7 +311,8 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // Visual overhaul A, Slice 4c: they are sections of the plate, all present.
   // The visual overhaul's Console pull request: the "Channel" section, which
   // repeated the sections above it, went (the survey's clutter findings).
-  for (const section of ["eq", "dynamics", "send", "meter"] as const) {
+  // (2026-10-04: the dynamics went; see the test of the plate without them.)
+  for (const section of ["eq", "send", "meter"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toBeAttached();
   }
   await expect(page.locator('[data-plate-section="channel"]')).toHaveCount(0);
@@ -364,13 +365,6 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await page.getByTestId("audio-eq-menu").click();
   await expect(page.getByTestId("audio-eq-menu-peq")).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
-  await revealPlateSection(page, "dynamics");
-  // Old: a range row repeated the compressor's numbers. New: the two-row table
-  // is the one place they are read.
-  await expect(
-    page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp", exact: true })
-  ).toBeEnabled();
-  await expect(page.getByTestId("audio-dynamics-row-compressor")).toBeVisible();
   await revealPlateSection(page, "send");
   // Old: a send card per mix with four mode keys. New: a row per other mix.
   // Reason: Atrium's OTHER MIXES; the mix target's send is the strip's fader.
@@ -654,7 +648,7 @@ test("supports audio group filtering and source/output selection flow", async ({
   // output's own section and none of the channel's. Reason: no tab row — what
   // the plate shows is what the selection has.
   await expect(page.locator('[data-plate-section="output"]')).toBeVisible();
-  for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
+  for (const section of ["eq", "send", "preamp"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toHaveCount(0);
   }
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Phones 1");
@@ -669,7 +663,6 @@ test("supports audio group filtering and source/output selection flow", async ({
     "peakHold"
   );
   await expect(page.getByTestId("audio-inspector-eq-mini")).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-dynamics-mini")).toHaveCount(0);
   // The visual overhaul's Console pull request. Old: the output's plate had its
   // "Monitor level" slider and Mute and Unity keys. New: the plate shows the
   // output's meter and facts, and no control of its level. Reason: the output
@@ -993,42 +986,19 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
   expect(graphDragCountsAfter["audio.channel.eq.update"] ?? 0).toBeLessThanOrEqual(3);
 });
 
-test("supports engine-backed audio dynamics editing", async ({ page }) => {
-  test.slow();
+test("the plate has no dynamics: they never reached TotalMix", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await revealPlateSection(page, "dynamics");
-  // The visual overhaul's Console pull request. Old: a curve, a range row and
-  // ten knobs in the plate. New: a two-row table (Comp, Gate) whose keys switch
-  // each, and a press on a row's values opens its popover with the five knobs.
-  // Reason: the plate fits without scrolling (Atrium: dynamics as a table).
-  const comp = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp", exact: true });
-  await expect(comp).toHaveAttribute("data-active", "false");
-  await comp.click();
-  await expect(comp).toHaveAttribute("data-active", "true");
-  await expect(page.getByTestId("audio-inspector-dynamics")).toContainText("comp on");
-
-  await page.getByTestId("audio-dynamics-row-compressor").click();
-  await expect(page.getByTestId("audio-dynamics-popover-compressor")).toBeVisible();
-  await expectSliderValueChanges(page, "Host compressor threshold");
-  await expectSliderValueChanges(page, "Host compressor ratio");
-  await expectSliderValueChanges(page, "Host compressor attack");
-  await expectSliderValueChanges(page, "Host compressor release");
-  await expectSliderValueChanges(page, "Host compressor makeup");
-
-  await page.keyboard.press("Escape");
-  const gate = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Gate", exact: true });
-  await expect(gate).toHaveAttribute("data-active", "false");
-  await gate.click();
-  await expect(gate).toHaveAttribute("data-active", "true");
-  await page.getByTestId("audio-dynamics-row-gate").click();
-  await expect(page.getByTestId("audio-dynamics-popover-gate")).toBeVisible();
-  await expectSliderValueChanges(page, "Host gate threshold");
-  await expectSliderValueChanges(page, "Host gate ratio");
-  await expectSliderValueChanges(page, "Host gate attack");
-  await expectSliderValueChanges(page, "Host gate release");
-  await expectSliderValueChanges(page, "Host gate makeup");
+  // 2026-10-04 (the owner's decision). Old: a Dynamics section, a compressor
+  // and a gate in a two-row table, each with five knobs in a popover. New: no
+  // Dynamics section; the equaliser follows the other mixes and the meter
+  // follows it. Reason: the app only kept the values; nothing sent them to
+  // TotalMix, whose dynamics are one compressor/expander per input.
+  await expect(page.locator('[data-plate-section="eq"]')).toBeVisible();
+  await expect(page.locator('[data-plate-section="meter"]')).toBeVisible();
+  await expect(page.locator('[data-plate-section="dynamics"]')).toHaveCount(0);
+  await expect(page.getByTestId("audio-inspector")).not.toContainText("Dynamics");
 });
 
 test("the plate's other mixes: a row per mix, its menu makes it the mix target", async ({ page }) => {
@@ -1301,7 +1271,7 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
   // Visual overhaul A, Slice 4c: every section of the plate is present. The
   // visual overhaul's Console pull request: and the plate never scrolls.
-  for (const section of ["eq", "dynamics", "send", "meter"] as const) {
+  for (const section of ["eq", "send", "meter"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toBeVisible();
   }
   await expectAudioStudioSideRailsFilled(page);
@@ -1323,7 +1293,7 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   await expect(page.locator('[data-plate-section="output"]')).toBeVisible();
   await expectAudioInspectorPanelsFit(page);
   await expectDbfsScaleLabelsInsideMeters(page, "2560 output plate");
-  for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
+  for (const section of ["eq", "send", "preamp"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toHaveCount(0);
   }
   // Visual overhaul A, Slice 4c: the long facts (Clock, Metering) are the

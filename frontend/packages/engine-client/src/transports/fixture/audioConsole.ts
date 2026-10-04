@@ -99,13 +99,6 @@ export function normalizeEqBandType(bandId: string, bandType: string) {
   return "bell";
 }
 
-export function buildAudioDynamics() {
-  return {
-    compressor: { enabled: false, thresholdDb: -18, ratio: 2, attackMs: 12, releaseMs: 120, makeupDb: 0 },
-    gate: { enabled: false, thresholdDb: -48, ratio: 1.5, attackMs: 4, releaseMs: 180, makeupDb: 0 },
-  };
-}
-
 /** TotalMix's slots, `/snapshot/load/1` to `/snapshot/load/8` (`SNAPSHOT_SLOTS`). */
 export const CONSOLE_SNAPSHOT_SLOTS = 8;
 
@@ -212,7 +205,6 @@ export function buildAudioChannel(
     instrument: options.instrument === true,
     autoSet: options.autoSet === true,
     eq: buildAudioEq(),
-    dynamics: buildAudioDynamics(),
   };
 }
 

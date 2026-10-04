@@ -1,6 +1,6 @@
 /**
  * Pure helpers, constants, and type aliases shared by the audio inspector
- * surfaces (Overview, EQ, Dynamics, Sends, Output mode).
+ * surfaces (Overview, EQ, Sends, Output mode).
  *
  * Everything here is stateless and side-effect free — no React, no DOM
  * dependencies — so future inspector sub-files can import freely without
@@ -12,7 +12,6 @@ import { formatAudioRole } from "../../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 
 export type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-export type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[0];
 export type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
 export type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 export type SelectedAudioChannel = NonNullable<AudioWorkspaceViewModel["selectedChannel"]>;
@@ -211,31 +210,6 @@ export function outputRouteText(role: string) {
   if (role === "phones-a") return "Phones cue A";
   if (role === "phones-b") return "Phones cue B";
   return "Hardware output";
-}
-
-export function dynamicsThresholdPercent(thresholdDb: number) {
-  return clamp(((thresholdDb + 80) / 80) * 100, 0, 100);
-}
-
-export function dynamicsCurvePath(processor: SelectedAudioChannel["dynamics"]["compressor"]) {
-  if (!processor.enabled) {
-    return "M 0 92 L 100 8";
-  }
-  const threshold = dynamicsThresholdPercent(processor.thresholdDb);
-  const ratio = Math.max(1, processor.ratio);
-  const endOutput = threshold + (100 - threshold) / ratio;
-  return `M 0 100 L ${threshold.toFixed(1)} ${(100 - threshold).toFixed(1)} L 100 ${(100 - endOutput).toFixed(1)}`;
-}
-
-export function dynamicsPoint(processor: SelectedAudioChannel["dynamics"]["compressor"]) {
-  const x = dynamicsThresholdPercent(processor.thresholdDb);
-  return { x, y: 100 - x };
-}
-
-export function dynamicsStatusText(channel: SelectedAudioChannel) {
-  const comp = channel.dynamics.compressor.enabled ? "Comp in" : "Comp bypassed";
-  const gate = channel.dynamics.gate.enabled ? "Gate in" : "Gate bypassed";
-  return `${comp} · ${gate}`;
 }
 
 export function eqStatusText(channel: SelectedAudioChannel) {

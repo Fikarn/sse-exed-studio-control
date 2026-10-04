@@ -14,7 +14,6 @@ import type { MutableFixtureState } from "./state";
 
 /** The screen's methods that can leave a row (`RECORDED_UI_METHODS`). */
 export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
-  "audio.channel.dynamics.update",
   "audio.channel.eq.update",
   "audio.channel.update",
   "audio.mixTarget.update",
@@ -292,13 +291,6 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
         rows.push(audio("eq-band", name, `EQ band ${text(params, ["bandId"]) ?? "?"} ${onOff(band)}: ${name}`));
       }
       return rows;
-    }
-    case "audio.channel.dynamics.update": {
-      const name = text(result, ["name"]) ?? "Channel";
-      const enabled = flag(params, "enabled");
-      return enabled === null
-        ? []
-        : [audio("dynamics", name, `Dynamics (${text(params, ["section"]) ?? "section"}) ${onOff(enabled)}: ${name}`)];
     }
     case "audio.snapshot.load": {
       // A slot TotalMix saved no name for is named by its number; the rows never say "snapshot".

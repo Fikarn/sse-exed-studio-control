@@ -209,17 +209,6 @@ export interface AudioEqUpdateRequest {
   q?: number;
 }
 
-export interface AudioDynamicsUpdateRequest {
-  channelId: string;
-  section: "compressor" | "gate";
-  enabled?: boolean;
-  thresholdDb?: number;
-  ratio?: number;
-  attackMs?: number;
-  releaseMs?: number;
-  makeupDb?: number;
-}
-
 export interface AudioMixTargetUpdateRequest {
   mixTargetId: string;
   volume?: number;
@@ -601,7 +590,6 @@ export interface ShellStore {
   clearAllAudioSolo(): Promise<JsonValue>;
   updateAudioChannel(request: AudioChannelUpdateRequest): Promise<JsonValue>;
   updateAudioChannelEq(request: AudioEqUpdateRequest): Promise<JsonValue>;
-  updateAudioChannelDynamics(request: AudioDynamicsUpdateRequest): Promise<JsonValue>;
   updateAudioMixTarget(request: AudioMixTargetUpdateRequest): Promise<JsonValue>;
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;

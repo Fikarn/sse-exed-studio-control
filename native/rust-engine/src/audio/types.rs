@@ -128,7 +128,6 @@ pub struct AudioChannelSnapshot {
     #[serde(rename = "autoSet")]
     pub auto_set: bool,
     pub eq: AudioEqSnapshot,
-    pub dynamics: AudioDynamicsSnapshot,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -243,30 +242,6 @@ pub struct AudioEqBandSnapshot {
     pub band_type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioDynamicsSnapshot {
-    pub compressor: AudioDynamicsProcessorSnapshot,
-    pub gate: AudioDynamicsProcessorSnapshot,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioDynamicsProcessorSnapshot {
-    pub enabled: bool,
-    #[serde(rename = "thresholdDb")]
-    pub threshold_db: f64,
-    pub ratio: f64,
-    #[serde(rename = "attackMs")]
-    pub attack_ms: f64,
-    #[serde(rename = "releaseMs")]
-    pub release_ms: f64,
-    #[serde(rename = "makeupDb")]
-    pub makeup_db: f64,
-}
-
 #[derive(Debug, Serialize, Clone)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
@@ -328,13 +303,12 @@ pub struct StoredAudioChannelState {
     pub auto_set: bool,
     #[serde(default = "default_audio_eq_snapshot")]
     pub eq: AudioEqSnapshot,
-    #[serde(default = "default_audio_dynamics_snapshot")]
-    pub dynamics: AudioDynamicsSnapshot,
-    // 2026-10-04 (the owner's decision): the per-send modes (pre fader, mute
-    // send, link, solo send) went. They were only ever kept here and never
-    // reached TotalMix, which has no such modes per send. Saved data written
-    // before still carries `sendModes`; it is read past (no field here denies
-    // an unknown one) and dropped at the next write.
+    // 2026-10-04 (the owner's decisions): the per-send modes (pre fader, mute
+    // send, link, solo send) and the dynamics (a compressor and a gate) went.
+    // They were only ever kept here and never reached TotalMix, which has no
+    // such modes per send and models its dynamics differently. Saved data
+    // written before still carries `sendModes` and `dynamics`; they are read
+    // past (no field here denies an unknown one) and dropped at the next write.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -496,18 +470,6 @@ pub struct AudioEqUpdateRequest {
     pub q: Option<f64>,
 }
 
-#[derive(Debug, Clone)]
-pub struct AudioDynamicsUpdateRequest {
-    pub channel_id: String,
-    pub section: String,
-    pub enabled: Option<bool>,
-    pub threshold_db: Option<f64>,
-    pub ratio: Option<f64>,
-    pub attack_ms: Option<f64>,
-    pub release_ms: Option<f64>,
-    pub makeup_db: Option<f64>,
-}
-
 pub fn default_audio_eq_snapshot() -> AudioEqSnapshot {
     AudioEqSnapshot {
         enabled: false,
@@ -557,35 +519,8 @@ pub fn default_audio_low_cut_snapshot() -> AudioLowCutSnapshot {
     }
 }
 
-pub fn default_audio_dynamics_snapshot() -> AudioDynamicsSnapshot {
-    AudioDynamicsSnapshot {
-        compressor: AudioDynamicsProcessorSnapshot {
-            enabled: false,
-            threshold_db: -18.0,
-            ratio: 2.0,
-            attack_ms: 12.0,
-            release_ms: 120.0,
-            makeup_db: 0.0,
-        },
-        gate: AudioDynamicsProcessorSnapshot {
-            enabled: false,
-            threshold_db: -48.0,
-            ratio: 1.5,
-            attack_ms: 4.0,
-            release_ms: 180.0,
-            makeup_db: 0.0,
-        },
-    }
-}
-
 impl Default for AudioEqSnapshot {
     fn default() -> Self {
         default_audio_eq_snapshot()
-    }
-}
-
-impl Default for AudioDynamicsSnapshot {
-    fn default() -> Self {
-        default_audio_dynamics_snapshot()
     }
 }

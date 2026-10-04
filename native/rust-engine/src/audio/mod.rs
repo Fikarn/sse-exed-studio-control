@@ -20,6 +20,13 @@ const RETIRED_SNAPSHOT_CODES: [&str; 3] = [
     "AUDIO_SNAPSHOT_RECALL_FAILED",
     "AUDIO_CHANNEL_NAME_INVALID",
 ];
+/// The refusal codes and the success messages only the builds before
+/// 2026-10-04 wrote for the per-send modes and the dynamics, which were kept in
+/// the app and never reached TotalMix (the owner's decisions).
+const RETIRED_APP_ONLY_CODES: [&str; 2] =
+    ["AUDIO_SEND_UNAVAILABLE", "AUDIO_PROCESSING_UNAVAILABLE"];
+const RETIRED_APP_ONLY_MESSAGES: [&str; 2] =
+    ["Audio send mode updated.", "Audio dynamics updated."];
 const AUDIO_LAST_ACTION_MESSAGE_KEY: &str = "app.audio.last_action_message";
 const AUDIO_CHANNEL_STATE_KEY: &str = "app.audio.channels_state";
 const AUDIO_MIX_TARGET_STATE_KEY: &str = "app.audio.mix_targets_state";

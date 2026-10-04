@@ -4,8 +4,7 @@
  * Renders a 270° arc (track + accent fill + indicator + hub) with a caption
  * and a monospace value readout, matching the Claude Design "Console"
  * prototype's knob language. Generalised from AudioStripPreamp so the EQ
- * band controls, dynamics controls, and the inspector preamp hero knob can
- * all share one widget.
+ * band controls and the inspector preamp hero knob share one widget.
  *
  * Contract mirrors AudioSliderControl so it slots into the existing
  * draft-store commit plumbing: `onPreview(value)` fires continuously during a

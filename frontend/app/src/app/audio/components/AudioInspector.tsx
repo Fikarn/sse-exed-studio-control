@@ -5,7 +5,6 @@ import { MenuButton, PlateHead, Readouts, type UseArmResult } from "@sse/design-
 import styles from "./AudioInspector.module.css";
 import { buildChannelMenu } from "./audioChannelMenu";
 import { AudioGainEntryDialog, AudioLevelEntryDialog } from "./AudioEntryDialogs";
-import { AudioPlateDynamics } from "./inspector/AudioPlateDynamics";
 import { AudioPlateEq } from "./inspector/AudioPlateEq";
 import { AudioPlateMeter } from "./inspector/AudioPlateMeter";
 import { AudioPlateMixes } from "./inspector/AudioPlateMixes";
@@ -15,7 +14,6 @@ import {
   channelOrdinalLabel,
   channelTypeLabel,
   type AudioChannelUpdate,
-  type AudioDynamicsUpdate,
   type AudioEqUpdate,
 } from "./inspector/audioInspectorHelpers";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
@@ -30,9 +28,10 @@ import {
 // The plate (visual overhaul, the Console): the selection whole on one plate
 // that never scrolls. A channel: its title plate (the name, one line of what it
 // is, the strip's own menu), then its preamp (an input's), the other mixes it
-// feeds, its equaliser, its dynamics and its meter. An output: its title plate
-// and its meter; its level's one home is the cluster. Editing that needs more
-// room than a row opens beside the row (a band's, a processor's popover).
+// feeds, its equaliser and its meter. An output: its title plate and its
+// meter; its level's one home is the cluster. Editing that needs more room
+// than a row opens beside the row (a band's popover). The dynamics went on
+// 2026-10-04: they were kept in the app and never reached TotalMix.
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
@@ -51,7 +50,6 @@ export interface AudioInspectorProps {
   onTogglePeakHold: () => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  onUpdateChannelDynamics: (request: AudioDynamicsUpdate) => void;
   onUpdateChannelEq: (request: AudioEqUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   peakHoldEnabled: boolean;
@@ -99,7 +97,6 @@ function AudioChannelPlate({
   onTogglePeakHold,
   onTogglePhantom,
   onUpdateChannel,
-  onUpdateChannelDynamics,
   onUpdateChannelEq,
   peakHoldEnabled,
   peakHoldResetToken,
@@ -209,18 +206,6 @@ function AudioChannelPlate({
         eqState={eqState}
         menuLock={menuLock}
         onUpdateChannelEq={onUpdateChannelEq}
-        setDraftValue={setDraftValue}
-      />
-
-      <AudioPlateDynamics
-        arm={arm}
-        ask={ask}
-        canEdit={canEdit}
-        channel={channel}
-        clearDraftValueLater={clearDraftValueLater}
-        getDraftValue={getDraftValue}
-        menuLock={menuLock}
-        onUpdateChannelDynamics={onUpdateChannelDynamics}
         setDraftValue={setDraftValue}
       />
 
