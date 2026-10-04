@@ -2,7 +2,6 @@
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { JsonObject } from "../../generated/protocol";
 import { asArray, asRecord, asString, asBoolean, asNumber } from "./json";
-import { clampNumber } from "./lighting";
 import type { MutableFixtureState } from "./state";
 
 export function buildAudioMixLevels(main: number, phonesA: number, phonesB: number) {
@@ -11,92 +10,6 @@ export function buildAudioMixLevels(main: number, phonesA: number, phonesB: numb
     "audio-mix-phones-a": phonesA,
     "audio-mix-phones-b": phonesB,
   };
-}
-
-export function buildAudioEq() {
-  return {
-    enabled: false,
-    lowCut: { enabled: false, frequencyHz: 80, slopeDbPerOctave: 12 },
-    hardwareStatus: "local",
-    bands: [
-      { id: "1", label: "1", enabled: true, frequencyHz: 180, gainDb: 0, q: 0.9, bandType: "bell" },
-      { id: "2", label: "2", enabled: true, frequencyHz: 1600, gainDb: 0, q: 1.2, bandType: "bell" },
-      { id: "3", label: "3", enabled: true, frequencyHz: 8500, gainDb: 0, q: 0.8, bandType: "high-shelf" },
-    ],
-  };
-}
-
-export function normalizeAudioEq(value: JsonObject | null) {
-  const defaults = buildAudioEq();
-  if (!value) return defaults;
-  const sourceBands = asArray(value.bands)
-    .map((entry) => asRecord(entry))
-    .filter((entry): entry is JsonObject => entry !== null);
-  const legacyLowCut = sourceBands.find((entry) => asString(entry.id) === "lc");
-  const sourceLowCut = asRecord(value.lowCut);
-  const lowCut = {
-    enabled: legacyLowCut ? asBoolean(legacyLowCut.enabled, false) : asBoolean(sourceLowCut?.enabled, false),
-    frequencyHz: clampNumber(
-      typeof legacyLowCut?.frequencyHz === "number"
-        ? legacyLowCut.frequencyHz
-        : typeof sourceLowCut?.frequencyHz === "number"
-          ? sourceLowCut.frequencyHz
-          : 80,
-      20,
-      500
-    ),
-    slopeDbPerOctave: normalizeLowCutSlope(
-      typeof sourceLowCut?.slopeDbPerOctave === "number" ? sourceLowCut.slopeDbPerOctave : 12
-    ),
-  };
-
-  const bands = (defaults.bands as JsonObject[]).map((defaultBand) => {
-    const id = asString(defaultBand.id);
-    const legacyId = id === "1" ? "lo" : id === "2" ? "mid" : id === "3" ? "hi" : id;
-    const source = sourceBands.find((entry) => asString(entry.id) === id || asString(entry.id) === legacyId);
-    const bandType = normalizeEqBandType(id, asString(source?.bandType, asString(defaultBand.bandType)));
-    const sourceEnabled = asBoolean(source?.enabled, true);
-    const gainDb = clampNumber(
-      typeof source?.gainDb === "number" ? source.gainDb : Number(defaultBand.gainDb),
-      -20,
-      20
-    );
-    return {
-      ...defaultBand,
-      enabled: true,
-      frequencyHz: clampNumber(
-        typeof source?.frequencyHz === "number" ? source.frequencyHz : Number(defaultBand.frequencyHz),
-        20,
-        20_000
-      ),
-      gainDb: sourceEnabled ? gainDb : 0,
-      q: clampNumber(typeof source?.q === "number" ? source.q : Number(defaultBand.q), 0.4, 9.9),
-      bandType,
-    };
-  });
-
-  const hardwareStatus = ["pending", "confirmed"].includes(asString(value.hardwareStatus))
-    ? asString(value.hardwareStatus)
-    : "local";
-  return { enabled: asBoolean(value.enabled, false), lowCut, hardwareStatus, bands };
-}
-
-export function normalizeLowCutSlope(value: number) {
-  if (value <= 9) return 6;
-  if (value <= 15) return 12;
-  if (value <= 21) return 18;
-  return 24;
-}
-
-export function normalizeEqBandType(bandId: string, bandType: string) {
-  if (bandId === "1") {
-    return ["bell", "low-shelf", "high-pass", "low-pass"].includes(bandType) ? bandType : "bell";
-  }
-  if (bandId === "3") {
-    if (bandType === "shelf") return "high-shelf";
-    return ["bell", "high-shelf", "low-pass", "high-pass"].includes(bandType) ? bandType : "bell";
-  }
-  return "bell";
 }
 
 /** TotalMix's slots, `/snapshot/load/1` to `/snapshot/load/8` (`SNAPSHOT_SLOTS`). */
@@ -204,7 +117,6 @@ export function buildAudioChannel(
     pad: false,
     instrument: options.instrument === true,
     autoSet: options.autoSet === true,
-    eq: buildAudioEq(),
   };
 }
 
@@ -232,7 +144,6 @@ export function buildDefaultAudioSnapshot(): JsonObject {
       canEditMixerState: true,
       canSync: true,
       canRecallConsoleSnapshot: true,
-      canEditProcessing: true,
       canClearClips: true,
       canUseMasterView: true,
     },
@@ -526,7 +437,6 @@ export function refreshAudioCapabilities(audioSnapshot: JsonObject, state: Mutab
     canEditMixerState: consoleReady,
     canSync: consoleReady,
     canRecallConsoleSnapshot: consoleReady,
-    canEditProcessing: consoleReady,
     canClearClips: oscEnabled,
     canUseMasterView: oscEnabled,
   };
@@ -564,15 +474,4 @@ export function ensureAudioActionAllowed(state: MutableFixtureState) {
   }
 
   return audioSnapshot;
-}
-
-export function fixtureAudioChannel(audioSnapshot: JsonObject, channelIdValue: unknown) {
-  const channelId = asString(channelIdValue).trim();
-  const channel = asArray(audioSnapshot.channels)
-    .map((entry) => asRecord(entry))
-    .find((entry) => asString(entry?.id) === channelId);
-  if (!channel) {
-    throw new Error(`Audio channel '${channelId}' is not exposed by the fixture transport.`);
-  }
-  return channel;
 }

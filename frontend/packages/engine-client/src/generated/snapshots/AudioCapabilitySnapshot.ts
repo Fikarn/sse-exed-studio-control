@@ -4,7 +4,6 @@ export type AudioCapabilitySnapshot = {
   canEditMixerState: boolean;
   canSync: boolean;
   canRecallConsoleSnapshot: boolean;
-  canEditProcessing: boolean;
   canClearClips: boolean;
   canUseMasterView: boolean;
 };
