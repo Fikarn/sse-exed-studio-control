@@ -94,12 +94,10 @@ export function formatEqFrequency(value: number) {
   return `${Math.round(value)} Hz`;
 }
 
+/** A band's type in sentence case: "Bell", "High shelf", "Low pass". */
 export function formatEqBandType(value: string) {
-  return value
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
+  const words = value.split(/[-_]/).filter(Boolean).join(" ");
+  return `${words.slice(0, 1).toUpperCase()}${words.slice(1)}`;
 }
 
 export function eqBandId(value: string) {
@@ -129,12 +127,6 @@ export function eqPointY(gainDb: number) {
 
 export function eqGainFromPointY(percent: number) {
   return Number((EQ_GAIN_MAX - clamp(percent, 0, 1) * (EQ_GAIN_MAX - EQ_GAIN_MIN)).toFixed(1));
-}
-
-export function lowCutFrequencyFromPointX(percent: number) {
-  const min = Math.log10(LOW_CUT_FREQUENCY_MIN);
-  const max = Math.log10(LOW_CUT_FREQUENCY_MAX);
-  return Math.round(10 ** (min + clamp(percent, 0, 1) * (max - min)));
 }
 
 export function eqOctaves(frequency: number, center: number) {

@@ -1,309 +1,363 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { Key, PlateHead, Section } from "@sse/design-system";
+import { MenuButton, PlateHead, Readouts, type UseArmResult } from "@sse/design-system";
 
 import styles from "./AudioInspector.module.css";
-import { AudioPlateChannelFacts } from "./AudioPlateChannelFacts";
-import { AudioEmptyInspector } from "./inspector/AudioEmptyInspector";
-import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
-import { audioChannelSupportsGain, getAudioChannelGroup, type AudioWorkspaceViewModel } from "../audioViewModel";
-import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
-import { AudioInspectorChannelHardwareCard } from "./inspector/AudioInspectorChannelHardwareCard";
-import { AudioInspectorChannelHeader } from "./inspector/AudioInspectorChannelHeader";
-import { AudioInspectorChannelMeterCard } from "./inspector/AudioInspectorChannelMeterCard";
-import { AudioInspectorDynamicsTab } from "./inspector/AudioInspectorDynamicsTab";
-import { AudioInspectorEqTab } from "./inspector/AudioInspectorEqTab";
-import { AudioInspectorOutputView } from "./inspector/AudioInspectorOutputView";
-import { AudioInspectorSendsTab } from "./inspector/AudioInspectorSendsTab";
+import { buildChannelMenu, channelSendMode } from "./audioChannelMenu";
+import { AudioGainEntryDialog, AudioLevelEntryDialog } from "./AudioEntryDialogs";
+import { AudioPlateDynamics } from "./inspector/AudioPlateDynamics";
+import { AudioPlateEq } from "./inspector/AudioPlateEq";
+import { AudioPlateMeter } from "./inspector/AudioPlateMeter";
+import { AudioPlateMixes } from "./inspector/AudioPlateMixes";
+import { AudioPlatePreamp } from "./inspector/AudioPlatePreamp";
+import { usePlateValueEntry } from "./inspector/usePlateValueEntry";
 import {
+  channelOrdinalLabel,
+  channelTypeLabel,
   type AudioChannelUpdate,
   type AudioDynamicsUpdate,
   type AudioEqUpdate,
-  type AudioMixTargetUpdate,
   type AudioSendModeUpdate,
 } from "./inspector/audioInspectorHelpers";
+import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
+import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
+import {
+  audioChannelSupportsGain,
+  getAudioChannelGroup,
+  selectedChannelSendLevel,
+  type AudioWorkspaceViewModel,
+} from "../audioViewModel";
 
-// Visual overhaul A, Slice 4c (system §7, plan Slice 4): the plate. Each
-// section keeps the test id its tab panel carried, and says which section it is
-// with `data-plate-section` for the geometry checks. The selected strip's
-// preamp, its send, every mix it feeds, its EQ, its dynamics, its meter and the
-// flags the desk reports — all of it visible at once, with no tab row to hide
-// half of it behind. New pages program, Slice 3 (decision 4): the section keys
-// P / Q / E / D / R that scrolled the plate to a section went; the plate
-// scrolls.
-export function AudioInspector({
-  armedActionKey,
-  clearDraftValueLater,
-  commitChannelContinuous,
-  commitChannelEqContinuous,
-  commitMixTargetContinuous,
-  draftStore,
-  getDraftValue,
-  onResetPeakHolds,
-  onSelectMixTarget,
-  onTogglePeakHold,
-  setDraftValue,
-  onUpdateChannelDynamics,
-  onUpdateChannelEq,
-  onUpdateChannelSendMode,
-  onTogglePhantom,
-  onUpdateChannel,
-  onUpdateMixTarget,
-  peakHoldEnabled,
-  peakHoldResetToken,
-  store,
-  viewModel,
-}: {
+// The plate (visual overhaul, the Console): the selection whole on one plate
+// that never scrolls. A channel: its title plate (the name, one line of what it
+// is, the strip's own menu), then its preamp (an input's), the other mixes it
+// feeds, its equaliser, its dynamics and its meter. An output: its title plate
+// and its meter; its level's one home is the cluster. Editing that needs more
+// room than a row opens beside the row (a band's, a processor's popover).
+
+type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
+
+export interface AudioInspectorProps {
+  arm: UseArmResult;
   armedActionKey: string | null;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
   commitChannelEqContinuous: (request: AudioEqUpdate) => void;
-  commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
+  onClearClip: (channelId: string) => void;
   onResetPeakHolds: () => void;
+  onResetToUnity: (channelId: string) => void;
   onSelectMixTarget: (mixTargetId: string) => void;
   onTogglePeakHold: () => void;
-  setDraftValue: (key: string, value: number) => void;
+  onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
+  onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateChannelDynamics: (request: AudioDynamicsUpdate) => void;
   onUpdateChannelEq: (request: AudioEqUpdate) => void;
   onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
-  onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
-  onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   peakHoldEnabled: boolean;
   peakHoldResetToken: number;
+  setDraftValue: (key: string, value: number) => void;
   store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
-}) {
+}
+
+export function AudioInspector(props: AudioInspectorProps) {
+  const { viewModel } = props;
   useEffect(() => {
     if (!window.__SSE_TEST_RENDER_COUNTS__) return;
     window.__SSE_TEST_RENDER_COUNTS__.audioInspector = (window.__SSE_TEST_RENDER_COUNTS__.audioInspector ?? 0) + 1;
   });
 
-  const selectedChannel = viewModel.selectedChannel;
+  return (
+    <aside className={styles.plate} data-source-tier={viewModel.selectedSourceTier} data-testid="audio-inspector">
+      {viewModel.selectedChannel ? (
+        <AudioChannelPlate key={viewModel.selectedChannel.id} {...props} />
+      ) : viewModel.selectedMixTarget ? (
+        <AudioOutputPlate {...props} />
+      ) : (
+        <div className={styles.empty}>
+          <span className={styles.emptyTitle}>No channel selected</span>
+          <span className={styles.quiet}>Press a strip to see it here.</span>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function AudioChannelPlate({
+  arm,
+  armedActionKey,
+  clearDraftValueLater,
+  commitChannelContinuous,
+  commitChannelEqContinuous,
+  draftStore,
+  getDraftValue,
+  onClearClip,
+  onResetPeakHolds,
+  onResetToUnity,
+  onSelectMixTarget,
+  onTogglePeakHold,
+  onTogglePhantom,
+  onUpdateChannel,
+  onUpdateChannelDynamics,
+  onUpdateChannelEq,
+  onUpdateChannelSendMode,
+  peakHoldEnabled,
+  peakHoldResetToken,
+  setDraftValue,
+  store,
+  viewModel,
+}: AudioInspectorProps) {
+  const channel = viewModel.selectedChannel!;
   const selectedMixTarget = viewModel.selectedMixTarget;
+  const [entry, setEntry] = useState<"level" | "gain" | null>(null);
+  const { ask, dialog } = usePlateValueEntry();
+  const menuLock = viewModel.actionsAllowed ? null : `desk ${viewModel.status.label}`;
+  const lockedReason = viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined);
+  const canEdit = viewModel.capabilities.canEditProcessing;
 
   const eqState = useAudioInspectorEqState({
     clearDraftValueLater,
     commitChannelEqContinuous,
     getDraftValue,
     onUpdateChannelEq,
-    selectedChannel,
+    selectedChannel: channel,
     setDraftValue,
     viewModel,
   });
 
-  const selectedClip = selectedChannel?.clip ?? false;
-  const gainDraftKey = selectedChannel ? `channel:${selectedChannel.id}:gain` : "channel:none:gain";
-  const selectedGain = useAudioControlDraftValue(
+  const gainDraftKey = `channel:${channel.id}:gain`;
+  const gain = useAudioControlDraftValue(draftStore, gainDraftKey, getDraftValue(gainDraftKey, channel.gain));
+  const sendDraftKey = `channel:${channel.id}:send:${selectedMixTarget?.id ?? "none"}`;
+  const sendLevel = useAudioControlDraftValue(
     draftStore,
-    gainDraftKey,
-    selectedChannel ? getDraftValue(gainDraftKey, selectedChannel.gain) : 0
+    sendDraftKey,
+    getDraftValue(sendDraftKey, selectedChannelSendLevel(channel, selectedMixTarget?.id ?? null))
   );
-  const monitorDraftKey = selectedMixTarget
-    ? `mixTarget:${selectedMixTarget.id}:inspector-volume`
-    : "mixTarget:none:inspector-volume";
-  const monitorValue = useAudioControlDraftValue(
-    draftStore,
-    monitorDraftKey,
-    getDraftValue(monitorDraftKey, selectedMixTarget?.volume ?? 0)
-  );
-  const selectedGroup = selectedChannel ? getAudioChannelGroup(selectedChannel) : "";
-  const selectedLeftMeter = selectedChannel?.meterLeft ?? 0;
-  const selectedRightMeter = selectedChannel
-    ? selectedChannel.stereo
-      ? selectedChannel.meterRight
-      : selectedLeftMeter
-    : 0;
-  const outputLeftMeter = selectedMixTarget?.meterLeft ?? 0;
-  const outputRightMeter = selectedMixTarget?.mono
-    ? (selectedMixTarget?.meterLevel ?? 0)
-    : (selectedMixTarget?.meterRight ?? 0);
-  const nextPhantomState = selectedChannel ? !selectedChannel.phantom : false;
-  const phantomArmed = selectedChannel ? armedActionKey === `phantom:${selectedChannel.id}:${nextPhantomState}` : false;
-  const phantomLabel = phantomArmed ? (nextPhantomState ? "Confirm 48 V on" : "Confirm 48 V off") : "48 V";
-  const supportsGain = selectedChannel ? audioChannelSupportsGain(selectedChannel) : false;
-  const eqOn = selectedChannel ? selectedChannel.eq.enabled : false;
+  const commitGain = (next: number) => {
+    setDraftValue(gainDraftKey, next);
+    commitChannelContinuous({ channelId: channel.id, gain: next });
+    clearDraftValueLater(gainDraftKey);
+  };
 
-  const meterKeys = (
-    <>
-      <Key
-        size="small"
-        mode="toggle"
-        engaged={peakHoldEnabled}
-        testId="audio-peak-hold-toggle"
-        aria-pressed={peakHoldEnabled}
-        title={peakHoldEnabled ? "Disable held peak marks" : "Enable held peak marks"}
-        onClick={onTogglePeakHold}
-      >
-        Peak hold
-      </Key>
-      <Key size="small" testId="audio-peak-hold-reset" title="Reset held peak marks" onClick={onResetPeakHolds}>
-        Reset peaks
-      </Key>
-    </>
-  );
+  // One line under the name: what the strip is, as the desk reports it.
+  const linked = channelSendMode(channel, selectedMixTarget?.id ?? null).linkStereo;
+  const sub = [
+    `${channelTypeLabel(channel.role)} ${channelOrdinalLabel(viewModel, channel)}`,
+    channel.stereo ? `stereo${linked ? ", linked" : ""}` : "mono",
+    `group ${getAudioChannelGroup(channel)}`,
+  ].join(" · ");
+
+  const menu = buildChannelMenu({
+    channel,
+    gain,
+    sendLevel,
+    selectedMixTarget,
+    mixTargets: viewModel.mixTargets,
+    menuLock,
+    onRequestLevel: () => setEntry("level"),
+    onRequestGain: () => setEntry("gain"),
+    onResetToUnity,
+    onClearClip,
+    onUpdateChannel,
+    onUpdateChannelSendMode,
+    testIdPrefix: "audio-plate-menu",
+  });
 
   return (
-    <aside className={styles.inspector} data-source-tier={viewModel.selectedSourceTier} data-testid="audio-inspector">
-      {selectedChannel ? (
-        <>
-          <PlateHead
-            title={selectedChannel.name}
-            sub={
-              <AudioInspectorChannelHeader
-                selectedChannel={selectedChannel}
-                selectedGroup={selectedGroup}
-                selectedMixTarget={selectedMixTarget}
-                viewModel={viewModel}
-              />
-            }
-            // No Rename key (2026-10-01): the strips take TotalMix's names, and
-            // a channel is renamed in TotalMix.
-            testId="audio-plate-head"
-          />
+    <>
+      <PlateHead
+        title={channel.name}
+        sub={sub}
+        action={
+          <MenuButton buttonLabel={`${channel.name} menu`} buttonTestId="audio-plate-menu" menu={{ ...menu, arm }} />
+        }
+        testId="audio-plate-head"
+      />
 
-          <Section
-            className={styles.plateSection}
-            title={supportsGain ? "Preamp" : "Software"}
-            detail={supportsGain ? "mic / line gain on the UFX III" : "as the desk reports it"}
-            data-plate-section="preamp"
-            testId="audio-inspector-channel"
-          >
-            <AudioInspectorChannelHardwareCard
-              clearDraftValueLater={clearDraftValueLater}
-              commitChannelContinuous={commitChannelContinuous}
-              gainDraftKey={gainDraftKey}
-              onTogglePhantom={onTogglePhantom}
-              onUpdateChannel={onUpdateChannel}
-              phantomArmed={phantomArmed}
-              phantomLabel={phantomLabel}
-              selectedChannel={selectedChannel}
-              selectedGain={selectedGain}
-              setDraftValue={setDraftValue}
-              viewModel={viewModel}
-            />
-          </Section>
-
-          {/* One place for the sends: the mix the faders are on first, marked
-              as the active mix, then every other mix this source feeds. The
-              strip's own keys are a glance to the left, so the plate does not
-              print a second Mute / Solo / Unity row. */}
-          <Section
-            className={styles.plateSection}
-            title={`Send to ${selectedMixTarget?.name ?? "output"}`}
-            detail="and every other mix this source feeds"
-            data-plate-section="send"
-            testId="audio-inspector-sends"
-          >
-            <AudioInspectorSendsTab
-              clearDraftValueLater={clearDraftValueLater}
-              commitChannelContinuous={commitChannelContinuous}
-              getDraftValue={getDraftValue}
-              onSelectMixTarget={onSelectMixTarget}
-              onUpdateChannelSendMode={onUpdateChannelSendMode}
-              selectedChannel={selectedChannel}
-              setDraftValue={setDraftValue}
-              viewModel={viewModel}
-            />
-          </Section>
-
-          <Section
-            className={styles.plateSection}
-            title="Equaliser"
-            detail={eqOn ? `on · ${eqState.eqBands.length} bands` : "bypassed"}
-            data-plate-section="eq"
-            testId="audio-inspector-eq"
-          >
-            <AudioInspectorEqTab
-              {...eqState}
-              clearDraftValueLater={clearDraftValueLater}
-              onUpdateChannelEq={onUpdateChannelEq}
-              selectedChannel={selectedChannel}
-              setDraftValue={setDraftValue}
-              viewModel={viewModel}
-            />
-          </Section>
-
-          <Section
-            className={styles.plateSection}
-            title="Dynamics"
-            detail="compressor and gate"
-            data-plate-section="dynamics"
-            testId="audio-inspector-dynamics"
-          >
-            <AudioInspectorDynamicsTab
-              clearDraftValueLater={clearDraftValueLater}
-              getDraftValue={getDraftValue}
-              onUpdateChannelDynamics={onUpdateChannelDynamics}
-              selectedChannel={selectedChannel}
-              setDraftValue={setDraftValue}
-              viewModel={viewModel}
-            />
-          </Section>
-
-          <Section
-            className={styles.plateSection}
-            title="Meter"
-            detail="post-fader · dBFS"
-            data-plate-section="meter"
-            testId="audio-plate-meter"
-            actions={meterKeys}
-          >
-            <AudioInspectorChannelMeterCard
-              peakHoldEnabled={peakHoldEnabled}
-              peakHoldResetToken={peakHoldResetToken}
-              selectedChannel={selectedChannel}
-              selectedClip={selectedClip}
-              selectedLeftMeter={selectedLeftMeter}
-              selectedRightMeter={selectedRightMeter}
-              store={store}
-              viewModel={viewModel}
-            />
-          </Section>
-
-          <Section
-            className={styles.plateSection}
-            title="Channel"
-            detail="as the desk reports it"
-            data-plate-section="channel"
-            testId="audio-plate-channel"
-          >
-            <AudioPlateChannelFacts selectedChannel={selectedChannel} selectedMixTarget={selectedMixTarget} />
-          </Section>
-        </>
-      ) : selectedMixTarget ? (
-        <Section
-          className={styles.plateSection}
-          title={selectedMixTarget.name}
-          detail="the mix the faders send into"
-          data-plate-section="output"
-          testId="audio-inspector-output-panel"
-          actions={meterKeys}
-        >
-          <AudioInspectorOutputView
-            clearDraftValueLater={clearDraftValueLater}
-            commitMixTargetContinuous={commitMixTargetContinuous}
-            monitorDraftKey={monitorDraftKey}
-            monitorValue={monitorValue}
-            onUpdateMixTarget={onUpdateMixTarget}
-            outputLeftMeter={outputLeftMeter}
-            outputRightMeter={outputRightMeter}
-            peakHoldEnabled={peakHoldEnabled}
-            peakHoldResetToken={peakHoldResetToken}
-            selectedMixTarget={selectedMixTarget}
-            setDraftValue={setDraftValue}
-            store={store}
-            viewModel={viewModel}
-          />
-        </Section>
-      ) : (
-        <AudioEmptyInspector
-          description="Click a strip to select a source. Output selection stays active."
-          title="No channel selected"
+      {audioChannelSupportsGain(channel) ? (
+        <AudioPlatePreamp
+          actionsAllowed={viewModel.actionsAllowed}
+          armedActionKey={armedActionKey}
+          channel={channel}
+          gain={gain}
+          lockedReason={lockedReason}
+          onCommitGain={commitGain}
+          onPreviewGain={(next) => setDraftValue(gainDraftKey, next)}
+          onTogglePhantom={onTogglePhantom}
+          onUpdateChannel={onUpdateChannel}
         />
-      )}
-    </aside>
+      ) : null}
+
+      <AudioPlateMixes
+        actionsAllowed={viewModel.actionsAllowed}
+        arm={arm}
+        channel={channel}
+        clearDraftValueLater={clearDraftValueLater}
+        commitChannelContinuous={commitChannelContinuous}
+        draftStore={draftStore}
+        getDraftValue={getDraftValue}
+        menuLock={menuLock}
+        mixTargets={viewModel.mixTargets}
+        onSelectMixTarget={onSelectMixTarget}
+        onUpdateChannelSendMode={onUpdateChannelSendMode}
+        selectedMixTarget={selectedMixTarget}
+        setDraftValue={setDraftValue}
+      />
+
+      <AudioPlateEq
+        arm={arm}
+        ask={ask}
+        canEdit={canEdit}
+        channel={channel}
+        clearDraftValueLater={clearDraftValueLater}
+        eqState={eqState}
+        menuLock={menuLock}
+        onUpdateChannelEq={onUpdateChannelEq}
+        setDraftValue={setDraftValue}
+      />
+
+      <AudioPlateDynamics
+        arm={arm}
+        ask={ask}
+        canEdit={canEdit}
+        channel={channel}
+        clearDraftValueLater={clearDraftValueLater}
+        getDraftValue={getDraftValue}
+        menuLock={menuLock}
+        onUpdateChannelDynamics={onUpdateChannelDynamics}
+        setDraftValue={setDraftValue}
+      />
+
+      <AudioPlateMeter
+        arm={arm}
+        extraItems={[
+          {
+            id: "clear-clip",
+            label: "Clear clip",
+            onSelect: () => onClearClip(channel.id),
+            disabledReason: channel.clip ? null : "no clip held",
+          },
+        ]}
+        kind="channel"
+        meterId={channel.id}
+        name={channel.name}
+        left={channel.meterLeft}
+        right={channel.stereo ? channel.meterRight : channel.meterLeft}
+        peakLeft={channel.peakHoldLeft}
+        peakRight={channel.stereo ? channel.peakHoldRight : channel.peakHoldLeft}
+        mirrorRight={!channel.stereo}
+        clip={channel.clip}
+        onResetPeakHolds={onResetPeakHolds}
+        onTogglePeakHold={onTogglePeakHold}
+        peakHoldEnabled={peakHoldEnabled}
+        peakHoldResetToken={peakHoldResetToken}
+        plateSection="meter"
+        sectionTestId="audio-plate-meter"
+        meteringTestId="audio-inspector-metering"
+        levelTestId="audio-inspector-level-readout"
+        peakHoldTestId="audio-inspector-peak-hold-readout"
+        store={store}
+      />
+
+      {entry === "level" ? (
+        <AudioLevelEntryDialog
+          title={`Set ${channel.name} send level`}
+          value={sendLevel}
+          onCancel={() => setEntry(null)}
+          onConfirm={(next) => {
+            setEntry(null);
+            setDraftValue(sendDraftKey, next);
+            commitChannelContinuous({ channelId: channel.id, fader: next, mixTargetId: selectedMixTarget?.id });
+            clearDraftValueLater(sendDraftKey);
+          }}
+        />
+      ) : null}
+      {entry === "gain" ? (
+        <AudioGainEntryDialog
+          title={`Set ${channel.name} preamp gain`}
+          gain={gain}
+          onCancel={() => setEntry(null)}
+          onConfirm={(next) => {
+            setEntry(null);
+            commitGain(next);
+          }}
+        />
+      ) : null}
+      {dialog}
+    </>
+  );
+}
+
+function AudioOutputPlate({
+  arm,
+  onResetPeakHolds,
+  onTogglePeakHold,
+  peakHoldEnabled,
+  peakHoldResetToken,
+  store,
+  viewModel,
+}: AudioInspectorProps) {
+  const mixTarget = viewModel.selectedMixTarget!;
+  const isMainOut = mixTarget.role === "main-out";
+  const targeted = mixTarget.id === viewModel.selectedMixTargetId;
+  const rows = [
+    { id: "routing", label: "Feeds", value: "Hardware output" },
+    {
+      id: "mute",
+      label: "Mute",
+      value: mixTarget.mute ? "on" : "off",
+      tone: mixTarget.mute ? ("attention" as const) : undefined,
+    },
+    ...(isMainOut
+      ? [
+          {
+            id: "dim",
+            label: "Dim",
+            value: mixTarget.dim ? "−20 dB" : "off",
+            tone: mixTarget.dim ? ("attention" as const) : undefined,
+          },
+          {
+            id: "mono",
+            label: "Mono",
+            value: mixTarget.mono ? "on" : "off",
+            tone: mixTarget.mono ? ("attention" as const) : undefined,
+          },
+        ]
+      : []),
+  ];
+  return (
+    <div data-testid="audio-inspector-output" className={styles.outputPlate}>
+      <PlateHead
+        title={mixTarget.name}
+        sub={targeted ? "Output · the mix target: the strips' faders send into it" : "Output"}
+        testId="audio-plate-head"
+      />
+      <AudioPlateMeter
+        arm={arm}
+        facts={<Readouts rows={rows} />}
+        kind="mixTarget"
+        meterId={mixTarget.id}
+        name={mixTarget.name}
+        left={mixTarget.meterLeft}
+        right={mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight}
+        peakLeft={mixTarget.peakHoldLeft}
+        peakRight={mixTarget.peakHoldRight}
+        mirrorRight={mixTarget.mono}
+        onResetPeakHolds={onResetPeakHolds}
+        onTogglePeakHold={onTogglePeakHold}
+        peakHoldEnabled={peakHoldEnabled}
+        peakHoldResetToken={peakHoldResetToken}
+        plateSection="output"
+        sectionTestId="audio-inspector-output-panel"
+        meteringTestId="audio-inspector-output-metering"
+        levelTestId="audio-inspector-output-level-readout"
+        peakHoldTestId="audio-inspector-output-peak-hold-readout"
+        store={store}
+        title="Output"
+      />
+    </div>
   );
 }

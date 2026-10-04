@@ -1,797 +1,458 @@
-/* AudioInspector module — Console redesign (2026-05-27).
- *
- * Right-rail inspector matching the Claude Design prototype: bordered left
- * edge, tab strip with accent underline on active tab, sticky channel/output
- * header, scrollable body. Class-name surface (inspector, inspectorSticky,
- * inspectorTabs, inspectorPanel, emptyInspector) preserved.
- */
+/* The Console's plate (visual overhaul, the Console): the selection on one
+   plate that never scrolls. Sections by type and the heavy rule, rows on
+   hairlines, wells only round the graph and the meter. */
 
-/* Visual overhaul A, Slice 4c (system §7): the plate holding every section of
-   the selected strip at once. It scrolls as one column; nothing is behind a
-   tab. The shell (overhaul 3): it fills the shell's plate, which draws its
-   edge. */
-.inspector {
+.plate {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  height: 100%;
   min-height: 0;
-  padding: 20px 16px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
+  padding: 16px;
+  overflow: hidden;
 }
 
-.plateSection {
+.section {
   flex: none;
-  min-width: 0;
 }
 
-/* ── Tab strip ────────────────────────────────────────────────────────────── */
-
-.inspectorTabs {
-  display: flex;
-  gap: 4px;
-  padding: 14px 24px 0;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
+.quiet {
+  font: 400 var(--font-size-body) / 1.3 var(--font-family-ui);
+  color: var(--text-text3);
 }
 
-.inspectorTabs button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 10px 14px;
-  font-family: var(--font-ui);
+.unit {
   font-size: var(--font-size-tick);
-  font-weight: 400;
-  letter-spacing: -0.005em;
-  color: var(--fg-3);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  cursor: pointer;
-  transition:
-    color 0.15s var(--easing),
-    border-color 0.15s var(--easing);
+  color: var(--text-text3);
 }
 
-.inspectorTabs button:hover {
-  color: var(--fg);
-}
-
-.inspectorTabs button[aria-selected="true"],
-.inspectorTabs button[data-active="true"] {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.inspectorTabs button[aria-disabled="true"],
-.inspectorTabs button[disabled] {
-  color: var(--audio-caption-muted);
-  cursor: not-allowed;
-}
-
-.inspectorOutputTabs button {
-  cursor: default;
-}
-
-/* ── Sticky channel/output header ─────────────────────────────────────────── */
-
-.inspectorSticky {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 22px 24px 18px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-1);
-  flex-shrink: 0;
-}
-
-/* ── Tab body ─────────────────────────────────────────────────────────────── */
-
-.inspectorPanel {
-  flex: 1;
-  padding: 22px 24px;
-  overflow-y: auto;
+.empty {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-2) transparent;
+  gap: 8px;
+  padding-top: 24px;
 }
 
-.inspectorPanel::-webkit-scrollbar {
-  width: 6px;
+.emptyTitle {
+  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
 }
 
-.inspectorPanel::-webkit-scrollbar-thumb {
-  background: var(--line-2);
-  border-radius: var(--radius-ctl);
-}
+/* ---- Preamp: the gain knob and the preamp's switches ---- */
 
-/* ── Empty state ─────────────────────────────────────────────────────────── */
-
-.emptyInspector {
-  flex: 1;
+.preamp {
   display: grid;
-  place-items: center;
-  color: var(--fg-3);
-  text-align: center;
-  padding: 40px 32px;
-  gap: 12px;
-}
-
-.emptyInspector h3 {
-  margin: 0;
-  color: var(--fg);
-  font-size: var(--font-size-body);
-  font-weight: 700;
-  letter-spacing: -0.005em;
-}
-
-.emptyInspector p {
-  margin: 0;
-  font-size: var(--font-size-label);
-  line-height: 1.5;
-  max-width: 280px;
-  color: var(--fg-3);
-}
-
-.emptyInspectorIcon {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  background: var(--bg-2);
-  color: var(--fg-3);
-}
-
-/* ── Header identity (eyebrow / name / subtitle / tags) ───────────────────── */
-
-.inspectorEyebrowRow {
-  display: flex;
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-  margin-bottom: 10px;
-}
-
-.inspectorTagRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.inspectorTag {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 2px 6px;
-  border-radius: var(--radius-ctl);
-  background: var(--bg-3);
-  color: var(--fg-2);
-  border: 1px solid var(--line);
-  text-transform: uppercase;
-}
-
-.inspectorTitle {
-  margin: 0 0 4px;
-  font-family: var(--font-ui);
-  font-size: var(--font-size-2xl);
-  /* Claude Design polish (DP4 · om-polish-2): the inspector hero title
-     carries the focal weight (600) so it out-ranks the 600-weight
-     channel-card names by size AND weight — the panel subject reads as
-     the clear anchor. */
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--fg);
-  line-height: 1.1;
-}
-
-.inspectorSubtitle {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  color: var(--fg-3);
-}
-
-.inspectorSubtitle strong {
-  color: var(--accent);
-  font-weight: 700;
-}
-
-/* ── Hardware (preamp) card ───────────────────────────────────────────────── */
-
-.inspectorStickyHardwareCard {
-  padding: 22px 16px 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  background: radial-gradient(
-    120% 80% at 50% 0%,
-    color-mix(in oklch, var(--accent) 6%, var(--bg-2)) 0%,
-    var(--bg-2) 70%
-  );
-  display: flex;
-  flex-direction: column;
   gap: 16px;
 }
 
-.inspectorStickyHardwareCard .eyebrow {
-  color: var(--fg-3);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  /* Claude Design polish (DP4): this sticky-hardware card was the only
-     inspector card centering its eyebrow; every other eyebrow is
-     left-aligned, so match them. */
-  text-align: left;
-}
-
-.inspectorHardwareGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  align-items: stretch;
-}
-
-/* Hero preamp pane (prototype Preamp tab): big knob + range scale, centred. */
-.preampHero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-}
-
-.preampHeroScale {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.12em;
-  color: var(--audio-caption-muted);
-}
-
-.preampHeroScaleTrack {
-  position: relative;
-  width: 120px;
-  height: 1px;
-  background: var(--line-2);
-}
-
-.preampHeroScaleTrack i {
-  position: absolute;
-  top: -2px;
-  width: 2px;
-  height: 5px;
-  background: var(--fg);
-  transform: translateX(-50%);
-}
-
-/* Chip-toggle row for +48V / Hi-Z / Polarity / AutoSet */
-.unsupportedToggleRow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.unsupportedToggleRow > button {
-  appearance: none;
-  flex: 1 1 0;
-  min-width: 0;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: var(--radius-key);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  color: var(--fg-2);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  cursor: pointer;
-  transition:
-    background var(--motion-duration-exit) var(--easing),
-    color var(--motion-duration-exit) var(--easing),
-    border-color var(--motion-duration-exit) var(--easing);
-  white-space: nowrap;
-}
-
-.unsupportedToggleRow > button::before {
-  content: "";
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--fg-4);
-  flex-shrink: 0;
-  transition:
-    background var(--motion-duration-exit) var(--easing),
-    box-shadow var(--motion-duration-exit) var(--easing);
-}
-
-.unsupportedToggleRow > button:hover:not(:disabled) {
-  border-color: var(--line-2);
-  color: var(--fg);
-}
-
-.unsupportedToggleRow > button[data-active="true"] {
-  background: var(--bg-elev);
-  color: var(--fg);
-  border-color: var(--fg-4);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-.unsupportedToggleRow > button[data-active="true"]::before {
-  background: var(--fg);
-  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-}
-
-.unsupportedToggleRow > button:disabled {
-  opacity: var(--control-disabled-opacity);
-  cursor: not-allowed;
-}
-
-/* +48V earns a single dot of accent — it's destructive to mics if wrong. */
-.unsupportedToggleRow > button[aria-label*="48V"][data-active="true"] {
-  border-color: var(--accent-glow);
-}
-
-.unsupportedToggleRow > button[aria-label*="48V"][data-active="true"]::before {
-  background: var(--accent);
-  box-shadow: 0 0 5px var(--accent-glow);
-}
-
-.softwarePanelStack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.unavailableTelemetry {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  border-radius: var(--radius-key);
-  background: var(--bg-3);
-  border: 1px dashed var(--line-2);
-  color: var(--fg-2);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-tick);
-}
-
-.unavailableTelemetry strong {
-  color: var(--fg);
-  font-size: var(--font-size-tick);
-  font-weight: 700;
-}
-
-.unavailableTelemetry span {
-  color: var(--fg-3);
-  font-size: var(--font-size-tick);
-  line-height: 1.4;
-}
-
-.detailGrid {
+.preampKeys {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.detailGrid > span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px;
-  border-radius: var(--radius-ctl);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-}
-
-.detailGrid small {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.14em;
-  color: var(--audio-caption-muted);
-  text-transform: uppercase;
-}
-
-.detailGrid strong {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 400;
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Source card (used by overview / output panes) ──────────────────────── */
-
-.inspectorMiniCard,
-.sourceCard {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.inspectorMiniCard .eyebrow,
-.sourceCard .eyebrow {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-}
-
-.inspectorMiniCard strong,
-.sourceCard strong {
-  font-size: var(--font-size-body);
-  font-weight: 700;
-  color: var(--fg);
-  letter-spacing: -0.01em;
-}
-
-.inspectorMiniCard span:not([class]),
-.sourceCard span:not([class]) {
-  color: var(--fg-2);
-  font-size: var(--font-size-tick);
-  line-height: 1.4;
-}
-
-.inspectorMiniGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.channelOverviewGrid,
-.outputInspectorGrid {
-  gap: 12px;
-}
-
-/* Subdued state for "not yet exposed" cards. */
-.subduedInspectorCard {
-  opacity: 0.6;
-  border-style: dashed;
-}
-
-/* Send actions row */
-.inspectorSendActions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 0 0;
-  margin-top: 12px;
-  border-top: 1px solid var(--line);
-}
-
-/* ── Send / monitor fader card + Mute/Solo/Unity action row ────────────────
-   C01: these five classes were referenced by AudioInspectorChannelSendActions
-   and AudioInspectorOutputView but never defined, so the send head, dB tick
-   scale, slider width and action row all fell back to raw block flow with
-   default browser buttons. Token-only, mirroring the sibling
-   `.unsupportedToggleRow` lane-toggle treatment so the action pills share the
-   shipped monochrome-amber + clip-red vocabulary. */
-.inspectorFaderCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  background: var(--bg-2);
-}
-
-.inspectorFaderHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  color: var(--fg-3);
-}
-
-.inspectorFaderHead strong {
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.inspectorFaderTicks {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  color: var(--fg-3);
-}
-
-/* AudioSliderControl horizontal sliders measure their own rect and do not
-   self-stretch — without this the slider collapses to its intrinsic width. */
-.inspectorSendSlider {
+.preampKeys > * {
   width: 100%;
 }
 
-.inspectorActionRow {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+/* The 48 V key armed keeps the key's height: the question and the countdown. */
+.preampArmKey {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  flex-direction: row;
+  align-items: center;
 }
 
-/* Mute/Solo/Unity is a segmented control: the buttons compose the shared
-   `.segmentedToggle` reset (see AudioWorkspace) but keep their SIGNAL-color
-   active treatment local — mute lights to --danger and solo to --accent, the
-   same clip-red + amber the lanes use. Geometry (3-up grid cell, mono caption,
-   bordered resting fill) stays local too. */
-.inspectorActionButton {
-  composes: segmentedToggle from "../AudioWorkspace.module.css";
-  min-width: 0;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: var(--radius-key);
-  background: var(--bg-3);
-  border: 1px solid var(--line);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  display: inline-flex;
+/* ---- Other mixes: a row a send ---- */
+
+.mixRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.mixRow {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 76px 28px;
   align-items: center;
-  justify-content: center;
-  transition:
-    background var(--motion-duration-exit) var(--easing),
-    color var(--motion-duration-exit) var(--easing),
-    border-color var(--motion-duration-exit) var(--easing);
+  gap: 10px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.mixName {
+  font: 700 var(--font-size-body) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mixValue {
+  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text);
+  text-align: right;
   white-space: nowrap;
 }
 
-.inspectorActionButton:hover:not(:disabled) {
-  border-color: var(--line-2);
-  color: var(--fg);
+.mixValue[data-muted] {
+  color: var(--role-yellow-text);
 }
 
-.inspectorActionButton[data-control="mute"][data-active="true"] {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
-}
+/* ---- Equaliser: the graph, then the band table ---- */
 
-.inspectorActionButton[data-control="solo"][data-active="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
-}
-
-.inspectorActionButton:disabled {
-  opacity: var(--control-disabled-opacity);
-  cursor: not-allowed;
-}
-
-/* Preamp tab body hint: tells the operator the preamp lives in the sticky
-   header above and points to the other tabs. */
-.preampTabHint {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  border-radius: var(--radius-key);
-  border: 1px dashed var(--line-2);
-  background: var(--bg-2);
-}
-
-.preampTabHint p {
-  margin: 0;
-  font-size: var(--font-size-tick);
-  line-height: 1.4;
-  color: var(--fg-3);
-}
-
-.preampTabHint p strong {
-  color: var(--fg-2);
-  font-weight: 700;
-}
-
-/* ── Inspector EQ mini-preview (Claude Design polish · DP4) ────────────────
-   A read-only EQ glance on the Preamp tab. It reuses the EQ tab's own
-   `.eqGraphFull` styling (imported as the child element's classes) and the
-   parent's live EQ draft data, so it matches the full EQ tab exactly; here we
-   only shrink the band handle for preview scale, freeze the curve
-   (pointer-events:none → inert spans), and tuck the value badge in. The child
-   nodes live in AudioInspectorEqTab.module.css; we reach them via the stable
-   `data-eq-preview*` hooks the markup sets, never their hashed classes. */
-.eqPreviewCard {
-  gap: 12px;
-}
-
-/* Was sticky + 170px in the EQ tab; the preview is a compact card panel. */
-.eqPreviewCard [data-eq-preview] {
+.eqGraph {
   position: relative;
-  min-height: 124px;
+  height: 176px;
+  overflow: hidden;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
 }
 
-.eqPreviewCard [data-eq-preview] svg {
+.eqGraph svg {
   position: absolute;
   inset: 0;
-}
-
-/* Shrunk, inert band handles — preview scale, no interaction. */
-.eqPreviewCard [data-eq-preview-point] {
-  width: 18px;
-  height: 18px;
-  font-size: var(--font-size-tick);
-  cursor: default;
-  pointer-events: none;
-}
-
-/* Restyled value badge: tighter inset + smaller type for the preview. */
-.eqPreviewCard [data-eq-preview-badge] {
-  top: 8px;
-  right: 8px;
-  min-width: 0;
-  padding: 6px 8px;
-}
-
-.eqPreviewCard [data-eq-preview-badge] strong {
-  font-size: var(--font-size-tick);
-}
-
-.eqPreviewCard [data-eq-preview-badge] span {
-  font-size: var(--audio-type-micro);
-}
-
-/* ── Full graph-panel head (EQ / Dynamics tab shared layout) ───────────────
-   AUD-02: these three classes were dropped when the inspector CSS was split
-   (PR #111) but their JSX refs (styles.placeholderPanel / .graphCardHead /
-   .eqBandRow in AudioInspectorEqTab.tsx + AudioInspectorDynamicsTab.tsx)
-   remained, so the graph head collapsed to default block/inline flow (eyebrow +
-   pills stacked, band buttons bunched). Restored to the pre-split geometry.
-   `.placeholderPanel` supplies the display/gap/height that its co-applied
-   `.inspectorFullGraphPanel` (align-content:start only) cannot. */
-.placeholderPanel {
-  display: grid;
-  align-content: start;
-  gap: 12px;
+  display: block;
+  width: 100%;
   height: 100%;
 }
 
-.graphCardHead {
+.eqCurve {
+  fill: none;
+  stroke: var(--role-cap-fill);
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Bypassed, the curve shows what the equaliser would do, quieter. */
+.eqGraph[data-eq-enabled="false"] .eqCurve {
+  stroke: var(--text-text4);
+}
+
+.eqLowCutShade {
+  fill: var(--material-raise);
+  stroke: none;
+}
+
+.eqGuides,
+.eqDbMarkers,
+.eqFrequencyMarkers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The 0 dB line. */
+.eqDbMarkers::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  content: "";
+  background: var(--material-line2);
+}
+
+/* The dB marks stand over the curve, which runs through 0 dB; the points
+   stand over the marks. */
+.eqDbLabel {
+  position: absolute;
+  z-index: 1;
+  top: clamp(8px, var(--eq-marker-y), calc(100% - 8px));
+  left: 6px;
+  padding: 1px 3px;
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  background: var(--material-well);
+  transform: translateY(-50%);
+}
+
+.eqFrequencyMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--eq-marker-x);
+  width: 1px;
+  background: var(--material-line);
+}
+
+.eqFrequencyMarker i {
+  display: block;
+  width: 1px;
+  height: 100%;
+}
+
+.eqFrequencyMarker small {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  padding: 1px 3px;
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  background: var(--material-well);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.eqFrequencyMarker:first-child small {
+  left: 0;
+  transform: none;
+}
+
+.eqFrequencyMarker:last-child small {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.eqPoints {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.eqPoint {
+  position: absolute;
+  left: var(--eq-point-x);
+  top: var(--eq-point-y);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-pill);
+  background: var(--material-key);
+  color: var(--text-text);
+  font: 700 var(--font-size-tick) / 1 var(--font-family-ui);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.eqPoint:hover:not(:disabled) {
+  border-color: var(--text-text3);
+}
+
+/* The band the table and the popover are on: the Beige keyline. */
+.eqPoint[data-selected="true"] {
+  border: 2px solid var(--accent);
+}
+
+/* A band that does nothing (bypassed, or no gain): quieter, still pressable. */
+.eqPoint[data-ghost="true"]:not([data-selected="true"]) {
+  color: var(--text-text3);
+}
+
+.eqLowCutPoint {
+  border-radius: var(--radius-base);
+}
+
+.eqLowCutPoint[data-active="false"]:not([data-selected="true"]) {
+  color: var(--text-text3);
+}
+
+.eqPoint:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.eqTable {
   display: flex;
+  flex-direction: column;
+}
+
+.eqRow {
+  display: grid;
+  grid-template-columns: 84px repeat(4, minmax(0, 1fr));
   align-items: center;
+  min-height: 28px;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.eqRow:first-child {
+  min-height: 40px;
+}
+
+.eqRowLabel {
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.eqHead {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.eqHead > * {
+  min-width: 44px;
+}
+
+.eqCell {
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eqCell[data-off] {
+  color: var(--text-text3);
+}
+
+/* ---- Dynamics: two rows, the key and its values ---- */
+
+.dynTable {
+  display: flex;
+  flex-direction: column;
+}
+
+.dynRow {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  min-height: 40px;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.dynRow:first-child {
+  grid-template-columns: 64px repeat(5, minmax(0, 1fr));
+  min-height: 24px;
+}
+
+.dynHeadCell {
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dynKeyCell > * {
+  min-width: 56px;
+}
+
+/* A row's values are one press: the processor's popover. */
+.dynValues {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background: none;
+  color: var(--text-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dynValues:hover {
+  border-color: var(--material-line2);
+}
+
+.dynValues:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dynValues[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.dynValues[data-off] {
+  color: var(--text-text3);
+}
+
+.dynCell {
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- The popovers beside the tables ---- */
+
+.popoverBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.popoverRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.popoverControls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.popoverLabel {
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.popoverKnobs {
+  display: flex;
   justify-content: space-between;
   gap: 8px;
 }
 
-.eqBandRow {
-  display: inline-flex;
-  gap: 4px;
-}
+/* ---- Meter: the stereo meter and its readouts ---- */
 
-/* Slice 11: the band keys carry no class of their own, so they were sized by
-   the user agent — 21 px across for a one-character cap, under the 24 px target
-   floor (system §10). Only the floor is set here; what they look like is
-   `.eqTypeRow`'s question, and it is not this slice's. */
-.eqBandRow button {
-  min-width: 24px;
-  min-height: 24px;
-}
-
-/* ── Channel meter card (audio-inspector-metering) ─────────────────────────
-   2026-05-27 redesign follow-up: the `.bigMeter*` rules were dropped when the
-   inspector CSS was rewritten, so the card lost its 2-column layout and the
-   AudioStereoMeter collapsed to ~2px tall (its dBFS scale labels then clipped
-   outside the meter). Restored here; the old `--audio-*` tokens alias to the
-   redesign tokens (see AudioWorkspace.module.css), so the palette matches the
-   Console surface. */
-.bigMeterCard {
+.meterCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  background: var(--bg-2);
+  align-items: center;
+  gap: 16px;
 }
 
-/* Selector by attribute (data-meter-component) is resilient to CSS-module
-   hashing across files — the meter class lives in AudioStereoMeter.module.css. */
-.bigMeterCard [data-meter-component="stereo"] {
-  width: 58px;
-  min-height: 88px;
+.meterReadouts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.bigMeterInfo {
-  display: grid;
-  gap: 8px;
-  align-content: space-between;
-  min-width: 0;
-}
-
-.bigMeterInfo .meterSimulationBadge {
-  justify-self: start;
-  min-height: 12px;
-  padding: 0;
-  color: var(--accent);
-  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.bigMeterRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.bigMeterReferenceRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding-top: 6px;
-  border-top: 1px solid var(--line);
-}
-
-.bigMeterRow span,
-.bigMeterReferenceRow span {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.bigMeterRow small,
-.bigMeterReferenceRow small {
-  color: var(--fg-3);
-  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.bigMeterRow strong {
-  display: inline-flex;
+.meterReadout {
+  display: flex;
   align-items: baseline;
-  min-width: 0;
-  color: var(--fg);
-  font: var(--font-weight-bold) var(--font-size-name) / 1 var(--font-family-mono);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.meterReadout dt {
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.meterReadout dd {
+  margin: 0;
+  font: 400 var(--font-size-body) / 1.2 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
+  color: var(--text-text);
   white-space: nowrap;
 }
 
-.bigMeterReferenceRow strong {
-  color: var(--fg-2);
-  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
+.meterReadout dd[data-tone="clip"] {
+  color: var(--role-coral-text);
 }
 
-.bigMeterRow strong[data-tone="warn"] {
-  color: var(--audio-meter-warn);
-}
-
-.bigMeterRow strong[data-tone="clip"] {
-  color: var(--danger);
-}
-
-.bigMeterRow em,
-.bigMeterReferenceRow em {
-  margin-left: 2px;
-  color: var(--audio-caption-muted);
-  font-style: normal;
-  font-weight: var(--font-weight-regular);
+.outputPlate {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
