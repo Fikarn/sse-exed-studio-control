@@ -4,14 +4,14 @@ import styles from "../AudioInspector.module.css";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../../audioControlDraftStore";
 import { AUDIO_FADER_UNITY, AUDIO_FADER_UNITY_SNAP, formatAudioDb } from "../../audioFormatting";
 import { selectedChannelSendLevel } from "../../audioViewModel";
-import { channelSendMode } from "../audioChannelMenu";
 import type { AudioMixTargetEntry } from "../../../shellData";
-import type { AudioChannelUpdate, AudioSendModeUpdate, SelectedAudioChannel } from "./audioInspectorHelpers";
+import type { AudioChannelUpdate, SelectedAudioChannel } from "./audioInspectorHelpers";
 
 // The other mixes this source feeds (visual overhaul, the Console; Atrium's
 // OTHER MIXES): a row each, its name, its send as a slider and a value, and
-// the send's modes in the row's ⋯. The mix target's send is the strip's fader,
-// its one home, so it has no row here.
+// a ⋯ that makes it the mix target. The mix target's send is the strip's
+// fader, its one home, so it has no row here. A send has no modes of its own:
+// TotalMix has no pre fader, mute, link or solo per send (2026-10-04).
 
 export function AudioPlateMixes({
   actionsAllowed,
@@ -24,7 +24,6 @@ export function AudioPlateMixes({
   menuLock,
   mixTargets,
   onSelectMixTarget,
-  onUpdateChannelSendMode,
   selectedMixTarget,
   setDraftValue,
 }: {
@@ -38,7 +37,6 @@ export function AudioPlateMixes({
   menuLock: string | null;
   mixTargets: readonly AudioMixTargetEntry[];
   onSelectMixTarget: (mixTargetId: string) => void;
-  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   selectedMixTarget: AudioMixTargetEntry | null;
   setDraftValue: (key: string, value: number) => void;
 }) {
@@ -74,7 +72,6 @@ export function AudioPlateMixes({
               menuLock={menuLock}
               mixTarget={mixTarget}
               onSelectMixTarget={onSelectMixTarget}
-              onUpdateChannelSendMode={onUpdateChannelSendMode}
               setDraftValue={setDraftValue}
             />
           ))}
@@ -95,7 +92,6 @@ function AudioPlateMixRow({
   menuLock,
   mixTarget,
   onSelectMixTarget,
-  onUpdateChannelSendMode,
   setDraftValue,
 }: {
   actionsAllowed: boolean;
@@ -108,7 +104,6 @@ function AudioPlateMixRow({
   menuLock: string | null;
   mixTarget: AudioMixTargetEntry;
   onSelectMixTarget: (mixTargetId: string) => void;
-  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   setDraftValue: (key: string, value: number) => void;
 }) {
   const draftKey = `channel:${channel.id}:send:${mixTarget.id}`;
@@ -117,16 +112,13 @@ function AudioPlateMixRow({
     draftKey,
     getDraftValue(draftKey, selectedChannelSendLevel(channel, mixTarget.id))
   );
-  const mode = channelSendMode(channel, mixTarget.id);
-  const sendMuted = channel.mute || mode.mute;
+  const sendMuted = channel.mute;
   const noSend = value <= 0.01;
   const commit = (next: number) => {
     setDraftValue(draftKey, next);
     commitChannelContinuous({ channelId: channel.id, fader: next, mixTargetId: mixTarget.id });
     clearDraftValueLater(draftKey);
   };
-  const setMode = (patch: Omit<AudioSendModeUpdate, "channelId" | "mixTargetId">) =>
-    onUpdateChannelSendMode({ channelId: channel.id, mixTargetId: mixTarget.id, ...patch });
 
   return (
     <div
@@ -157,43 +149,6 @@ function AudioPlateMixRow({
         menu={{
           head: { title: `Send to ${mixTarget.name}`, detail: channel.name },
           items: [
-            {
-              kind: "check",
-              id: "pre-fader",
-              label: "Pre fader",
-              checked: mode.preFader,
-              onCheckedChange: (preFader) => setMode({ preFader }),
-              disabledReason: menuLock,
-              testId: `audio-send-pre-fader-${mixTarget.id}`,
-            },
-            {
-              kind: "check",
-              id: "mute",
-              label: "Mute send",
-              checked: mode.mute,
-              onCheckedChange: (mute) => setMode({ mute }),
-              disabledReason: menuLock,
-              testId: `audio-send-mute-${mixTarget.id}`,
-            },
-            {
-              kind: "check",
-              id: "link",
-              label: "Link L+R",
-              checked: mode.linkStereo,
-              onCheckedChange: (linkStereo) => setMode({ linkStereo }),
-              disabledReason: menuLock,
-              testId: `audio-send-link-${mixTarget.id}`,
-            },
-            {
-              kind: "check",
-              id: "solo",
-              label: "Solo send",
-              checked: mode.solo,
-              onCheckedChange: (solo) => setMode({ solo }),
-              disabledReason: menuLock,
-              testId: `audio-send-solo-${mixTarget.id}`,
-            },
-            { kind: "divider", id: "target-divider" },
             {
               id: "target",
               label: "Make mix target",

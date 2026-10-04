@@ -3,7 +3,7 @@ import type { ShellStore } from "@sse/engine-client";
 import { MenuButton, PlateHead, Readouts, type UseArmResult } from "@sse/design-system";
 
 import styles from "./AudioInspector.module.css";
-import { buildChannelMenu, channelSendMode } from "./audioChannelMenu";
+import { buildChannelMenu } from "./audioChannelMenu";
 import { AudioGainEntryDialog, AudioLevelEntryDialog } from "./AudioEntryDialogs";
 import { AudioPlateDynamics } from "./inspector/AudioPlateDynamics";
 import { AudioPlateEq } from "./inspector/AudioPlateEq";
@@ -17,7 +17,6 @@ import {
   type AudioChannelUpdate,
   type AudioDynamicsUpdate,
   type AudioEqUpdate,
-  type AudioSendModeUpdate,
 } from "./inspector/audioInspectorHelpers";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
@@ -54,7 +53,6 @@ export interface AudioInspectorProps {
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateChannelDynamics: (request: AudioDynamicsUpdate) => void;
   onUpdateChannelEq: (request: AudioEqUpdate) => void;
-  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   peakHoldEnabled: boolean;
   peakHoldResetToken: number;
@@ -103,7 +101,6 @@ function AudioChannelPlate({
   onUpdateChannel,
   onUpdateChannelDynamics,
   onUpdateChannelEq,
-  onUpdateChannelSendMode,
   peakHoldEnabled,
   peakHoldResetToken,
   setDraftValue,
@@ -143,10 +140,9 @@ function AudioChannelPlate({
   };
 
   // One line under the name: what the strip is, as the desk reports it.
-  const linked = channelSendMode(channel, selectedMixTarget?.id ?? null).linkStereo;
   const sub = [
     `${channelTypeLabel(channel.role)} ${channelOrdinalLabel(viewModel, channel)}`,
-    channel.stereo ? `stereo${linked ? ", linked" : ""}` : "mono",
+    channel.stereo ? "stereo" : "mono",
     `group ${getAudioChannelGroup(channel)}`,
   ].join(" · ");
 
@@ -155,14 +151,12 @@ function AudioChannelPlate({
     gain,
     sendLevel,
     selectedMixTarget,
-    mixTargets: viewModel.mixTargets,
     menuLock,
     onRequestLevel: () => setEntry("level"),
     onRequestGain: () => setEntry("gain"),
     onResetToUnity,
     onClearClip,
     onUpdateChannel,
-    onUpdateChannelSendMode,
     testIdPrefix: "audio-plate-menu",
   });
 
@@ -202,7 +196,6 @@ function AudioChannelPlate({
         menuLock={menuLock}
         mixTargets={viewModel.mixTargets}
         onSelectMixTarget={onSelectMixTarget}
-        onUpdateChannelSendMode={onUpdateChannelSendMode}
         selectedMixTarget={selectedMixTarget}
         setDraftValue={setDraftValue}
       />

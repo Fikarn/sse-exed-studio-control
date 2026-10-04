@@ -4,7 +4,6 @@ import type {
   AudioEqSnapshot,
   AudioConsoleSnapshotSlot,
   AudioMixTargetSnapshot,
-  AudioSendModeSnapshot,
   AudioSnapshot,
   LightingDmxChannelSnapshot,
   LightingDmxMonitorSnapshot,
@@ -155,7 +154,6 @@ export interface AudioChannelEntry {
   stereo: boolean;
   eq: AudioEqSnapshot;
   dynamics: AudioDynamicsSnapshot;
-  sendModes: Record<string, AudioSendModeSnapshot>;
 }
 
 export interface AudioMixTargetEntry {
@@ -433,7 +431,6 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
     stereo: c.stereo,
     eq: c.eq,
     dynamics: c.dynamics,
-    sendModes: { ...c.sendModes },
   }));
 }
 

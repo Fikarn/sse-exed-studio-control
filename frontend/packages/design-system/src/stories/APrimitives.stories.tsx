@@ -543,11 +543,7 @@ function PlateCards() {
   return (
     <>
       <Card title="PlateHead · the Dark Green title plate">
-        <PlateHead
-          title="FX 3/4"
-          sub="Playback 02 · stereo, linked · group FX"
-          action={<Key size="small">Rename</Key>}
-        />
+        <PlateHead title="FX 3/4" sub="Playback 02 · stereo · group FX" action={<Key size="small">Rename</Key>} />
         <PlateHead title="Interview block, wide, with the guest on the left" action={<Key size="small">Rename</Key>} />
         <PlateHead
           title="Warm wash"

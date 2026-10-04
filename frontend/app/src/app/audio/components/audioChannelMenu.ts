@@ -16,13 +16,10 @@ import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 
 // A channel's menu (DESIGN.md §9; Atrium's "What moved where"), one menu for
 // the strip's ⋯, a right-click on the strip and the plate's title ⋯: the level
-// and the gain by number, the sends' modes, the preamp's switches, the clip.
-// The destructive item is the existing 48 V arm, in place.
+// and the gain by number, the preamp's switches, the clip. The destructive
+// item is the existing 48 V arm, in place.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
-
-const DEFAULT_SEND_MODE = { linkStereo: true, mute: false, preFader: false, solo: false };
 
 function inputPreampNumber(channelId: string) {
   const raw = Number(channelId.match(/\d+/g)?.at(-1) ?? 1);
@@ -39,11 +36,6 @@ export function channelSubtitle(channel: AudioChannelEntry) {
   return `${channel.stereo ? "Stereo" : "Mono"}${group ? ` · ${group}` : ""}`;
 }
 
-/** A send's modes, as the desk reports them or TotalMix's defaults. */
-export function channelSendMode(channel: AudioChannelEntry, mixTargetId: string | null) {
-  return (mixTargetId ? channel.sendModes[mixTargetId] : undefined) ?? DEFAULT_SEND_MODE;
-}
-
 export interface ChannelMenuArgs {
   channel: AudioChannelEntry;
   /** The preamp's gain as shown (the draft while it moves). */
@@ -51,7 +43,6 @@ export interface ChannelMenuArgs {
   /** The send into the mix target as shown (the draft while it moves). */
   sendLevel: number;
   selectedMixTarget: AudioMixTargetEntry | null;
-  mixTargets: readonly AudioMixTargetEntry[];
   /** The short reason for a locked item ("desk NOT VERIFIED"); null when unlocked. */
   menuLock: string | null;
   onRequestLevel: () => void;
@@ -59,7 +50,6 @@ export interface ChannelMenuArgs {
   onResetToUnity: (channelId: string) => void;
   onClearClip: (channelId: string) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   testIdPrefix: string;
 }
 
@@ -68,20 +58,17 @@ export function buildChannelMenu({
   gain,
   sendLevel,
   selectedMixTarget,
-  mixTargets,
   menuLock,
   onRequestLevel,
   onRequestGain,
   onResetToUnity,
   onClearClip,
   onUpdateChannel,
-  onUpdateChannelSendMode,
   testIdPrefix,
 }: ChannelMenuArgs): Omit<MenuContent, "arm"> {
   const targetId = selectedMixTarget?.id ?? null;
   const targetName = selectedMixTarget?.name ?? "the mix target";
   const noTarget = targetId ? null : "no mix target";
-  const targetMode = channelSendMode(channel, targetId);
   const check = (entry: Omit<Extract<MenuEntry, { kind: "check" }>, "kind">): MenuEntry => ({
     kind: "check",
     ...entry,
@@ -113,42 +100,6 @@ export function buildChannelMenu({
       disabledReason: menuLock,
       testId: `${testIdPrefix}-gain`,
     });
-  }
-  items.push({ kind: "divider", id: "sends" });
-  items.push(
-    check({
-      id: "pre-fader",
-      label: `Pre fader for ${targetName}`,
-      checked: targetMode.preFader,
-      onCheckedChange: (preFader) =>
-        targetId && onUpdateChannelSendMode({ channelId: channel.id, mixTargetId: targetId, preFader }),
-      disabledReason: menuLock ?? noTarget,
-    })
-  );
-  if (channel.stereo) {
-    items.push(
-      check({
-        id: "link",
-        label: `Link L+R for ${targetName}`,
-        checked: targetMode.linkStereo,
-        onCheckedChange: (linkStereo) =>
-          targetId && onUpdateChannelSendMode({ channelId: channel.id, mixTargetId: targetId, linkStereo }),
-        disabledReason: menuLock ?? noTarget,
-      })
-    );
-  }
-  // Every mix's send mute, the target's too: a send muted while another mix
-  // was the target is still shown and can be cleared (the review of #299).
-  for (const mixTarget of mixTargets) {
-    items.push(
-      check({
-        id: `mute-send-${mixTarget.id}`,
-        label: `Mute send to ${mixTarget.name}`,
-        checked: channelSendMode(channel, mixTarget.id).mute,
-        onCheckedChange: (mute) => onUpdateChannelSendMode({ channelId: channel.id, mixTargetId: mixTarget.id, mute }),
-        disabledReason: menuLock,
-      })
-    );
   }
   items.push({ kind: "divider", id: "channel" });
   if (audioChannelSupportsInstrument(channel)) {

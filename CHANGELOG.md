@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The sends' modes leave the Console: Pre fader, Mute send, Link L+R and Solo send were only kept by the app and never reached TotalMix, which has none of them per send. A strip's `S` is unchanged (#PR).
 - The Console is drawn anew: the outputs are rows in the left column under `DIM` and `MONO`; the strips have one-line names, bigger `M` and `S` and the gain shown; the plate fits without scrolling; every strip, output and section has a `⋯` (or a right-click), and the Console row is the page's `⋯`. Unity reads `+0.0 dB`, as on the deck (#299).
 - The frame is the new design's: an 80 px header with each page's lamp and word in its tab (the open page's in its own display), a `REC` slot that never moves, the clock and the SSE logotype; every page's plate on the right at the same width; `Nothing latched` under every state display, with a `⋯` for the page's commands. Start-up and recovery stand on the same frame (#298).
 - The Stream Deck takes the screen's look: its words in the screen's faces and colours, `SOLO` as the screen's latch, one armed form ("press again" in dark red), the selected camera in beige, the page keys dark green with the tab words and a dot a page. It reaches the deck with the next export and Full Reset & Import in Companion (#297).

@@ -212,11 +212,13 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // The visual overhaul's Console pull request. Old: a playback strip's plate
   // had a "Software" section: "No playback stats from the driver", its stereo
   // link and a fixed "Auto fade Off". New: a playback strip has no preamp
-  // section; what it is (stereo, linked, its group) is the title plate's one
-  // line. Reason: the section repeated the plate's other facts or printed
+  // section; what it is (stereo, its group) is the title plate's one line.
+  // Reason: the section repeated the plate's other facts or printed
   // placeholders (the survey's clutter findings), and the plate must fit.
+  // (2026-10-04: "linked" went with the send modes.)
   await expect(page.locator('[data-plate-section="preamp"]')).toHaveCount(0);
-  await expect(page.getByTestId("audio-plate-head")).toContainText("stereo, linked");
+  await expect(page.getByTestId("audio-plate-head")).toContainText("stereo");
+  await expect(page.getByTestId("audio-plate-head")).not.toContainText("linked");
   await page.getByTestId("audio-strip-audio-input-9").click();
   await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Preamp");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48 V");
@@ -370,18 +372,11 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   ).toBeEnabled();
   await expect(page.getByTestId("audio-dynamics-row-compressor")).toBeVisible();
   await revealPlateSection(page, "send");
-  // Old: a send card per mix with four mode keys. New: a row per other mix, its
-  // modes in the row's ⋯ as toggles stating their value. Reason: Atrium's OTHER
-  // MIXES; the mix target's send is the strip's fader.
+  // Old: a send card per mix with four mode keys. New: a row per other mix.
+  // Reason: Atrium's OTHER MIXES; the mix target's send is the strip's fader.
+  // The row's ⋯ is covered by the test of the other mixes below.
   await expect(page.getByTestId("audio-inspector-sends")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
-  await page.getByTestId("audio-send-menu-audio-mix-phones-a").click();
-  const preFader = page.getByTestId("audio-send-pre-fader-audio-mix-phones-a");
-  await expect(preFader).toHaveAttribute("aria-checked", "false");
-  await preFader.click();
-  await page.getByTestId("audio-send-menu-audio-mix-phones-a").click();
-  await expect(preFader).toHaveAttribute("aria-checked", "true");
-  await page.keyboard.press("Escape");
 
   // New pages program, Slice 3 (decisions 4 and 6). Old: E / D / R / P brought
   // a plate section into view, then Esc let the strip go. New: the section
@@ -1036,7 +1031,7 @@ test("supports engine-backed audio dynamics editing", async ({ page }) => {
   await expectSliderValueChanges(page, "Host gate makeup");
 });
 
-test("supports engine-backed audio send mode controls", async ({ page }) => {
+test("the plate's other mixes: a row per mix, its menu makes it the mix target", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
@@ -1044,26 +1039,21 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
   // The visual overhaul's Console pull request. Old: a card per mix, the mix
   // target's first, each with four mode keys. New: a row per other mix; the mix
   // target's send is the strip's fader, so Main Out has no row while it is the
-  // target; a row's modes are its ⋯'s toggles, which state their value.
-  // Reason: Atrium's OTHER MIXES.
+  // target. Reason: Atrium's OTHER MIXES.
   await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toHaveCount(0);
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-b")).toContainText("Phones 2");
-  const sendMenu = page.getByTestId("audio-send-menu-audio-mix-phones-a");
-  await sendMenu.click();
-  const preFader = page.getByTestId("audio-send-pre-fader-audio-mix-phones-a");
-  await expect(preFader).not.toHaveAttribute("aria-disabled", "true");
-  await expect(preFader).toHaveAttribute("aria-checked", "false");
-  await preFader.click();
-  await sendMenu.click();
-  await expect(preFader).toHaveAttribute("aria-checked", "true");
-
-  const link = page.getByTestId("audio-send-link-audio-mix-phones-a");
-  await expect(link).toHaveAttribute("aria-checked", "true");
-  await link.click();
-  await sendMenu.click();
-  await expect(link).toHaveAttribute("aria-checked", "false");
-  await page.keyboard.press("Escape");
+  // 2026-10-04. Old: the row's ⋯ held the send's four modes (Pre fader, Mute
+  // send, Link L+R, Solo send) above "Make mix target". New: "Make mix target"
+  // alone. Reason: the app only kept the modes; they never reached TotalMix,
+  // which has no such modes per send (the owner's decision).
+  await page.getByTestId("audio-send-menu-audio-mix-phones-a").click();
+  const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitemcheckbox")).toHaveCount(0);
+  await expect(menu).not.toContainText("Pre fader");
+  await menu.getByRole("menuitem", { name: "Make mix target" }).click();
+  await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toHaveCount(0);
+  await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toContainText("Main Out");
 });
 
 // New pages program, Slice 3 (D6): "supports audio command palette and

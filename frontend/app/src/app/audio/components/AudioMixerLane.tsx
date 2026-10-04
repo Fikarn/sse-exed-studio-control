@@ -22,7 +22,6 @@ import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 // strip's menu: its ⋯, or a right-click on the strip, opens the same menu.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 
 export interface AudioChannelLaneProps {
   actionsAllowed: boolean;
@@ -39,13 +38,11 @@ export interface AudioChannelLaneProps {
   menuLock: string | null;
   /** No metering is arriving: the well carries its reference and nothing else. */
   meterEmpty?: boolean;
-  mixTargets: readonly AudioMixTargetEntry[];
   onClearClip: (channelId: string) => void;
   onResetToUnity: (channelId: string) => void;
   onSelect: (channelId: string) => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
   setDraftValue: (key: string, value: number) => void;
   selected: boolean;
   selectedMixTarget: AudioMixTargetEntry | null;
@@ -64,13 +61,11 @@ export function AudioChannelLane({
   lockedReason,
   menuLock,
   meterEmpty,
-  mixTargets,
   onClearClip,
   onResetToUnity,
   onSelect,
   onTogglePhantom,
   onUpdateChannel,
-  onUpdateChannelSendMode,
   setDraftValue,
   selected,
   selectedMixTarget,
@@ -115,14 +110,12 @@ export function AudioChannelLane({
     gain,
     sendLevel,
     selectedMixTarget,
-    mixTargets,
     menuLock,
     onRequestLevel: () => setEntry("level"),
     onRequestGain: () => setEntry("gain"),
     onResetToUnity,
     onClearClip,
     onUpdateChannel,
-    onUpdateChannelSendMode,
     testIdPrefix: `audio-lane-menu-${channel.id}`,
   });
 
