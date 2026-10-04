@@ -62,7 +62,7 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on. The strip's `⋯` ends in `Turn 48 V off…`, also pressed twice.
 - **Gain** shows on a preamp's strip. `Set preamp gain…` in the strip's `⋯` types it, 0 to 75 dB; the plate's knob rides it.
 - **Groups.** A row's `⋯` shows only some groups (Talent, Line, Bed, FX, Remote); the heading then says which, and `Show all` brings every strip back.
-- **Plate.** The whole strip, without scrolling: its preamp (an input's), the other mixes it feeds (a row's `⋯` makes that mix the target), the equaliser (a graph and a table; a band's key, or its point, opens its controls) and its meter. Each section's `⋯` holds its switches.
+- **Plate.** The whole strip, without scrolling: its preamp (an input's), the other mixes it feeds (a row's `⋯` makes that mix the target) and its meter. Each section's `⋯` holds its switches. The equaliser, the Low Cut and the dynamics are set in TotalMix.
 - **Solo and clip.** The latch slot names the soloed strips, with `Clear all`; a clip latches beside it, with `Clear`.
 - **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot twice (`LOAD?`) to load it in TotalMix; the Console then reads the desk. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
 - **The page's `⋯`** holds `Sync from TotalMix`, which reads the desk and changes nothing on it, `Run audio probe`, `Clear clips`, `Peak hold`, `Reset peaks` and `Open Setup`.

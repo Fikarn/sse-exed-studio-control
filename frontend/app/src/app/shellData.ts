@@ -1,6 +1,5 @@
 import type {
   AudioChannelSnapshot,
-  AudioEqSnapshot,
   AudioConsoleSnapshotSlot,
   AudioMixTargetSnapshot,
   AudioSnapshot,
@@ -151,7 +150,6 @@ export interface AudioChannelEntry {
   shortName: string;
   solo: boolean;
   stereo: boolean;
-  eq: AudioEqSnapshot;
 }
 
 export interface AudioMixTargetEntry {
@@ -427,7 +425,6 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
     shortName: c.shortName,
     solo: c.solo,
     stereo: c.stereo,
-    eq: c.eq,
   }));
 }
 

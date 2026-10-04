@@ -67,12 +67,6 @@ export const INSPECTOR_DB_HYSTERESIS = 0.75;
 // Source: previously the `delayMs = 75` default param in audioContinuousControls.ts:3.
 export const AUDIO_THROTTLE_FADER_MS = 75;
 
-// Why: throttle window for EQ continuous edits. Higher than fader throttle
-// because EQ commits are more expensive engine-side and the response curve is
-// less sensitive to sub-frame latency.
-// Source: previously inline at AudioInspector.tsx:308.
-export const AUDIO_THROTTLE_EQ_MS = 500;
-
 // Why: delay before clearing optimistic local-draft state after a commit.
 // Long enough for the engine snapshot to round-trip and authoritative state
 // to land in the React tree; short enough that stale drafts never linger.

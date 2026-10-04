@@ -98,9 +98,9 @@ const GHOST_STROKE = "var(--color-fixture-ghost-stroke)";
 // backlit in every theme — so its labels take the display inks, not the theme's
 // plate inks (Bone's muted ink read 1.7:1 on the plot floor). A label also
 // falls across whatever the rig is making, and a beam pool is any colour at
-// all, so each label sits on a chip of the plot's own floor. That is the same
-// answer the Console's equaliser scale uses, and it is what makes a fixture
-// name readable over a lit pool instead of readable only over the floor.
+// all, so each label sits on a chip of the plot's own floor. That is what
+// makes a fixture name readable over a lit pool instead of readable only over
+// the floor.
 const LABEL_NAME_FILL = "var(--display-text)";
 const LABEL_META_FILL = "var(--display-text2)";
 // JetBrains Mono advances 0.6 em, so a chip's width follows from the string.

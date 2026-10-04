@@ -49,7 +49,6 @@ declare global {
 }
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
-type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 type AudioSettingsUpdate = Parameters<ShellStore["updateAudioSettings"]>[0];
 
@@ -284,21 +283,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
   );
 
-  const updateChannelEq = useLiveCallback((request: AudioEqUpdate) => {
-    void performAction(`audio-channel-eq-${request.channelId}`, async () => {
-      await store.updateAudioChannelEq(request);
-    });
-  });
-
-  const commitChannelEqContinuous = useLiveCallback((request: AudioEqUpdate) => {
-    void store.updateAudioChannelEq(request).catch((error) => {
-      setFeedback({
-        message: error instanceof Error ? error.message : `The EQ control could not be changed. ${SYNC_HINT}`,
-        tone: "error",
-      });
-    });
-  });
-
   const updateMixTarget = useLiveCallback((request: AudioMixTargetUpdate) => {
     void performAction(`audio-output-${request.mixTargetId}`, async () => {
       await store.updateAudioMixTarget(request);
@@ -418,7 +402,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
             armedActionKey={armedAction?.key ?? null}
             clearDraftValueLater={clearDraftValueLater}
             commitChannelContinuous={commitChannelContinuous}
-            commitChannelEqContinuous={commitChannelEqContinuous}
             draftStore={draftStore}
             getDraftValue={getDraftValue}
             onClearClip={clearClips}
@@ -428,7 +411,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
             onTogglePeakHold={togglePeakHold}
             onTogglePhantom={togglePhantom}
             onUpdateChannel={updateChannel}
-            onUpdateChannelEq={updateChannelEq}
             onUpdateMixTarget={updateMixTarget}
             peakHoldEnabled={peakHoldEnabled}
             peakHoldResetToken={peakHoldResetToken}
