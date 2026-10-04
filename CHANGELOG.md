@@ -8,7 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
-- The plate's equaliser and Low Cut leave the Console: they went to TotalMix over its old page-2 commands, whose on/off only flipped TotalMix's switch, which could land on another mic, and which nothing read back. Set the EQ in TotalMix. The plate is now the preamp, the other mixes and the meter (#PR).
+- The plate's equaliser and Low Cut leave the Console: they went to TotalMix over its old page-2 commands, whose on/off only flipped TotalMix's switch, which could land on another mic, and which nothing read back. Set the EQ in TotalMix. The plate is now the preamp, the other mixes and the meter (#302).
 - The plate's dynamics leave the Console: the compressor and the gate were only kept by the app and never reached TotalMix, whose dynamics are one compressor and expander per input (#301).
 - The sends' modes leave the Console: Pre fader, Mute send, Link L+R and Solo send were only kept by the app and never reached TotalMix, which has none of them per send. A strip's `S` is unchanged (#300).
 - The Console is drawn anew: the outputs are rows in the left column under `DIM` and `MONO`; the strips have one-line names, bigger `M` and `S` and the gain shown; the plate fits without scrolling; every strip, output and section has a `⋯` (or a right-click), and the Console row is the page's `⋯`. Unity reads `+0.0 dB`, as on the deck (#299).
