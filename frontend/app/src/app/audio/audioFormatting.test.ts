@@ -294,7 +294,7 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
           lastActionMessage: "TotalMix did not confirm 1 change (input 8 mute). Press Sync to pull the console state.",
         })
       ).warningBody
-    ).toContain("Showing the last state the desk confirmed.");
+    ).toContain("The strips may not match TotalMix.");
     const general = describeAudioStatus(
       passedWithTotalMix({
         consoleStateConfidence: "assumed",
@@ -303,7 +303,7 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
         lastActionMessage: "TotalMix did not answer.",
       })
     ).warningBody;
-    expect(general).toContain("Showing the last state the desk confirmed.");
+    expect(general).toContain("The strips may not match TotalMix.");
     expect(
       describeAudioStatus(
         passedWithTotalMix({
@@ -313,7 +313,7 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
           lastActionMessage: "An older sentence.",
         })
       ).warningBody
-    ).toContain("Showing the last state the desk confirmed.");
+    ).toContain("The strips may not match TotalMix.");
   });
 
   it("reads VERIFIED once the desk has been read", () => {

@@ -468,9 +468,13 @@ fn off_send_on_an_empty_submix_is_confirmed_by_the_status_marker() {
 }
 
 #[test]
-fn channel_readback_that_omits_a_parameter_confirms_it_by_absence() {
+fn channel_readback_that_omits_a_parameter_leaves_it_unconfirmed() {
     // The right side of a stereo-linked pair reports only its L/R
     // parameters; a mute sent to it is never echoed (live, 2026-09-03).
+    // 2026-10-04 (the owner's decision). Old: absent from the answered burst,
+    // the mute counted as confirmed. New: it expires unconfirmed. Reason: only
+    // a report confirms; RME addresses a pair's mute by its left channel, so
+    // TotalMix most likely never applied it.
     let mut link = ConsoleLinkState::default();
     link.register_outgoing(&[(String::from("/input/3/mute"), f(0.0))], 0);
     assert_eq!(
@@ -482,15 +486,64 @@ fn channel_readback_that_omits_a_parameter_confirms_it_by_absence() {
         link.ingest(&msg("/input/3/phase", f(0.0)), 160),
         Classification::External
     );
-    link.tick(200);
-    assert_eq!(link.pending_count(), 1, "burst not quiet yet");
+    link.tick(250);
+    assert_eq!(link.pending_count(), 1, "absence confirms no channel value");
+    link.tick(1_600);
+    assert_eq!(link.pending_count(), 0);
+    let summary = link.summary(1_600);
+    assert_eq!(summary.confirmed_sends, 0);
+    assert_eq!(summary.unconfirmed_sends, 1);
+    assert_eq!(
+        summary.unconfirmed_addresses,
+        vec![String::from("input 3 mute")]
+    );
+}
+
+#[test]
+fn a_status_line_answers_no_channel_or_settings_readback() {
+    // 2026-10-04 (the owner's decision). Old: any status line closed every
+    // read-back still without a reply, so a channel read-back that TotalMix
+    // never answered confirmed its sends by absence once a fader move's
+    // `/sendstate` came back. New: a status line closes only a submix
+    // read-back. Reason: it is that read-back's end-of-burst marker and no
+    // other's.
+    let mut link = ConsoleLinkState::default();
+    link.register_outgoing(
+        &[
+            (String::from("/input/8/mute"), f(1.0)),
+            (String::from("/controlroom/dim"), f(1.0)),
+            (String::from("/mix/pb/6/0/faderlin"), f(0.0)),
+        ],
+        0,
+    );
+    assert_eq!(
+        link.due_readbacks(130).len(),
+        4,
+        "channel, settings, submix + status"
+    );
+    // Only the submix's status marker comes back.
+    link.ingest(&msg("/status/connection", f(1.0)), 160);
     link.tick(250);
     assert_eq!(
         link.pending_count(),
-        0,
-        "absent from the answered burst: confirmed"
+        2,
+        "the off node is confirmed; the mute and the dim are not"
     );
-    assert_eq!(link.summary(250).confirmed_sends, 1);
+    // A settings reply that comes late still answers its read-back: the desk's
+    // value wins.
+    assert_eq!(
+        link.ingest(&msg("/controlroom/dim", f(0.0)), 400),
+        Classification::Adjusted
+    );
+    link.tick(1_600);
+    assert_eq!(link.pending_count(), 0);
+    let summary = link.summary(1_600);
+    assert_eq!(summary.confirmed_sends, 1);
+    assert_eq!(summary.unconfirmed_sends, 1);
+    assert_eq!(
+        summary.unconfirmed_addresses,
+        vec![String::from("input 8 mute")]
+    );
 }
 
 #[test]
@@ -528,7 +581,7 @@ fn solo_off_on_an_unlisted_node_confirms_by_absence_but_a_fader_does_not() {
 }
 
 #[test]
-fn non_off_send_absent_from_the_reply_expires_as_unconfirmed() {
+fn a_channel_send_with_no_reply_at_all_expires_as_unconfirmed() {
     let mut link = ConsoleLinkState::default();
     link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 0);
     link.due_readbacks(130);

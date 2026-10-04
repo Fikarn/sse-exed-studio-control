@@ -15,7 +15,11 @@
 //!   fader curve. `/sendsubmix 2` omits nodes at or below -65 dB, so an "off"
 //!   send is confirmed by its absence once the reply burst has finished.
 //! - Writes to channels hidden in the TotalMix layout are dropped silently;
-//!   the read-back then reports the old value and the console wins.
+//!   the channel read-back then reported the old value and the desk won: the
+//!   strip went back to it, as a change made at TotalMix.
+//! - A channel value counts as confirmed only when a reply carries it; only a
+//!   submix read-back may confirm an "off" by its absence (the owner's
+//!   decision, 2026-10-04).
 //!
 //! The state lives behind [`shared_console_link`]: the IPC thread registers
 //! outgoing commands before they hit the wire, the metering thread (which owns
@@ -747,18 +751,22 @@ fn is_off_send(value: &ConsoleValue) -> bool {
 /// Whether a pending send that a completed read-back burst did not mention
 /// counts as confirmed. Live-verified on the studio desk (2026-09-03):
 /// `/sendsubmix 2` lists only nodes above -65 dB, so an off fader and a
-/// solo-off on such a node never appear; `/sendchan` for the right side of a
-/// stereo-linked pair reports only the L/R parameters, so a mute or gain sent
-/// to it is never echoed either. A fader that should be audible but is absent
-/// stays unconfirmed — that is exactly the hidden-channel case where TotalMix
-/// dropped the write.
+/// solo-off on such a node never appear. A fader that should be audible but
+/// is absent stays unconfirmed: TotalMix dropped the write.
+///
+/// A channel read-back confirms nothing by absence (the owner's decision,
+/// 2026-10-04). `/sendchan` reports every parameter of the channel (RME's
+/// table), so a send its reply leaves out is one TotalMix did not report: the
+/// right side of a stereo-linked pair, which reports only its L/R parameters
+/// (on this desk only a hidden line input could be one), or a reply cut short.
+/// Until then such a send counted as confirmed; it now expires unconfirmed and
+/// the Console reads `ASSUMED`.
 fn confirmable_by_absence(request: &ReadbackRequest, key: &ParamKey, value: &ConsoleValue) -> bool {
     match (request, key) {
         (ReadbackRequest::Submix { .. }, ParamKey::MixFader { .. }) => is_off_send(value),
         (ReadbackRequest::Submix { .. }, ParamKey::MixSolo { .. }) => {
             matches!(value, ConsoleValue::Flag(false))
         }
-        (ReadbackRequest::Channel { .. }, _) => true,
         _ => false,
     }
 }
@@ -865,14 +873,20 @@ impl ConsoleLinkState {
             }
         }
 
-        // Status replies are the end-of-burst marker for every outstanding
-        // read-back (each submix read-back is paired with `/sendstate`).
+        // A status reply is the end-of-burst marker for a submix read-back,
+        // which is paired with `/sendstate` for a bus with no active nodes. It
+        // answers no other read-back (2026-10-04): until then any status line
+        // closed a channel read-back that had no reply, and the sends it
+        // covered counted as confirmed.
         if matches!(
             parsed.key,
             ParamKey::StatusConnection | ParamKey::StatusDevice | ParamKey::StatusDsp
         ) {
-            for outstanding in self.outstanding.values_mut() {
-                if outstanding.requested_at_ms <= now_ms && outstanding.last_reply_at_ms.is_none() {
+            for (request, outstanding) in self.outstanding.iter_mut() {
+                if matches!(request, ReadbackRequest::Submix { .. })
+                    && outstanding.requested_at_ms <= now_ms
+                    && outstanding.last_reply_at_ms.is_none()
+                {
                     outstanding.last_reply_at_ms = Some(now_ms);
                 }
             }
