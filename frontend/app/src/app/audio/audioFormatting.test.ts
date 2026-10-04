@@ -125,8 +125,11 @@ describe("formatMeterPercent", () => {
 });
 
 describe("formatAudioDb / formatMeterDb", () => {
-  it("formats unity as '0.0 dB' (no sign at zero)", () => {
-    expect(formatAudioDb(AUDIO_FADER_UNITY)).toBe("0.0 dB");
+  // The visual overhaul's Console pull request. Old: "0.0 dB", no sign at zero.
+  // New: "+0.0 dB". Reason: the deck's display prints "+0.0 dB" at unity, and
+  // the studio walk checks that the Console and the deck read the same.
+  it("formats unity as '+0.0 dB', as the deck does", () => {
+    expect(formatAudioDb(AUDIO_FADER_UNITY)).toBe("+0.0 dB");
   });
 
   it("formats above-unity values with a leading +", () => {

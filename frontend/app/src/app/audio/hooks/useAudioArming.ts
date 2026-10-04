@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useArm, type UseArmResult } from "@sse/design-system";
 
-import { type AudioArmedAction } from "../audioArming";
-import { AUDIO_ARM_MIN_DWELL_MS } from "../audioConstants";
+import type { AudioArmCandidate, AudioArmedAction } from "../audioArming";
+import { AUDIO_ARM_MIN_DWELL_MS, AUDIO_ARM_TIMEOUT_MS } from "../audioConstants";
 import type { AudioFeedbackTone } from "../audioFormatting";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 
@@ -25,143 +26,77 @@ export interface UseAudioArmingArgs {
 }
 
 export interface UseAudioArmingResult {
+  /**
+   * The Console's one arm, for every menu on the page (`Menu`'s `arm`): a
+   * menu's destructive item and a key on the page are never armed at once.
+   */
+  arm: UseArmResult;
   armedAction: AudioArmedAction | null;
-  armOrApplyAction: (candidate: Omit<AudioArmedAction, "armedAt">, apply: () => void) => void;
+  armOrApplyAction: (candidate: AudioArmCandidate, apply: () => void) => void;
   cancelArmedAction: () => boolean;
   clearArmedAction: () => void;
 }
 
 /**
- * Shared arm-then-apply state for the audio workspace.
+ * The Console's arm-then-apply state: the design system's `useArm` with the
+ * Console's numbers (the 350 ms dwell, the 4.5 s window) and its reset rules.
+ * (`setFeedback(null)` clears the page's last line when something is armed.)
  *
- * The hook owns the `armedAction` slice and the expiry timer that retires the
- * arm window after `candidate.timeoutMs`. Consumers thread `armedAction` into
- * the snapshot deck (for the countdown bar and the data-armed lane treatment)
- * and call `armOrApplyAction` from each user-initiated armed action (48V
- * phantom, a TotalMix snapshot load).
+ * The visual overhaul's Console pull request moved it onto `useArm`, so the
+ * strip's 48 V, the plate's 48 V, the snapshot keys and every menu's
+ * destructive item share one arm: arming one disarms any other. `useArm` owns
+ * the dwell, the window, the Esc that cancels an arm (left alone when a layer
+ * above took it) and the held Enter whose repeats never confirm one.
  *
- * `clearArmedAction` is intentionally exposed for the few non-arming code
- * paths that must drop the current arm — eg. `performAction` resetting state
- * before kicking off an async store call. Direct callers should always use
- * the canonical `armOrApplyAction` + `cancelArmedAction` pair so the toast is
- * raised consistently.
- *
- * Esc cancels the arm (new pages program, Slice 3 — D6 keeps Esc on an armed
- * action). The hook listens for it only while something is armed, as the
- * design system's `useArm` does; it used to live in the Console's page-wide
- * key handler, which went with the keyboard shortcuts. While something is
- * armed the same listener cancels a held Enter's auto-repeat, so holding Enter
- * on a focused arm key arms it and never applies it.
+ * What the Console adds:
+ * - an arm made against the desk as it was is dropped when the desk moves
+ *   under it (TotalMix loaded another snapshot, the selection or the mix target
+ *   changed), with no message: the operator did not cancel it;
+ * - an arm the operator cancels with Esc says so once. Arming says nothing
+ *   here: the state display's armed row and the key itself say it.
  */
 export function useAudioArming({
   now = () => performance.now(),
   resetTriggers,
   setFeedback,
 }: UseAudioArmingArgs): UseAudioArmingResult {
-  const [armedAction, setArmedAction] = useState<AudioArmedAction | null>(null);
-  const armedActionTimerRef = useRef<number | null>(null);
+  const setFeedbackRef = useRef(setFeedback);
+  setFeedbackRef.current = setFeedback;
 
-  // Why: while an arm is active, schedule a single setTimeout that retires the
-  // candidate when `armedAction.timeoutMs` elapses. The cleanup branch fires
-  // when the dependency changes or the component unmounts; it also runs when
-  // the user applies/cancels (because setArmedAction(null) triggers a fresh
-  // effect run).
-  useEffect(() => {
-    if (armedActionTimerRef.current !== null) {
-      window.clearTimeout(armedActionTimerRef.current);
-      armedActionTimerRef.current = null;
-    }
-    if (!armedAction) return;
-
-    armedActionTimerRef.current = window.setTimeout(() => {
-      setArmedAction(null);
-      armedActionTimerRef.current = null;
-    }, armedAction.timeoutMs);
-
-    return () => {
-      if (armedActionTimerRef.current !== null) {
-        window.clearTimeout(armedActionTimerRef.current);
-        armedActionTimerRef.current = null;
-      }
-    };
-  }, [armedAction]);
-
-  // Why: any external state shift that invalidates the current arm (TotalMix
-  // loaded another snapshot, selection changed, mix target changed) clears
-  // the arm without raising a toast. The toast would be misleading because
-  // the operator did not cancel — the engine state moved.
-  useEffect(() => {
-    setArmedAction(null);
-  }, [resetTriggers.loadedSnapshotSlot, resetTriggers.selectedChannelId, resetTriggers.selectedMixTargetId]);
-
-  // Why: ensure the timer is cancelled if the workspace unmounts while an
-  // arm is pending — eg. operator switches workspace mid-arm.
-  useEffect(() => {
-    return () => {
-      if (armedActionTimerRef.current !== null) {
-        window.clearTimeout(armedActionTimerRef.current);
-        armedActionTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  const cancelArmedAction = useLiveCallback(() => {
-    if (!armedAction) return false;
-    setArmedAction(null);
-    setFeedback({ message: "Armed audio action canceled.", tone: "info" });
-    return true;
+  const arm = useArm({
+    dwellMs: AUDIO_ARM_MIN_DWELL_MS,
+    timeoutMs: AUDIO_ARM_TIMEOUT_MS,
+    now,
+    // A menu closing or the pointer leaving its armed item cancels too
+    // ("cancel"), and the timeout ends an arm by itself: neither is news.
+    onDisarm: (_armed, reason) => {
+      if (reason === "escape") setFeedbackRef.current({ message: "Armed audio action canceled.", tone: "info" });
+    },
   });
 
-  // Why: Esc cancels an armed 48 V change or snapshot load.
-  // Registered only while something is armed, so an idle Console binds no key.
-  // An Esc a dialog or a menu already took (`defaultPrevented`, or stopped
-  // before it reached the window) closes that and leaves the arm alone, as the
-  // old page-wide handler did.
-  // While armed, the listener also cancels a held Enter's auto-repeat. Enter
-  // presses the focused key again on every repeat, and a held key repeats past
-  // the dwell (Windows starts after about 500 ms by default), so holding Enter
-  // on a focused arm key armed it and then applied it. A cancelled keydown
-  // presses nothing, so a held key only arms (product brief §5: held keys never
-  // auto-repeat into an apply; new pages program, Slice 3, on review). A fresh
-  // Enter is not a repeat and still confirms.
-  const armed = armedAction !== null;
+  const { clear } = arm;
   useEffect(() => {
-    if (!armed) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Enter" && event.repeat) {
-        event.preventDefault();
-        return;
-      }
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (cancelArmedAction()) event.preventDefault();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [armed, cancelArmedAction]);
+    clear();
+  }, [clear, resetTriggers.loadedSnapshotSlot, resetTriggers.selectedChannelId, resetTriggers.selectedMixTargetId]);
 
-  const clearArmedAction = useLiveCallback(() => {
-    setArmedAction(null);
+  // A new arm, from a key or a menu, clears the last line the page printed, so
+  // an old "canceled" never stands beside a live arm (found in the pull
+  // request's review: arming used to overwrite it with its own line).
+  const armedKey = arm.armed?.key;
+  const armedAt = arm.armed?.armedAt;
+  useEffect(() => {
+    if (armedKey !== undefined) setFeedbackRef.current(null);
+  }, [armedKey, armedAt]);
+
+  const armOrApplyAction = useLiveCallback((candidate: AudioArmCandidate, apply: () => void) => {
+    arm.armOrApply(candidate.key, candidate.label, apply, candidate.timeoutMs);
   });
 
-  const armOrApplyAction = useLiveCallback((candidateInput: Omit<AudioArmedAction, "armedAt">, apply: () => void) => {
-    if (armedAction?.key === candidateInput.key) {
-      // 2026-09 audit Slice 7: the confirming activation must come after a
-      // minimum dwell. Inside it, the second activation is a double-click or a
-      // bounced pointer — the arm stays and nothing is applied. A held Enter
-      // repeats past the dwell; the key listener above cancels its repeats, so
-      // they never reach this point.
-      if (now() - armedAction.armedAt < AUDIO_ARM_MIN_DWELL_MS) {
-        return;
-      }
-      setArmedAction(null);
-      apply();
-      return;
-    }
-
-    const candidate: AudioArmedAction = { ...candidateInput, armedAt: now() };
-    setArmedAction(candidate);
-    setFeedback({ message: `Armed: ${candidate.label}. Repeat the same action to apply.`, tone: "info" });
-  });
-
-  return { armedAction, armOrApplyAction, cancelArmedAction, clearArmedAction };
+  return {
+    arm,
+    armedAction: arm.armed,
+    armOrApplyAction,
+    cancelArmedAction: arm.cancel,
+    clearArmedAction: arm.clear,
+  };
 }

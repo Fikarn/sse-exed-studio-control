@@ -103,8 +103,6 @@ describe("ShellDialog over an armed Console action", () => {
   const armedLoad = {
     key: "snapshot-load:2",
     label: "Load Interview in TotalMix",
-    targetId: "2",
-    targetKind: "snapshot-load" as const,
     // Longer than the test, so the arm cannot lapse on its own.
     timeoutMs: 60_000,
   };
@@ -122,9 +120,10 @@ describe("ShellDialog over an armed Console action", () => {
     setFeedback: ReturnType<typeof vi.fn>
   ) {
     expect(arming.result.current.armedAction?.key).toBe(armedLoad.key);
-    // Only the arm's own "Armed: …" line; no "Armed audio action canceled.".
-    expect(setFeedback).toHaveBeenCalledTimes(1);
-    expect(setFeedback).not.toHaveBeenCalledWith(expect.objectContaining({ message: "Armed audio action canceled." }));
+    // No "Armed audio action canceled.": the arm was kept. (Since the visual
+    // overhaul's Console pull request arming itself posts no line either; it
+    // clears the last one.)
+    expect(setFeedback).not.toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
   }
 
   it("Esc with focus on Cancel closes the dialog and keeps the arm", () => {

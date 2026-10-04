@@ -1,365 +1,46 @@
-/* AudioWorkspace.module.css
-   2026-05-27 redesign — "Console" prototype.
-
-   Tokens come from totalmix-fx-edvin-version/project/Console.html (the Claude
-   Design prototype the operator wants implemented). The canonical set
-   (--bg/--fg/--accent/--line + families) is the single source of truth; C07
-   (2026-06-02) migrated every live module CSS onto it and pruned the legacy
-   --audio-* and --color-* fork. The last twelve pure aliases were read only by
-   the dead AudioRail/AudioToolbar hosts and died with them on 2026-09-09; what
-   survives is three real tokens (--audio-clip for the canvas meter overlay,
-   --audio-caption-muted, --audio-type-micro) — see the block below. The former
-   --audio-accent output-role override went too: it existed only for those
-   hosts, since the Console routes every accent through --accent.
-   The Phase 3 "locked" broadcast palette (talkback green,
-   group ochres, warn yellow) is intentionally retired per the 2026-05-27
-   redesign decision.
-*/
-
-/* The Console's own variables (the shell, overhaul 3): on the page's root and
-   on the plate, which the shell draws outside it. */
-.consoleTheme {
-  /* ── Console theme — Studio (default, warm amber) ───────────────────────── */
-  --bg: var(--audio-console-bg);
-  --bg-1: var(--audio-console-bg1);
-  --bg-2: var(--audio-console-bg2);
-  --bg-3: var(--audio-console-bg3);
-  --bg-elev: var(--audio-console-bg-elev);
-
-  --fg: var(--audio-console-fg);
-  --fg-2: var(--audio-console-fg2);
-  /* C10 nudged muted text 0.44 → 0.50; 2026-09 audit Slice 10 raises it to
-     0.56 (≈ 5:1 on the console ground) because every caption that used to
-     paint --fg-4 (0.22, ≈ 1.6:1 — unreadable on the studio monitor) now paints
-     --audio-caption-muted = --fg-3. --fg-4 stays for hairlines and borders. */
-  --fg-3: var(--audio-console-fg3);
-  --fg-4: var(--audio-console-fg4);
-
-  --line: var(--audio-console-line);
-  --line-2: var(--audio-console-line2);
-
-  /* C20 (2026-06-02): audio-scoped font aliases onto the shared global scale.
-     The redesign hardcoded "Inter Tight"/"JetBrains Mono" literals ~75× across
-     the live module CSS, but the app only loads "Inter Variable" +
-     "JetBrains Mono Variable" (see packages/tokens) — there is NO @font-face
-     for "Inter Tight", so every sans literal silently fell back to system-ui
-     and the mono labels rendered in TWO physical fonts (real JetBrains for
-     token readouts, system monospace for the literals). Aliasing to the loaded
-     families (NOT to "Inter Tight" — adding that face is out of scope) collapses
-     the split: all sans text now renders in the loaded Inter and all mono text
-     in the single JetBrains Mono. Theme-independent (these never change per
-     theme), so they live only in the base .audioShell. */
-  --font-ui: var(--font-family-sans);
-  --font-mono: var(--font-family-mono);
-
-  --accent: var(--audio-console-accent);
-  --accent-soft: var(--audio-console-accent-soft);
-  --accent-glow: var(--audio-console-accent-glow);
-
-  --danger: var(--audio-console-danger);
-  --danger-soft: var(--audio-console-danger-soft);
-
-  /* Single warm meter tone + clip-only red. Anchored to the meter container,
-     so the warm→red boundary lives at the same physical position on every
-     meter regardless of fill height (see AudioStereoMeter.module.css). */
-  --meter-low: var(--audio-console-meter-low);
-  --meter-mid: var(--audio-console-meter-mid);
-  /* C09(a): darken the clip cap so the at/over-0 dBFS boundary clears the 3:1
-     UI floor against the cream body (was oklch(64% 0.24 27) ≈ 2.15:1 → ~3.15:1).
-     Mirrored per theme: Graphite a smaller drop, Bone (dark body) RAISES the
-     cap instead. Do NOT darken the cream body ramp to chase this. */
-  --meter-hi: var(--audio-console-meter-hi);
-  /* C09(a): tunable clip-cap edge tone. Defaults to --meter-hi so the canvas
-     clip cap (--audio-meter-over) and the static .meterFill top stop track the
-     corrected hot tone, but can be retuned without disturbing the MonitorBar
-     master meter, which also reads --meter-hi. */
-  --meter-clip-edge: var(--meter-hi);
-  /* C09(b): desaturated orange-red intermediate for the transient meterPointOver
-     band — a color-mix of the clip-cap tone toward the warm accent so it reads
-     distinct from BOTH the saturated clip-red AND the amber peak-warning outline
-     (so: not pure amber). */
-  --meter-over-tone: var(--audio-console-meter-over-tone);
-  /* C09(c): theme-aware keyline/halo for the live peak-hold tick. Dark halo on
-     the light cream meter bodies (Studio/Graphite); see Bone for the light halo. */
-  --meter-peak-edge: var(--audio-console-meter-peak-edge);
-  --meter-bg: var(--audio-console-meter-bg);
-  --meter-clip-pct: 88%;
-
-  /* The LIVE meters are painted on a <canvas> by AudioMeterCanvasOverlay,
-     which reads this --audio-meter-* family (NOT the static .meterFill CSS).
-     Map the whole ramp to the warm single tone so the canvas renders a cream
-     body with a red clip cap, matching the Console prototype — instead of the
-     green→amber→red fallback. The body gradient is over(top) → hot → amber →
-     green(bottom); setting hot/amber/green to cream and over to red leaves
-     red only at the clip cap. */
-  --audio-meter-bg: var(--meter-bg);
-  --audio-meter-low: var(--audio-console-meter-canvas-low);
-  --audio-meter-low-hot: var(--meter-low);
-  --audio-meter-warn: var(--meter-low);
-  --audio-meter-hot: var(--meter-low);
-  --audio-meter-over: var(--meter-clip-edge);
-  --audio-meter-peak-hold: var(--audio-console-meter-peak-hold);
-
-  --strip-bg: var(--audio-console-strip-bg);
-  --strip-bg-hover: var(--audio-console-strip-bg-hover);
-  --strip-bg-selected: var(--audio-console-strip-bg-selected);
-
-  /* Recessed-housing material: used by the topbar cluster, monitor meter,
-     monitor controls, etc. */
-  --housing-bg-top: var(--audio-console-housing-bg-top);
-  --housing-bg-bot: var(--audio-console-housing-bg-bot);
-  --housing-shadow: var(--audio-console-housing-shadow);
-
-  /* S13 (TOKENS-04): the audio motion curves were promoted to the shared
-     token set in S1 (byte-equal values) — the private names stay as the
-     audio seam, re-pointed to the shared tokens. */
-  --easing: var(--motion-easing-in-out);
-  --easing-out: var(--motion-easing-out);
-
-  /* C22: single disabled-control dim. Replaces a fork of hardcoded 0.4 / 0.45 /
-     0.46 / 0.48 :disabled rules so the disabled treatment is unified instead of
-     "opacity:0.4 everywhere". 0.4 composited the --fg-2 button labels to
-     ~2.14:1 Studio / ~1.78:1 Bone (below the 3:1 UI floor); 0.7 clears it.
-     Opacity is luminance-independent, so one value holds across Studio /
-     Graphite / Bone — no per-theme override needed. */
-  --control-disabled-opacity: 0.7;
-
-  /* ── Surviving --audio-* semantic tokens ───────────────────────────────────
-     C07 (2026-06-02) pruned the legacy --audio-* / --color-* fork down to the
-     names that still had a consumer. Two of the three reasons it cited are now
-     gone: the intentionally-dead, unmounted AudioRail and AudioToolbar hosts
-     (the Phase-2 GS-AUD-44 dead-code posture) were deleted on 2026-09-09, and
-     the twelve pure aliases only they read went with them — the six --audio-*
-     (panel, border, accent, hot, talk, engaged-fill) and the six .audioShell
-     --color-* overrides (surface-900/800/700, text-strong/muted/subtle). The
-     --color-* names still resolve app-wide from :root in the generated tokens,
-     which is where the portaled rename dialog (gone 2026-10-01) always read
-     them from; only the audio-scoped overrides are gone.
-
-     What remains below is not alias residue — each is a real token with live
-     consumers, so this block is no longer a bridge to be dismantled. */
-
-  /* Runtime-read by AudioMeterCanvasOverlay.readColors() — keep aliased even
-     though no static CSS consumer remains (the meter overlay reads it by name
-     via getComputedStyle, with #ff4b4b only as a hard fallback). */
-  --audio-clip: var(--danger);
-  /* C10: tier for the faintest *text* captions (snapshot slot/meta/shortcut,
-     lane preamp/index rows, output metric small). NOT a pure 1:1 alias — it
-     defaults to --fg-4 so the dark themes are unchanged, but the Bone block
-     lifts it to --fg-3 (AA), so it stays a real semantic token (kept live in
-     the inspector / mixer lane / snapshot deck). --fg-4 itself stays reserved
-     for hairlines/dots/thumbs. */
-  --audio-caption-muted: var(--fg-3);
-  /* 2026-09 audit Slice 10: the microtype floor. Every audio caption that sat
-     at 8 / 8.5 / 9 px (font-size-4xs, -4xs-plus, -3xs) reads this token, so
-     nothing in the Console renders below 9.5 px (audio-legibility.spec.ts). */
-  /* Visual overhaul A, Slice 11: the floor is 12 px (system §3); this step was
-     9.5, which is what kept the Console under it. */
-  --audio-type-micro: var(--font-size-tick);
-}
+/* The Console's page (visual overhaul, the Console): the bay's margin and the
+   plate's wrapper. The Console reads the design system's tokens only; its own
+   variables, its armed and focus rules and its themes went with this pull
+   request, so a key here is the key on every page. */
 
 .audioShell {
   display: grid;
-  /* C11 (2026-06-02): make the shell rows explicit. The persistent chrome is
-     topbar (r2) / body (r3, the flexible 1fr) / monitor bar (r4) / footer
-     (r5); the optional feedback banner takes r1 and collapses to 0 height when
-     absent. Previously only `auto 1fr auto` was declared, so the footer landed
-     in an *implicit* 4th row and a transient feedback banner shoved every bar
-     down a row (the body lost its 1fr). Pinning the same-module .feedbackBanner
-     and .audioBody by grid-row keeps the body flexible regardless of the
-     banner, and the cross-module bars auto-place into rows 2/4/5 in DOM order. */
-  grid-template-rows: auto auto 1fr auto auto;
-  gap: 0;
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
   position: relative;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-label);
-  letter-spacing: -0.005em;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* ── Themes ───────────────────────────────────────────────────────────────
-   Visual overhaul A, Slice 1 (2026-09): the Console's Studio / Graphite / Bone
-   values moved to the `audio.console.*` tokens (core.json for Studio,
-   themes.css for the other two, driven by the global `data-theme` on <html>,
-   which `data-audio-theme` mirrors), so the private theme blocks that lived
-   here are gone and the Console renders pixel-identically from tokens. Slice 4
-   moves it onto the role tokens; Slice 11 removes the family. */
-
-.eyebrow {
-  color: var(--fg-3);
-  font: 400 var(--font-size-tick) / 1 var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* C20 (2026-06-02): ONE audio segmented-control segment recipe. The
-   "pick-one-of-N" toggle idiom was hand-built ≥3× with divergent geometries —
-   the topbar theme switcher (.themeSwitch button), the Outputs-tier Peak Hold
-   switch (.tierPeakHoldSwitch button) and the inspector Mute/Solo/Unity action
-   row (.inspectorActionRow > button). This MIRRORS the design-system
-   SegmentedControl's segment structure (a reset button that reads muted at rest
-   and lights on its active flag) using the audio tokens — it is deliberately
-   NOT the DS component (that is bound to --color-studio-* and would break the
-   amber accent + Graphite/Bone themes).
-
-   Each site composes this base and keeps ONLY its distinguishing geometry
-   (font / padding / radius / container) and its active treatment local: the two
-   neutral pills light to --bg-elev, while the inspector row keeps its SIGNAL
-   colors (mute → --danger, solo → --accent) intact. The base carries solely the
-   declarations that are byte-identical across all three sites today
-   (appearance reset, pointer cursor, the muted resting color), so composing it
-   is provably render-neutral — there is nothing for a site rule to override. */
-.segmentedToggle {
-  appearance: none;
-  cursor: pointer;
-  color: var(--fg-3);
-}
-
-.masterHalo {
-  position: absolute;
-  inset: -28px;
-  z-index: 0;
-  border-radius: var(--radius-pill);
-  background: radial-gradient(
-    220px 180px at 50% 22%,
-    color-mix(in srgb, var(--accent) 46%, transparent) 0%,
-    transparent 70%
-  );
-  opacity: calc(0.18 + var(--master-glow, 0) * 0.55);
-  filter: blur(2px);
-  pointer-events: none;
-  transition: opacity 220ms ease;
-}
-
-.shellPanel {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  background: var(--bg-1);
-  /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
-  box-shadow: var(--elevation-plate), var(--elevation-float);
+  background: var(--material-bg);
+  color: var(--text-text);
+  font: 400 var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .loadingPanel {
-  composes: shellPanel;
   display: grid;
-  align-content: start;
-  gap: 14px;
+  place-items: center;
   height: 100%;
-  min-height: 0;
-  padding: 18px;
 }
 
-.loadingPanel h1 {
-  margin: 0;
-  color: var(--fg);
-  font: 700 var(--font-size-2xl) / 1.15 var(--font-ui);
-  letter-spacing: -0.02em;
+.loadingWord {
+  font: 400 var(--font-size-word) / 1.2 var(--font-family-ui);
+  color: var(--text-text3);
 }
 
-.loadingGrid {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.loadingGrid span {
-  min-height: 140px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-key);
-  background: var(--bg-2);
-}
-
-.feedbackBanner {
-  /* C11: explicit shell row 1 (collapses to 0 when no banner is rendered). */
-  grid-row: 1;
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: center;
-  gap: 12px;
-  min-height: 36px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font: 400 var(--font-size-tick) / 1.25 var(--font-ui);
-  letter-spacing: 0;
-}
-
-.feedbackBanner[data-tone="ok"] {
-  /* AUD copy fix: success confirmations read as a calm neutral "done" — NOT amber.
-     Amber (the default/`info` tone) is reserved for attention notices (e.g. the
-     arm-pending "repeat to apply" prompt); painting success amber was the
-     tone-mapping outlier the audit flagged. Monochrome-safe: the palette has no
-     success hue, so ok = quiet elevated neutral. Holds in all three themes. */
-  background: var(--bg-elev);
-  color: var(--fg);
-  border-bottom-color: var(--line-2);
-}
-
-.feedbackBanner[data-tone="error"] {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border-bottom-color: color-mix(in srgb, var(--danger) 40%, var(--line));
-}
-
-/* ── Layout slots ─────────────────────────────────────────────────────────── */
-
+/* The bay: the page keeps its own 16 px margin in it (the shell draws none). */
 .audioBody {
-  /* C11: explicit shell row 3 — the single flexible (1fr) row. Pinning it here
-     keeps the mixer body flexible even when the feedback banner occupies row 1.
-     The shell (overhaul 3): the plate is the shell's, so the body is the
-     mixer alone, with the page's own margin in the bay. */
-  grid-row: 3;
-  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0;
   min-height: 0;
   min-width: 0;
-  padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
+  padding: 0 var(--chrome-studio-gutter);
   overflow: hidden;
 }
 
-/* The plate in the shell's plate: the whole height, the inspector scrolling
-   inside it until the Console's own pull request fits it. */
+/* The plate in the shell's plate, the whole height. */
 .audioPlate {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-.consoleTheme button[data-armed="true"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-  /* Slice 9 (system §5): an armed key blooms at 14 px, from the token. */
-  box-shadow: var(--elevation-key-armed);
-}
-
-.consoleTheme :is(button, [role="button"], [role="slider"], input):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .consoleTheme *,
-  .consoleTheme *::before,
-  .consoleTheme *::after {
-    animation-duration: 0s !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0s !important;
-  }
-
-  .masterHalo {
-    transition: none !important;
-  }
 }

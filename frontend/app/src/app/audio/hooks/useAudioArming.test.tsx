@@ -11,8 +11,6 @@ import { useAudioArming } from "./useAudioArming";
 const candidate = {
   key: "phantom:audio-input-9:true",
   label: "Enable 48V on Host",
-  targetId: "audio-input-9",
-  targetKind: "phantom" as const,
   timeoutMs: AUDIO_ARM_TIMEOUT_MS,
 };
 
@@ -53,8 +51,13 @@ describe("useAudioArming dwell", () => {
     trigger();
     expect(hook.result.current.armedAction?.key).toBe(candidate.key);
     expect(apply).not.toHaveBeenCalled();
+    // Visual overhaul, the Console. Old: arming posted "Armed: … Repeat the
+    // same action to apply." in a band over the bay. New: arming prints no
+    // line of its own and clears the last one. Reason: the state display's
+    // armed row and the key say it, and the band shrank the bay, moving every
+    // fader cap.
     expect(setFeedback).toHaveBeenCalledTimes(1);
-    expect(setFeedback.mock.calls[0][0]?.message).toMatch(/^Armed: Enable 48V on Host/);
+    expect(setFeedback).toHaveBeenLastCalledWith(null);
 
     // A double-click: the same key again, well inside the dwell.
     advance(AUDIO_ARM_MIN_DWELL_MS - 50);
@@ -75,7 +78,7 @@ describe("useAudioArming dwell", () => {
     trigger();
     act(() =>
       hook.result.current.armOrApplyAction(
-        { ...candidate, key: "snapshot-load:1", label: "Load Mix 1 in TotalMix", targetKind: "snapshot-load" },
+        { ...candidate, key: "snapshot-load:1", label: "Load Mix 1 in TotalMix" },
         apply
       )
     );
@@ -146,7 +149,7 @@ describe("useAudioArming Esc", () => {
       window.dispatchEvent(dialogEscape);
     });
     expect(hook.result.current.armedAction?.key).toBe(candidate.key);
-    expect(setFeedback).toHaveBeenCalledTimes(1);
+    expect(setFeedback).not.toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
   });
 });
 
@@ -185,7 +188,7 @@ describe("useAudioArming held Enter", () => {
     // Neither applies nor cancels the arm by itself.
     expect(hook.result.current.armedAction?.key).toBe(candidate.key);
     expect(apply).not.toHaveBeenCalled();
-    expect(setFeedback).toHaveBeenCalledTimes(1);
+    expect(setFeedback).not.toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
   });
 
   it("binds nothing while nothing is armed, before the arm and after its apply", () => {
