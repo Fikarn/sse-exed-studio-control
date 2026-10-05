@@ -218,12 +218,14 @@ export function recKeyView(main: CameraSnapshot | null): RecKeyView {
 export interface TakeReadout {
   id: "length" | "timecode" | "card";
   label: string;
-  /** The value, mono; `null` when there is none to print. */
+  /** The value; `null` when there is none to print. */
   value: string | null;
-  /** What the value is, or why there is none. */
+  /** What the value is, or why there is none, in a few words. */
   note: string;
   /** The last thing CAM 1 reported, not a fact now. */
   doubt: boolean;
+  /** The whole sentence behind a short note, for its tooltip; `null` when the note says it all. */
+  explain: string | null;
 }
 
 /**
@@ -241,26 +243,33 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
   const recording = main?.recording ?? null;
   const unreachable = main?.state === "unreachable";
 
-  let length: Pick<TakeReadout, "value" | "note">;
+  let length: Pick<TakeReadout, "value" | "note" | "explain">;
   if (notRead !== null) {
-    length = { value: null, note: notRead };
+    length = { value: null, note: notRead, explain: null };
   } else if (unreachable) {
     length = {
       value: null,
       note: recording?.recording === true ? "not counted · CAM 1 does not answer" : "CAM 1 does not answer",
+      explain: null,
     };
   } else if (recording?.recording !== true) {
-    length = { value: null, note: "not recording" };
+    length = { value: null, note: "not recording", explain: null };
   } else if (recording.startedAt && !Number.isNaN(Date.parse(recording.startedAt))) {
     const started = Date.parse(recording.startedAt);
     length = {
       value: formatTakeLength((nowMs - started) / 1000),
       note: `counted here since ${clockTime(recording.startedAt)}`,
+      explain: null,
     };
   } else {
     // One line in the cluster, as every other thing this row says: the keys
     // under the take must not move when it changes (docs/DESIGN.md, section 1).
-    length = { value: null, note: "not known · started before Studio Control looked" };
+    // The rest of the sentence is the row's tooltip.
+    length = {
+      value: null,
+      note: "not known",
+      explain: "The take started before Studio Control looked, so its length is not known.",
+    };
   }
 
   let timecode: Pick<TakeReadout, "value" | "note" | "doubt">;
@@ -274,13 +283,17 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
     timecode = { value: recording.timecode, note: unreachable ? "last read" : "", doubt: unreachable };
   }
 
-  const card: Pick<TakeReadout, "value" | "note"> = recording?.cardTimeLeft
-    ? { value: recording.cardTimeLeft, note: "" }
-    : { value: null, note: recording?.cardTimeNotReported ?? notRead ?? "not reported" };
+  // The hardware link's sentence for a card time it cannot read is the row's
+  // tooltip; the row says it in two words, on one line.
+  const card: Pick<TakeReadout, "value" | "note" | "explain"> = recording?.cardTimeLeft
+    ? { value: recording.cardTimeLeft, note: "", explain: null }
+    : recording?.cardTimeNotReported
+      ? { value: null, note: "not reported", explain: recording.cardTimeNotReported }
+      : { value: null, note: notRead ?? "not reported", explain: null };
 
   return [
     { id: "length", label: "Take length", doubt: false, ...length },
-    { id: "timecode", label: "Timecode", ...timecode },
+    { id: "timecode", label: "Timecode", explain: null, ...timecode },
     { id: "card", label: "Card time left", doubt: false, ...card },
   ];
 }
@@ -311,7 +324,7 @@ export interface CameraKeyView {
   /** The make and how it is reached: `Panasonic LUMIX BGH1 · network · 172.16.16.85`. */
   meta: string;
   state: CameraState;
-  /** The state's word in the key's lower case (`held`, `not set up`). */
+  /** The state's word, the hardware link's, in capitals (`HELD`, `NOT SET UP`; DESIGN.md §8). */
   word: string;
   tone: CameraTone;
   /** What the camera reports, as one line. */
@@ -365,7 +378,7 @@ export function cameraKeyView(camera: CameraSnapshot, selected: number): CameraK
     tag: camera.tag,
     meta: `${camera.model} · ${linkLabel(camera)}`,
     state: camera.state,
-    word: camera.word.toLowerCase(),
+    word: camera.word,
     tone: camera.tone,
     values,
     valuesKind,
@@ -600,7 +613,7 @@ export interface PictureRowView {
   tag: string;
   /** What arrives, in the hardware link's words: `vMix Output 3 · 3840 × 2160 · 29.97`, `test picture`. */
   detail: string;
-  /** The lamp's word in the row's lower case: `live`, `no picture`. */
+  /** The lamp's word, the hardware link's, in capitals: `LIVE`, `NO PICTURE`. */
   word: string;
   tone: CameraTone;
 }
@@ -611,7 +624,7 @@ export function pictureRows(snapshot: CamerasSnapshot): PictureRowView[] {
     camera: cameraNumber(camera),
     tag: camera.tag,
     detail: camera.picture.detail,
-    word: camera.picture.word.toLowerCase(),
+    word: camera.picture.word,
     tone: camera.picture.tone,
   }));
 }

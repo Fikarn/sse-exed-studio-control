@@ -196,14 +196,23 @@ describe("what is known about the take", () => {
     const cam1 = cameraOf(await read(), 1);
     const later = NOW + (12 * 60 + 41) * 1000;
     expect(takeReadouts(cam1, later)).toEqual([
-      { id: "length", label: "Take length", value: "12:41", note: "counted here since 09:11", doubt: false },
-      { id: "timecode", label: "Timecode", value: "07:11:00:00", note: "", doubt: false },
+      {
+        id: "length",
+        label: "Take length",
+        value: "12:41",
+        note: "counted here since 09:11",
+        doubt: false,
+        explain: null,
+      },
+      { id: "timecode", label: "Timecode", value: "07:11:00:00", note: "", doubt: false, explain: null },
+      // The hardware link's sentence is the row's tooltip; the row says it in two words.
       {
         id: "card",
         label: "Card time left",
         value: null,
-        note: "CAM 1 does not report its card time over Bluetooth.",
+        note: "not reported",
         doubt: false,
+        explain: "CAM 1 does not report its card time over Bluetooth.",
       },
     ]);
     expect(recordingWord(cam1, false, later)).toBe("CAM 1 · recording · 12:41 counted here");
@@ -215,7 +224,8 @@ describe("what is known about the take", () => {
     const cam1 = cameraOf(await read(), 1);
     expect(takeReadouts(cam1, NOW)[0]).toMatchObject({
       value: null,
-      note: "not known · started before Studio Control looked",
+      note: "not known",
+      explain: "The take started before Studio Control looked, so its length is not known.",
     });
     expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · recording · length not known");
   });
@@ -237,7 +247,7 @@ describe("what is known about the take", () => {
     expect(takeReadouts(cam1, NOW).map((row) => [row.value, row.note])).toEqual([
       [null, "not read while released"],
       [null, "not read while released"],
-      [null, "CAM 1 does not report its card time over Bluetooth."],
+      [null, "not reported"],
     ]);
     expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · not read while released");
 
@@ -270,7 +280,7 @@ describe("the three cameras' keys", () => {
         tag: "CAM 1",
         meta: "Blackmagic Pocket Cinema Camera 6K Pro · Bluetooth",
         state: "held",
-        word: "held",
+        word: "HELD",
         tone: "ok",
         values: "ISO 400 · 180° · f/2.8 · 5600 K",
         valuesKind: "values",
@@ -283,7 +293,7 @@ describe("the three cameras' keys", () => {
         tag: "CAM 2",
         meta: "Panasonic LUMIX BGH1 · network · 172.16.16.85",
         state: "held",
-        word: "held",
+        word: "HELD",
         tone: "ok",
         values: "ISO 800 · 1/50 · f/4.0 · 5600 K",
         valuesKind: "values",
@@ -296,7 +306,7 @@ describe("the three cameras' keys", () => {
         tag: "CAM 3",
         meta: "Panasonic LUMIX BGH1 · network · 172.16.16.30",
         state: "held",
-        word: "held",
+        word: "HELD",
         tone: "ok",
         values: "ISO 1600 · 1/50 · f/2.8 · 4300 K",
         valuesKind: "values",
@@ -338,7 +348,7 @@ describe("the three cameras' keys", () => {
     const snapshot = await read();
     const [cam1, cam2, cam3] = snapshot.cameras.map((camera) => cameraKeyView(camera, snapshot.selected));
     expect(cam1).toMatchObject({
-      word: "unreachable",
+      word: "UNREACHABLE",
       tone: "error",
       values: "ISO 400 · 180° · f/2.8 · 5600 K",
       valuesKind: "doubt",
@@ -347,14 +357,14 @@ describe("the three cameras' keys", () => {
       selected: false,
     });
     expect(cam2).toMatchObject({
-      word: "released",
+      word: "RELEASED",
       values: "not read while released",
       valuesKind: "plain",
       valuesTag: null,
       selected: true,
     });
     expect(cam3).toMatchObject({
-      word: "not set up",
+      word: "NOT SET UP",
       meta: "Panasonic LUMIX BGH1 · network",
       values: "no address",
       valuesKind: "plain",
@@ -574,9 +584,9 @@ describe("the pictures", () => {
     const snapshot = await read();
     expect(snapshot.cameras.every(pictureShows)).toBe(true);
     expect(pictureRows(snapshot)).toEqual([
-      { camera: 1, tag: "CAM 1", detail: "test picture", word: "live", tone: "ok" },
-      { camera: 2, tag: "CAM 2", detail: "test picture", word: "live", tone: "ok" },
-      { camera: 3, tag: "CAM 3", detail: "test picture", word: "live", tone: "ok" },
+      { camera: 1, tag: "CAM 1", detail: "test picture", word: "LIVE", tone: "ok" },
+      { camera: 2, tag: "CAM 2", detail: "test picture", word: "LIVE", tone: "ok" },
+      { camera: 3, tag: "CAM 3", detail: "test picture", word: "LIVE", tone: "ok" },
     ]);
     expect(picturesWord(snapshot)).toBe("test pictures · 3 / 3");
     expect(pictureLock(snapshot.cameras[0]!)).toBeNull();
@@ -599,7 +609,7 @@ describe("the pictures", () => {
       camera: 2,
       tag: "CAM 2",
       detail: "nothing received",
-      word: "no picture",
+      word: "NO PICTURE",
       tone: "attention",
     });
     expect(picturesWord(snapshot)).toBe("test pictures · 2 / 3 · CAM 2 missing");
@@ -640,7 +650,7 @@ describe("the pictures", () => {
     const { read } = openCameras({ simulated: false });
     const snapshot = await read();
     expect(snapshot.cameras.some(pictureShows)).toBe(false);
-    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "vMix Output 2 · nothing received", word: "no picture" });
+    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "vMix Output 2 · nothing received", word: "NO PICTURE" });
     expect(picturesWord(snapshot)).toBe("none · vMix Outputs 2 to 4");
     expect(camerasStateView(snapshot)?.word, "the cameras speak first").toBe("NOT SET UP");
   });

@@ -38,8 +38,7 @@
 
 .title b {
   color: var(--text-text);
-  font: 700 var(--font-size-value) / 1 var(--font-family-mono);
-  letter-spacing: var(--font-tracking-cap);
+  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
 .detail {
@@ -66,23 +65,19 @@
   margin-left: auto;
 }
 
-.aidsNote {
-  color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+/* The word whose tooltip says that the view and the aids are this screen's own. */
+.aidsWord {
+  color: var(--text-text3);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  cursor: default;
 }
 
 /* A small segmented pair: two keys as wide as their words. */
-.view,
-.zoom {
-  padding: 2px;
-  gap: 2px;
-  border-radius: var(--radius-key);
-}
-
 .view > *,
 .zoom > * {
   flex: none;
-  min-height: 28px;
+  min-height: 26px;
+  padding: 0 12px;
 }
 
 /* The picture's area is exactly the picture: its edge is an outline outside
@@ -95,7 +90,7 @@
   flex: none;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-ctl);
+  border-radius: var(--radius-base);
   outline: 1px solid var(--material-line);
   background: var(--material-well);
   overflow: hidden;
@@ -105,6 +100,15 @@
   width: 1680px;
   height: 945px;
   cursor: crosshair;
+}
+
+/* A small picture and its chip: the chip stands over the picture, beside
+   the picture's key rather than inside it. */
+.tileWrap {
+  position: relative;
+  flex: none;
+  width: 544px;
+  height: 306px;
 }
 
 .tile {
@@ -137,8 +141,9 @@
   flex: none;
 }
 
-/* A caption on a small picture: a display of its own, so its inks hold on
-   any picture. */
+/* A caption on a small picture: a well of its own, so its inks hold on any
+   picture, with the camera's ⋯ at its end. It is a hole in the pictures'
+   layer in the app's window, so the ⋯ in it is never drawn over. */
 .chip {
   position: absolute;
   top: 10px;
@@ -146,18 +151,17 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--radius-key);
+  height: 32px;
+  padding: 0 2px 0 10px;
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  color: var(--display-text);
+  color: var(--text-text);
   font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
 }
 
 .chip b {
-  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
-  letter-spacing: var(--font-tracking-cap);
+  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .loupe {
@@ -181,11 +185,6 @@
   font: 700 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
-.loupeNote {
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-}
-
 .zoom {
   margin-left: auto;
 }
@@ -194,7 +193,7 @@
   width: 568px;
   height: 272px;
   flex: none;
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   outline: 1px solid var(--material-line);
   background: var(--material-well);
   overflow: hidden;
@@ -213,7 +212,7 @@
   gap: 12px;
   padding: 24px;
   text-align: center;
-  color: var(--display-text);
+  color: var(--text-text);
   white-space: normal;
 }
 
@@ -223,16 +222,16 @@
 }
 
 .noPictureWord {
-  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
+  font-size: var(--font-size-word);
 }
 
 .noPictureSentence {
-  font: 700 var(--font-size-value) / 1.3 var(--font-family-ui);
+  font: 700 var(--font-size-head) / 1.3 var(--font-family-ui);
 }
 
 .noPictureDetail {
   max-width: 680px;
-  color: var(--display-text2);
+  color: var(--text-text2);
   font: 400 var(--font-size-body) / 1.4 var(--font-family-ui);
 }
 

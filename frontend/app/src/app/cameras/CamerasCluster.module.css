@@ -1,12 +1,12 @@
 /* The Cameras page's cluster: board 2's left column. The state display first
-   and fixed, the take under it, the three cameras, the pictures, the Recent
-   list, the standing actions at the foot. Every value is a token or a board
-   dimension. */
+   and fixed, the latch slot, the take under it, the three cameras, what the
+   deck's dials set, the pictures and the Recent list. The visual overhaul
+   (2026-10-05): every colour and size is the design system's. */
 
 .cluster {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;
@@ -38,72 +38,56 @@
 }
 
 /* Doubt on the take-time key: the last thing CAM 1 reported, not a fact now.
-   A dashed amber keyline on a display, at full strength: it is to be read. */
+   The dashed yellow keyline at full strength: it is to be read. */
 .recDoubt {
   opacity: 1;
-  border: 2px dashed var(--display-yellow);
+  border: 1px dashed var(--role-yellow-line);
   background: var(--material-well);
-  color: var(--display-yellow);
+  color: var(--role-yellow-text);
 }
 
 .recDoubt:hover {
-  border-color: var(--display-yellow);
+  border-color: var(--role-yellow-line);
 }
 
 .recDoubt > span:nth-child(2) {
-  color: var(--display-text);
+  color: var(--text-text);
 }
 
 .recWhy {
-  color: var(--display-yellow);
+  color: var(--role-yellow-text);
   font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
+/* What is known about the take: label · value rows on hairlines, one line
+   each whatever they say, so the keys under the take stand where they stood. */
 .take {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
+  flex: none;
 }
 
-/* A row keeps its height whatever it says, so that the keys under the take
-   stand where they stood: one line, as high as a value, and two for what the
-   card's row says. */
-.takeRow {
-  display: grid;
-  grid-template-columns: auto 1fr;
+.takeValue {
+  display: inline-flex;
   align-items: baseline;
-  column-gap: 12px;
-  min-height: calc(var(--font-size-body) * 1.2);
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
-}
-
-.takeRow[data-lines="2"] {
-  min-height: calc(var(--font-size-label) * 1.2 * 2);
-}
-
-.takeRow dt {
-  white-space: nowrap;
-}
-
-.takeRow dd {
-  display: flex;
   justify-content: flex-end;
-  align-items: baseline;
   gap: 8px;
-  margin: 0;
-  text-align: right;
 }
 
-.takeRow b {
-  color: var(--text-text);
-  font: 700 var(--font-size-body) / 1.2 var(--font-family-mono);
+.takeValue b {
+  font: 700 var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   font-variant-numeric: tabular-nums;
+  color: var(--text-text);
 }
 
-.takeRow b[data-doubt] {
+/* Doubt: the dashed yellow keyline on the value itself. */
+.takeValue b[data-doubt] {
   color: var(--role-yellow-text);
+  outline: 1px dashed var(--role-yellow-line);
+  outline-offset: 2px;
+}
+
+.takeNote {
+  color: var(--text-text2);
+  font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .cameras {
@@ -112,29 +96,38 @@
   gap: 8px;
 }
 
+/* A camera's row: its key across the cluster, and the key's ⋯ inside its
+   top right corner, a sibling of the key since a key cannot hold one. */
+.cameraRow {
+  position: relative;
+}
+
+.cameraMenu {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
 /* A camera's key: its tag and state, how it is reached, what it reports. */
 .camera {
   appearance: none;
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  column-gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
   row-gap: 6px;
   width: 100%;
   min-height: 84px;
   padding: 10px 12px;
-  border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
-  background: var(--elevation-key-fill);
-  box-shadow: var(--elevation-key);
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  background: var(--material-key);
   color: var(--text-text);
   text-align: left;
   cursor: pointer;
   transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
 }
 
-.camera:hover {
-  border-color: var(--material-line2);
+.camera:hover:not([data-selected]) {
+  border-color: var(--text-text4);
 }
 
 .camera:focus-visible {
@@ -142,26 +135,42 @@
   outline-offset: 2px;
 }
 
-/* Selected: a neutral keyline, which takes the hairline's place. */
+/* Selected: the Beige keyline, 2 px, as the design system's key draws it. */
 .camera[data-selected] {
-  padding: 9px 11px;
-  border: 2px solid var(--accent);
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.camera[data-selected]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The tag and the words; the row leaves the ⋯ its room at the right. */
+.cameraHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 28px;
+  padding-right: 36px;
 }
 
 .cameraTag {
-  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
-  letter-spacing: var(--font-tracking-cap);
+  flex: none;
+  font: 700 var(--font-size-word) / 1 var(--font-family-ui);
 }
 
 .cameraWords {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  justify-self: end;
+  margin-left: auto;
+  min-width: 0;
 }
 
 .cameraMeta {
-  grid-column: 1 / -1;
   min-width: 0;
   overflow: hidden;
   color: var(--text-text2);
@@ -178,9 +187,8 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
-  grid-column: 1 / -1;
   min-width: 0;
-  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -202,13 +210,12 @@
 
 .cameraValues[data-kind="plain"] {
   color: var(--text-text2);
-  font-family: var(--font-family-ui);
 }
 
 .fine {
   margin: 0;
   color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
 }
 
 /* What the deck's dials set: three keys across the cluster. The hint under
@@ -231,28 +238,31 @@
 
 .pictureRow {
   display: grid;
-  grid-template-columns: 56px 1fr auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   align-items: baseline;
   column-gap: 8px;
   font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
 }
 
 .pictureTag {
-  font: 700 var(--font-size-label) / 1.2 var(--font-family-mono);
-  letter-spacing: var(--font-tracking-cap);
+  font: 700 var(--font-size-label) / 1.2 var(--font-family-ui);
 }
 
 .pictureDetail {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-text2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-/* Whether it arrives: `live`, or `no picture` in amber. */
+/* Whether it arrives: LIVE, or NO PICTURE in yellow. */
 .pictureWord {
   font-size: var(--font-size-label);
 }
 
 /* The Recent list takes what room is left, and never scrolls: it holds the
-   newest five, each on one line. */
+   newest five, each on two lines at most. */
 .recentSection {
   flex: 0 1 auto;
   min-height: 0;
@@ -278,7 +288,7 @@
 
 .recentTime {
   color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1.15 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1.15 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
 }
 

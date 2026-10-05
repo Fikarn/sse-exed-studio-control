@@ -10,8 +10,9 @@ import type { PictureCamera, PicturePlaces, PlaceRect, PlacedPicture } from "@ss
 // over a picture (a small picture's chip, a message, a tooltip, a menu, a popover), which
 // the helper leaves clear. The design system says what floats (`floatingLayers`): every
 // menu, list, tooltip and element of the floating layer, each counted once, and never a
-// dialog. While a dialog is open (the values list is one until it becomes a popover), or
-// more stands over the pictures than the helper can leave clear, or the window is hidden,
+// dialog. While a dialog is open (the page's own lists and typed values are popovers since
+// 2026-10-05, so none of them is one), or more stands over the pictures than the helper
+// can leave clear, or the window is hidden,
 // the page says it shows no picture, and the layer hides: a picture is never drawn over
 // something the operator should see.
 //

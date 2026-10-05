@@ -1,17 +1,23 @@
+import { useRef } from "react";
+
 import {
   ArmKey,
   Key,
   LampWord,
   LatchSlot,
   MenuButton,
+  Readouts,
   Section,
   Segmented,
   StateDisplay,
+  Tooltip,
   type ArmedKey,
   type MenuEntry,
+  type UseArmResult,
 } from "@sse/design-system";
-import type { CameraDialBank, CameraNumber, CamerasSnapshot } from "@sse/engine-client";
+import type { CameraDialBank, CameraNumber, CameraSnapshot, CamerasSnapshot } from "@sse/engine-client";
 
+import type { CamerasMenu } from "./camerasMenus";
 import {
   cameraKeyView,
   cameraOf,
@@ -22,6 +28,7 @@ import {
   recKeyView,
   takeReadouts,
   type CamerasStateView,
+  type TakeReadout,
 } from "./camerasModel";
 import { STOP_WINDOW_MS } from "./perform";
 import styles from "./CamerasCluster.module.css";
@@ -30,7 +37,10 @@ import styles from "./CamerasCluster.module.css";
 // its armed row, the take — REC, which is CAM 1's whichever camera is
 // selected (D14), and what is known about the take —, the three cameras,
 // what the Stream Deck's dials set, where the pictures come from and whether
-// each arrives, who changed what, and the standing actions.
+// each arrives, and who changed what. The visual overhaul (2026-10-05): each
+// camera's key has its ⋯ beside it, with the same menu as its small picture
+// and the plate's title; the state words are the hardware link's, in
+// capitals; the helper sentences are the section heads' tooltips.
 
 /** The rows the Recent list has room for: what the hardware link sends. */
 const RECENT_ROOM = 5;
@@ -39,6 +49,12 @@ export interface CamerasClusterProps {
   snapshot: CamerasSnapshot;
   state: CamerasStateView;
   armed: ArmedKey | null;
+  /** What the armed row says before "· press again". */
+  armedWords: string | null;
+  /** The page's one arm, which every menu shares. */
+  arm: UseArmResult;
+  /** A camera's menu, as its key, its small picture and the plate's title open it. */
+  cameraMenu: (camera: CameraSnapshot, testIdPrefix: string) => CamerasMenu;
   /** The clock the take's length is counted against. */
   now: number;
   onRecord: () => void;
@@ -52,10 +68,98 @@ export interface CamerasClusterProps {
   onOpenActions: () => void;
 }
 
+/** A section head's word with its helper sentence as the tooltip. */
+function Head({ word, tip }: { word: string; tip: string }) {
+  return (
+    <Tooltip content={tip} placement="right">
+      <span>{word}</span>
+    </Tooltip>
+  );
+}
+
+/** A take row's value: the number, and what it is in a few words; the whole sentence on hover. */
+function TakeValue({ row }: { row: TakeReadout }) {
+  const value = (
+    <span className={styles.takeValue} data-testid={`cameras-take-${row.id}`}>
+      {row.value !== null ? <b data-doubt={row.doubt ? "" : undefined}>{row.value}</b> : null}
+      {row.note ? <span className={styles.takeNote}>{row.note}</span> : null}
+    </span>
+  );
+  return row.explain ? (
+    <Tooltip content={row.explain} placement="right">
+      {value}
+    </Tooltip>
+  ) : (
+    value
+  );
+}
+
+interface CameraKeyProps {
+  entry: CameraSnapshot;
+  selected: number;
+  menu: CamerasMenu;
+  arm: UseArmResult;
+  onSelect: (camera: CameraNumber) => void;
+}
+
+/**
+ * A camera's key and its ⋯. The key is the take-time control (it selects); the
+ * ⋯ stands beside it, inside its edge, since a key cannot hold a key. A
+ * right-click anywhere on the row opens the same menu.
+ */
+function CameraKey({ entry, selected, menu, arm, onSelect }: CameraKeyProps) {
+  const row = useRef<HTMLDivElement>(null);
+  const camera = cameraKeyView(entry, selected);
+  return (
+    <div ref={row} className={styles.cameraRow}>
+      <button
+        type="button"
+        className={styles.camera}
+        data-material="key"
+        data-take=""
+        data-selected={camera.selected ? "" : undefined}
+        data-state={camera.state}
+        aria-pressed={camera.selected}
+        data-testid={`cameras-key-${camera.camera}`}
+        onClick={() => onSelect(camera.camera)}
+      >
+        <span className={styles.cameraHead}>
+          <span className={styles.cameraTag}>{camera.tag}</span>
+          <span className={styles.cameraWords}>
+            {camera.rec === "recording" ? (
+              <LampWord tone="error">REC</LampWord>
+            ) : camera.rec === "last-known" ? (
+              <LampWord tone="attention">LAST KNOWN REC</LampWord>
+            ) : null}
+            <LampWord tone={camera.tone}>{camera.word}</LampWord>
+          </span>
+        </span>
+        <span className={styles.cameraMeta}>{camera.meta}</span>
+        <span className={styles.cameraValues} data-kind={camera.valuesKind}>
+          <span className={styles.cameraLine}>{camera.values}</span>
+          {camera.valuesTag ? <span className={styles.cameraValuesTag}>{camera.valuesTag}</span> : null}
+        </span>
+      </button>
+      <span className={styles.cameraMenu}>
+        <MenuButton
+          buttonLabel={`${camera.tag} menu`}
+          buttonTestId={`cameras-key-menu-${camera.camera}`}
+          contextTarget={row}
+          size="sm"
+          menu={{ ...menu, arm }}
+        />
+      </span>
+    </div>
+  );
+}
+
 export function CamerasCluster({
   snapshot,
   state,
   armed,
+  armedWords,
+  arm,
+  cameraMenu,
   now,
   onRecord,
   onSelect,
@@ -72,9 +176,7 @@ export function CamerasCluster({
   const wayOut = state.wayOut;
   const dials = dialsView(snapshot);
   // The shell (overhaul 3): the page's ⋯ on the state display holds the
-  // standing commands, with the same handlers; the row of keys that held them
-  // went, so the cluster keeps its room for the latch slot under the 80 px
-  // header (the Recent list's five rows at two lines).
+  // standing commands, with the same handlers.
   const pageMenu: MenuEntry[] = [
     { id: "read-all", label: "Read all cameras again", onSelect: () => onReadAgain(null), testId: "cameras-read-all" },
     { id: "all-actions", label: "All actions", onSelect: onOpenActions },
@@ -115,7 +217,7 @@ export function CamerasCluster({
         }
         // The REC key and the plate's own keys say that they are armed; the
         // row says what the second press does.
-        armed={armed ? { text: `${armed.label} · press again`, timeoutMs: armed.timeoutMs } : null}
+        armed={armed ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs } : null}
         data-camera={state.camera}
         testId="cameras-state-display"
         menu={
@@ -130,7 +232,10 @@ export function CamerasCluster({
       {/* The shell (overhaul 3): the latch slot, the same on every page. */}
       <LatchSlot testId="cameras-latch-slot" />
 
-      <Section title="Recording" detail="CAM 1 only · whichever camera is selected" testId="cameras-recording">
+      <Section
+        title={<Head word="Recording" tip="REC is CAM 1's, whichever camera is selected." />}
+        testId="cameras-recording"
+      >
         {rec.kind === "recording" ? (
           <ArmKey
             hazard
@@ -182,73 +287,51 @@ export function CamerasCluster({
             ) : null}
           </Key>
         )}
-        <dl className={styles.take} data-testid="cameras-take">
-          {takeReadouts(main, now).map((row) => (
-            <div
-              key={row.id}
-              className={styles.takeRow}
-              data-lines={row.id === "card" ? "2" : undefined}
-              data-testid={`cameras-take-${row.id}`}
-            >
-              <dt>{row.label}</dt>
-              <dd>
-                {row.value !== null ? <b data-doubt={row.doubt ? "" : undefined}>{row.value}</b> : null}
-                {row.note ? <span>{row.note}</span> : null}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <Readouts
+          className={styles.take}
+          data-testid="cameras-take"
+          rows={takeReadouts(main, now).map((row) => ({
+            id: row.id,
+            label: row.label,
+            value: <TakeValue row={row} />,
+          }))}
+        />
       </Section>
 
-      <Section title="Cameras" detail="press one: the picture and the plate follow" testId="cameras-list">
+      <Section
+        title={<Head word="Cameras" tip="Press one: the big picture and the plate follow it." />}
+        testId="cameras-list"
+      >
         <div className={styles.cameras} role="group" aria-label="Cameras">
-          {snapshot.cameras.map((entry) => {
-            const camera = cameraKeyView(entry, snapshot.selected);
-            return (
-              <button
-                key={camera.camera}
-                type="button"
-                className={styles.camera}
-                data-material="key"
-                data-take=""
-                data-selected={camera.selected ? "" : undefined}
-                data-state={camera.state}
-                aria-pressed={camera.selected}
-                data-testid={`cameras-key-${camera.camera}`}
-                onClick={() => onSelect(camera.camera)}
-              >
-                <span className={styles.cameraTag}>{camera.tag}</span>
-                <span className={styles.cameraWords}>
-                  {camera.rec === "recording" ? (
-                    <LampWord tone="error">REC</LampWord>
-                  ) : camera.rec === "last-known" ? (
-                    <LampWord tone="attention" cap={false}>
-                      last known REC
-                    </LampWord>
-                  ) : null}
-                  <LampWord tone={camera.tone} cap={false}>
-                    {camera.word}
-                  </LampWord>
-                </span>
-                <span className={styles.cameraMeta}>{camera.meta}</span>
-                <span className={styles.cameraValues} data-kind={camera.valuesKind}>
-                  <span className={styles.cameraLine}>{camera.values}</span>
-                  {camera.valuesTag ? <span className={styles.cameraValuesTag}>{camera.valuesTag}</span> : null}
-                </span>
-              </button>
-            );
-          })}
+          {snapshot.cameras.map((entry) => (
+            <CameraKey
+              key={entry.camera}
+              entry={entry}
+              selected={snapshot.selected}
+              menu={cameraMenu(entry, `cameras-key-menu-${entry.camera}`)}
+              arm={arm}
+              onSelect={onSelect}
+            />
+          ))}
         </div>
       </Section>
 
       {dials ? (
-        <Section title="Stream Deck" detail="CAMERAS page · what the dials set" testId="cameras-dials">
+        <Section
+          title={
+            <Head
+              word="Stream Deck"
+              tip="The deck's CAMERAS page: what its dials set on the selected camera. It sends nothing to a camera."
+            />
+          }
+          testId="cameras-dials"
+        >
           <Segmented label="What the Stream Deck's dials set" className={styles.banks} testId="cameras-bank">
             {DIAL_BANKS.map((entry) => (
               <Key
                 key={entry.bank}
                 mode="segmented"
-                engaged={dials.bank === entry.bank}
+                selected={dials.bank === entry.bank}
                 aria-pressed={dials.bank === entry.bank}
                 testId={`cameras-bank-${entry.bank}`}
                 onClick={() => onBank(entry.bank)}
@@ -263,24 +346,26 @@ export function CamerasCluster({
         </Section>
       ) : null}
 
-      <Section title="Pictures" detail={snapshot.pictures.source} testId="cameras-pictures">
+      <Section
+        title={<Head word="Pictures" tip={snapshot.pictures.note} />}
+        detail={snapshot.pictures.source}
+        testId="cameras-pictures"
+      >
         <ul className={styles.pictures}>
           {pictureRows(snapshot).map((row) => (
             <li key={row.camera} className={styles.pictureRow} data-testid={`cameras-picture-row-${row.camera}`}>
               <span className={styles.pictureTag}>{row.tag}</span>
               <span className={styles.pictureDetail}>{row.detail}</span>
-              <LampWord tone={row.tone} cap={false} className={styles.pictureWord}>
+              <LampWord tone={row.tone} className={styles.pictureWord}>
                 {row.word}
               </LampWord>
             </li>
           ))}
         </ul>
-        <p className={styles.fine}>{snapshot.pictures.note}</p>
       </Section>
 
       <Section
-        title="Recent"
-        detail="who changed what"
+        title={<Head word="Recent" tip="Who changed what on the cameras: the newest five, with who did it." />}
         className={styles.recentSection}
         actions={
           <Key size="small" testId="cameras-all-actions" onClick={onOpenActions}>

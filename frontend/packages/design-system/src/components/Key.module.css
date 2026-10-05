@@ -235,6 +235,19 @@
     color: var(--role-yellow-ink);
   }
 
+  /* The current choice, where a choice is a setting and not something engaged
+     (a camera's frame rate, the view): the Beige keyline, 2 px inside the
+     segment, in the main ink. Yellow stays for what is engaged. */
+  .segmented .selected {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    color: var(--text-text);
+  }
+
+  .segmented .selected:focus-visible {
+    outline-offset: 2px;
+  }
+
   .segmented .live {
     background: var(--role-green-fill);
     color: var(--role-green-ink);

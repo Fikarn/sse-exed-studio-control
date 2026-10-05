@@ -108,9 +108,11 @@ The Prompter XL:
 The pictures, with vMix running and its Outputs 2, 3 and 4 sent over NDI:
 
 - [ ] The build's folder holds the shell, the engine, `studio-control-pictures.exe`, `Processing.NDI.Lib.x64.dll` and `build.json`. When the app starts, Windows may ask about the firewall for `studio-control-pictures.exe` at the build's path. The answer is the owner's, as a firewall rule is a security setting; with Cancel, check that the pictures still come.
-- [ ] All three pictures show, CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4, each `live` with `vMix Output N · 3840 × 2160 · 29.97` (or its own size and rate), with no switch; the footer reads `Pictures vMix Outputs 2 to 4 · 3 / 3`. The engine's log says the helper loaded NDI's library from the build's folder, its hash the pinned one.
+- [ ] All three pictures show, CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4, each `LIVE` with `vMix Output N · 3840 × 2160 · 29.97` (or its own size and rate), with no switch; the footer reads `Pictures vMix Outputs 2 to 4 · 3 / 3`. The engine's log says the helper loaded NDI's library from the build's folder, its hash the pinned one.
 - [ ] `Guides`, `Peaking` and `Zebras 95 %` draw on the big picture, zebras and peaking in the loupe, and the loupe's dashed frame on the big picture; `1:1`, 2:1 and 4:1 and a press on the big picture move them.
 - [ ] With one of Outputs 2 to 4 not sent over NDI in vMix, that camera's place reads `NO PICTURE` and names the output to check; with vMix closed, `NO PICTURES` says to open vMix and send the outputs. The controls still work.
+- [ ] The `⋯` in a small picture's label opens its camera's menu over the picture, and the picture stays drawn round the label and the menu. A right-click on the small picture opens the same menu at the pointer. (The picture is drawn natively over the page in the app's window, and whether a right-click there reaches the page is not known yet: if it does not, note it; the `⋯` is the way that always works.)
+- [ ] The `⋯` beside a camera's key and in the plate's title open the same menu; a right-click on a camera's key does too. A menu stays on screen while it is open, and Esc closes it.
 
 Until the links to the cameras are built:
 

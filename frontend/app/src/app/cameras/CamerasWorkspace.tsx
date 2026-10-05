@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ShellRegion, useArm } from "@sse/design-system";
+import { ShellRegion } from "@sse/design-system";
 import {
   EngineRequestError,
   type CameraDialBank,
   type CameraNumber,
   type CameraPressSetting,
+  type CameraSnapshot,
   type CamerasSnapshot,
   type JsonValue,
   type PicturePlaces,
@@ -18,6 +19,7 @@ import { useLiveCallback } from "../shared/useLiveCallback";
 import { CamerasBay } from "./CamerasBay";
 import { CamerasCluster } from "./CamerasCluster";
 import { CamerasFooter } from "./CamerasFooter";
+import { buildCameraMenu } from "./camerasMenus";
 import { CamerasPlate } from "./CamerasPlate";
 import {
   cameraNumber,
@@ -28,6 +30,7 @@ import {
   selectedCamera,
 } from "./camerasModel";
 import { STOP_WINDOW_MS, type PerformAction } from "./perform";
+import { armedCamera, camerasArmedWords, camerasArmKey, STOP_ARM_KEY, useCamerasArming } from "./useCamerasArming";
 import { NO_AIDS, type PictureAids } from "./pictures/CameraPicture";
 import { usePictureFrames } from "./pictures/pictureFrames";
 import { CENTRE, type BigView, type LoupeZoom, type Point } from "./pictures/pictureGeometry";
@@ -45,6 +48,13 @@ import styles from "./CamerasWorkspace.module.css";
 // again at every start: the view, the picture aids, the loupe and the one
 // armed key. One press sets exposure, colour and focus and starts a take;
 // stopping it, the format, the look and Release are press twice (D11).
+//
+// The visual overhaul (2026-10-05): one arm for the page (`useCamerasArming`),
+// shared by REC's stop, the plate's Release, the format's and the look's
+// choices and the selected camera's menu. Each camera has one menu, opened by
+// its key's ⋯, its small picture's ⋯, the plate title's ⋯ or a right-click
+// on any of them. Release from another camera's menu selects that camera and
+// arms the plate's Release key once the hardware link says it is selected.
 //
 // The page reads the cameras once a second while it is open: a camera says
 // nothing by itself until its link is built, and a read sends nothing (D12).
@@ -72,7 +82,7 @@ const EVERY_CAMERA: Record<CameraNumber, Point> = { 1: CENTRE, 2: CENTRE, 3: CEN
 
 export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: CamerasWorkspaceProps) {
   const toast = useToast();
-  const arm = useArm();
+  const arm = useCamerasArming();
   const [view, setView] = useState<BigView>("whole");
   const [aids, setAids] = useState<PictureAids>(NO_AIDS);
   const [zoom, setZoom] = useState<LoupeZoom>(2);
@@ -113,12 +123,12 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
 
   // An armed key names a camera that must still be held when it is pressed
   // again: a camera that was released, lost or selected away drops the arm.
+  // A menu's arm (`menu:release:N`) names its camera too.
   const armedKey = arm.armed?.key ?? null;
-  const armedCamera = armedKey === null ? null : armedKey === "stop" ? 1 : Number(armedKey.split(":")[1]);
-  const armedHeld =
-    armedCamera === null || (camerasSnapshot && cameraOf(camerasSnapshot, armedCamera)?.state) === "held";
-  const armedInView = armedKey === null || armedKey === "stop" || armedCamera === selectedNumber;
-  const stillRecording = armedKey !== "stop" || main?.recording.recording === true;
+  const armedOn = armedKey === null ? null : armedCamera(armedKey);
+  const armedHeld = armedOn === null || (camerasSnapshot && cameraOf(camerasSnapshot, armedOn)?.state) === "held";
+  const armedInView = armedKey === null || armedKey === STOP_ARM_KEY || armedOn === null || armedOn === selectedNumber;
+  const stillRecording = armedKey !== STOP_ARM_KEY || main?.recording.recording === true;
   const clearArm = arm.clear;
   useEffect(() => {
     if (!armedHeld || !armedInView || !stillRecording) clearArm();
@@ -204,20 +214,38 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
       return;
     }
     arm.armOrApply(
-      "stop",
+      STOP_ARM_KEY,
       "Stop recording on CAM 1",
       () => void perform(() => store.stopCameraRecording(true)),
       STOP_WINDOW_MS
     );
   });
-  const release = useLiveCallback(() => {
-    if (!selected) return;
-    const camera = selectedNumber;
+  /** The plate's Release key for `target`: the first press arms, the second releases. */
+  const armRelease = (target: CameraSnapshot) => {
+    const camera = cameraNumber(target);
     arm.armOrApply(
-      `release:${camera}`,
-      `Release ${selected.tag} to ${releasedTo(selected)}`,
+      camerasArmKey.release(camera),
+      `Release ${target.tag} to ${releasedTo(target)}`,
       () => void perform(() => store.releaseCamera(camera, true), true)
     );
+  };
+  const release = useLiveCallback(() => {
+    if (selected) armRelease(selected);
+  });
+  // Release from the menu of a camera that is not selected: select it, then
+  // arm the plate's Release key, and only if the read that follows the
+  // selection says that camera is selected and held. That read is the one
+  // chance: nothing waits for a later read, so a later selection of the camera,
+  // by hand or from the deck, never arms anything. It never arms the camera
+  // that was selected before, and it only arms: it never gives the second press.
+  const releaseElsewhere = useLiveCallback(async (camera: CameraNumber) => {
+    if (camera === selectedNumber) return;
+    const answer = await perform(() => store.selectCamera(camera));
+    if (answer === null) return;
+    const now = store.getSnapshot().camerasSnapshot;
+    const target = now?.selected === camera ? cameraOf(now, camera) : null;
+    if (target?.state !== "held" || arm.armed?.key === camerasArmKey.release(camera)) return;
+    armRelease(target);
   });
   const format = useLiveCallback((setting: "resolution" | "frameRate", value: string) => {
     if (!selected) return;
@@ -227,7 +255,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
     const unit = setting === "frameRate" ? "p" : "";
     const what = setting === "frameRate" ? "Frame rate" : "Resolution";
     arm.armOrApply(
-      `format:${camera}:${setting}:${value}`,
+      camerasArmKey.format(camera, setting, value),
       `${what} ${current ?? "—"}${unit} → ${value}${unit} on ${selected.tag}`,
       () => void perform(() => store.setCameraFormat({ camera, [setting]: value, confirm: true }), true)
     );
@@ -243,11 +271,28 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
           ? `Display LUT → ${String(value)}`
           : `Display LUT ${value === true ? "on" : "off"}`;
     arm.armOrApply(
-      `look:${camera}:${setting}:${String(value)}`,
+      camerasArmKey.look(camera, setting, value),
       `${what} on ${selected.tag}`,
       () => void perform(() => store.setCameraLook({ camera, [setting]: value, confirm: true }), true)
     );
   });
+
+  /** A camera's one menu, for its key, its small picture and the plate's title. */
+  const cameraMenu = (camera: CameraSnapshot, testIdPrefix: string) => {
+    const number = cameraNumber(camera);
+    return buildCameraMenu({
+      camera,
+      selected: number === selectedNumber,
+      testIdPrefix,
+      onSelect: () => select(number),
+      onConnect: () => connect(number),
+      onReadAgain: () => void readAgain(number),
+      onOpenSetup: openSetup,
+      onRelease: () => void perform(() => store.releaseCamera(number, true), true),
+      onReleaseElsewhere: () => void releaseElsewhere(number),
+    });
+  };
+  const armedWords = arm.armed ? camerasArmedWords(arm.armed, camerasSnapshot) : null;
 
   const moveLoupe = useLiveCallback((point: Point) => {
     setPoints((held) => ({ ...held, [selectedNumber]: point }));
@@ -269,6 +314,9 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
       <ShellRegion region="cluster">
         <CamerasCluster
           armed={arm.armed}
+          armedWords={armedWords}
+          arm={arm}
+          cameraMenu={cameraMenu}
           now={now}
           snapshot={camerasSnapshot}
           state={state}
@@ -293,6 +341,8 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
         onMoveLoupe={moveLoupe}
         onPlaces={sayPlaces}
         onSelect={select}
+        arm={arm}
+        cameraMenu={cameraMenu}
         onToggleAid={toggleAid}
         onView={setView}
         onZoom={setZoom}
@@ -300,6 +350,8 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
       <ShellRegion region="plate">
         <CamerasPlate
           armed={arm.armed}
+          arm={arm}
+          menu={cameraMenu(selected, "cameras-plate-menu")}
           camera={selected}
           mainRecording={main?.state === "held" && main.recording.recording === true}
           onAuto={auto}
@@ -318,7 +370,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
           now={now}
           selected={selected}
           snapshot={camerasSnapshot}
-          stopArmed={arm.armed?.key === "stop"}
+          stopArmed={arm.armed?.key === STOP_ARM_KEY}
           view={view}
         />
       </ShellRegion>
