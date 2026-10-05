@@ -131,7 +131,7 @@ describe("the Runner binds no key of its own (new pages S3, D6)", () => {
     const lights = screen.getByRole("button", { name: "LIGHTS" });
     const audio = screen.getByRole("button", { name: "AUDIO" });
     // The LIGHTS page's first key: REC, top left on every page (2026-10-03).
-    const firstLight = () => screen.getByRole("button", { name: "REC button" });
+    const firstLight = () => screen.getByRole("button", { name: "REC key" });
     expect(lights.getAttribute("data-active")).toBe("true");
     expect(firstLight().getAttribute("data-selected")).toBe("true");
 
@@ -149,8 +149,8 @@ describe("the Runner binds no key of its own (new pages S3, D6)", () => {
     expect(audio.textContent).toBe("AUDIO");
     await user.click(audio);
     expect(audio.getAttribute("data-active")).toBe("true");
-    expect(screen.getByRole("button", { name: "REC button" }).getAttribute("data-selected")).toBe("true");
-    expect(screen.getByRole("button", { name: "MAIN OUT button" }).getAttribute("data-selected")).toBe("false");
+    expect(screen.getByRole("button", { name: "REC key" }).getAttribute("data-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: "MAIN OUT key" }).getAttribute("data-selected")).toBe("false");
     await store.dispose();
   });
 });

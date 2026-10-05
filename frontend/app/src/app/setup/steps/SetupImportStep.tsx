@@ -1,11 +1,10 @@
-import { SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
-import styles from "../SetupSupportPilot.module.css";
+import { SetupField, SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
 import { Key } from "@sse/design-system";
 import { healthCheckTone } from "../../shellData";
 import { runnerStepOrder } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
-/** Runner step 1: the addresses the workstation talks to. */
+/** Runner step 1: the deck's profile for Companion. */
 export function SetupImportStep({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot } = editor.props;
   const { activeStepId, setExportBaseUrl, exportBaseUrl, runtimePaths, controlSurface, pages, totalControlCount } =
@@ -19,53 +18,46 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
           head={bayHead}
           eyebrow={`Step 1 of ${runnerStepOrder.length}`}
           title="Import the Companion profile"
-          lead="Export the ready-to-import deck profile, then load it in Companion on this workstation."
+          lead="Export the deck's profile for Companion: its pages, keys and dials, made from what Studio Control holds. It lands in the exports folder."
+          // What to do in Companion stays on screen: the import replaces what
+          // Companion holds (docs/HARDWARE.md, "To put the profile on the deck").
           rules={[
+            { id: "companion", text: "Start Companion first: the export asks it for the deck." },
             {
-              id: "bindings",
-              text: "The profile carries the deck pages and their controls; edit bindings in Map bindings, not in Companion.",
-              tone: "off",
-            },
-            {
-              id: "url",
-              text: "The server base URL is where Companion reaches this workstation; keep it on the studio network.",
-              tone: "off",
+              id: "reset",
+              text: "In Companion, import it with Full Reset & Import, then check that Horizontal Swipe Changes Page is off for the deck.",
             },
           ]}
           facts={
             <>
-              <label className={styles.field}>
-                <span>Server base URL</span>
-                <input
-                  className={styles.textField}
-                  onChange={(event) => setExportBaseUrl(event.target.value)}
-                  placeholder="http://127.0.0.1:38201"
-                  value={exportBaseUrl}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Export target</span>
-                <input
-                  className={styles.textField}
-                  disabled
-                  value={String(runtimePaths?.appDataDir ?? "Native runtime path unavailable")}
-                />
-              </label>
+              <SetupField
+                label="Server base URL"
+                wide
+                placeholder="http://127.0.0.1:38201"
+                value={exportBaseUrl}
+                onChange={(event) => setExportBaseUrl(event.target.value)}
+              />
+              <SetupField
+                label="Export target"
+                wide
+                disabled
+                readOnly
+                value={String(runtimePaths?.appDataDir ?? "not reported")}
+              />
             </>
           }
           actions={
             <>
               {primaryKey}
               <Key
-                take
+                size="large"
                 testId="setup-download-companion"
                 onClick={() => void performAction("export-companion-inline", () => saveImportProfile(false))}
               >
-                Download Companion profile
+                Export only
               </Key>
             </>
           }
-          note="Download profile writes the export, then opens Probe hardware."
           record={
             <>
               <SetupRecordHeading>Before you start</SetupRecordHeading>
@@ -82,8 +74,7 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
               />
               <SetupRecordRow
                 label="Hardware profile"
-                value={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
-                tone="off"
+                value={String(commissioningSnapshot?.hardwareProfile ?? "not reported")}
               />
             </>
           }

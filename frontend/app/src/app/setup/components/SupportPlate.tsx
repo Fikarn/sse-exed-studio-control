@@ -1,17 +1,33 @@
-import { Danger, Key, PlateHead, Readouts, Section, Segmented } from "@sse/design-system";
+import {
+  Danger,
+  Key,
+  LampWord,
+  MenuButton,
+  PlateHead,
+  Readouts,
+  Section,
+  Segmented,
+  Tooltip,
+  type UseArmResult,
+} from "@sse/design-system";
 
 import { OPERATOR_UI_SCALES } from "../../operatorLayout";
 import type { OperatorUiScale } from "../../operatorLayout";
+import { buildSupportPlateMenu } from "../support/supportMenus";
 import { RecentActions, type RecentAction } from "./RecentActions";
 import styles from "./SupportPlate.module.css";
 
-// Visual overhaul A, Slice 7 (A-setup.html's plate): Support is always here,
-// whatever step the runner is on — the workstation's own settings, the backup
-// the operator would restore from, the two things that show what went wrong, the
-// sample data that asks first, what version everything is, and the one red
-// command on the surface.
+// Support, on the shell's plate (the visual overhaul, 2026-10-05): always here,
+// whatever the bay shows. The workstation's own settings, the backup the
+// operator would restore from, the two things that show what went wrong, what
+// version everything is, what was done last, and the one coral command. Every
+// section is on screen at once and nothing scrolls; the helper sentences are
+// the section words' tooltips. The plate title's ⋯ holds every command of the
+// plate but the switches.
 
 export interface SupportPlateProps {
+  /** The page's arm: the menu takes it, so two keys are never armed at once. */
+  arm: UseArmResult;
   archiveCount: number;
   backupKind: string;
   busy?: boolean;
@@ -22,7 +38,7 @@ export interface SupportPlateProps {
    *  are armed, as the lighting state says; `null` until it has been read. */
   lightOutputsArmed: boolean | null;
   /** New pages program, Slice 6a: the Prompter XL as Windows reports it
-   *  (`connected · 1920×1080 · 60 Hz`), with its tone; `null` before the
+   *  (`CONNECTED · 1920×1080 · 60 Hz`), with its tone; `null` before the
    *  hardware link has said. */
   prompterXl?: { value: string; tone: "ok" | "attention" | "error" } | null;
   protocolVersion: string;
@@ -49,7 +65,17 @@ export interface SupportPlateProps {
   restoreDisabled: boolean;
 }
 
+/** A section's word with its helper sentence as the tooltip. */
+function SectionWord({ word, tip }: { word: string; tip: string }) {
+  return (
+    <Tooltip content={tip} placement="left">
+      <span>{word}</span>
+    </Tooltip>
+  );
+}
+
 export function SupportPlate({
+  arm,
   archiveCount,
   backupKind,
   busy = false,
@@ -75,85 +101,127 @@ export function SupportPlate({
   onVerifyBackup,
   restoreDisabled,
 }: SupportPlateProps) {
+  const noBackupReason = restoreDisabled ? "no backup yet" : null;
+  // Held is not a blackout: the rig keeps its last look, or does what the
+  // bridge does when its source goes away. The words say what is sent, never
+  // what the room looks like.
+  const outputs =
+    lightOutputsArmed === null
+      ? { word: "NOT READ", tone: "off" as const, sentence: "The light outputs have not been read yet." }
+      : lightOutputsArmed
+        ? { word: "ARMED", tone: "ok" as const, sentence: "Armed: the rig follows the app." }
+        : {
+            word: "HELD",
+            tone: "attention" as const,
+            sentence: "Held: nothing is sent to the rig until the outputs are armed.",
+          };
+
   return (
     <div className={styles.plate} data-testid="support-plate" aria-label="Support">
       <PlateHead
-        title="Support"
-        sub="Workstation settings, backups and diagnostics · always here, whatever step the runner is on"
+        title={
+          <Tooltip
+            content="Workstation settings, backups and diagnostics. Always here, whatever the bay shows."
+            placement="left"
+          >
+            <span>Support</span>
+          </Tooltip>
+        }
+        action={
+          <MenuButton
+            buttonLabel="Support menu"
+            buttonTestId="support-plate-menu"
+            menu={{
+              ...buildSupportPlateMenu({
+                busy,
+                noBackupReason,
+                canOpenLog: canOpenEngineLog,
+                onExportBackup,
+                onVerifyLatest: onVerifyBackup,
+                onRestoreLatest,
+                onExportDiagnostics,
+                onOpenLog: onOpenEngineLog,
+                onStudioFullscreen: onEnterStudioFullscreen,
+                onResetWindowLayout,
+              }),
+              arm,
+            }}
+          />
+        }
         testId="support-plate-head"
       />
 
-      <Section title="Workstation" detail="applies to every workspace" testId="support-workstation">
-        <Readouts rows={[{ id: "scale", label: "UI scale", value: `${uiScale} %` }]} />
-        <Segmented label="UI scale" className={styles.segmented} testId="support-scale-switch">
-          {OPERATOR_UI_SCALES.map((scale) => (
-            <Key
-              key={scale}
-              mode="segmented"
-              cap={String(scale)}
-              take
-              engaged={uiScale === scale}
-              aria-pressed={uiScale === scale}
-              aria-label={`UI scale ${scale} %`}
-              testId={`support-scale-${scale}`}
-              onClick={() => onSelectUiScale(scale)}
-            />
-          ))}
-        </Segmented>
-        {/* New pages program, Slice 3 (D6, decision 2): the window commands
-            the command palette held. They are commands, not a switch, so no
-            key is lit; a refusal lands in the pilot's message line. Slice SW
-            (D22): the Windowed key went with the windowed layout, and the
-            row's copy under the bay's Support screen, for screens under
-            2200 px, went too; this is the one Window row. */}
-        <Readouts rows={[{ id: "window", label: "Window", value: "kept for the next launch" }]} />
+      <Section
+        title={<SectionWord word="Workstation" tip="These settings apply to every page." />}
+        testId="support-workstation"
+      >
+        <div className={styles.row}>
+          <span className={styles.label}>UI scale</span>
+          <Segmented label="UI scale" className={styles.segmented} testId="support-scale-switch">
+            {OPERATOR_UI_SCALES.map((scale) => (
+              <Key
+                key={scale}
+                mode="segmented"
+                selected={uiScale === scale}
+                aria-pressed={uiScale === scale}
+                aria-label={`UI scale ${scale} %`}
+                testId={`support-scale-${scale}`}
+                onClick={() => onSelectUiScale(scale)}
+              >
+                {String(scale)}
+              </Key>
+            ))}
+          </Segmented>
+        </div>
+        {/* New pages program, Slice 3 (D6, decision 2): the window commands.
+            They are commands, not a switch, so no key is lit; a refusal lands
+            in the pilot's message line. The window is kept for the next
+            launch. */}
         <div role="group" aria-label="Window" className={styles.windowKeys} data-testid="support-window-keys">
           <Key size="small" disabled={busy} testId="support-window-studio-fullscreen" onClick={onEnterStudioFullscreen}>
             Studio fullscreen
           </Key>
-          <Key size="small" disabled={busy} testId="support-window-reset" onClick={onResetWindowLayout}>
-            Reset the window layout
-          </Key>
+          <Tooltip
+            content="Forgets where the window was and puts it fullscreen on the studio display. The window is kept for the next launch."
+            placement="left"
+          >
+            <span className={styles.keyCell}>
+              <Key size="small" disabled={busy} testId="support-window-reset" onClick={onResetWindowLayout}>
+                Reset the window layout
+              </Key>
+            </span>
+          </Tooltip>
         </div>
-        {/* Held is not a blackout: the rig keeps its last look, or does what
-            the bridge does when its source goes away. The words say what is
-            sent, never what the room looks like. */}
-        <Readouts
-          rows={[
-            {
-              id: "light-outputs",
-              label: "Light outputs",
-              tone: lightOutputsArmed === false ? "attention" : undefined,
-              value:
-                lightOutputsArmed === null
-                  ? "not read yet"
-                  : lightOutputsArmed
-                    ? "the rig follows the app"
-                    : "nothing is sent to the rig",
-            },
-          ]}
-        />
+        <div className={styles.row} data-testid="support-outputs">
+          <Tooltip content={outputs.sentence} placement="left">
+            <span className={styles.label}>Light outputs</span>
+          </Tooltip>
+          <LampWord tone={outputs.tone} className={styles.outputsWord} testId="support-outputs-word">
+            {outputs.word}
+          </LampWord>
+        </div>
+        {/* One press: arming sends the current state at once (F31). */}
         <Segmented label="Light outputs" className={styles.segmented} testId="support-outputs-switch">
           <Key
             mode="segmented"
-            cap="Armed"
-            take
             disabled={busy || lightOutputsArmed === null}
-            engaged={lightOutputsArmed === true}
+            selected={lightOutputsArmed === true}
             aria-pressed={lightOutputsArmed === true}
             testId="support-outputs-armed"
             onClick={() => onSetLightOutputsArmed(true)}
-          />
+          >
+            Armed
+          </Key>
           <Key
             mode="segmented"
-            cap="Held"
-            take
             disabled={busy || lightOutputsArmed === null}
-            engaged={lightOutputsArmed === false}
+            selected={lightOutputsArmed === false}
             aria-pressed={lightOutputsArmed === false}
             testId="support-outputs-held"
             onClick={() => onSetLightOutputsArmed(false)}
-          />
+          >
+            Held
+          </Key>
         </Segmented>
         {prompterXl ? (
           <Readouts
@@ -171,7 +239,7 @@ export function SupportPlate({
       </Section>
 
       <Section
-        title="Backups"
+        title={<SectionWord word="Backups" tip="Export one before any restore. A restore asks first." />}
         detail={archiveCount === 1 ? "1 backup" : `${archiveCount} backups`}
         testId="support-backups"
       >
@@ -191,15 +259,20 @@ export function SupportPlate({
             testId="support-restore-latest"
             onClick={onRestoreLatest}
           >
-            Restore latest
+            Restore latest…
           </Key>
           <Key size="small" disabled={busy || restoreDisabled} testId="support-verify-latest" onClick={onVerifyBackup}>
             Verify latest
           </Key>
         </div>
+        {restoreDisabled ? (
+          <p className={styles.reason} data-testid="support-backups-reason">
+            Nothing to restore or verify yet: no backup has been exported.
+          </p>
+        ) : null}
       </Section>
 
-      <Section title="Diagnostics" detail="what happened, in a file" testId="support-diagnostics">
+      <Section title={<SectionWord word="Diagnostics" tip="What happened, in a file." />} testId="support-diagnostics">
         <div className={styles.keys}>
           <Key size="small" disabled={busy} testId="support-export-diagnostics" onClick={onExportDiagnostics}>
             Export diagnostics
@@ -210,7 +283,7 @@ export function SupportPlate({
         </div>
       </Section>
 
-      <Section title="About" detail="this workstation" testId="support-about">
+      <Section title={<SectionWord word="About" tip="This workstation." />} testId="support-about">
         <Readouts
           rows={[
             { id: "app", label: "Studio Control", value: appVersion },

@@ -1,5 +1,5 @@
 import styles from "./SetupSupportPilot.module.css";
-import { ShellRegion, StatusPill } from "@sse/design-system";
+import { LampWord, ShellRegion } from "@sse/design-system";
 import { SetupCluster } from "./components/SetupCluster";
 import { SetupImportStep } from "./steps/SetupImportStep";
 import { SetupProbeStep } from "./steps/SetupProbeStep";
@@ -13,7 +13,6 @@ import { SetupPilotDialogs } from "./support/SetupPilotDialogs";
 import {
   probeChecks,
   type RunnerStepId,
-  feedbackStatus,
   APP_VERSION,
   runnerStepOrder,
   type SetupSupportPilotProps,
@@ -26,9 +25,9 @@ import { useSetupPilot } from "./useSetupPilot";
 export function SetupSupportPilot(props: SetupSupportPilotProps) {
   const editor = useSetupPilot(props);
   const { store } = props;
-  const { busyAction, canReturnToConsole, checks, mode, feedback, recommendedStepId, runnerSteps, stepIndex } =
+  const { busyAction, canReturnToConsole, checks, mode, feedback, recommendedStepId, runnerSteps, stepIndex, isReady } =
     editor.state;
-  const { setupState, clusterSteps, openEngineLog } = editor.chrome;
+  const { setupState, clusterSteps, openEngineLog, armedWords } = editor.chrome;
   const { arm } = editor.state;
   const {
     performAction,
@@ -42,12 +41,14 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
     <div className={styles.workspaceStack} data-testid="setup-workspace">
       <ShellRegion region="cluster">
         <SetupCluster
-          armed={arm.armed}
+          arm={arm}
+          armedWords={armedWords}
           busy={busyAction !== null}
           canReturnToConsole={canReturnToConsole}
           checks={probeChecks(checks)}
           mode={mode}
           nextStepId={recommendedStepId}
+          published={isReady}
           state={setupState}
           steps={clusterSteps}
           onExportBackup={() => void performAction("support-export", exportSupportBackup)}
@@ -78,13 +79,17 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
             <SetupSupportScreen editor={editor} />
           )}
 
+          {/* The last result, in one place at the bay's foot, whatever the
+              screen above it is. */}
           {feedback ? (
-            <div className={styles.feedbackBanner} data-testid="setup-feedback" data-tone={feedback.tone} role="status">
-              <StatusPill
-                label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
-                tone={feedbackStatus(feedback) ?? "info"}
-              />
-              <span>{feedback.message}</span>
+            <div className={styles.feedback} data-testid="setup-feedback" data-tone={feedback.tone} role="status">
+              <LampWord
+                tone={feedback.tone === "ok" ? "ok" : feedback.tone === "error" ? "error" : "info"}
+                cap={false}
+                className={styles.feedbackWords}
+              >
+                {feedback.message}
+              </LampWord>
             </div>
           ) : null}
         </main>

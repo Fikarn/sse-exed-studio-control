@@ -1,7 +1,7 @@
-/* Visual overhaul A, Slice 7: Setup's cluster. Every value is a token; the
-   geometry is the mock's — the state display first and fixed, Runner · Support
-   under it, the five steps, the three probes, and the standing actions at the
-   foot. */
+/* Setup's cluster (the visual overhaul, 2026-10-05): the state display first
+   and fixed, Runner · Support · Cameras under it, the five steps, the three
+   probes. Nothing scrolls: the column is the height of the frame, and what it
+   holds fits with room to spare. Every value is a token. */
 
 .cluster {
   display: flex;
@@ -10,7 +10,7 @@
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .section {
@@ -31,78 +31,82 @@
 .steps {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+
+/* A step across the column: the tooltip's wrapper and trigger take its width. */
+.stepCell {
+  display: flex;
+  min-width: 0;
+}
+
+.stepCell > span,
+.stepCell > span > span:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .step {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 10px;
+  width: 100%;
   min-height: 56px;
-  padding: 8px 12px;
-  border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
-  background: linear-gradient(180deg, var(--material-key-top), var(--material-key));
-  color: var(--text-text);
+  justify-content: flex-start;
+  padding: 0 12px;
   text-align: left;
-  cursor: pointer;
 }
 
-.step[data-current="true"] {
-  border-color: var(--accent);
+.step[data-armed="false"] > span {
+  flex: 1;
+  min-width: 0;
 }
 
-/* A press that would unpublish the setup, armed: the armed key's amber
-   keyline, without moving the key. */
-.step[data-armed="true"] {
-  border-color: var(--display-yellow);
-}
-
-.step[data-armed="true"] .stepStanding {
-  color: var(--role-yellow-text);
+.stepFace {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  width: 100%;
+  min-width: 0;
 }
 
 .stepNumber {
   grid-row: 1 / span 2;
-  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
-  color: var(--text-text2);
+  color: var(--text-text3);
+  font: var(--font-weight-bold) var(--font-size-body) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .stepName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: 700 var(--font-size-value) / 1.2 var(--font-family-ui);
-}
-
-.stepHint {
   grid-column: 2;
   min-width: 0;
   overflow: hidden;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 3px;
-  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
-  color: var(--text-text2);
+}
+
+/* On a published setup a step arms first, and says so at rest. */
+.stepTwice {
+  grid-column: 2;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .stepStanding {
   grid-row: 1 / span 2;
   grid-column: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
-  color: var(--text-text2);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
-.step[data-current="true"] .stepStanding {
-  color: var(--text-text);
-  font-weight: 700;
+/* An armed key that keeps its height: the tag and the words side by side, as
+   the Teleprompter's Clear and Lighting's Save row do, so nothing under it
+   moves while it counts down. */
+.armRow[data-armed="true"] {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px;
 }
 
 /* ---- the three probes --------------------------------------------------- */
@@ -110,69 +114,44 @@
 .probes {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
+/* A probe: its name and its word, and under them what it answered. Rows under
+   hairlines, never boxes. */
 .probe {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 10px;
-  min-height: 44px;
-  padding: 6px 12px;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--material-line);
 }
 
 .probeName {
   min-width: 0;
   overflow: hidden;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 700 var(--font-size-label) / 1.2 var(--font-family-ui);
-  color: var(--display-text);
-}
-
-.probeDetail {
-  grid-column: 2;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 2px;
-  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
-  color: var(--display-text2);
 }
 
 .probeStanding {
-  grid-row: 1 / span 2;
-  grid-column: 3;
-  font: 700 var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--role-green-text);
+  justify-self: end;
 }
 
-.probeStanding[data-status="attention"] {
-  color: var(--role-yellow-text);
+/* Run all probes across the column, under the probes. */
+.probesKey > * {
+  width: 100%;
 }
 
-.probeStanding[data-status="error"] {
-  color: var(--role-coral-text);
-}
-
-/* ---- the standing actions ----------------------------------------------- */
-
-.actions {
-  margin-top: auto;
-  flex: none;
-}
-
-.actionRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.actionRow > * {
-  flex: 1;
-  white-space: nowrap;
+.probeDetail {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }

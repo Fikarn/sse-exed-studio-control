@@ -1,27 +1,41 @@
-/* Visual overhaul A, Slice 7: the Support plate. Every section on screen at
-   once, the red command at the bottom, nothing behind a tab. */
+/* The Support plate (the visual overhaul, 2026-10-05): the rhythm of every
+   plate, 16 px between sections, every section on screen at once, the coral
+   command at the bottom, nothing behind a tab and nothing that scrolls. */
 
 .plate {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   height: 100%;
   min-height: 0;
-  padding: 16px;
-  overflow-y: auto;
+  padding: 16px 16px 20px;
+  overflow: hidden;
 }
 
-.segmented {
-  margin-top: 6px;
+/* A setting: its word at the left, the control at the right. */
+.row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 28px;
+}
+
+.label {
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .segmented > * {
   flex: 1;
 }
 
+.outputsWord {
+  justify-self: end;
+}
+
 .keys {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -30,23 +44,36 @@
   white-space: nowrap;
 }
 
-/* New pages program, Slice 3 (decision 2): the window keys under their
-   readout, as the switches sit under theirs, each across the row. Slice SW
-   (D22): Studio fullscreen takes the row it shared with Windowed, so the row
-   keeps its height and Reset its place under it. */
+/* The window keys, side by side across the plate. */
 .windowKeys {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
-  margin-top: 6px;
 }
 
-/* The camera pictures' build, step 3: NDI's attribution under About, as
-   words (the app opens no page outside it). */
-.fine {
-  margin: 6px 0 0;
+.windowKeys > *,
+.windowKeys > span > span:first-child,
+.keyCell,
+.keyCell > * {
+  width: 100%;
+}
+
+.keyCell {
+  display: flex;
+}
+
+/* Why a key is locked, on screen. */
+.reason {
+  margin: 0;
   color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1.35 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+/* NDI's attribution under About, as words (the app opens no page outside it). */
+.fine {
+  margin: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-tick) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .danger {

@@ -68,7 +68,7 @@ describe("the recovery screen's restore keys ask first", () => {
       .spyOn(store, "restoreSupportBackup")
       .mockResolvedValue({ requiresRestart: true, sourcePath: "C:/app-data/backups/db.sqlite3" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Restore latest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore latest…" }));
     const dialog = screen.getByRole("dialog", { name: "Restore this backup?" });
     expect(dialog.textContent).toContain("It replaces");
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -77,7 +77,7 @@ describe("the recovery screen's restore keys ask first", () => {
     });
     expect(restore).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Restore latest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore latest…" }));
     fireEvent.click(
       within(screen.getByRole("dialog", { name: "Restore this backup?" })).getByRole("button", { name: "Restore" })
     );
@@ -97,7 +97,7 @@ describe("the recovery screen's restore keys ask first", () => {
 
     expect(screen.getByText("Latest database backup")).toBeTruthy();
     expect(screen.getByText(/only a database backup can be restored/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Restore latest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore latest…" }));
     const dialog = screen.getByRole("dialog", { name: "Restore this backup?" });
     expect(dialog.textContent).toContain("The database backup of");
     fireEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
@@ -111,7 +111,7 @@ describe("the recovery screen's restore keys ask first", () => {
     const store = await renderRecovery({ backups: [ARCHIVE], failure: STORAGE_CORRUPT });
 
     expect(screen.getByText("No database backup yet")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Restore latest" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Restore latest…" }) as HTMLButtonElement).disabled).toBe(true);
     await store.dispose();
   });
 
@@ -119,9 +119,26 @@ describe("the recovery screen's restore keys ask first", () => {
     const store = await renderRecovery();
     const restore = vi.spyOn(store, "restoreSupportBackup");
 
-    fireEvent.click(screen.getByRole("button", { name: "Restore path" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restore path…" }));
     expect(screen.getByRole("dialog", { name: "Restore this backup?" })).toBeTruthy();
     expect(restore).not.toHaveBeenCalled();
+    await store.dispose();
+  });
+
+  // The visual overhaul (2026-10-05): while the saved data does not open only
+  // a database backup restores, so an archive in the field locks Restore path
+  // with the reason on screen, rather than being refused after the question.
+  it("Restore path is locked for an archive while the saved data does not open", async () => {
+    const store = await renderRecovery({ failure: STORAGE_CORRUPT });
+
+    fireEvent.click(screen.getByTestId("setup-recovery-backup-0"));
+    expect(screen.getByTestId("setup-recovery-backup-0").getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByRole("button", { name: "Restore path…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("setup-recovery-archive-refused").textContent).toContain("choose a database backup");
+
+    fireEvent.click(screen.getByTestId("setup-recovery-backup-1"));
+    expect((screen.getByRole("button", { name: "Restore path…" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId("setup-recovery-archive-refused")).toBeNull();
     await store.dispose();
   });
 });

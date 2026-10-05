@@ -1,74 +1,112 @@
-/* Setup / Support's Cameras screen: one card a camera, across the step's left
-   column, each with its fields in rows. The card is printed on the screen's
-   well, so its inks are the display's. */
+/* Setup / Support's Cameras screen (the visual overhaul, 2026-10-05): one
+   block a camera, its head with the camera's word and its ⋯, then its rows,
+   under a hairline. Nothing is a card. */
 
 .camera {
-  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--display-text) 20%, transparent);
-  border-radius: var(--radius-key);
-  color: var(--display-text);
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--material-line);
 }
 
 .head {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
   min-width: 0;
 }
 
+/* The camera's name keeps its case: PT Sans, never Adelia. */
 .tag {
-  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
-  letter-spacing: var(--font-tracking-cap);
+  flex: none;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .model {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--display-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  white-space: nowrap;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sentence {
+  margin: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .row {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 140px;
+  grid-template-columns: 120px minmax(0, 1fr) 160px;
   align-items: center;
   gap: 12px;
+  min-height: 40px;
 }
 
 .label {
-  color: var(--display-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
-  letter-spacing: var(--font-tracking-eyebrow);
-  text-transform: uppercase;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .value {
-  font: 700 var(--font-size-name) / 1 var(--font-family-mono);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
-.foot {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px;
-  align-items: center;
-  gap: 12px;
+/* `paired` and `not paired` are state words: capitals. */
+.value[data-testid$="-paired"] {
+  letter-spacing: var(--font-tracking-cap);
+  text-transform: uppercase;
+}
+
+.keyCell {
+  display: inline-flex;
+}
+
+.row > :last-child {
+  justify-self: end;
+}
+
+/* A camera's address: a field on the well, as tall as a key. */
+.address {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.address:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.address::placeholder {
+  color: var(--text-text4);
+}
+
+.address:disabled {
+  color: var(--text-text3);
 }
 
 .locked {
+  margin: 0;
   color: var(--role-yellow-text);
-  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .waiting {
-  grid-column: 1 / -1;
   margin: 0;
-  color: var(--display-text2);
-  font: 400 var(--font-size-body) / 1.4 var(--font-family-ui);
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }
