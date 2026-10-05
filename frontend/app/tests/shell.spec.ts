@@ -497,6 +497,14 @@ test("lazy workspace loads", async ({ page }) => {
 test("no tab moves when the page changes", async ({ page }) => {
   await openFixture(page, "setup-ready");
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  // The baseline once the shell is ready: before it, the tabs carry other
+  // words (pending), and the faces may still be loading.
+  await expectWorkspaceMounted(page, "setup");
+  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+  await page.evaluate(() => document.fonts.ready);
   const lefts = () =>
     nav.evaluate((element) =>
       [...element.querySelectorAll("button")].map((button) => Math.round(button.getBoundingClientRect().left))

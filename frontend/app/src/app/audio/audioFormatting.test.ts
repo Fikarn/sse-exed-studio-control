@@ -254,8 +254,7 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
   });
 
   it("says for how long TotalMix was out of touch while ASSUMED (2026-10-01)", () => {
-    const sentence =
-      "TotalMix was out of touch for 31 s, so a change made there meanwhile may be missing. Press Sync from TotalMix.";
+    const sentence = "TotalMix was out of touch for 31 s: a change made there may be missing.";
     const status = describeAudioStatus(
       passedWithTotalMix({
         consoleStateConfidence: "assumed",
@@ -270,7 +269,7 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
   });
 
   it("says the desk has not been read since the start while ASSUMED (2026-10-02)", () => {
-    const sentence = "Studio Control has not read the desk since it started. Press Sync from TotalMix.";
+    const sentence = "Studio Control has not read the desk since it started.";
     const status = describeAudioStatus(
       passedWithTotalMix({
         consoleStateConfidence: "assumed",
@@ -291,7 +290,7 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
         consoleStateConfidence: "assumed",
         lastActionStatus: "failed",
         lastActionCode: "AUDIO_CONSOLE_UNREAD_SINCE_START",
-        lastActionMessage: "Studio Control has not read the desk since it started. Press Sync from TotalMix.",
+        lastActionMessage: "Studio Control has not read the desk since it started.",
       })
     );
     expect(status.label).toBe("OFFLINE");

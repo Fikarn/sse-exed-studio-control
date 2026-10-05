@@ -128,7 +128,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 
 Every state word is the hardware link's, in capitals with its lamp. Its sentence is printed as the link gives it. A raw code prints small under the sentence and is never the first thing read. Every state sentence says what happened and what to do, and the way out is a key in the same display.
 
-The sentence keeps two lines, so every state sentence is written to fit them, about 70 characters, whether the hardware link or the page writes it; the way-out key beside it names the action, so the sentence need not. The meta fits beside the way-out key, about 30 characters. Should a name ever make either longer, the display says the whole of it on hover. The page tests hold that none is cut on any fixture.
+The sentence keeps two lines, so every state sentence is written to fit them, about 70 characters, whether the hardware link or the page writes it; the way-out key beside it names the action, so the sentence need not. The meta fits beside the way-out key, about 30 characters. Should a name ever make either longer (a snapshot load's failure names its slot first), the display says the whole of it on hover. The page tests hold that none is cut on any fixture.
 
 | Page         | Words                                                                                                                                       |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |

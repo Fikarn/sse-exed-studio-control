@@ -36,7 +36,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 ## Audio console
 
 - [ ] In TotalMix FX, remote 4 is `In Use` in `Global OSC` mode, port incoming 7004, port outgoing 9004, `Send changes` on, `Follow Submix` off.
-- [ ] After a start, with the Console last `VERIFIED` or `ASSUMED`, it reads `ASSUMED`, "Studio Control has not read the desk since it started. Press Sync from TotalMix.", and `engine.log` says `The Console reads assumed until a Sync`. After `Sync from TotalMix` it reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
+- [ ] After a start, with the Console last `VERIFIED` or `ASSUMED`, it reads `ASSUMED`, "Studio Control has not read the desk since it started.", and `engine.log` says `The Console reads assumed until a Sync`. After `Sync from TotalMix` it reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
 - [ ] A fader moved or a mute pressed in TotalMix shows on the Console within about a second.
 - [ ] `Sync from TotalMix` says how many values it read and moves nothing in TotalMix.
 - [ ] On a preamp with an SM7B (48 V does it no harm), the speakers down: `M` twice, 48 V to the other state and back (two presses each), Hi-Z and AutoSet on and off again, the gain 1 dB up and back; on Phones 1, `M` twice. The Console stays `VERIFIED` and reads no `ASSUMED`: since D36 a change counts only when TotalMix's answer carries it. Everything is left as it was.

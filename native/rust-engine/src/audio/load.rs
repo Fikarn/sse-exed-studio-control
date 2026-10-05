@@ -155,7 +155,7 @@ pub fn load_audio_console_snapshot_with(
         let guard = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if !guard.slot_bound {
             let message = format!(
-                "Nothing was sent: Studio Control is not listening on TotalMix's port {}. Check Setup.",
+                "Nothing sent: Studio Control is not listening on port {}. Check Setup.",
                 config.receive_port + 3
             );
             drop(guard);
