@@ -123,3 +123,9 @@
   font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
   color: var(--text-text3);
 }
+
+/* The design system's empty line, at the rail's own spacing. */
+.emptyLine {
+  margin: 0;
+  padding: 4px 0;
+}

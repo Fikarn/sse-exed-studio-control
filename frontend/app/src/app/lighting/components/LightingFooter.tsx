@@ -7,7 +7,8 @@ const DMX_UNIVERSE_TOTAL_CHANNELS = 512;
 // only (DESIGN.md §2): the channels in use, how many fixtures are patched, and
 // whether the scene on the rig is the one that was saved, in the deck's words.
 // The bridge's address is the state display's sentence; the DMX strip's key
-// is in the page's ⋯.
+// is in the page's ⋯. The visual overhaul's polish (2026-10-05): its counts
+// read "n of m", as every page's do (they read "n / m").
 
 export interface LightingFooterProps {
   bridgeUniverse: number;
@@ -45,9 +46,9 @@ export function LightingFooter({
         {
           id: "channels",
           label: `Universe ${bridgeUniverse}`,
-          value: `${channelCount} / ${DMX_UNIVERSE_TOTAL_CHANNELS} channels`,
+          value: `${channelCount} of ${DMX_UNIVERSE_TOTAL_CHANNELS} channels`,
         },
-        { id: "fixtures", label: "Fixtures", value: `${fixturesPatched} / ${fixturesTotal} patched` },
+        { id: "fixtures", label: "Fixtures", value: `${fixturesPatched} of ${fixturesTotal} patched` },
         { id: "scene", label: previewMode ? "Preview" : "Scene", value: sceneState },
       ]}
       testId="lighting-health-bar"

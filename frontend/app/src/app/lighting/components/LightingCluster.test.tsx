@@ -127,6 +127,23 @@ describe("LightingCluster", () => {
     expect(screen.getByTestId("lighting-power-toggle").getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByTestId("lighting-grand-master").getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByTestId("lighting-state-display").textContent).toContain("has not passed its probe");
+    // The visual overhaul's polish (2026-10-05): the Scenes head says a recall
+    // waits; the rows stay pressable, and a recall into the preview is allowed.
+    expect(screen.getByTestId("lighting-scenes-section").textContent).toContain("recalls refused");
+    cleanup();
+
+    renderCluster({ bridgeReachable: false, previewMode: true });
+    expect(screen.getByTestId("lighting-scenes-section").textContent).not.toContain("recalls refused");
+  });
+
+  // The visual overhaul's polish (2026-10-05): on a rig with no fixtures
+  // LIGHTING locks beside CUT ALL, each with its reason.
+  it("LIGHTING and CUT ALL lock together on a rig with no fixtures", () => {
+    renderCluster({ fixtureTotal: 0, fixtureOnCount: 0 });
+    const power = screen.getByTestId("lighting-power-toggle");
+    expect(power.getAttribute("aria-disabled")).toBe("true");
+    expect(power.getAttribute("title")).toBe("There are no fixtures on the rig to switch.");
+    expect(screen.getByTestId("lighting-emergency-cut").getAttribute("aria-disabled")).toBe("true");
   });
 
   it("the grand master waits in Preview: it acts on the rig itself", () => {

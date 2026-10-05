@@ -45,7 +45,8 @@ test("renders the lighting snapshot loading posture", async ({ page }) => {
   await expect(page.getByTestId("lighting-cluster").getByText("No scenes saved yet")).toBeVisible();
   await expect(workspace.getByText("No fixtures on the rig yet")).toBeVisible();
   // Visual overhaul A, Slice 5: how many fixtures are patched is a footer item.
-  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("0 / 0 patched");
+  // The visual overhaul's polish (2026-10-05): "n of m", as the pages count.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("0 of 0 patched");
   await expect(page.getByRole("button", { name: /Fixture /i })).toHaveCount(0);
 });
 
@@ -59,10 +60,12 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   // fixed, then the keys, in the same place as every other workspace.
   await expect(page.getByTestId("lighting-cluster")).toBeVisible();
   // The visual overhaul (2026-10-04): the bridge's address is the state
-  // display's sentence alone; the footer counts the universe's channels.
-  await expect(page.getByTestId("lighting-state-display")).toContainText("192.168.1.80 · universe 1");
+  // display's sentence alone; the footer counts the universe's channels. The
+  // polish (2026-10-05): the universe is the footer's alone, so the sentence
+  // keeps its two lines, and the footer counts "n of m".
+  await expect(page.getByTestId("lighting-state-display")).toContainText("Bridge 192.168.1.80 is answering");
   await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("Universe 1");
-  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("12 / 512 channels");
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("12 of 512 channels");
   // The scene on the rig says so in the deck's RECALL word.
   await expect(page.getByRole("button", { name: "Recall scene Warm wash (on rig)" })).toHaveAttribute(
     "data-selected",
@@ -112,14 +115,21 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await page.getByLabel("Fixture CCT").press("End");
   await expect(page.getByLabel("Fixture CCT")).toHaveAttribute("aria-valuenow", "5600");
 
-  await page.getByRole("button", { name: /^Fixture Warm wash,/ }).focus();
+  // The visual overhaul's polish (2026-10-05): the Apollo Bridge's node is
+  // "Apollo node" (it shared the scene Warm wash's name), and the plate's
+  // power is the Light key, lit while the fixture is on.
+  await page.getByRole("button", { name: /^Fixture Apollo node,/ }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("button", { name: /^Fixture Warm wash,/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: /^Fixture Apollo node,/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Lighting inspector — Fixture").getByTestId("lighting-plate-head")).toContainText(
     "Apollo Bridge"
   );
-  await page.getByRole("button", { name: "Turn off" }).click();
-  await expect(page.getByRole("button", { name: /^Fixture Warm wash, off,/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("lighting-plate-power")).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("lighting-plate-power").click();
+  await expect(page.getByRole("button", { name: /^Fixture Apollo node, off,/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
 
   // The visual overhaul. Old: the group chip's chevron "Inspect Front group".
   // New: its ⋯'s "Show on the plate", whose title plate then names the group.
@@ -127,7 +137,7 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await page.getByRole("menuitem", { name: "Show on the plate" }).click();
   await expect(page.getByTestId("lighting-plate-head")).toContainText("Front");
   await expect(page.getByTestId("lighting-plate-head")).toContainText("Group");
-  await page.getByRole("button", { name: "Turn group off" }).click();
+  await page.getByTestId("lighting-plate-group-power").click();
   await expect(page.getByRole("button", { name: /Front, 2 fixtures.*off\. Toggle on\./i })).toBeVisible();
 });
 
@@ -214,6 +224,11 @@ test("the lighting layout at 2560x1440: the cluster, the stage and every primary
 test("the plot draws the room at its real metres, with rulers and names at one size", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   const plot = page.getByRole("application", { name: "Lighting stage plot" });
+  // The rig stands at its real metres (the polish, 2026-10-05), so framing it
+  // leaves the room's corner out of view: the rulers are read with the whole
+  // room fitted, where both start at its corner.
+  await (await openPlotMenu(page)).getByRole("menuitemradio", { name: "Fit the room" }).click();
+  await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
   await expect(plot.locator('svg[data-axis="x"] text').first()).toHaveText("0");
   await expect(plot.locator('svg[data-axis="y"] text').first()).toHaveText("0");
   const labels = page.getByTestId("lighting-plot-labels");
@@ -232,10 +247,12 @@ test("the plot draws the room at its real metres, with rulers and names at one s
 });
 
 // Visual overhaul A, Slice 5 (plan Slice 5, findings M3 and C3): while the
-// bridge has not passed its probe, the rig's keys are outlined and say why, and
-// the plot says so on its face. The visual overhaul (2026-10-04): the sentence
-// says what is so (a recall is refused; until then it said nothing would reach
-// the rig), and CUT ALL stays live: the hardware link takes it in every state.
+// bridge has not passed its probe, the rig's keys are outlined and say why. The
+// visual overhaul (2026-10-04): the sentence says what is so (a recall is
+// refused; until then it said nothing would reach the rig), and CUT ALL stays
+// live: the hardware link takes it in every state. The polish (2026-10-05): the
+// plot's "locked" note went, since the plot is not locked (a drag, a turn and a
+// fixture's power still reach the rig); the Scenes head says a recall waits.
 test("unreachable: the state display carries the bridge sentence, the rig is outlined and the header lamp is red", async ({
   page,
 }) => {
@@ -244,7 +261,7 @@ test("unreachable: the state display carries the bridge sentence, the rig is out
   const stateDisplay = page.getByTestId("lighting-state-display");
   await expect(stateDisplay).toContainText("UNREACHABLE");
   await expect(stateDisplay).toHaveAttribute("data-tone", "error");
-  await expect(stateDisplay).toContainText(/has not passed its probe, so recalls are refused/);
+  await expect(stateDisplay).toContainText(/has not passed its probe: recalls are refused/);
   await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
   await expect(page.getByTestId("lighting-emergency-cut")).not.toHaveAttribute("aria-disabled", "true");
 
@@ -261,7 +278,8 @@ test("unreachable: the state display carries the bridge sentence, the rig is out
   }
 
   await expect(page.getByTestId("lighting-stage")).toHaveAttribute("data-locked", "");
-  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveText("locked · the bridge has not passed its probe");
+  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveCount(0);
+  await expect(page.getByTestId("lighting-scenes-section")).toContainText("recalls refused");
 });
 
 // Found, to check (2026-09-28): nothing looked at the bridge during a session.
@@ -274,7 +292,9 @@ test("not answering: the watch's word is amber, and nothing is locked", async ({
   const stateDisplay = page.getByTestId("lighting-state-display");
   await expect(stateDisplay).toContainText("NOT ANSWERING");
   await expect(stateDisplay).toHaveAttribute("data-tone", "attention");
-  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d\. Nothing is locked; this clears/);
+  // The visual overhaul's polish (2026-10-05): the sentence keeps its two
+  // lines, what happened and what to do; the keys staying live say the rest.
+  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d\. Check its power and cable\./);
   // No key to Setup: a probe run mid-session that fails would lock the rig
   // (the review of #260).
   await expect(page.getByTestId("lighting-state-setup")).toHaveCount(0);
@@ -290,13 +310,14 @@ test("not answering: the watch's word is amber, and nothing is locked", async ({
 });
 
 // The review of #260: a silent bridge outranks a hold, so its sentence names
-// the hold, and `Open Setup` is the way to the switch, as it is for HELD.
+// the hold, and `Open Setup` is the way to the switch, as it is for HELD (the
+// polish, 2026-10-05: the key says where, so the sentence no longer does).
 test("not answering while held: the sentence names the hold, and Open Setup goes to the switch", async ({ page }) => {
   await openFixture(page, "lighting-bridge-silent-held");
 
   const stateDisplay = page.getByTestId("lighting-state-display");
   await expect(stateDisplay).toContainText("NOT ANSWERING");
-  await expect(stateDisplay).toContainText(/and the outputs are held until armed in Setup \/ Support/);
+  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d, and the outputs are held\./);
   await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
 });
 
@@ -391,10 +412,13 @@ test("the plate shows the selected fixture's sections at once, with no tab row",
   await expect(plate.getByRole("tab")).toHaveCount(0);
 
   await expect(plate.getByRole("button", { name: "Identify" })).toBeVisible();
-  await expect(plate.getByRole("button", { name: /Turn off|Turn on/ })).toBeVisible();
+  // The visual overhaul's polish (2026-10-05): the Light key, lit while on.
+  await expect(plate.getByTestId("lighting-plate-power")).toBeVisible();
   await expect(plate.getByLabel("Fixture intensity")).toBeVisible();
   await expect(plate.getByLabel("Fixture CCT")).toBeVisible();
-  await expect(page.getByTestId("lighting-plate-placement")).toContainText("0.24 m");
+  // The rig stands at its real metres in the room (2026-10-05): Key's Stage X
+  // is 4.2 m (its height is 4.2 m too, so the Stage X value is read alone).
+  await expect(page.getByTestId("lighting-plate-placement").locator("dd").first()).toHaveText("4.2 m");
 
   const patchFacts = page.getByTestId("lighting-plate-patch-facts");
   await expect(patchFacts).toContainText("DMX start");
@@ -773,15 +797,18 @@ test("the scene's plate: its word, Recall and Save changes, and the fixtures it 
 test("edits a fixture's placement in the fields beside the plate", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
-  await expect(page.getByTestId("lighting-plate-placement")).toContainText("0.24 m");
+  // The rig stands at its real metres (the polish, 2026-10-05): Key's Stage X
+  // is 4.2 m, read alone since its height is 4.2 m too.
+  const stageXValue = page.getByTestId("lighting-plate-placement").locator("dd").first();
+  await expect(stageXValue).toHaveText("4.2 m");
   await page.getByTestId("lighting-placement-edit").click();
   const popover = page.getByTestId("lighting-placement-popover");
   await expect(popover).toBeVisible();
   const stageX = popover.getByLabel("Stage X position in metres");
-  await expect(stageX).toHaveValue("0.24");
+  await expect(stageX).toHaveValue("4.2");
   await stageX.fill("0.5");
   await stageX.press("Enter");
-  await expect(page.getByTestId("lighting-plate-placement")).toContainText("0.5 m");
+  await expect(stageXValue).toHaveText("0.5 m");
 
   // The fixture menu's Edit placement… opens the same fields.
   await page.keyboard.press("Escape");
@@ -819,8 +846,12 @@ test("a catalog control's commit keeps the fixture's other controls", async ({ p
   await openFixture(page, "lighting-populated");
   await page.getByRole("button", { name: /^Fixture Back,/ }).click();
   await expect(page.getByTestId("lighting-plate-head")).toContainText("Back");
-  // Back is off in the scene, and an off fixture's levels wait.
-  await page.getByRole("button", { name: "Turn on", exact: true }).click();
+  // Back is off in the scene, and an off fixture's levels wait. The plate's
+  // Light key (the polish, 2026-10-05) switches it on and lights.
+  const power = page.getByTestId("lighting-plate-power");
+  await expect(power).toHaveAttribute("aria-pressed", "false");
+  await power.click();
+  await expect(power).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("slider", { name: "Red", exact: true })).not.toHaveAttribute("aria-disabled", "true");
 
   for (const [label, value] of [
@@ -926,16 +957,20 @@ test("drags the selected fixture to a new plot position", async ({ page }) => {
   });
   const startOutputTransform = await output.getAttribute("transform");
 
-  // From (0.24, 0.26) m by (1.26, 0.74) m: the drop snaps to (1.5, 1.0) m.
+  // The rig stands at its real metres (the polish, 2026-10-05): from Key's
+  // (4.2, 6.2) m by (0.8, −0.7) m, clear of the other marks, the drop snaps to
+  // (5.0, 5.5) m. Stage X and Stage Y are read each on its own, since "5 m"
+  // is also a part of "5.5 m".
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
-  await page.mouse.move(start.x + 1.26 * pixelsPerMetre, start.y + 0.74 * pixelsPerMetre, { steps: 8 });
+  await page.mouse.move(start.x + 0.8 * pixelsPerMetre, start.y - 0.7 * pixelsPerMetre, { steps: 8 });
   await expect.poll(async () => output.getAttribute("transform")).not.toBe(startOutputTransform);
   await page.mouse.up();
   expect(await output.getAttribute("transform")).not.toBe(startOutputTransform);
 
-  await expect(page.getByTestId("lighting-plate-placement")).toContainText("1.5 m");
-  await expect(page.getByTestId("lighting-plate-placement")).toContainText("1 m");
+  const placementValues = page.getByTestId("lighting-plate-placement").locator("dd");
+  await expect(placementValues.nth(0)).toHaveText("5 m");
+  await expect(placementValues.nth(1)).toHaveText("5.5 m");
 });
 
 test("mirrors fixture intensity slider drafts on the stage plot before commit", async ({ page }) => {
@@ -971,8 +1006,10 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
   await (await openPlotMenu(page)).getByRole("menuitemradio", { name: "Fit the room" }).click();
   await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
+  // Key is aimed at Talent 2 from camera left (the rig at its real metres, the
+  // polish, 2026-10-05).
   const placement = page.getByTestId("lighting-plate-placement");
-  await expect(placement).toContainText("0°");
+  await expect(placement).toContainText("230°");
 
   const output = page.locator('[data-fixture-output-id="fixture-key"]');
   const startOutputTransform = await output.getAttribute("transform");
@@ -1011,10 +1048,20 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
   // pointer came up. New: wait for it to leave 0 first. Reason: the field shows
   // the fixture's stored rotation, which moves when the reply to the drag's
   // commit has been fetched, not when the pointer comes up; a read that beat
-  // the reply saw 0 (runs 34487837771 and 34595097112).
+  // the reply saw 0 (runs 34487837771 and 34595097112). The polish
+  // (2026-10-05): Key starts at 230°, so "not 0" no longer waits for the
+  // reply; the wait is for the value the drag lands on.
   await page.getByTestId("lighting-placement-edit").click();
   const rotationInput = page.getByLabel("Fixture rotation in degrees");
-  await expect(rotationInput).not.toHaveValue("0");
+  await expect
+    .poll(
+      async () => {
+        const value = Number(await rotationInput.inputValue());
+        return value >= 78 && value <= 88;
+      },
+      { message: "the rotate handle drag lands near a right angle" }
+    )
+    .toBe(true);
   const draggedRotation = Number(await rotationInput.inputValue());
   expect(draggedRotation, "the rotate handle drag lands near a right angle").toBeGreaterThanOrEqual(78);
   expect(draggedRotation, "the rotate handle drag lands near a right angle").toBeLessThanOrEqual(88);
@@ -1063,7 +1110,7 @@ test("shows lighting DMX-unreachable posture and blackout hold", async ({ page }
   // state display, in the same place every time.
   const stateDisplay = page.getByTestId("lighting-state-display");
   await expect(stateDisplay).toContainText("UNREACHABLE");
-  await expect(stateDisplay).toContainText(/has not passed its probe, so recalls are refused/);
+  await expect(stateDisplay).toContainText(/has not passed its probe: recalls are refused/);
   await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
   await expect(page.getByRole("button", { name: "Identify" })).toBeDisabled();
 
@@ -1100,7 +1147,7 @@ test("CUT ALL during a Find ends it: the Find key reads Find again", async ({ pa
   await pausePageClock(page);
   // All four lights, so the Find runs 1.9 s, longer than the cut's dwell.
   await page.getByTestId("lighting-add-to-selection").click();
-  for (const name of ["Fill", "Back", "Warm wash"]) {
+  for (const name of ["Fill", "Back", "Apollo node"]) {
     await page.getByRole("button", { name: new RegExp(`^Fixture ${name},`) }).focus();
     await page.keyboard.press("Enter");
   }

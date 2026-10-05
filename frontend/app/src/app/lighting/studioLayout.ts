@@ -76,8 +76,9 @@ export const STUDIO_LAYOUT: StudioLayout = {
     { id: "talent-2", label: "Talent 2", xMeters: 6.0, yMeters: 4.7 },
     { id: "talent-3", label: "Talent 3", xMeters: 7.3, yMeters: 4.7 },
   ],
-  cameras: [
-    { id: "cam-a", xMeters: 6.0, yMeters: 7.2, rotationDegrees: 0, label: "CAM A" },
-    { id: "cam-b", xMeters: 9.4, yMeters: 6.7, rotationDegrees: -25, label: "CAM B" },
-  ],
+  // The visual overhaul's polish (2026-10-05, the owner's word): no camera
+  // marks until he gives where CAM 1 to CAM 3 stand. Until then the plot drew
+  // two cameras, CAM A and CAM B, at places nobody measured, under names the
+  // rest of the program does not use.
+  cameras: [],
 };

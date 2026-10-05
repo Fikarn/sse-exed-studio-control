@@ -211,6 +211,16 @@ export function LightingCluster(props: LightingClusterProps) {
   // CUT ALL is never locked by the page: the hardware link takes it in every
   // state the rig is in. Only a rig with no fixtures has nothing to cut.
   const cutLockedReason = fixtureTotal === 0 ? "There are no fixtures on the rig to cut." : undefined;
+  // The visual overhaul's polish (2026-10-05): LIGHTING locks beside CUT ALL
+  // on an empty rig, with its reason; until then it stayed live with nothing
+  // to switch.
+  const powerLockedReason =
+    lockedReason ?? (fixtureTotal === 0 ? "There are no fixtures on the rig to switch." : undefined);
+  // While the bridge has not passed its probe the scene rows stay pressable
+  // (a press shows the scene on the plate), and the Scenes head says that a
+  // recall waits. UNREACHABLE outranks PREVIEW, and a recall into the preview
+  // is allowed, so not in Preview.
+  const recallsRefused = state.word === "UNREACHABLE" && !previewMode;
 
   // The way out of the state the rig is in, as keys on the display itself.
   const stateActions = (
@@ -419,8 +429,8 @@ export function LightingCluster(props: LightingClusterProps) {
           layout="stack"
           size="tall"
           live={anyOn}
-          locked={rigLocked}
-          reason={lockedReason}
+          locked={Boolean(powerLockedReason)}
+          reason={powerLockedReason}
           take
           data-toolbar-primary="status"
           testId="lighting-power-toggle"
@@ -520,7 +530,9 @@ export function LightingCluster(props: LightingClusterProps) {
       <Section
         className={styles.scenes}
         title="Scenes"
-        detail={patchMode ? "Patch is on" : `${sceneRailProps.scenes.length} saved`}
+        detail={
+          patchMode ? "Patch is on" : recallsRefused ? "recalls refused" : `${sceneRailProps.scenes.length} saved`
+        }
         testId="lighting-scenes-section"
         actions={
           <span ref={fadeKeyRef} className={styles.fadeAnchor}>

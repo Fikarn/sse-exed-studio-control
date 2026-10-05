@@ -57,11 +57,19 @@ export function InspectorPatch({
     setDraft(fixtureDraftAddress);
   }, [fixtureDraftAddress, fixtureDraftKey]);
 
+  // The visual overhaul's polish (2026-10-05): the helper sentence is the
+  // title's tooltip (DESIGN.md §9); until then it was the sub-line.
   if (!fixture) {
     return (
       <PlateHead
-        title="Patch"
-        sub="Choose a fixture on the plot to set its DMX address. Leave Patch from the latch under the state display."
+        title={
+          <Tooltip
+            content="Choose a fixture on the plot to set its DMX address. Leave Patch from the latch under the state display."
+            placement="left"
+          >
+            <span>Patch</span>
+          </Tooltip>
+        }
         testId="lighting-plate-head"
       />
     );

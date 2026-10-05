@@ -241,11 +241,10 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
           viewport={viewport}
           chipHoverFixtureId={chipHoverFixtureId}
         />
-        {bridgeReachable ? null : (
-          <div className={styles.stageLockNote} data-testid="lighting-stage-lock-note">
-            locked · the bridge has not passed its probe
-          </div>
-        )}
+        {/* The visual overhaul's polish (2026-10-05): the plot's "locked" note
+            went. The plot is not locked while the bridge has not passed its
+            probe: a drag, a turn, a fixture's power and the plate's levels all
+            reach the rig. The state display says what is refused. */}
         {dmxStripOn ? (
           <div className={styles.dmxStrip}>
             <DMXCompactStrip

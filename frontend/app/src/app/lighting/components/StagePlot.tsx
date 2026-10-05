@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 
-import { Key } from "@sse/design-system";
+import { Key, Tooltip } from "@sse/design-system";
 import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting } from "../fixtureMounting";
@@ -413,6 +413,33 @@ export function StagePlot({
         kind: "fixed",
       });
     }
+    // The visual overhaul's polish (2026-10-05): every shape on the floor has
+    // its name. The door and the booth window are named on the room's side of
+    // their wall; the backdrop's band reads as the wall and stays unnamed, so
+    // no word covers a fixture hung along it.
+    const { door, controlBoothWindow } = layout.walls;
+    if (door && (door.wall === "east" || door.wall === "west")) {
+      entries.push({
+        id: "wall-door",
+        xCm: door.wall === "east" ? widthCm - 4 : 4,
+        yCm: (door.offsetMeters + door.widthMeters / 2) * 100,
+        radiusCm: 4,
+        name: "Door",
+        kind: "fixed",
+        side: door.wall === "east" ? "left" : "right",
+      });
+    }
+    if (controlBoothWindow) {
+      entries.push({
+        id: "wall-booth-window",
+        xCm: (controlBoothWindow.offsetMeters + controlBoothWindow.widthMeters / 2) * 100,
+        yCm: depthCm - 5,
+        radiusCm: 5,
+        name: "Booth window",
+        kind: "fixed",
+        side: "above",
+      });
+    }
     fixtures.forEach((fixture, index) => {
       const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
       const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
@@ -443,6 +470,7 @@ export function StagePlot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     catalog,
+    depthCm,
     displayedPositionFor,
     fixtureVisuals,
     fixtures,
@@ -451,6 +479,7 @@ export function StagePlot({
     patchMode,
     selectedFixtureId,
     selectedFixtureIds,
+    widthCm,
   ]);
 
   // A right-click on the floor opens the plot's menu; one on a fixture its own
@@ -680,19 +709,26 @@ export function StagePlot({
 
         <StagePlotLabels projection={projection} labels={labels} />
         {showSymbolKey ? <FixtureSymbolKey catalog={catalog} fixtures={fixtures} renderMode={renderMode} /> : null}
-      </div>
 
-      {fixtures.length === 0 ? (
-        <div className={styles.plotEmpty}>
-          <p className={styles.plotEmptyTitle}>No fixtures on the rig yet</p>
-          <p className={styles.plotEmptyText}>Add the first fixture, then place it where it hangs in the room.</p>
-          {onAddFixture ? (
-            <Key mode="primary" onClick={onAddFixture}>
-              Add fixture…
-            </Key>
-          ) : null}
-        </div>
-      ) : null}
+        {/* The visual overhaul's polish (2026-10-05): the empty rig's words
+            stand in the room's area, centred on its axis and lifted into the
+            band between the bench and the talent marks; the grid stops behind
+            the title. The helper sentence is the key's tooltip (DESIGN.md §9).
+            Until then the block was centred on the whole well, rulers
+            included, and printed straight over the grid. */}
+        {fixtures.length === 0 ? (
+          <div className={styles.plotEmpty}>
+            <p className={styles.plotEmptyTitle}>No fixtures on the rig yet</p>
+            {onAddFixture ? (
+              <Tooltip content="Add the first fixture, then place it where it hangs in the room.">
+                <Key mode="primary" onClick={onAddFixture}>
+                  Add fixture…
+                </Key>
+              </Tooltip>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

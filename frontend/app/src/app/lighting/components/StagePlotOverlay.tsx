@@ -171,8 +171,12 @@ export interface PlotLabel {
   /** The selected fixture's name is bold. */
   strong?: boolean;
   /** A fixture's name avoids the others and may take a leader; a fixed word
-   *  (a talent mark, the bench, a camera) stands under its mark. */
+   *  (a talent mark, the bench, a camera, a wall's door or window) stands by
+   *  its mark. */
   kind: "fixture" | "fixed";
+  /** Where a fixed word stands from its mark: under it (the default), or on
+   *  the room's side of a wall (above the south wall, left of the east one). */
+  side?: "below" | "above" | "left" | "right";
   dimmed?: boolean;
 }
 
@@ -239,7 +243,16 @@ export function placeLabels(labels: readonly PlotLabel[], projection: PlotProjec
     );
     const h = label.detail ? LINE_HEIGHT * 2 : LINE_HEIGHT;
     if (label.kind === "fixed") {
-      const box = { x: anchor.x - w / 2, y: anchor.y + r + 4, w, h };
+      // The visual overhaul's polish (2026-10-05): a wall's word stands on the
+      // room's side of its mark, so it is never outside the room.
+      const box =
+        label.side === "above"
+          ? { x: anchor.x - w / 2, y: anchor.y - r - 4 - h, w, h }
+          : label.side === "left"
+            ? { x: anchor.x - r - GAP - w, y: anchor.y - h / 2, w, h }
+            : label.side === "right"
+              ? { x: anchor.x + r + GAP, y: anchor.y - h / 2, w, h }
+              : { x: anchor.x - w / 2, y: anchor.y + r + 4, w, h };
       placed.push({ label, box, anchor, leader: null });
       taken.push(box);
       return;

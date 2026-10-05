@@ -121,6 +121,10 @@
   fill: var(--text-text3);
 }
 
+/* The empty rig: over the room's area (not the rulers), so it centres on the
+   room's axis, lifted 120 px into the free band between the bench and the
+   talent marks (tuned to the studio's layout at the framed view; the visual
+   overhaul's polish, 2026-10-05). */
 .plotEmpty {
   position: absolute;
   inset: 0;
@@ -129,6 +133,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
+  padding-bottom: 120px;
   pointer-events: none;
 }
 
@@ -136,16 +141,14 @@
   pointer-events: auto;
 }
 
+/* The floor's own colour behind the words: the grid stops there, as it does
+   behind the plot's names, with no box drawn. */
 .plotEmptyTitle {
   margin: 0;
+  padding: 2px 8px;
+  background: var(--material-floor);
   font: var(--font-weight-bold) var(--font-size-word) / 1.2 var(--font-family-ui);
   color: var(--text-text);
-}
-
-.plotEmptyText {
-  margin: 0;
-  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
-  color: var(--text-text3);
 }
 
 .liveGhostLayer {

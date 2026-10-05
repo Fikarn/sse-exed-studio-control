@@ -7,7 +7,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { Key, type MenuContent } from "@sse/design-system";
+import { EmptyLine, Key, type MenuContent } from "@sse/design-system";
 import type { LightingSceneSnapshot } from "@sse/engine-client";
 
 import type { LightingMenu } from "../lightingMenus";
@@ -156,7 +156,13 @@ export function SceneRail({
 
   let body: ReactNode;
   if (scenes.length === 0) {
-    body = <p className={styles.empty}>No scenes saved yet. Set the rig, then save it as a new scene.</p>;
+    // The visual overhaul's polish (2026-10-05): the design system's empty
+    // line, one line, its hint the words' tooltip (DESIGN.md §9).
+    body = (
+      <EmptyLine tip="Set the rig, then save it as a new scene." className={styles.emptyLine}>
+        No scenes saved yet
+      </EmptyLine>
+    );
   } else if (filtered.length === 0) {
     body = (
       <p className={styles.empty}>

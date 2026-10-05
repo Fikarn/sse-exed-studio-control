@@ -111,6 +111,11 @@ function buildLightingPalettePreviewFixture(): FixtureScenarioRecord {
   return scenario;
 }
 
+// The visual overhaul's polish (2026-10-05): as in `fixtures.json`, the rig
+// stands at its real metres in the 12 × 8 m room (until then the lights held
+// fractions of it, so the plot drew them all in its first metre); the two
+// added lights hang either side of the talent marks, and Back keeps the
+// heading the rig gives it.
 function buildLightingSymbolFamiliesFixture(): FixtureScenarioRecord {
   const scenario = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
     lightingSnapshot: Record<string, unknown>;
@@ -119,9 +124,7 @@ function buildLightingSymbolFamiliesFixture(): FixtureScenarioRecord {
     Array.isArray(scenario.lightingSnapshot.fixtures)
       ? (scenario.lightingSnapshot.fixtures as Array<Record<string, unknown>>)
       : []
-  ).map((fixture) =>
-    fixture.id === "fixture-back" ? { ...fixture, intensity: 42, on: true, spatialRotation: 180 } : fixture
-  );
+  ).map((fixture) => (fixture.id === "fixture-back" ? { ...fixture, intensity: 42, on: true } : fixture));
   scenario.lightingSnapshot.fixtures = [
     ...fixtures,
     {
@@ -131,8 +134,8 @@ function buildLightingSymbolFamiliesFixture(): FixtureScenarioRecord {
       dmxStartAddress: 81,
       kind: "wash",
       groupId: "group-front",
-      spatialX: 0.36,
-      spatialY: 0.5,
+      spatialX: 3,
+      spatialY: 4.2,
       spatialRotation: 90,
       rigZ: 3.4,
       beamAngleDegrees: null,
@@ -147,8 +150,8 @@ function buildLightingSymbolFamiliesFixture(): FixtureScenarioRecord {
       dmxStartAddress: 101,
       kind: "beam",
       groupId: "group-back",
-      spatialX: 0.65,
-      spatialY: 0.5,
+      spatialX: 9,
+      spatialY: 4.2,
       spatialRotation: 145,
       rigZ: 4.8,
       beamAngleDegrees: null,

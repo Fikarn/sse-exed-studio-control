@@ -34,10 +34,10 @@ import styles from "./LightingInspector.module.css";
 // The visual overhaul's Lighting page (2026-10-04): one fixture on the plate.
 // The Dark Green title plate (its name, what it is, its ⋯: the same menu as a
 // right-click on it on the plot, with Delete fixture… last, arming in place);
-// Turn off and Identify; where it is patched; its levels, each with a ▲ under
-// the slider where the scene on the rig keeps it (Yellow while the rig has
-// left the scene); where it hangs, in one row, the fields behind Edit. Every
-// section shows at once and the plate never scrolls.
+// its Light key (lit while on) and Identify; where it is patched; its levels,
+// each with a ▲ under the slider where the scene on the rig keeps it (Yellow
+// while the rig has left the scene); where it hangs, in one row, the fields
+// behind Edit. Every section shows at once and the plate never scrolls.
 
 const RIG_HEIGHT_MAX_METERS = 8;
 const BEAM_ANGLE_MIN_DEGREES = 1;
@@ -258,15 +258,20 @@ export function InspectorFixture({
       />
 
       <div className={styles.keyRow}>
+        {/* The visual overhaul's polish (2026-10-05): a toggle keeps one name
+            and its fill and hint say the state, as the cluster's LIGHTING and
+            group keys do; until then a lit key read "Turn off". */}
         <Key
           mode="toggle"
           size="large"
           live={fixture.on}
           aria-pressed={fixture.on}
           disabled={powerBusy}
+          hint={fixture.on ? "on" : "off"}
+          testId="lighting-plate-power"
           onClick={() => onTogglePower(fixture.id, !fixture.on)}
         >
-          {fixture.on ? "Turn off" : "Turn on"}
+          Light
         </Key>
         <IdentifyBurstButton
           fixtureId={fixture.id}

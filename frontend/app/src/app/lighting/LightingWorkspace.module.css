@@ -14,7 +14,7 @@
 }
 
 /* The plot's well: the room, backlit. The blue keyline says the operator is
-   editing offline; the lock note says what the bridge has not done. */
+   editing offline. */
 .stage {
   position: relative;
   flex: 1 1 0;
@@ -30,18 +30,6 @@
 
 .stage[data-preview] {
   border-color: var(--role-blue-text);
-}
-
-.stageLockNote {
-  position: absolute;
-  top: 32px;
-  left: 52px;
-  padding: 4px 8px;
-  border-radius: var(--radius-base);
-  background: var(--material-well);
-  color: var(--role-coral-text);
-  font: var(--font-weight-bold) var(--font-size-label) / 1.4 var(--font-family-ui);
-  pointer-events: none;
 }
 
 /* The compact DMX strip, while it is shown: over the well's foot, so the

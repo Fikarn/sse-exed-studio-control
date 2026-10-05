@@ -9,6 +9,7 @@ import {
   PlateHead,
   Readouts,
   Section,
+  Tooltip,
   type InlineRenameHandle,
   type MenuContent,
 } from "@sse/design-system";
@@ -92,11 +93,17 @@ export function InspectorScene({
     if (box) setColourAt({ x: box.left + 16, y: box.bottom });
   }, [colourRequest]);
 
+  // The visual overhaul's polish (2026-10-05): the helper sentence is the
+  // title's tooltip, as on Support and the Teleprompter (DESIGN.md §9); until
+  // then it was the sub-line, beside the same advice in the Scenes list.
   if (!scene) {
     return (
       <PlateHead
-        title="No scene"
-        sub="Set the rig, then save it with Save as a new scene in the Scenes list."
+        title={
+          <Tooltip content="Set the rig, then save it with Save as a new scene in the Scenes list." placement="left">
+            <span>No scene</span>
+          </Tooltip>
+        }
         testId="lighting-plate-head"
       />
     );

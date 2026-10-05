@@ -8,9 +8,10 @@ import { lightingFixtureCctRange, lightingFixtureColor } from "../lightingHelper
 import styles from "./LightingInspector.module.css";
 
 // The visual overhaul's Lighting page (2026-10-04): several fixtures on the
-// plate. Their title plate; Turn all on or off and Clear the selection; one
-// slider for their levels and one for their colour (a drag moves them all and
-// keeps their spread); and the fixtures, each a row that opens it alone.
+// plate. Their title plate; the Selection key (lit while any is on) and Clear
+// the selection; one slider for their levels and one for their colour (a drag
+// moves them all and keeps their spread); and the fixtures, each a row that
+// opens it alone.
 
 export interface BulkFixtureValue {
   fixtureId: string;
@@ -64,24 +65,35 @@ export function InspectorFixtureBulk({
   const buildCctValues = (next: readonly number[]): BulkFixtureValue[] =>
     next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value / 100) * 100 }));
   const shown = fixtures.slice(0, MEMBER_ROWS);
+  const onCount = fixtures.filter((fixture) => fixture.on).length;
 
   return (
     <>
+      {/* The visual overhaul's polish (2026-10-05): the helper sentence is the
+          title's tooltip (DESIGN.md §9); until then it was the sub-line. */}
       <PlateHead
-        title={`${fixtures.length} fixtures selected`}
-        sub="A change here applies to every one of them."
+        title={
+          <Tooltip content="A change here applies to every one of them." placement="left">
+            <span>{`${fixtures.length} fixtures selected`}</span>
+          </Tooltip>
+        }
         testId="lighting-plate-head"
       />
 
       <div className={styles.keyRow}>
+        {/* The visual overhaul's polish (2026-10-05): a toggle keeps one name
+            and its fill and hint say the state, in the LIGHTING key's words;
+            until then a lit key read "Turn all off". */}
         <Key
           mode="toggle"
           size="large"
           live={anyOn}
           aria-pressed={anyOn}
+          hint={anyOn ? `on · ${onCount} of ${fixtures.length} lit` : "off · nothing lit"}
+          testId="lighting-plate-bulk-power"
           onClick={() => onBulkTogglePower(ids, !anyOn)}
         >
-          {anyOn ? "Turn all off" : "Turn all on"}
+          Selection
         </Key>
         <Key size="large" onClick={onClearSelection}>
           Clear selection
