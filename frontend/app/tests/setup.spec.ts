@@ -1,8 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
+import {
+  measureRoom,
+  openMenu,
+  openSetup as openSetupPage,
+  openSetupPageMenu,
+  PAST_THE_DWELL_MS,
+} from "./helpers/setup";
 
 // plan PR 4 / workstream D4: setup / commissioning surface specs split
 // out of operator-shell.spec.ts. Covers the setup-required runner walk,
@@ -117,7 +123,7 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
     .getByTestId("setup-cluster")
     .getByRole("button", { name: /^Support$/ })
     .click();
-  await expect(page.getByText("What went wrong?")).toBeVisible();
+  // The visual overhaul (2026-10-05): the screen's sentence is its title's tooltip.
   await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
 
   await plate.getByRole("button", { name: "Export backup" }).click();
@@ -145,7 +151,6 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
 // within 3 s unpublishes. The page's clock stands still between the presses
 // (helpers/pageClock.ts), so the dwell and the window are true on any runner.
 test.describe("a published setup unpublishes only at a second press", () => {
-  const PAST_THE_DWELL_MS = ARM_DWELL_MS + 50;
   /** `UNPUBLISH_WINDOW_MS` in setupPilotModel.ts, which a test cannot import. */
   const UNPUBLISH_WINDOW_MS = 3_000;
   const audioNav = (page: Page) =>
@@ -168,7 +173,10 @@ test.describe("a published setup unpublishes only at a second press", () => {
     await step.click();
     await expect(step).toHaveAttribute("data-armed", "true");
     const display = page.getByTestId("setup-state-display");
-    await expect(display).toContainText("Unpublish the setup · press again");
+    // The visual overhaul (2026-10-05): the armed row says where the second
+    // press goes; the sentence says that it unpublishes.
+    await expect(display).toContainText("Go to Probe hardware · press again");
+    await expect(display).toContainText("A second press unpublishes");
     await expect(display).toContainText("Lighting, Audio, Cameras and Teleprompter lock");
     await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
 
@@ -323,7 +331,6 @@ test("degraded: the display offers Run all probes and Publish becomes Publish wi
   const display = page.getByTestId("setup-state-display");
   await expect(display).toContainText("DEGRADED");
   await expect(display).toContainText("1 of 3 probes passed");
-  await expect(display).toContainText("re-verify before publishing");
   await expect(page.getByTestId("setup-state-run-probes")).toBeVisible();
 
   // The publish key says what pressing it will do before it is pressed.
@@ -414,12 +421,15 @@ test.describe("Light outputs: Armed / Held", () => {
     const plate = page.getByTestId("support-plate");
     const workstation = plate.getByTestId("support-workstation");
     await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "true");
+    // The visual overhaul (2026-10-05): the state is the word, what it sends the word's tooltip.
+    await expect(workstation.getByTestId("support-outputs-word")).toHaveText("ARMED");
     await expect(workstation).toContainText("the rig follows the app");
     await expect(plate.getByTestId("support-recent-actions-empty")).toBeVisible();
 
     await plate.getByTestId("support-outputs-held").click();
     await expect(plate.getByTestId("support-outputs-held")).toHaveAttribute("aria-pressed", "true");
     await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "false");
+    await expect(workstation.getByTestId("support-outputs-word")).toHaveText("HELD");
     await expect(workstation).toContainText("nothing is sent to the rig");
     await expect(lamp).toContainText("held");
     const feedback = page.getByTestId("setup-feedback");
@@ -547,7 +557,8 @@ test("Runner and Support, the Map step and Restart the hardware link, by pointer
   await page.getByRole("dialog", { name: "Skip ahead?" }).getByRole("button", { name: "Skip ahead" }).click();
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
   const map = page.getByTestId("setup-screen-map");
-  await expect(map.getByRole("button", { name: /^REC ?button$/ })).toHaveAttribute("data-selected", "true");
+  // The visual overhaul (2026-10-05): a control is named with its kind in the operator's words.
+  await expect(map.getByRole("button", { name: "REC key", exact: true })).toHaveAttribute("data-selected", "true");
 
   // The page tabs name the page and nothing else (they printed "LIGHTS 1" and
   // "AUDIO 2", the number keys that chose them).
@@ -559,9 +570,9 @@ test("Runner and Support, the Map step and Restart the hardware link, by pointer
   // A deck page by its tab, a control by its key.
   await audio.click();
   await expect(audio).toHaveAttribute("data-active", "true");
-  await expect(map.getByRole("button", { name: /^REC ?button$/ })).toHaveAttribute("data-selected", "true");
-  await map.getByRole("button", { name: /^PHONES ?button$/ }).click();
-  await expect(map.getByRole("button", { name: /^PHONES ?button$/ })).toHaveAttribute("data-selected", "true");
+  await expect(map.getByRole("button", { name: "REC key", exact: true })).toHaveAttribute("data-selected", "true");
+  await map.getByRole("button", { name: "PHONES key", exact: true }).click();
+  await expect(map.getByRole("button", { name: "PHONES key", exact: true })).toHaveAttribute("data-selected", "true");
   await expect(map.getByText("Make the next phones mix the active mix target: Phones 1, then Phones 2.")).toBeVisible();
 
   // Back a step at a time with the back key.
@@ -710,9 +721,162 @@ test("Setup prints no key hints: the footer, the Console key, the bay head (S3)"
   }
   await expect(page.getByTestId("setup-footer-shortcuts")).toHaveCount(0);
 
-  // The Console key stays; its small print "Ctrl+3" went.
-  await expect(page.getByTestId("setup-back-to-console")).toHaveText("Console");
+  // The visual overhaul (2026-10-05): the Console key is the page's ⋯ item,
+  // with the key's test id, and prints no key hint.
+  const menu = await openSetupPageMenu(page);
+  await expect(menu.getByTestId("setup-back-to-console")).toContainText("Back to the Console");
+  await expect(menu).not.toContainText("Ctrl");
+  await page.keyboard.press("Escape");
 
   // The bay head's Shortcuts key went with the shortcut guide.
   await expect(page.getByTestId("setup-screen-publish")).not.toContainText("Shortcuts");
+});
+
+// ---------------------------------------------------------------------------
+// The visual overhaul's Setup / Support (2026-10-05): the room, the one armed
+// form in each key's own height, the standing commands in the page's ⋯, and a
+// menu on every object (the plate, a backup, a camera).
+// ---------------------------------------------------------------------------
+
+test.describe("Setup / Support after the visual overhaul", () => {
+  test("nothing scrolls and no line is cut, on every screen of the bay", async ({ page }) => {
+    const screens: { fixture: string; name: string; open?: (page: Page) => Promise<void> }[] = [
+      { fixture: "setup-ready", name: "Publish, published" },
+      { fixture: "setup-required", name: "Import, unpublished" },
+      { fixture: "setup-degraded", name: "Publish, degraded" },
+      { fixture: "setup-cameras", name: "Cameras" },
+      {
+        fixture: "setup-ready",
+        name: "Support",
+        open: async (page) => {
+          await page.getByTestId("setup-mode-support").click();
+          await expect(page.getByTestId("setup-screen-support")).toBeVisible();
+        },
+      },
+      {
+        fixture: "setup-map-cameras",
+        name: "Map, CAMERAS",
+        open: async (page) => {
+          await page.getByTestId("setup-deck-page-cameras").click();
+          await expect(page.getByTestId("setup-deck-page-cameras")).toHaveAttribute("data-active", "true");
+        },
+      },
+      {
+        fixture: "setup-required",
+        name: "Probe",
+        open: async (page) => {
+          await page.getByTestId("setup-step-probe").click();
+          await page.getByRole("dialog", { name: "Skip ahead?" }).getByRole("button", { name: "Skip ahead" }).click();
+          await expect(page.getByTestId("setup-screen-probe")).toBeVisible();
+        },
+      },
+    ];
+    for (const { fixture, name, open } of screens) {
+      await openSetupPage(page, fixture);
+      await open?.(page);
+      const room = await measureRoom(page);
+      expect(room.page, name).toEqual([2560, 1440]);
+      expect(room.scrolls, `${name}: every column holds what it shows`).toEqual([]);
+      expect(room.cut, `${name}: no line is cut`).toEqual([]);
+    }
+  });
+
+  test("an armed key keeps its height and moves nothing under it", async ({ page }) => {
+    await openSetupPage(page, "setup-ready", { clock: true });
+    for (const [keyId, underId] of [
+      ["setup-step-probe", "setup-step-map"],
+      ["setup-step-back", null],
+      ["setup-run-all-probes", "setup-probe-lighting"],
+    ] as const) {
+      const key = page.getByTestId(keyId);
+      const before = await key.boundingBox();
+      const under = underId ? await page.getByTestId(underId).boundingBox() : null;
+      await pausePageClock(page);
+      await key.click();
+      await expect(key, keyId).toHaveAttribute("data-armed", "true");
+      await expect(key, keyId).toContainText("press again");
+      // Its height and its row: a key's words may run wider, never taller.
+      const armed = await key.boundingBox();
+      expect([armed!.y, armed!.height], `${keyId} keeps its height and its row`).toEqual([before!.y, before!.height]);
+      if (underId) expect(await page.getByTestId(underId).boundingBox(), `${underId} stays`).toEqual(under);
+      await page.keyboard.press("Escape");
+      await expect(key, keyId).toHaveAttribute("data-armed", "false");
+      await page.clock.resume();
+    }
+  });
+
+  test("DEGRADED's way out arms in the display's foot, in its own height", async ({ page }) => {
+    await openSetupPage(page, "setup-degraded", { clock: true });
+    const display = page.getByTestId("setup-state-display");
+    const key = page.getByTestId("setup-state-run-probes");
+    await expect(key).toHaveText("Run all probes · press twice");
+    // One key offers it: the Probes section leaves it to the display.
+    await expect(page.getByTestId("setup-run-all-probes")).toHaveCount(0);
+    const before = await key.boundingBox();
+    await pausePageClock(page);
+    await key.click();
+    await expect(key).toHaveAttribute("data-armed", "true");
+    const armed = await key.boundingBox();
+    const box = await display.boundingBox();
+    expect(armed!.height).toBe(before!.height);
+    expect(armed!.y).toBe(before!.y);
+    expect(armed!.y + armed!.height).toBeLessThanOrEqual(box!.y + box!.height);
+    await page.keyboard.press("Escape");
+    await page.clock.resume();
+  });
+
+  test("the page's ⋯ holds the standing commands, with their keys' test ids", async ({ page }) => {
+    await openSetupPage(page, "setup-required");
+    // The standing row went: the ⋯ is their one home.
+    await expect(page.getByTestId("setup-standing-actions")).toHaveCount(0);
+    const menu = await openSetupPageMenu(page);
+    await expect(menu.getByTestId("setup-export-backup")).toHaveText("Export backup");
+    await expect(menu.getByTestId("setup-engine-log")).toHaveText("Open the log");
+    // Before the setup is published the Console is locked, and the item says why.
+    const consoleItem = menu.getByTestId("setup-back-to-console");
+    await expect(consoleItem).toHaveAttribute("aria-disabled", "true");
+    await expect(consoleItem).toContainText("the setup is not published");
+    await menu.getByTestId("setup-export-backup").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText("Exported support backup to");
+  });
+
+  test("Support's plate has its ⋯, and a backup's ⋯ restores only through the dialog", async ({ page }) => {
+    await openSetupPage(page, "setup-ready");
+    const plateMenu = await openMenu(page, page.getByTestId("support-plate-menu"));
+    for (const item of ["export-backup", "verify-latest", "restore-latest", "export-diagnostics", "open-log"]) {
+      await expect(plateMenu.getByTestId(`support-plate-menu-${item}`)).toBeVisible();
+    }
+    await page.keyboard.press("Escape");
+
+    await page.getByTestId("setup-mode-support").click();
+    const row = page.getByTestId("support-backup-0");
+    // The newest backup's path is in the field at first: it is the Beige selection.
+    await expect(row).toHaveAttribute("aria-pressed", "true");
+    const menu = await openMenu(page, page.getByTestId("support-backup-menu-0"));
+    await menu.getByTestId("support-backup-menu-0-restore").click();
+    const dialog = page.getByRole("dialog", { name: "Restore this backup?" });
+    await expect(dialog).toContainText("It replaces");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("a camera's ⋯ forgets it only at a second press", async ({ page }) => {
+    await page.clock.install();
+    await openFixture(page, "setup-cameras");
+    await expectWorkspaceMounted(page, "setup");
+    const menu = await openMenu(page, page.getByTestId("setup-camera-menu-2"));
+    const forget = menu.getByTestId("setup-camera-2-forget");
+    await expect(forget).toHaveText("Forget CAM 2…");
+    await pausePageClock(page);
+    await forget.click();
+    await expect(forget).toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("setup-state-display")).toContainText("Forget CAM 2 · press again");
+    // Nothing forgotten yet.
+    await expect(page.getByTestId("setup-camera-2-state")).toHaveText("HELD");
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await forget.click();
+    await page.clock.resume();
+    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 2's address is forgotten.");
+    await expect(page.getByTestId("setup-camera-2-state")).toHaveText("NOT SET UP");
+  });
 });

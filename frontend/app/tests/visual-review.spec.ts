@@ -235,6 +235,9 @@ const STATE_FIXTURES = [
   "cameras-no-link",
   "cameras-picture-missing",
   "setup-cameras",
+  // The visual overhaul (2026-10-05): Support in the bay, with more backups
+  // than a page of the list shows.
+  "setup-support",
   // Setup's Map step on the deck's two pages of 2026-09-28, CAMERAS and
   // PROMPTER, as the hardware link's page model gives them.
   "setup-map-cameras",

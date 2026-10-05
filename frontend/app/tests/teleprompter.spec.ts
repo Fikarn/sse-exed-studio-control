@@ -222,7 +222,8 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await openTeleprompter(page);
     await page.getByRole("button", { name: "Setup / Support", exact: true }).click();
     await expectWorkspaceMounted(page, "setup");
-    await expect(page.getByTestId("support-prompter-xl")).toContainText("connected · 1920×1080 · 60 Hz");
+    // The visual overhaul (2026-10-05): the link's word in its capitals.
+    await expect(page.getByTestId("support-prompter-xl")).toContainText("CONNECTED · 1920×1080 · 60 Hz");
   });
 });
 
