@@ -1,12 +1,13 @@
 import { Footer } from "@sse/design-system";
 import type { CameraSnapshot, CamerasSnapshot } from "@sse/engine-client";
 
-import { cameraOf, dialsView, heldWord, picturesWord, recordingWord } from "./camerasModel";
+import { cameraOf, dialsView, picturesWord, recordingWord } from "./camerasModel";
 import { bigViewWord, type BigView } from "./pictures/pictureGeometry";
 
-// The Cameras page's footer (board 2): who holds the cameras, where the
-// pictures come from and how many arrive, what the big picture shows, what
-// the Stream Deck's dials set, and the take.
+// The Cameras page's footer (board 2): where the pictures come from and how
+// many arrive, what the big picture shows, what the Stream Deck's dials set,
+// and the take. The visual overhaul's polish (2026-10-05): who holds the
+// cameras went, since the state display's meta and the camera list say it.
 
 export interface CamerasFooterProps {
   snapshot: CamerasSnapshot;
@@ -22,7 +23,6 @@ export function CamerasFooter({ snapshot, selected, view, stopArmed, now }: Came
     <Footer
       testId="cameras-footer"
       items={[
-        { id: "cameras", label: "Cameras", value: heldWord(snapshot) },
         { id: "pictures", label: "Pictures", value: picturesWord(snapshot) },
         { id: "big", label: "Big picture", value: `${selected.tag} · ${bigViewWord(view)}` },
         { id: "dials", label: "Dials", value: dialsView(snapshot)?.footer ?? selected.tag },

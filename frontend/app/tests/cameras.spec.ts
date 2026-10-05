@@ -58,7 +58,10 @@ test.describe("the Cameras page", () => {
     }
     await expect(state(page)).toContainText("HELD");
     await expect(state(page)).toContainText("CAM 1 is held: Studio Control reads it and sends only what you press.");
-    await expect(state(page)).toContainText("3 of 3 held · CAM 1 not recording");
+    // The visual overhaul's polish (2026-10-05): the meta leaves CAM 1's take
+    // to the REC section and the header's tally.
+    await expect(state(page)).toContainText("3 of 3 held");
+    await expect(state(page)).not.toContainText("not recording");
 
     await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-camera", "1");
     await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-picture", "");
@@ -507,7 +510,11 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-iso-value")).toContainText("last read");
     await expect(page.getByTestId("cameras-iso-up")).toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("cameras-release")).toHaveCount(0);
-    await expect(page.getByTestId("cameras-footer")).toContainText("2 / 3 held · CAM 3 unreachable");
+    // The polish (2026-10-05): the meta says when CAM 3 last answered, the
+    // camera list who is held, and the footer leaves both to them.
+    await expect(state(page)).toContainText("Last answer");
+    await expect(page.getByTestId("cameras-key-3")).toContainText("UNREACHABLE");
+    await expect(page.getByTestId("cameras-footer")).not.toContainText("held");
 
     // Try again is one read, which sends nothing: the page says that it tried.
     await page.getByTestId("cameras-state-read-again").click();
@@ -537,8 +544,9 @@ test.describe("the Cameras page", () => {
     const rec = page.getByTestId("cameras-rec");
     await expect(rec).toHaveAttribute("data-rec", "last-known");
     await expect(rec).toHaveAttribute("aria-disabled", "true");
-    await expect(rec).toContainText("last known: recording");
-    await expect(rec).toContainText("STOP is locked until CAM 1 answers");
+    // One line under the cap (the polish, 2026-10-05): when it was last known,
+    // and why STOP is locked.
+    await expect(rec).toContainText(/last known \d\d:\d\d · STOP is locked until CAM 1 answers/);
     await expect(recChip(page)).toContainText("last known");
     await expect(recChip(page)).toHaveAttribute("data-tone", "attention");
     await expect(page.getByTestId("cameras-take-timecode").locator("b")).toHaveAttribute("data-doubt", "");
@@ -554,7 +562,9 @@ test.describe("the Cameras page", () => {
     await expect(state(page)).toContainText("Studio Control has no link to CAM 1 yet: it comes with a later version.");
     await expect(page.getByTestId("cameras-rec")).toHaveAttribute("data-rec", "locked");
     await expect(page.getByTestId("cameras-rec")).toContainText("locked · CAM 1 is not set up");
-    await expect(page.getByTestId("cameras-recent-empty")).toBeVisible();
+    // The design system's empty line (the polish, 2026-10-05): the head's
+    // tooltip says what the list holds.
+    await expect(page.getByTestId("cameras-recent-empty")).toHaveText("Nothing yet");
     await expect(recChip(page)).toHaveCount(0);
   });
 
@@ -611,7 +621,7 @@ test.describe("the Cameras page", () => {
     await expect(state(page)).toContainText(
       "vMix sends no picture for CAM 2. Check that vMix input 7 is still there and live."
     );
-    await expect(state(page)).toContainText("The camera controls still work · 3 of 3 held");
+    await expect(state(page)).toContainText("Camera controls still work");
     await expect(page.getByTestId("cameras-no-picture-2")).toContainText("NO PICTURE");
     await expect(page.getByTestId("cameras-no-picture-2")).toContainText("nothing received");
     await expect(page.getByTestId("cameras-picture-row-2")).toContainText("nothing received");
@@ -619,7 +629,7 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-picture-row-2")).toContainText("NO PICTURE");
     await expect(page.getByTestId("cameras-picture-row-1")).toContainText("test picture");
     await expect(page.getByTestId("cameras-picture-row-1")).toContainText("LIVE");
-    await expect(page.getByTestId("cameras-footer")).toContainText("Pictures test pictures · 2 / 3 · CAM 2 missing");
+    await expect(page.getByTestId("cameras-footer")).toContainText("Pictures test pictures · 2 of 3 · CAM 2 missing");
     // CAM 1's picture arrives, and its aids work.
     await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-camera", "1");
     await page.getByTestId("cameras-aid-zebras").click();

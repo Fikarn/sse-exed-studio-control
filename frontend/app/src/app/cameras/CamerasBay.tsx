@@ -4,7 +4,7 @@ import { Key, LampWord, MenuButton, Segmented, Tooltip, type UseArmResult } from
 import type { CameraNumber, CameraSnapshot, CamerasSnapshot, PicturePlaces } from "@sse/engine-client";
 
 import type { CamerasMenu } from "./camerasMenus";
-import { cameraNumber, pictureLock, pictureShows, releasedTo } from "./camerasModel";
+import { cameraNumber, pictureLock, pictureShows } from "./camerasModel";
 import { CameraPicture, type PictureAids } from "./pictures/CameraPicture";
 import type { PictureFrames } from "./pictures/pictureFrames";
 import { usePicturePlaces } from "./pictures/picturePlaces";
@@ -49,6 +49,12 @@ import styles from "./CamerasBay.module.css";
 // chip is already a hole in the pictures' layer, so the ⋯ costs no other; a
 // ⋯ anywhere else on the picture would be drawn over in the app's window.
 // The current view and zoom are drawn as the selection, not lit.
+//
+// The polish (2026-10-05): the caption names the camera by its tag and word,
+// as the small pictures' chips do; its model stands on the camera's key and
+// the plate's title, and a lock stands in the state display, the plate's
+// connection well and each section's head, so the caption repeats neither.
+// The loupe's head is inset as the caption is.
 
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
@@ -196,14 +202,6 @@ export function CamerasBay({
   const part = bigRect(view, point);
   const loupe = loupeRect(point, zoom);
   const others = snapshot.cameras.filter((entry) => entry.camera !== selected.camera);
-  const lockNote =
-    selected.state === "released"
-      ? `released to ${releasedTo(selected)} · not read`
-      : selected.state === "unreachable"
-        ? "not answering · controls locked"
-        : selected.state === "not-set-up"
-          ? "not set up · controls locked"
-          : null;
 
   const press = (event: MouseEvent<HTMLButtonElement>) => {
     // A press from the keyboard has no place: it puts the loupe back at the centre.
@@ -237,9 +235,7 @@ export function CamerasBay({
   return (
     <div ref={bay} className={styles.bay} data-testid="cameras-bay">
       <div className={styles.caption} data-testid="cameras-caption">
-        <span className={styles.title}>
-          <b>{selected.tag}</b> {selected.model}
-        </span>
+        <span className={styles.title}>{selected.tag}</span>
         <LampWord tone={selected.tone} testId="cameras-caption-state">
           {selected.word}
         </LampWord>
@@ -252,11 +248,6 @@ export function CamerasBay({
               : ` · shown at ${bigViewWord(view)}`
             : null}
         </span>
-        {lockNote ? (
-          <span className={styles.lockNote} data-tone={selected.tone} data-testid="cameras-caption-lock">
-            {lockNote}
-          </span>
-        ) : null}
         <div className={styles.aids} role="group" aria-label="The big picture">
           <Tooltip
             content="The view and the aids are this screen's own: they reach neither the camera nor vMix."

@@ -13,7 +13,6 @@ import {
   dialsView,
   exposureRows,
   formatTakeLength,
-  heldWord,
   levelStepLock,
   levelText,
   linkLabel,
@@ -59,7 +58,7 @@ describe("the state display", () => {
       tone: "ok",
       word: "HELD",
       sentence: "CAM 1 is held: Studio Control reads it and sends only what you press.",
-      meta: "3 of 3 held · CAM 1 not recording",
+      meta: "3 of 3 held",
       wayOut: null,
     });
     await transport.request("cameras.select", { camera: 3 });
@@ -82,9 +81,8 @@ describe("the state display", () => {
       camera: 2,
       tone: "attention",
       word: "RELEASED",
-      sentence:
-        "CAM 2 is released to LUMIX Tether. Studio Control does not read it or send it anything until you connect it again.",
-      meta: "2 of 3 held · CAM 1 not recording",
+      sentence: "CAM 2 is released to LUMIX Tether. Connect it to control it here.",
+      meta: "2 of 3 held",
       wayOut: { kind: "connect", camera: 2, label: "Connect CAM 2" },
     });
 
@@ -98,7 +96,8 @@ describe("the state display", () => {
       sentence: "CAM 3 does not answer at 172.16.16.30. Check that it is on and on the network.",
       wayOut: { kind: "read-again", camera: 3, label: "Try CAM 3 again" },
     });
-    expect(view.meta).toBe("Last answer 09:11 · 2 of 3 held · CAM 1 not recording");
+    // When it last answered: the camera list says which are held.
+    expect(view.meta).toBe("Last answer 09:11");
   });
 
   it("sends a camera that is not set up to Setup, and counts what is held", async () => {
@@ -108,7 +107,7 @@ describe("the state display", () => {
       tone: "attention",
       word: "NOT SET UP",
       sentence: "CAM 2 has no address. Enter it in Setup.",
-      meta: "1 of 3 held · CAM 1 not recording",
+      meta: "1 of 3 held",
       wayOut: { kind: "setup", label: "Camera setup" },
     });
   });
@@ -120,20 +119,35 @@ describe("the state display", () => {
     expect(worstCamera(await read())?.camera).toBe(3);
   });
 
-  it("says what CAM 1's take is known to do", async () => {
+  // The visual overhaul's polish (2026-10-05): the meta stands beside the way-out
+  // key, which leaves it about 30 characters. CAM 1's take is the REC section's
+  // and the header tally's, so the meta does not repeat it.
+  it("leaves CAM 1's take to REC, and keeps the meta to 30 characters beside a way out", async () => {
     const recording = openCameras({
       cameras: [{ camera: 1, paired: true, recording: true }, ...ALL_SET_UP.cameras!.slice(1)],
     });
-    expect(camerasStateView(await recording.read())?.meta).toBe("3 of 3 held · CAM 1 recording");
+    expect(camerasStateView(await recording.read())?.meta).toBe("3 of 3 held");
     recording.hooks.stopAnswering(1);
-    expect(camerasStateView(await recording.read())?.meta).toBe(
-      "Last answer 09:11 · 2 of 3 held · CAM 1 last known recording"
-    );
+    const lost = camerasStateView(await recording.read())!;
+    expect(lost.meta).toBe("Last answer 09:11");
 
     const released = openCameras({
       cameras: [{ camera: 1, paired: true, released: true }, ...ALL_SET_UP.cameras!.slice(1)],
     });
-    expect(camerasStateView(await released.read())?.meta).toBe("2 of 3 held · CAM 1 not read");
+    const handedOver = camerasStateView(await released.read())!;
+    expect(handedOver.meta).toBe("2 of 3 held");
+
+    const unset = camerasStateView(await openCameras({ cameras: [] }).read())!;
+    expect(unset.meta).toBe("0 of 3 held");
+
+    const picture = openCameras();
+    await picture.transport.request("cameras.setup.update", { camera: 2, vmixInput: 7 });
+    const missing = camerasStateView(await picture.read())!;
+
+    for (const view of [lost, handedOver, unset, missing]) {
+      expect(view.wayOut, view.word).not.toBeNull();
+      expect(view.meta.length, `${view.word}: ${view.meta}`).toBeLessThanOrEqual(30);
+    }
   });
 });
 
@@ -157,9 +171,10 @@ describe("the REC key", () => {
     const { transport, hooks, cam1 } = await main(ALL_SET_UP);
     await transport.request("cameras.record.start");
     hooks.stopAnswering(1);
+    // One line under the cap: when it was last known, and why STOP is locked.
     expect(recKeyView(await cam1())).toEqual({
       kind: "last-known",
-      hint: "last known: recording · 09:11",
+      hint: "last known 09:11 · STOP is locked until CAM 1 answers",
       reason: "STOP is locked until CAM 1 answers. The take is left as it was.",
     });
   });
@@ -170,7 +185,7 @@ describe("the REC key", () => {
     expect(recKeyView(await lost.cam1())).toEqual({
       kind: "locked",
       hint: "locked · CAM 1 does not answer",
-      reason: "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC.",
+      reason: "CAM 1 does not answer over Bluetooth. Check it is on and within reach.",
     });
 
     const released = await main({ cameras: [{ camera: 1, paired: true, released: true }] });
@@ -256,10 +271,11 @@ describe("what is known about the take", () => {
     expect(recordingWord(unpaired, false, NOW)).toBe("CAM 1 · not set up");
   });
 
-  it("says stopped while CAM 1 is held and does not record", async () => {
+  // The footer says it in the take row's word (the polish, 2026-10-05).
+  it("says not recording while CAM 1 is held and does not record, in the take and the footer alike", async () => {
     const cam1 = cameraOf(await openCameras().read(), 1);
     expect(takeReadouts(cam1, NOW)[0]).toMatchObject({ value: null, note: "not recording" });
-    expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · stopped");
+    expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · not recording");
   });
 
   it("prints lengths whole, minutes unpadded below the hour", () => {
@@ -569,13 +585,6 @@ describe("the Recent list and the footer", () => {
     expect(camerasFingerprint(await read())).not.toBe(changed);
     expect(camerasFingerprint(null)).toBe("");
   });
-
-  it("counts the held cameras and names the first that is not", async () => {
-    const { hooks, read } = openCameras();
-    expect(heldWord(await read())).toBe("3 / 3 held");
-    hooks.stopAnswering(3);
-    expect(heldWord(await read())).toBe("2 / 3 held · CAM 3 unreachable");
-  });
 });
 
 describe("the pictures", () => {
@@ -588,7 +597,7 @@ describe("the pictures", () => {
       { camera: 2, tag: "CAM 2", detail: "test picture", word: "LIVE", tone: "ok" },
       { camera: 3, tag: "CAM 3", detail: "test picture", word: "LIVE", tone: "ok" },
     ]);
-    expect(picturesWord(snapshot)).toBe("test pictures · 3 / 3");
+    expect(picturesWord(snapshot)).toBe("test pictures · 3 of 3");
     expect(pictureLock(snapshot.cameras[0]!)).toBeNull();
     expect(camerasStateView(snapshot)?.word).toBe("HELD");
   });
@@ -602,7 +611,7 @@ describe("the pictures", () => {
       tone: "attention",
       word: "PICTURE MISSING",
       sentence: "vMix sends no picture for CAM 2. Check that vMix input 7 is still there and live.",
-      meta: "The camera controls still work · 3 of 3 held",
+      meta: "Camera controls still work",
       wayOut: { kind: "look-again", label: "Look again" },
     });
     expect(pictureRows(snapshot)[1]).toEqual({
@@ -612,7 +621,7 @@ describe("the pictures", () => {
       word: "NO PICTURE",
       tone: "attention",
     });
-    expect(picturesWord(snapshot)).toBe("test pictures · 2 / 3 · CAM 2 missing");
+    expect(picturesWord(snapshot)).toBe("test pictures · 2 of 3 · CAM 2 missing");
     const cam2 = cameraOf(snapshot, 2)!;
     expect(pictureShows(cam2)).toBe(false);
     expect(pictureLock(cam2)).toBe("CAM 2 has no picture to show.");

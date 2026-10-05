@@ -306,11 +306,22 @@ export function CamerasPlate({
   /** A section's quiet word: what locks it, or what its keys do. */
   const detail = (whenHeld?: string) => (held ? whenHeld : sectionDetail(camera, ""));
 
-  /** A press-twice section's value, as the camera reports it, or why there is none. */
+  /**
+   * A press-twice section's value, as the camera reports it, or why there is none. The visual
+   * overhaul's polish (2026-10-05): drawn as the take's rows in the cluster draw theirs, the
+   * doubt's keyline on the value alone and `last read` beside it, outside it, so the keyline
+   * ends inside the column; an absent value is the quiet note, never drawn like a value.
+   */
   const reported = (text: string | null, testId: string) => (
-    <span className={styles.reported} data-doubt={doubt && text !== null ? "" : undefined} data-testid={testId}>
-      {shown && text !== null ? text : "not read"}
-      {doubt && text !== null ? <span className={styles.reportedNote}> · last read</span> : null}
+    <span className={styles.reported} data-testid={testId}>
+      {shown && text !== null ? (
+        <span className={styles.reportedValue} data-doubt={doubt ? "" : undefined}>
+          {text}
+        </span>
+      ) : (
+        <span className={styles.reportedNote}>not read</span>
+      )}
+      {doubt && text !== null ? <span className={styles.reportedNote}>last read</span> : null}
     </span>
   );
 
@@ -356,11 +367,14 @@ export function CamerasPlate({
             </ArmKey>
           ),
         };
+      // The polish (2026-10-05): Connect and Try again are command keys, as
+      // Camera setup and Release are here; the state display's way out is the
+      // screen's one primary.
       case "released":
         return {
           detail: `to ${releasedTo(camera)} · not read`,
           key: (
-            <Key size="small" mode="primary" testId="cameras-connect" onClick={() => onConnect(number)}>
+            <Key size="small" testId="cameras-connect" onClick={() => onConnect(number)}>
               Connect
             </Key>
           ),
@@ -369,7 +383,7 @@ export function CamerasPlate({
         return {
           detail: `${linkLabel(camera)} · ${last ? `last answer ${last}` : "no answer since the start"}`,
           key: (
-            <Key size="small" mode="primary" testId="cameras-try-again" onClick={() => onReadAgain(number)}>
+            <Key size="small" testId="cameras-try-again" onClick={() => onReadAgain(number)}>
               Try again
             </Key>
           ),
@@ -554,7 +568,8 @@ export function CamerasPlate({
             rows={[{ id: "range", label: "Dynamic range", value: reported(range.value, "cameras-dynamicRange-value") }]}
           />
         ) : (
-          notReported("dynamicRange", "Profile", range.notReported)
+          // The polish (2026-10-05): the rows' own names, reported or not.
+          notReported("dynamicRange", "Dynamic range", range.notReported)
         )}
         {lut.reported ? (
           <>
@@ -579,7 +594,7 @@ export function CamerasPlate({
             ) : null}
           </>
         ) : (
-          notReported("displayLut", "LUT", lut.notReported)
+          notReported("displayLut", "Display LUT", lut.notReported)
         )}
       </Section>
 

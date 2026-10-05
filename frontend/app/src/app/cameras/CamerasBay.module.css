@@ -31,12 +31,9 @@
   white-space: nowrap;
 }
 
+/* The camera's tag, as the small pictures' chips name theirs (the polish,
+   2026-10-05: its model stands on its key and the plate's title). */
 .title {
-  color: var(--text-text2);
-  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
-}
-
-.title b {
   color: var(--text-text);
   font: 700 var(--font-size-body) / 1 var(--font-family-ui);
 }
@@ -44,18 +41,6 @@
 .detail {
   color: var(--text-text2);
   font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-}
-
-.lockNote {
-  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
-}
-
-.lockNote[data-tone="attention"] {
-  color: var(--role-yellow-text);
-}
-
-.lockNote[data-tone="error"] {
-  color: var(--role-coral-text);
 }
 
 .aids {
@@ -172,11 +157,16 @@
   flex: none;
 }
 
+/* The loupe's head stands over its well as the caption stands over the big
+   picture, inset as the caption is (the polish, 2026-10-05): its zoom keys
+   end under the caption's last key, off the plate's hairline, and their
+   focus ring is not clipped by the bay. */
 .loupeHead {
   display: flex;
   align-items: center;
   gap: 8px;
   height: 28px;
+  padding: 0 12px;
   flex: none;
 }
 
