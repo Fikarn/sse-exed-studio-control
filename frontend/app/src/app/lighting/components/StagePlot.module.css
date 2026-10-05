@@ -102,9 +102,12 @@
   fill: var(--text-text);
 }
 
+/* The room's own marks (Talent, Bench, Door, Booth window). The polish
+   (2026-10-05): with the rig placed in the room its beams light the floor
+   under them, where the quiet ink fell to 4.3:1; the second ink holds 4.5:1. */
 .labelFixed {
   font-weight: var(--font-weight-regular);
-  fill: var(--text-text3);
+  fill: var(--text-text2);
 }
 
 .labelDetail {

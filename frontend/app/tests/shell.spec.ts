@@ -180,12 +180,19 @@ test("audio solo latches a monitor-strip chip that survives workspace switches",
   // Re-latch and confirm the chip stands on every other page.
   await soloButton.click();
   await expect(soloLatch).toBeVisible();
+  await page.getByRole("button", { name: "Teleprompter", exact: true }).click();
+  await expect(soloChip).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-latched-solo")).toHaveText("Solo");
+  // The polish (2026-10-05): Lighting has a Solo of its own, so there the
+  // Console's latch says whose it is.
   await page.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
-  await expect(soloChip).toBeVisible();
+  const audioSoloChip = page.getByRole("button", { name: /Open Audio for Audio solo/ });
+  await expect(audioSoloChip).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-latched-solo")).toHaveText("Audio solo");
 
   // The chip's click target is the owning workspace, not Setup.
-  await soloChip.click();
+  await audioSoloChip.click();
   await expect(page.getByTestId("audio-workspace")).toBeVisible();
   await expect(soloChip).toHaveCount(0);
 });

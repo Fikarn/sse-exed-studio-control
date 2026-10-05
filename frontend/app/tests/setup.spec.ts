@@ -85,7 +85,8 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   // run reported is read off the notice it wrote.
   const feedback = page.getByTestId("setup-feedback");
   await expect(feedback).toContainText("2 of 3 probes passed");
-  await expect(feedback).toContainText("Lighting Bridge Probe: Bridge 0.0.0.0 did not answer");
+  await expect(feedback).toContainText("Lighting bridge: Bridge 0.0.0.0 did not answer");
+  await expect(feedback).not.toContainText("..");
   // A failed probe never advances the runner on its own.
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
 
@@ -98,7 +99,7 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   await page.getByTestId("setup-step-primary").click();
   const dialog = page.getByRole("dialog", { name: "Publish with failing probes?" });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Lighting Bridge Probe");
+  await expect(dialog).toContainText("Lighting bridge");
   await expect(dialog).toContainText("did not answer");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);

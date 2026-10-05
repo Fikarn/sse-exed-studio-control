@@ -169,7 +169,9 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     if (notPassed.length > 0) {
       return {
         message: `${results.length - notPassed.length} of ${results.length} probes passed — ${notPassed
-          .map((check) => `${check.label}: ${check.detail}`)
+          // A detail ends in its own full stop; the line adds one after the
+          // last (the polish, 2026-10-05: it read "probe.. Fix").
+          .map((check) => `${check.label}: ${check.detail.replace(/\.$/, "")}`)
           .join("; ")}. Fix the field it names, then press Run all probes again.`,
         tone: "error" as const,
       };
