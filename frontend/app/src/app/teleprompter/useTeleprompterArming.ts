@@ -76,18 +76,22 @@ export function teleprompterArmedWords(
 /**
  * Whether an armed key can still be pressed again for what it said. An arm
  * whose key has gone, or would now do something else, is dropped: Update once
- * `NOT UPDATED` has cleared (no key offers it any more), Clear once nothing is
+ * no key offers it (`NOT UPDATED` has cleared; or the Prompter XL does not
+ * draw, which takes the state display's key, and the selected script, whose
+ * plate would offer it, is not the one on the prompter), Clear once nothing is
  * on the prompter, Replace once its script is not the selected one, is on the
  * prompter itself or the prompter is blank (Put on is one press then), and
  * Delete for good once its script is no longer among the removed ones.
  */
 export function armStillStands(
   key: string,
-  snapshot: Pick<PrompterSnapshot, "glass" | "scripts" | "removed"> | null,
+  snapshot: Pick<PrompterSnapshot, "glass" | "scripts" | "removed" | "screen"> | null,
   selectedId: string | null
 ): boolean {
   const glass = snapshot?.glass ?? null;
-  if (key === UPDATE_ARM_KEY) return glass?.notUpdated === true;
+  if (key === UPDATE_ARM_KEY) {
+    return glass?.notUpdated === true && (snapshot?.screen.draws === true || glass.scriptId === selectedId);
+  }
   if (key === CLEAR_ARM_KEY) return glass !== null;
   const replacing = replaceArmedFor(key);
   if (replacing !== null) {

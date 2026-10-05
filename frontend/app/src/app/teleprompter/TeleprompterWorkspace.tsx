@@ -235,14 +235,14 @@ export function TeleprompterWorkspace({
   // and only from what the page holds right after that selection: that script
   // there, another one on the prompter. Nothing waits for a later read, so a
   // later selection of the script never arms anything; and the hand-off only
-  // arms: a key already armed for it is left as it is, never pressed again.
+  // arms (`armOnly`): a key already armed for it is left as it is, never
+  // pressed again, however late the selection lands after the press.
   const replaceElsewhere = useLiveCallback(async (scriptId: string) => {
     if (!(await select(scriptId))) return;
     const now = store.getSnapshot().prompterSnapshot;
     const target = now?.scripts.find((script) => script.id === scriptId) ?? null;
     if (!now?.glass || !target || now.glass.scriptId === scriptId) return;
-    if (arm.armed?.key === teleprompterArmKey.replace(scriptId)) return;
-    armReplace(target);
+    arm.armOnly(teleprompterArmKey.replace(target.id), `Replace with ${armName(target.name)}`);
   });
   // Edit script from a menu: that script in the bay's editor.
   const editScript = useLiveCallback(async (scriptId: string) => {
@@ -356,7 +356,7 @@ export function TeleprompterWorkspace({
           arm={arm}
           updateInDisplay={state.wayOut === "update"}
           onPutOn={putOn}
-          onSelect={(scriptId) => void select(scriptId)}
+          onSelect={select}
           onUpdate={update}
           onPutOnScript={(scriptId) => void putOnScript(scriptId)}
           onReplaceElsewhere={(scriptId) => void replaceElsewhere(scriptId)}

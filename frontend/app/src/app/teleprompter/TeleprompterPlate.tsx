@@ -56,7 +56,8 @@ export interface TeleprompterPlateProps {
   updateInDisplay: boolean;
   store: ShellStore;
   perform: PerformAction;
-  onSelect: (scriptId: string) => void;
+  /** Selects a script; false when the editor's text could not be saved and the selection stayed. */
+  onSelect: (scriptId: string) => Promise<boolean>;
   /** The plate's key for the selected script: Put on, or Replace's two presses. */
   onPutOn: () => void;
   onUpdate: () => void;
@@ -68,17 +69,23 @@ export interface TeleprompterPlateProps {
   onEdit: (scriptId: string) => void;
 }
 
-/** The selected script's versions, read when it is selected and again when it changes. */
-function useScriptVersions(store: ShellStore, selected: PrompterScriptSummary | null) {
-  const [read, setRead] = useState<{ key: string; script: PrompterScriptSnapshot } | null>(null);
-  const key = selected ? `${selected.id}@${selected.changedAt}` : null;
+/**
+ * The selected script's versions, read when it is selected and again when it
+ * changes, and whenever `again` moves (Put on, Replace and Update keep a
+ * version without changing the script's text; the versions' popover opening).
+ * The last read stands while the next is read, so the list never empties under
+ * the operator's hand (a Bring back reads again).
+ */
+function useScriptVersions(store: ShellStore, selected: PrompterScriptSummary | null, again: string) {
+  const [read, setRead] = useState<{ scriptId: string; script: PrompterScriptSnapshot } | null>(null);
   const scriptId = selected?.id ?? null;
+  const key = selected ? `${selected.id}@${selected.changedAt}#${again}` : null;
   useEffect(() => {
     if (!key || !scriptId) return undefined;
     let current = true;
     store.readPrompterScript(scriptId).then(
       (script) => {
-        if (current) setRead({ key, script });
+        if (current) setRead({ scriptId, script });
       },
       (error: unknown) => store.reportBackgroundFailure(error, "a script's earlier versions")
     );
@@ -86,7 +93,7 @@ function useScriptVersions(store: ShellStore, selected: PrompterScriptSummary | 
       current = false;
     };
   }, [key, scriptId, store]);
-  return read && read.key === key ? read.script.versions : null;
+  return read && read.scriptId === scriptId ? read.script.versions : null;
 }
 
 interface ScriptRowProps {
@@ -182,8 +189,15 @@ export function TeleprompterPlate({
   const [showRemoved, setShowRemoved] = useState(false);
   const [page, setPage] = useState(0);
   const [renaming, setRenaming] = useState<PrompterScriptSummary | null>(null);
-  const [versionsOpen, setVersionsOpen] = useState(false);
-  const versions = useScriptVersions(store, selected);
+  // The script whose earlier versions are open, and the how-manyth opening
+  // (the popover's key: opened again, it takes the focus again).
+  const [versionsFor, setVersionsFor] = useState<{ scriptId: string; opening: number } | null>(null);
+  const openings = useRef(0);
+  const versions = useScriptVersions(
+    store,
+    selected,
+    `${glass?.scriptId ?? ""}:${glass?.notUpdated ? 1 : 0}:${versionsFor?.opening ?? 0}`
+  );
   const onGlass = selected !== null && glass?.scriptId === selected.id;
   // The plate's title (what the versions stand beside), its ⋯, and the ⋯
   // whose menu opened the versions: the focus goes back to that one.
@@ -191,10 +205,12 @@ export function TeleprompterPlate({
   const plateKey = useRef<HTMLSpanElement | null>(null);
   const rowKeys = useRef(new Map<string, HTMLSpanElement>());
   const versionsOpener = useRef<HTMLElement | null>(null);
-  // The versions follow the selected script; with none, they close.
+  // The versions are the script's they were opened for: once the selection
+  // moves, they close.
+  const versionsShown = versionsFor !== null && versionsFor.scriptId === selected?.id ? versionsFor : null;
   useEffect(() => {
-    if (!selected && versionsOpen) setVersionsOpen(false);
-  }, [selected, versionsOpen]);
+    if (versionsFor && versionsFor.scriptId !== selected?.id) setVersionsFor(null);
+  }, [selected?.id, versionsFor]);
 
   const list = showRemoved ? removed : scripts;
   const pages = Math.max(Math.ceil(list.length / SCRIPT_ROOM), 1);
@@ -204,10 +220,11 @@ export function TeleprompterPlate({
   const onPrompterOf = (script: PrompterScriptSummary): OnPrompter =>
     !glass ? "nothing" : glass.scriptId === script.id ? "this" : "another";
 
-  /** Opens the selected script's earlier versions beside the title, from the ⋯ in `opener`. */
-  const openVersions = (opener: HTMLElement | null) => {
+  /** Opens a script's earlier versions beside the title, from the ⋯ in `opener`. */
+  const openVersions = (scriptId: string, opener: HTMLElement | null) => {
     versionsOpener.current = opener?.querySelector<HTMLElement>("button") ?? opener;
-    setVersionsOpen(true);
+    openings.current += 1;
+    setVersionsFor({ scriptId, opening: openings.current });
   };
 
   /** A script's one menu, for its row's ⋯ and right-click, and for the plate title's ⋯. */
@@ -218,15 +235,22 @@ export function TeleprompterPlate({
       onPrompter: onPrompterOf(script),
       onPlate,
       versions: script.id === selected?.id && versions ? versions.length : null,
-      onSelect: () => onSelect(script.id),
+      onSelect: () => void onSelect(script.id),
       onPutOn: () => onPutOnScript(script.id),
       onReplace: () => onReplaceElsewhere(script.id),
       onEdit: () => onEdit(script.id),
       onRename: () => setRenaming(script),
+      // Another script's versions open once it is selected, and not when the
+      // editor's text could not be saved and the selection stayed.
       onVersions: () => {
         const opener = onPlate ? plateKey.current : (rowKeys.current.get(script.id) ?? null);
-        if (script.id !== selected?.id) onSelect(script.id);
-        openVersions(opener);
+        if (script.id === selected?.id) {
+          openVersions(script.id, opener);
+          return;
+        }
+        void onSelect(script.id).then((selectedNow) => {
+          if (selectedNow) openVersions(script.id, opener);
+        });
       },
       onRemove: () => void perform(() => store.removePrompterScript(script.id), false),
       testIdPrefix: onPlate ? "teleprompter" : `teleprompter-row-menu-${script.id}`,
@@ -386,7 +410,7 @@ export function TeleprompterPlate({
                   selected={script.id === selected?.id}
                   menu={scriptMenu(script, false)}
                   arm={arm}
-                  onSelect={() => onSelect(script.id)}
+                  onSelect={() => void onSelect(script.id)}
                   keyRef={(element) => {
                     if (element) rowKeys.current.set(script.id, element);
                     else rowKeys.current.delete(script.id);
@@ -436,14 +460,15 @@ export function TeleprompterPlate({
         </Section>
       ) : null}
 
-      {selected && versionsOpen ? (
+      {selected && versionsShown ? (
         <TeleprompterVersions
+          key={versionsShown.opening}
           script={selected}
           versions={versions}
           anchor={head.current}
           opener={versionsOpener}
           onBringBack={(versionId) => void perform(() => store.bringBackPrompterVersion(selected.id, versionId), true)}
-          onClose={() => setVersionsOpen(false)}
+          onClose={() => setVersionsFor(null)}
         />
       ) : null}
 

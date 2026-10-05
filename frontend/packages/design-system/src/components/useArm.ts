@@ -40,6 +40,12 @@ export interface UseArmResult {
    * surface's (the Cameras page's stop has the deck's 3 s).
    */
   armOrApply: (key: string, label: string, apply: () => void, windowMs?: number) => void;
+  /**
+   * Arms `key` and never applies: a key already armed is left as it is. For a
+   * hand-off that arms another key for its own second press (a menu's item
+   * that arms the plate's key), so no timing can make it the second press.
+   */
+  armOnly: (key: string, label: string, windowMs?: number) => void;
   cancel: () => boolean;
   clear: () => void;
   /** Milliseconds left on the current arm, for a countdown; 0 when idle. */
@@ -105,6 +111,14 @@ export function useArm({
     [dwellMs, now, timeoutMs]
   );
 
+  const armOnly = useCallback(
+    (key: string, label: string, windowMs?: number) => {
+      if (armedRef.current?.key === key) return;
+      setArmed({ key, label, armedAt: now(), timeoutMs: windowMs ?? timeoutMs });
+    },
+    [now, timeoutMs]
+  );
+
   const cancel = useCallback(() => {
     const current = armedRef.current;
     if (!current) return false;
@@ -121,5 +135,5 @@ export function useArm({
     return Math.max(0, current.timeoutMs - (now() - current.armedAt));
   }, [now]);
 
-  return { armed, armOrApply, cancel, clear, remainingMs };
+  return { armed, armOrApply, armOnly, cancel, clear, remainingMs };
 }

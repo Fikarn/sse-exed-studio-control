@@ -488,9 +488,29 @@ test.describe("the Teleprompter page, the visual overhaul", () => {
     const rows = page.getByTestId("teleprompter-paragraphs").locator("button");
     await expect(rows.first()).toHaveAttribute("data-take", "");
     expect(await rows.evaluateAll((buttons) => buttons.every((button) => button.hasAttribute("data-take")))).toBe(true);
-    // − 5 and + 5 are labels: a value is never in the display face.
-    const face = await page.getByTestId("teleprompter-speed-up").evaluate((key) => getComputedStyle(key).fontFamily);
-    expect(face).not.toContain("Adelia");
+    // − 5, + 5, − 4 and + 4 are labels: a value is never in the display face.
+    // The face of each element that draws a figure inside the key (the
+    // review of pull request 7: the key's own face says nothing of its cap).
+    for (const id of [
+      "teleprompter-speed-down",
+      "teleprompter-speed-up",
+      "teleprompter-size-down",
+      "teleprompter-size-up",
+    ]) {
+      const faces = await page
+        .getByTestId(id)
+        .evaluate((key) =>
+          [key, ...key.querySelectorAll("*")]
+            .filter((element) =>
+              [...element.childNodes].some(
+                (node) => node.nodeType === Node.TEXT_NODE && /\d/.test(node.textContent ?? "")
+              )
+            )
+            .map((element) => getComputedStyle(element).fontFamily)
+        );
+      expect(faces.length, id).toBeGreaterThan(0);
+      for (const face of faces) expect(face, id).not.toContain("Adelia");
+    }
   });
 
   test("nothing scrolls, no line is cut, and the paragraph list's 16 rows end above Clear", async ({ page }) => {
@@ -793,5 +813,47 @@ test.describe("the Teleprompter page, the visual overhaul", () => {
     await page.keyboard.press("Escape");
     await expect(popover).toHaveCount(0);
     await expect(page.getByTestId("teleprompter-plate-menu")).toBeFocused();
+  });
+
+  // The review of pull request 7: another script's versions open once that
+  // script is selected, a Bring back keeps the focus in the popover (so Esc
+  // still closes it), and a press on the ⋯ that opened it closes it.
+  test("another script's versions open once it is selected; Bring back keeps Esc in reach; its ⋯ closes them", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    await (await openRowMenu(page, "04 Outro")).locator('[data-testid$="-versions"]').click();
+    const popover = page.getByTestId("teleprompter-versions-popover");
+    await expect(popover).toContainText("Earlier versions of 04 Outro");
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("04 Outro");
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+
+    await page.getByTestId("teleprompter-scripts").getByText("02 Interview intro").click();
+    await (await openPlateMenu(page)).getByTestId("teleprompter-versions").click();
+    await expect(popover).toContainText("Earlier versions of 02 Interview intro");
+    const rows = popover.locator('[data-testid^="teleprompter-bring-back-"]');
+    // The oldest version: its text differs from what is on the glass.
+    await rows.last().click();
+    await expect(state(page)).toContainText("NOT UPDATED");
+    await expect(popover).toBeVisible();
+    // The list is read again; the focus stays inside the popover, never on the body.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Boolean(
+            document.querySelector("[data-testid=teleprompter-versions-popover]")?.contains(document.activeElement)
+          )
+        )
+      )
+      .toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+
+    await (await openPlateMenu(page)).getByTestId("teleprompter-versions").click();
+    await expect(popover).toBeVisible();
+    await page.getByTestId("teleprompter-plate-menu").click();
+    await expect(popover).toHaveCount(0);
+    await expect(page.getByRole("menu")).toBeVisible();
   });
 });

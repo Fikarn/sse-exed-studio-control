@@ -51,8 +51,16 @@ function onGlass(overrides: Partial<PrompterGlassSummary> = {}): PrompterGlassSu
   return { scriptId: INTRO.id, name: INTRO.name, notUpdated: false, ...overrides } as PrompterGlassSummary;
 }
 
-function prompter(glass: PrompterGlassSummary | null): Pick<PrompterSnapshot, "glass" | "scripts" | "removed"> {
-  return { glass, scripts: [WELCOME, INTRO, OUTRO], removed: [DRAFT] };
+function prompter(
+  glass: PrompterGlassSummary | null,
+  draws = true
+): Pick<PrompterSnapshot, "glass" | "scripts" | "removed" | "screen"> {
+  return {
+    glass,
+    scripts: [WELCOME, INTRO, OUTRO],
+    removed: [DRAFT],
+    screen: { draws } as PrompterSnapshot["screen"],
+  };
 }
 
 function options(overrides: Partial<ScriptMenuOptions> & Pick<ScriptMenuOptions, "script">): ScriptMenuOptions {
@@ -188,6 +196,15 @@ describe("the page's one arm", () => {
     expect(armStillStands(UPDATE_ARM_KEY, prompter({ ...onGlass(), notUpdated: true }), INTRO.id)).toBe(true);
     expect(armStillStands(UPDATE_ARM_KEY, prompter(onGlass()), INTRO.id)).toBe(false);
     expect(armStillStands(UPDATE_ARM_KEY, prompter(null), INTRO.id)).toBe(false);
+  });
+
+  // The review of pull request 7: while the Prompter XL does not draw, only
+  // the plate offers Update, and only for the script on the prompter.
+  it("drops Update once no key offers it: the glass not drawn and another script selected", () => {
+    const edited = { ...onGlass(), notUpdated: true };
+    expect(armStillStands(UPDATE_ARM_KEY, prompter(edited, true), OUTRO.id)).toBe(true);
+    expect(armStillStands(UPDATE_ARM_KEY, prompter(edited, false), INTRO.id)).toBe(true);
+    expect(armStillStands(UPDATE_ARM_KEY, prompter(edited, false), OUTRO.id)).toBe(false);
   });
 
   it("drops Clear on a blank prompter, and Replace when its script is not the selected one or is on the prompter", () => {

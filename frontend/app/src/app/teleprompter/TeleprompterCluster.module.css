@@ -84,6 +84,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The size's unit, as a Readout draws the speed's: half its number's size,
+   the quiet ink. */
+.cellUnit {
+  font-size: var(--font-size-tick);
+}
+
 /* The speed's unit (the Readout's own), in the regular weight. */
 .cellValue > span:first-child > span {
   font-weight: var(--font-weight-regular);

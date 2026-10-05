@@ -350,7 +350,8 @@ export function TeleprompterCluster({
             tip={`The glass's text size: 4 px a press, from ${SIZE_RANGE.min} to ${SIZE_RANGE.max} px. Standard returns to ${look.standardSizePx} px.`}
           >
             <span className={styles.cellValue} data-testid="teleprompter-text-size">
-              <b>{sizePx} px</b> <span>{atStandard ? "standard" : `standard ${look.standardSizePx}`}</span>
+              <b>{sizePx}</b> <span className={styles.cellUnit}>px</span>{" "}
+              <span>{atStandard ? "standard" : `standard ${look.standardSizePx}`}</span>
             </span>
           </DialCell>
           <div className={styles.sizeKeys}>
