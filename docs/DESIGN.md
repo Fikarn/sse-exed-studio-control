@@ -12,17 +12,17 @@ From the operator's chair, in one glance and without reading a sentence: is it s
 
 Every page is one grid: **header · cluster · bay · plate · footer**, 80 · 440 | 1680 | 440 · 40. There is no page top bar; the cluster's first element is the state. The one surface is 2560×1440, fullscreen.
 
-| Region        | What it is                                                                                                                                         | Size (px) |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------: |
-| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                    |   80 high |
-| Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                              |  440 wide |
-| State display | a black display, fixed height: lamp and word, the page's ⋯ at its top right, the hardware link's sentence, the way-out key; nothing below it moves |  180 high |
-| Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched"           |   56 high |
-| Bay           | the page's picture: strips, the plot, the glass, the step screen; the shell draws no margin in it, the page keeps its own                          | 1680 wide |
-| Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                  |  440 wide |
-| Footer        | telemetry as `Label value` items and one action key                                                                                                |   40 high |
+| Region        | What it is                                                                                                                                                     | Size (px) |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------: |
+| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                                |   80 high |
+| Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                                          |  440 wide |
+| State display | a black display, fixed height: lamp and word, the page's ⋯ at its top right, the hardware link's sentence (two lines), the way-out key; nothing below it moves |  180 high |
+| Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched"                       |   56 high |
+| Bay           | the page's picture: strips, the plot, the glass, the step screen; the shell draws no margin in it, the page keeps its own                                      | 1680 wide |
+| Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                              |  440 wide |
+| Footer        | telemetry as `Label value` items and one action key                                                                                                            |   40 high |
 
-The header reads left to right: the product's name in SSE Adelia at the frame's 32 px margin, alone over the cluster; the tabs, Setup / Support · Lighting · Audio · Cameras · Teleprompter, each page's tab carrying its page's lamp and state word (16 px), the open page's none, because its state display says it; the deck's lamp, `Surface`, and a `Backup` chip only while the automatic backup failed or is overdue; the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself; the `REC` tally in a slot of its own that never moves, quiet at rest and the latch form in coral while CAM 1 records; the clock; and the SSE logotype alone at the right, 40 px high with half its height clear on every side, never a lockup. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer. Density never comes from the type; the sizes stay.
+The header reads left to right: the product's name in SSE Adelia at the frame's 32 px margin, alone over the cluster; the tabs, Setup / Support · Lighting · Audio · Cameras · Teleprompter, each page's tab carrying its page's lamp and state word (16 px), the open page's none, because its state display says it, though it keeps the word's room (drawn unseen after its keyline) and every name holds its bold width, so no tab moves when the page changes; the deck's lamp, `Surface`, and a `Backup` chip only while the automatic backup failed or is overdue; the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself (on Lighting, which has a Solo of its own, the Console's reads `AUDIO SOLO`); the `REC` tally in a slot of its own that never moves, quiet at rest and the latch form in coral while CAM 1 records; the clock; and the SSE logotype alone at the right, 40 px high with half its height clear on every side, never a lockup. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer; no tab is the current one, and a lamp never read is hollow and says `pending`, or `not read` after a start that failed. Density never comes from the type; the sizes stay.
 
 Every take-time key has one fixed home. A latch goes into the latch slot, never above or between keys, so nothing a hand reaches for during a take is ever pushed.
 
@@ -124,6 +124,8 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 ## 8. State words
 
 Every state word is the hardware link's, in capitals with its lamp. Its sentence is printed as the link gives it. A raw code prints small under the sentence and is never the first thing read. Every state sentence says what happened and what to do, and the way out is a key in the same display.
+
+The sentence keeps two lines, so every state sentence is written to fit them, about 70 characters, whether the hardware link or the page writes it; the way-out key beside it names the action, so the sentence need not. The meta fits beside the way-out key, about 30 characters. Should a name ever make either longer, the display says the whole of it on hover. The page tests hold that none is cut on any fixture.
 
 | Page         | Words                                                                                                                                       |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
