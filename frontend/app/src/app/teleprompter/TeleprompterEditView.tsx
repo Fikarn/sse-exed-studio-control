@@ -1,6 +1,6 @@
 import { useState, type Ref } from "react";
 
-import { LampWord, Readouts, Tooltip } from "@sse/design-system";
+import { EmptyLine, Readouts, Tooltip } from "@sse/design-system";
 import type { PrompterGlassSnapshot, PrompterScriptSummary, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
 import { ScriptEditor, type ScriptEditorHandle, type ScriptEditorMarks } from "./editor/ScriptEditor";
@@ -17,6 +17,10 @@ import styles from "./TeleprompterEditView.module.css";
 // run state and the reading line's state are words in capitals, and the
 // sentence on the quarter-size copy is the tooltip of its head; what an edit
 // does to the glass stays on screen.
+//
+// The polish (2026-10-05): the column says only what the edits do. What is on
+// the prompter, the place and the run state are the strip's, which stands over
+// the editor; nothing on the prompter is the design system's empty line.
 
 /** The quarter-size copy: a quarter of the Prompter XL's 1,920 px. */
 const QUARTER_WIDTH = 480;
@@ -29,7 +33,6 @@ export interface TeleprompterEditViewProps {
   snapshot: PrompterSnapshot;
   glassSnapshot: PrompterGlassSnapshot | null;
   glassText: PrompterGlassText | null;
-  place: string | null;
   store: ShellStore;
   editor: Ref<ScriptEditorHandle>;
   onLayout: (report: PrompterGlassLayoutReport) => void;
@@ -41,7 +44,6 @@ export function TeleprompterEditView({
   snapshot,
   glassSnapshot,
   glassText,
-  place,
   store,
   editor,
   onLayout,
@@ -97,7 +99,6 @@ export function TeleprompterEditView({
           <Tooltip content={QUARTER} placement="left">
             <span className={styles.label}>On the glass now</span>
           </Tooltip>
-          <span className={styles.detail}>{glass ? glass.name : "—"}</span>
         </div>
         <div className={styles.quarter} data-on-glass={snapshot.screen.draws ? "" : undefined}>
           <PrompterGlass
@@ -112,18 +113,8 @@ export function TeleprompterEditView({
         {glass ? (
           <Readouts
             className={styles.readouts}
-            rows={[
-              { id: "place", label: "Place", value: place ?? "—" },
-              {
-                id: "run",
-                label: "The prompter",
-                value: (
-                  <LampWord tone={glass.playing ? "ok" : "off"}>
-                    {glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused"}
-                  </LampWord>
-                ),
-              },
-              ...(onGlass
+            rows={
+              onGlass
                 ? [
                     {
                       id: "edited",
@@ -152,13 +143,13 @@ export function TeleprompterEditView({
                       ),
                     },
                   ]
-                : [{ id: "editing", label: "You are editing", value: script.name }]),
-            ]}
+                : [{ id: "editing", label: "You are editing", value: script.name }]
+            }
           />
         ) : (
-          <p className={styles.nothing}>
-            <LampWord tone="off">Nothing on the prompter</LampWord>
-          </p>
+          <EmptyLine lamp className={styles.nothing}>
+            Nothing on the prompter
+          </EmptyLine>
         )}
         <p className={styles.note} data-testid="teleprompter-edit-note">
           {note}

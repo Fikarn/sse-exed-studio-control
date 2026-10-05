@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
-import { Field, Key, LampWord, Segmented, Tooltip } from "@sse/design-system";
+import { EmptyLine, Key, LampWord, Segmented, Tooltip, Well } from "@sse/design-system";
 import type { PrompterJumpRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
 import type { GlassParagraph } from "./glass/glassText";
@@ -22,6 +22,14 @@ import styles from "./TeleprompterBay.module.css";
 // run state and Not on the glass are state words in capitals, the bar's
 // sentence is a tooltip on its word, and the bar and Go are marked take-time.
 // The copy itself, the glass's props and its layout report are as they were.
+//
+// The polish (2026-10-05): the strip says what is on the prompter, which stays
+// true while the Prompter XL draws nothing (NOT ON THE GLASS completes it),
+// and its three readouts share one baseline, an empty time a small dash like
+// the place's. The bar's head leaves the share read to the strip. The cue
+// keys, the Go to paragraph field and Go are one 36 px row, the field's label
+// before it; the cues are upright (PT Sans has no italic). Nothing on the
+// prompter is the design system's empty line.
 
 /** The copy across the bay, 1,680 × 945: 87.5 % of the Prompter XL's pixels (the proposal §6.1;
  *  the shell, overhaul 3, made the bay 1,680 wide). */
@@ -52,8 +60,8 @@ function counted(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-/** Three rows of cue keys (`.cues`' height in the CSS). */
-const CUE_ROWS_HEIGHT = 104;
+/** Three rows of 36 px cue keys, 8 px apart (`.cues`' height in the CSS). */
+const CUE_ROWS_HEIGHT = 124;
 
 /** The most paragraphs the script bar draws one by one: about 14 px each across the bay. */
 const BAR_SEGMENT_ROOM = 120;
@@ -160,30 +168,34 @@ export function TeleprompterBay({
           </Key>
         </Segmented>
         <header className={styles.head} data-well="" data-testid="teleprompter-glass-strip">
-          <span className={styles.stripItem}>
-            <span className={styles.stripLabel}>On the glass</span>
-            <b className={styles.stripValue} data-testid="teleprompter-on-glass">
-              {glass ? glass.name : "Nothing"}
-            </b>
-          </span>
-          <span className={styles.stripItem}>
-            <span className={styles.stripLabel}>Place</span>
-            <b className={styles.stripValue} data-testid="teleprompter-place">
-              {place ? place.text : "—"}
-            </b>
-          </span>
-          <span className={styles.stripItem}>
-            <span className={styles.stripLabel}>Left</span>
-            <b className={styles.stripHero} data-testid="teleprompter-time-left">
-              {time ? time.left : "—"}
-            </b>
-            {time ? (
-              <span className={styles.stripDetail}>
-                {time.of}
-                {time.ends ? ` · ${time.ends}` : ""}
-                {glass?.estimated ? " · estimated" : ""}
-              </span>
-            ) : null}
+          {/* The three readouts on the time's baseline; the run state centred apart. */}
+          <span className={styles.readouts}>
+            <span className={styles.stripItem}>
+              <span className={styles.stripLabel}>On the prompter</span>
+              <b className={styles.stripValue} data-testid="teleprompter-on-glass">
+                {glass ? glass.name : "Nothing"}
+              </b>
+            </span>
+            <span className={styles.stripItem}>
+              <span className={styles.stripLabel}>Place</span>
+              <b className={styles.stripValue} data-testid="teleprompter-place">
+                {place ? place.text : "—"}
+              </b>
+            </span>
+            <span className={styles.stripItem}>
+              <span className={styles.stripLabel}>Left</span>
+              {/* An empty time keeps the hero's line, so the baseline stays when a time arrives. */}
+              <b className={styles.stripHero} data-testid="teleprompter-time-left">
+                {time ? time.left : <span className={styles.stripValue}>—</span>}
+              </b>
+              {time ? (
+                <span className={styles.stripDetail}>
+                  {time.of}
+                  {time.ends ? ` · ${time.ends}` : ""}
+                  {glass?.estimated ? " · estimated" : ""}
+                </span>
+              ) : null}
+            </span>
           </span>
           {glass ? (
             <LampWord tone={glass.playing ? "ok" : "off"} className={styles.runState} testId="teleprompter-run-state">
@@ -224,10 +236,7 @@ export function TeleprompterBay({
                 >
                   <span className={styles.barWord}>The whole script</span>
                 </Tooltip>
-                <span>
-                  {readWords}
-                  {place ? ` · ${Math.floor(place.share * 100)} % read` : ""}
-                </span>
+                <span>{readWords}</span>
               </div>
               <button
                 type="button"
@@ -285,34 +294,33 @@ export function TeleprompterBay({
                   {shownCues.map((cue, index) => (
                     <Key
                       key={`${cue.paragraph}:${cue.word}:${index}`}
-                      size="small"
                       take
                       data-cue-key=""
                       testId={`teleprompter-cue-${index + 1}`}
                       onClick={() => jump({ to: "place", paragraph: cue.paragraph, word: cue.word })}
                     >
                       <span className={styles.cueParagraph}>¶ {cue.paragraph + 1}</span>{" "}
-                      <i className={styles.cueText}>{cue.text}</i>
+                      <span className={styles.cueText}>{cue.text}</span>
                     </Key>
                   ))}
                 </div>
                 <div className={styles.goTo} role="group" data-testid="teleprompter-go-to">
-                  <Field
-                    className={styles.goToWell}
-                    label={<label htmlFor="teleprompter-go-to-paragraph">Go to paragraph</label>}
-                    value={
-                      <input
-                        id="teleprompter-go-to-paragraph"
-                        className={styles.goToField}
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder={`1–${glass.paragraphCount}`}
-                        value={goTo}
-                        onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
-                        data-testid="teleprompter-go-to-field"
-                      />
-                    }
-                  />
+                  {/* The label before the well, so the field is one 36 px line beside Go. */}
+                  <label className={styles.goToLabel} htmlFor="teleprompter-go-to-paragraph">
+                    Go to paragraph
+                  </label>
+                  <Well className={styles.goToWell}>
+                    <input
+                      id="teleprompter-go-to-paragraph"
+                      className={styles.goToField}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={`1–${glass.paragraphCount}`}
+                      value={goTo}
+                      onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
+                      data-testid="teleprompter-go-to-field"
+                    />
+                  </Well>
                   <Key
                     take
                     locked={goToProblem !== null}
@@ -326,9 +334,9 @@ export function TeleprompterBay({
               </div>
             </>
           ) : (
-            <p className={styles.nothing} data-testid="teleprompter-nothing-on">
-              <LampWord tone="off">Nothing on the prompter</LampWord>
-            </p>
+            <EmptyLine lamp testId="teleprompter-nothing-on" className={styles.nothing}>
+              Nothing on the prompter
+            </EmptyLine>
           )}
         </>
       )}

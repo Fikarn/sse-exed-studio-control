@@ -37,8 +37,9 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
       await expect(tabs.nth(index)).toHaveAccessibleName(name);
     }
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("ON SCREEN");
+    // The polish (2026-10-05): the page's own sentences keep the display's two lines.
     await expect(page.getByTestId("teleprompter-state-display")).toContainText(
-      "The Prompter XL shows 02 Interview intro. Paused at paragraph 8"
+      "02 Interview intro is on the glass. Paused at paragraph 8"
     );
     await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("02 Interview intro");
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 8 of");
@@ -173,6 +174,16 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("NOT CONNECTED");
     await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("data-locked", "");
     await expect(page.getByTestId("teleprompter-not-on-glass")).toHaveText("Not on the glass");
+    // The polish (2026-10-05): the strip says what is on the prompter, which
+    // stays true; the plate says Not on the glass too, and no green lamp says
+    // the script is on it while nothing is drawn.
+    await expect(page.getByTestId("teleprompter-glass-strip")).toContainText("On the prompter");
+    await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("02 Interview intro");
+    await expect(page.getByTestId("teleprompter-on-prompter")).toContainText("Not on the glass");
+    await expect(page.getByTestId("teleprompter-plate").locator('[data-lamp="ok"]')).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid^="teleprompter-script-"]', { hasText: "02 Interview intro" }).locator("[data-tone]")
+    ).toHaveAttribute("data-tone", "off");
     // Jumps still work: the place they set is where the prompter comes back.
     await page.getByTestId("teleprompter-top").click();
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 1 of");
@@ -466,8 +477,11 @@ test.describe("the Teleprompter page, the visual overhaul", () => {
     await expect(size).toHaveText("88 px standard");
     // READY with no script: the way out is Open file….
     await expect(page.getByTestId("teleprompter-state-open-file")).toHaveText("Open file…");
+    // The polish (2026-10-05): a locked TOP says nothing under its cap, as BACK.
+    await expect(page.getByTestId("teleprompter-top")).toHaveText("Top");
 
     await openTeleprompter(page);
+    await expect(page.getByTestId("teleprompter-top")).toContainText("pauses · to ¶ 1");
     for (const id of [
       "teleprompter-play",
       "teleprompter-back",
@@ -570,6 +584,23 @@ test.describe("the Teleprompter page, the visual overhaul", () => {
     }
   });
 
+  // The polish (2026-10-05): the cue keys, the Go to paragraph field and Go
+  // are one row at one height, on one centre line.
+  test("the cue keys, the Go to paragraph field and Go stand in one 36 px row", async ({ page }) => {
+    await openTeleprompter(page);
+    const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
+    const cue = await box("teleprompter-cue-1");
+    const go = await box("teleprompter-go-to-key");
+    const field = await box("teleprompter-go-to-field");
+    expect(Math.round(cue.height), "a cue key is 36 px").toBe(36);
+    expect(Math.round(go.height), "Go is 36 px").toBe(36);
+    expect(Math.abs(cue.y - go.y), "the first cue key and Go share a top").toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(field.y + field.height / 2 - (go.y + go.height / 2)),
+      "the field and Go share a centre line"
+    ).toBeLessThanOrEqual(1);
+  });
+
   test("an armed Clear keeps its height, and moves nothing above it", async ({ page }) => {
     await page.clock.install();
     await openTeleprompter(page);
@@ -626,7 +657,8 @@ test.describe("the Teleprompter page, the visual overhaul", () => {
     await openTeleprompter(page);
     const fromKey = await openRowMenu(page, "04 Outro");
     await expect(fromKey).toHaveAccessibleName("04 Outro");
-    await expect(fromKey).toHaveAccessibleDescription("1:13 at 140 · 171 words");
+    // The polish (2026-10-05): the pace carries its unit; the words are the plate head's.
+    await expect(fromKey).toHaveAccessibleDescription("1:13 at 140 words/min");
     const words = await fromKey.getByRole("menuitem").allTextContents();
     expect(words.map((word) => word.trim())).toEqual([
       "Select",
@@ -791,6 +823,11 @@ test.describe("the Teleprompter page, the visual overhaul", () => {
     page,
   }) => {
     await openTeleprompter(page);
+    // The polish (2026-10-05): the footer keeps only the Prompter XL's mode;
+    // the strip and the speed dial hold the rest.
+    const footer = page.getByTestId("teleprompter-footer");
+    await expect(footer).toContainText("1920×1080 · 60 Hz");
+    await expect(footer).not.toContainText("02 Interview intro");
     const open = page.getByTestId("teleprompter-screen-open");
     await open.click();
     const popover = page.getByTestId("teleprompter-screen-popover");

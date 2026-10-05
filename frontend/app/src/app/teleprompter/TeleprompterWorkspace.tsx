@@ -23,14 +23,7 @@ import { TeleprompterCluster } from "./TeleprompterCluster";
 import { TeleprompterEditView } from "./TeleprompterEditView";
 import { TeleprompterFooter } from "./TeleprompterFooter";
 import { TeleprompterPlate } from "./TeleprompterPlate";
-import {
-  backParagraph,
-  cutGlassText,
-  glassTextOf,
-  placeView,
-  prompterStateView,
-  type ReportedLines,
-} from "./teleprompterModel";
+import { backParagraph, cutGlassText, glassTextOf, prompterStateView, type ReportedLines } from "./teleprompterModel";
 import {
   armName,
   armStillStands,
@@ -334,7 +327,6 @@ export function TeleprompterWorkspace({
               glassText={glassText}
               onLayout={reportLayout}
               onNotice={notice}
-              place={glass && cut.length > 0 ? placeView(glass, cut).text : null}
               script={selected}
               snapshot={prompterSnapshot}
               store={store}
@@ -370,7 +362,7 @@ export function TeleprompterWorkspace({
         />
       </ShellRegion>
       <ShellRegion region="footer">
-        <TeleprompterFooter cut={cut} snapshot={prompterSnapshot} timeLeft={timeLeft} />
+        <TeleprompterFooter snapshot={prompterSnapshot} />
       </ShellRegion>
     </div>
   );

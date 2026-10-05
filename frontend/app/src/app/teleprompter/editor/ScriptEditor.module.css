@@ -20,11 +20,13 @@
   flex: none;
 }
 
+/* The well, with every well's 1 px edge (DESIGN §5; the polish, 2026-10-05). */
 .field {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  border: 1px solid var(--material-line);
   border-radius: var(--radius-base);
   background: var(--material-well);
 }
@@ -146,8 +148,4 @@
 
 .saved[data-save="unsaved"] {
   color: var(--role-coral-text);
-}
-
-.note {
-  margin-left: auto;
 }

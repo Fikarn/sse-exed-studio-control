@@ -25,6 +25,8 @@ import {
   readWordsOf,
   scriptBar,
   scriptDetail,
+  scriptDetailParts,
+  scriptLine,
   screenMode,
   stepLocks,
 } from "./teleprompterModel";
@@ -86,15 +88,15 @@ describe("the state display", () => {
     expect(prompterStateView(snapshot(), null, true)).toEqual({
       tone: "ok",
       word: "ON SCREEN",
-      sentence: "The Prompter XL shows 02 Interview intro. Paused at paragraph 8 of 18.",
+      sentence: "02 Interview intro is on the glass. Paused at paragraph 8 of 18.",
       meta: "1920×1080 · 60 Hz",
       wayOut: null,
     });
     expect(prompterStateView(snapshot({ glass: glass({ playing: true }) }), null, true).sentence).toBe(
-      "The Prompter XL shows 02 Interview intro. Playing at 140 words a minute."
+      "02 Interview intro is on the glass. Playing at 140 words a minute."
     );
     expect(prompterStateView(snapshot({ glass: glass({ atEnd: true }) }), null, true).sentence).toBe(
-      "The Prompter XL shows 02 Interview intro. At the end."
+      "02 Interview intro is on the glass. At the end."
     );
   });
 
@@ -103,7 +105,32 @@ describe("the state display", () => {
     // The visual overhaul (2026-10-05): Put on is the plate's key; the display
     // offers Open file… while no script is kept.
     expect(blank).toMatchObject({ tone: "ok", word: "READY", wayOut: null });
-    expect(prompterStateView(snapshot({ glass: null }), null, false).wayOut).toBe("open-file");
+    expect(blank.sentence).toBe("The Prompter XL is connected and blank. Put a script on it.");
+    expect(prompterStateView(snapshot({ glass: null }), null, false)).toMatchObject({
+      sentence: "The Prompter XL is connected and blank. There is no script yet.",
+      wayOut: "open-file",
+    });
+  });
+
+  // The visual overhaul's polish (2026-10-05, the owner's rule): the display's
+  // sentence keeps two lines, so every sentence the page builds for it holds
+  // at most 70 characters, whatever the script's name and the place; the meta
+  // beside a way-out key holds about 30.
+  it("keeps every sentence it builds within two lines, and its meta beside a way-out key within one", () => {
+    const longName = "A script with a name far too long for the state display's two lines";
+    const long = glass({ name: longName, place: { paragraph: 998, word: 0 }, paragraphCount: 999, speedWpm: 300 });
+    const sentences = [
+      prompterStateView(snapshot({ glass: long }), null, true).sentence,
+      prompterStateView(snapshot({ glass: { ...long, playing: true } }), null, true).sentence,
+      prompterStateView(snapshot({ glass: { ...long, atEnd: true } }), null, true).sentence,
+      prompterStateView(snapshot({ glass: { ...long, notUpdated: true } }), null, true).sentence,
+      prompterStateView(snapshot({ glass: null }), null, true).sentence,
+      prompterStateView(snapshot({ glass: null }), null, false).sentence,
+    ];
+    for (const sentence of sentences) expect(sentence.length, sentence).toBeLessThanOrEqual(70);
+    expect(sentences[0]).toBe("A script with a nam… is on the glass. Paused at paragraph 999 of 999.");
+    const besideOpenFile = prompterStateView(snapshot({ glass: null }), null, false);
+    expect(besideOpenFile.meta?.length ?? 0).toBeLessThanOrEqual(30);
   });
 
   it("puts the Prompter XL's fault first, in the hardware link's word and sentence", () => {
@@ -131,8 +158,7 @@ describe("the state display", () => {
       ok: false,
       status: "attention",
       word: "NOT UPDATED",
-      summary:
-        "02 Interview intro was edited after it went on the prompter. The prompter still shows the earlier text.",
+      summary: "Edited since it went on: the prompter still shows the earlier text.",
       notUpdated: true,
       screen: screen(),
     } as PrompterHealthCheck;
@@ -339,7 +365,15 @@ describe("the plate's lines", () => {
       removedAt: null,
       onPrompter: true,
     };
-    expect(scriptDetail(script)).toBe("From Interview intro.docx · 18 paragraphs · 4:19 at 140 · 581 words");
+    // The visual overhaul's polish (2026-10-05): the pace carries its unit, and
+    // the plate breaks the line only between its parts.
+    expect(scriptDetail(script)).toBe("From Interview intro.docx · 18 paragraphs · 4:19 at 140 words/min · 581 words");
+    expect(scriptDetailParts(script)).toEqual({
+      from: "From Interview intro.docx",
+      facts: ["18 paragraphs", "4:19 at 140 words/min", "581 words"],
+    });
+    expect(scriptLine(script)).toBe("4:19 at 140 words/min");
+    expect(scriptDetailParts({ ...script, sourceFileName: null }).from).toBeNull();
     expect(formatDuration(3725)).toBe("1:02:05");
     expect(formatDuration(37)).toBe("0:37");
   });

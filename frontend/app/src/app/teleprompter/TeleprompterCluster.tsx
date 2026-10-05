@@ -4,6 +4,7 @@ import {
   ArmKey,
   ARM_TIMEOUT_MS,
   Dialog,
+  EmptyLine,
   Key,
   LatchSlot,
   MenuButton,
@@ -52,6 +53,11 @@ import styles from "./TeleprompterCluster.module.css";
 // top right), which leaves the paragraph list its 16 rows. The helper
 // sentences are tooltips on the words; press twice, the countdowns and the
 // lock reasons stay on screen.
+//
+// The polish (2026-10-05): a locked TOP says nothing under its cap, as BACK
+// and PLAY; the paragraph rows are list rows at the body size, their cues
+// upright (PT Sans has no italic); nothing on the prompter is the design
+// system's empty line.
 
 /** The paragraph list's rows: as many as the cluster holds under the steps and over Clear
  *  (`teleprompter.spec.ts` holds that the last one ends inside the cluster); a longer
@@ -300,7 +306,7 @@ export function TeleprompterCluster({
         />
         <Key
           cap="Top"
-          hint="pauses · to ¶ 1"
+          hint={glass ? "pauses · to ¶ 1" : undefined}
           layout="stack"
           locked={runLock !== null}
           reason={runLock ?? undefined}
@@ -478,7 +484,7 @@ export function TeleprompterCluster({
                   >
                     <span className={styles.paragraphNumber}>{row.index + 1}</span>
                     <span className={styles.paragraphText} data-paragraph-text="">
-                      {row.cue ? <i className={styles.paragraphCue}>{row.cue}</i> : null}
+                      {row.cue ? <span className={styles.paragraphCue}>{row.cue}</span> : null}
                       {row.cue && row.text ? " " : null}
                       {row.text}
                     </span>
@@ -489,7 +495,7 @@ export function TeleprompterCluster({
             })}
           </ol>
         ) : (
-          <p className={styles.none}>Nothing on the prompter</p>
+          <EmptyLine lamp>Nothing on the prompter</EmptyLine>
         )}
       </Section>
 
