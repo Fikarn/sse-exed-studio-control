@@ -1,7 +1,10 @@
-/* Visual overhaul A, Slice 7: the engine's handshake as rows on the start-up
+/* Visual overhaul A, Slice 7: the start's steps as rows on the start-up
    surface — what the step is, what it does, and whether it is done. The shell
-   (overhaul 3): rows divided by hairlines, never boxes; the step's state is
-   its lamp and its word. */
+   (overhaul 3): rows divided by hairlines, never boxes. The visual overhaul's
+   polish (2026-10-05): the rows stand in the bay, one line each; the step's
+   state is a LampWord (its lamp and its word together, the word in the
+   tone's colour), as the plate's checks are. The columns are fixed, so the
+   word stands just right of what the step does, not 1600 px from its name. */
 
 .steps {
   display: flex;
@@ -10,10 +13,10 @@
 
 .step {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: 240px 640px auto;
+  justify-content: start;
   align-items: center;
-  column-gap: 12px;
-  row-gap: 4px;
+  column-gap: 16px;
   padding: 12px 0;
   border-bottom: 1px solid var(--material-line);
 }
@@ -28,17 +31,7 @@
 }
 
 .stepDetail {
-  grid-column: 2;
   min-width: 0;
   font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
-  color: var(--text-text2);
-}
-
-.stepStanding {
-  grid-row: 1 / span 2;
-  grid-column: 3;
-  font: 700 var(--font-size-label) / 1 var(--font-family-display);
-  letter-spacing: var(--font-tracking-display);
-  text-transform: uppercase;
   color: var(--text-text2);
 }

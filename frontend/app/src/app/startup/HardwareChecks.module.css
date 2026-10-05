@@ -1,0 +1,40 @@
+/* The hardware's three checks on the plate of a screen before ready (the
+   visual overhaul's polish, 2026-10-05; moved from the recovery screen's
+   stylesheet): rows under hairlines, the name and its word with a lamp, what
+   the hardware said under them. */
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.checkTitle {
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.checkWord {
+  justify-self: end;
+}
+
+.hint {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
