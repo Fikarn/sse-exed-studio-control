@@ -34,7 +34,8 @@ export interface MonitorItem {
   detail?: string;
   /** A value after the word that changes, in PT Sans (`2:31 left`). */
   value?: string;
-  status: Exclude<SharedStatusTone, "neutral">;
+  /** `neutral` only before ready: a check never read (a hollow lamp). */
+  status: SharedStatusTone;
   /** Where clicking the chip takes the operator; defaults to Setup / Support.
    *  Latched-state chips (GLO-09) point at their owning workspace instead. */
   target?: string;
@@ -117,7 +118,10 @@ export function AppShellFrame({
           <nav className={styles.tabs} aria-label="Workspace navigation">
             {workspaces.map((workspace) => {
               const active = workspace.id === activeWorkspace;
-              const lamp = active ? undefined : monitorItems.find((item) => item.tab === workspace.id);
+              // The open tab shows no word (its page's state display says it)
+              // but keeps the word's room, so no tab moves with the page.
+              const pageLamp = monitorItems.find((item) => item.tab === workspace.id);
+              const lamp = active ? undefined : pageLamp;
               return (
                 <Tab
                   key={workspace.id}
@@ -129,6 +133,9 @@ export function AppShellFrame({
                   value={lamp?.value}
                   tone={lamp?.status}
                   wordTestId={lamp ? testIdFor(lamp) : undefined}
+                  reserve={
+                    active && pageLamp ? { word: pageLamp.detail ?? pageLamp.status, value: pageLamp.value } : undefined
+                  }
                   onClick={() => onWorkspaceChange?.(workspace.id)}
                 />
               );

@@ -493,6 +493,6 @@ fn the_prompter_xl_reaches_the_health_check_and_the_lamp_follows() {
     assert!(health["summary"]
         .as_str()
         .unwrap()
-        .ends_with("Prompter: Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen."));
+        .ends_with("Prompter: Windows does not see the Prompter XL. Check its USB-C cable (15 W)."));
     assert!(prompter_rows(&app).is_empty(), "never a Recent actions row");
 }

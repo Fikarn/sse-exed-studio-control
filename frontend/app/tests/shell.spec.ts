@@ -230,7 +230,7 @@ for (const { fixture, tab, label, band, tone, word } of [
     label: "Lighting",
     band: "lighting-state-display",
     tone: "error",
-    word: "no bridge",
+    word: "unreachable",
   },
   {
     fixture: "lighting-bridge-silent",
@@ -482,4 +482,22 @@ test("lazy workspace loads", async ({ page }) => {
       () => (window as unknown as { __sawWorkspaceLoading: { loading: boolean } }).__sawWorkspaceLoading.loading
     )
   ).toBe(false);
+});
+
+// The polish (2026-10-05): the open tab keeps the room of its word, so no tab
+// moves when the page changes and the tab just pressed stays under the
+// pointer (DESIGN §1).
+test("no tab moves when the page changes", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  const lefts = () =>
+    nav.evaluate((element) =>
+      [...element.querySelectorAll("button")].map((button) => Math.round(button.getBoundingClientRect().left))
+    );
+  const first = await lefts();
+  for (const label of ["Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"]) {
+    await nav.getByRole("button", { name: label, exact: true }).click();
+    await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
+    expect(await lefts(), `the tabs on ${label}`).toEqual(first);
+  }
 });

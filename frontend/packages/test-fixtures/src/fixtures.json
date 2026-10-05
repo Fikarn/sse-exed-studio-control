@@ -402,7 +402,7 @@
     "startupFailure": {
       "stage": "protocol-negotiation",
       "code": "PROTOCOL_MISMATCH",
-      "message": "The app asked for protocol 1 and the hardware link speaks protocol 2: the two files are of different builds.",
+      "message": "The app speaks protocol 1, the hardware link protocol 2: different builds.",
       "requestedProtocol": "1",
       "supportedProtocol": "2",
       "paths": {
@@ -1345,7 +1345,7 @@
           "id": "audio",
           "label": "Audio OSC Probe",
           "status": "failed",
-          "message": "TotalMix did not answer on the Global OSC remote (send 7004 → receive 9004). Check that remote 4 is In Use in Global OSC mode with these ports."
+          "message": "TotalMix did not answer on remote 4 (7004 → 9004). Check Global OSC."
         }
       ]
     },
@@ -1366,7 +1366,7 @@
       },
       "consoleStateConfidence": "assumed",
       "lastActionCode": "AUDIO_SYNC_FAILED",
-      "lastActionMessage": "TotalMix did not answer on the Global OSC remote (send 7004 → receive 9004). Check that remote 4 is In Use in Global OSC mode with these ports.",
+      "lastActionMessage": "TotalMix did not answer on remote 4 (7004 → 9004). Check Global OSC.",
       "lastActionStatus": "failed"
     }
   },

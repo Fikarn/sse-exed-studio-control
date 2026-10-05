@@ -1,7 +1,8 @@
-import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 
 import { Lamp } from "./Lamp";
 import styles from "./StateDisplay.module.css";
+import { Tooltip } from "./Tooltip";
 
 // Visual overhaul A, Slice 3 (plan D1; system §2, §8); Atrium: the first
 // element of every cluster — a black well of fixed height carrying the lamp
@@ -12,6 +13,12 @@ import styles from "./StateDisplay.module.css";
 // line's place (finding C1). The shell (overhaul 3): the page's ⋯ stands at
 // the display's top right (`menu`, a `MenuButton`), in the same place on
 // every page.
+//
+// The polish (2026-10-05, the owner's rule): the sentence keeps two lines and
+// is written to fit them, and the meta fits beside the way-out key. Should a
+// name ever make either longer, the display says the whole of it on hover
+// (the Tooltip), so nothing is lost; the page tests hold that no fixture's
+// sentence or meta is cut.
 export type StateDisplayTone = "ok" | "attention" | "error" | "info";
 
 /** A word longer than this drops from the display size to the readout size. */
@@ -68,6 +75,42 @@ export function StateDisplay({
   className,
   ...rest
 }: StateDisplayProps) {
+  const sentenceRef = useRef<HTMLDivElement | null>(null);
+  const metaRef = useRef<HTMLDivElement | null>(null);
+  const [cut, setCut] = useState({ sentence: false, meta: false });
+  const showsMeta = !armed && Boolean(meta);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const sentenceElement = sentenceRef.current;
+      const metaElement = metaRef.current;
+      const next = {
+        sentence: Boolean(sentenceElement && sentenceElement.scrollHeight > sentenceElement.clientHeight + 1),
+        meta: Boolean(metaElement && metaElement.scrollWidth > metaElement.clientWidth + 1),
+      };
+      setCut((last) => (last.sentence === next.sentence && last.meta === next.meta ? last : next));
+    };
+    measure();
+    // The faces load after the first draw; measure again once they have.
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (live) measure();
+    });
+    return () => {
+      live = false;
+    };
+  }, [sentence, meta, showsMeta, actions]);
+
+  const sentenceNode = sentence ? (
+    <div ref={sentenceRef} className={styles.sentence} data-state-sentence="">
+      {sentence}
+    </div>
+  ) : null;
+  const metaNode = showsMeta ? (
+    <div ref={metaRef} className={styles.meta} data-state-meta="">
+      {meta}
+    </div>
+  ) : null;
+
   return (
     <section
       className={[styles.display, styles[tone], className].filter(Boolean).join(" ")}
@@ -90,7 +133,15 @@ export function StateDisplay({
           foot. The sentence keeps at most two lines; the code shows whole
           when it fits under them and gives way when it does not. */}
       <div className={styles.story}>
-        {sentence ? <div className={styles.sentence}>{sentence}</div> : null}
+        {sentenceNode && cut.sentence ? (
+          <div className={styles.tip}>
+            <Tooltip content={sentence} placement="right" maxWidth={440}>
+              {sentenceNode}
+            </Tooltip>
+          </div>
+        ) : (
+          sentenceNode
+        )}
         {/* data-state-code: the one place a raw fault code is allowed to
             stand on its own — it is the code slot, never the first thing the
             sentence says. The operator-copy census keys on this marker. */}
@@ -123,9 +174,15 @@ export function StateDisplay({
               />
             </span>
           </div>
-        ) : meta ? (
-          <div className={styles.meta}>{meta}</div>
-        ) : null}
+        ) : metaNode && cut.meta ? (
+          <div className={[styles.tip, styles.metaTip].join(" ")}>
+            <Tooltip content={meta} placement="right">
+              {metaNode}
+            </Tooltip>
+          </div>
+        ) : (
+          metaNode
+        )}
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </div>
     </section>

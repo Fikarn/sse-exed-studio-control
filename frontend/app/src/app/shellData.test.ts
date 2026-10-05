@@ -62,8 +62,9 @@ describe("the Lighting lamp and held light outputs", () => {
     });
   });
 
-  it("no bridge outranks a hold, and a hold outranks an unsaved scene", () => {
-    expect(deriveLightingWorkspaceTone({ outputArmed: false, reachable: false }, true)?.word).toBe("no bridge");
+  // The polish (2026-10-05): the page's own word, UNREACHABLE, was NO BRIDGE in the tab.
+  it("unreachable outranks a hold, and a hold outranks an unsaved scene", () => {
+    expect(deriveLightingWorkspaceTone({ outputArmed: false, reachable: false }, true)?.word).toBe("unreachable");
     expect(deriveLightingWorkspaceTone({ outputArmed: false, reachable: true }, true)?.word).toBe("held");
     expect(deriveLightingWorkspaceTone({ outputArmed: true, reachable: true }, true)?.word).toBe("unsaved");
   });
@@ -87,7 +88,7 @@ describe("the Lighting lamp and held light outputs", () => {
     const silent = deriveLightingWorkspaceTone({ bridgeAnswering: false, outputArmed: false, reachable: true }, true);
     expect(silent).toEqual({ tone: "attention", winsTies: true, word: "not answering" });
     expect(lightingLamp("ok", silent)).toEqual({ detail: "not answering", status: "attention" });
-    expect(deriveLightingWorkspaceTone({ bridgeAnswering: false, reachable: false }, false)?.word).toBe("no bridge");
+    expect(deriveLightingWorkspaceTone({ bridgeAnswering: false, reachable: false }, false)?.word).toBe("unreachable");
     expect(deriveLightingWorkspaceTone({ bridgeAnswering: null, reachable: true }, false)).toBeNull();
     expect(deriveLightingWorkspaceTone({ bridgeAnswering: true, reachable: true }, false)).toBeNull();
   });
@@ -347,6 +348,16 @@ describe("the header on each page", () => {
     );
   });
 
+  // The polish (2026-10-05): on Lighting, which has a Solo of its own, the
+  // Console's latch says whose it is; its id (and test id) stays.
+  it("names the Console's solo AUDIO SOLO on Lighting only", () => {
+    const items = buildMonitorItems(recording as never, { lightingSceneDrift: false, audioSolo: true });
+    const solo = (page: string) => headerItems(items, page).lamps.find((item) => item.id === "latched:solo");
+    expect(solo("lighting")?.label).toBe("Audio solo");
+    for (const page of ["setup", "cameras", "teleprompter"]) expect(solo(page)?.label).toBe("Solo");
+    expect(items.find((item) => item.id === "latched:solo")?.label).toBe("Solo");
+  });
+
   it("prints the drifted scene once: not as a latch when the Lighting tab already says unsaved", () => {
     const items = buildMonitorItems(
       recording as never,
@@ -370,10 +381,10 @@ describe("the header says what fails in the background", () => {
     ({ checks: { lighting: { status: "ready" }, engine } }) as unknown as Parameters<typeof buildMonitorItems>[0];
   const item = (items: ReturnType<typeof buildMonitorItems>, id: string) => items.find((entry) => entry.id === id);
 
-  it("a light output that could not open reads no output, above held and no bridge", () => {
+  it("a light output that could not open reads no output, above held and unreachable", () => {
     const failed = health({ sacn: { state: "attention", at: nowSecs } });
     const held = { lighting: { tone: "attention" as const, winsTies: true, word: "held" } };
-    for (const tones of [undefined, held, { lighting: { tone: "error" as const, word: "no bridge" } }]) {
+    for (const tones of [undefined, held, { lighting: { tone: "error" as const, word: "unreachable" } }]) {
       expect(item(buildMonitorItems(failed, undefined, tones, NOW_MS), "lighting")).toMatchObject({
         detail: "no output",
         status: "error",
@@ -408,5 +419,38 @@ describe("the header says what fails in the background", () => {
       ).toBeUndefined();
     }
     expect(buildMonitorItems(null, undefined, undefined, NOW_MS)).toHaveLength(5);
+  });
+});
+
+// The polish (2026-10-05): before ready, a check never read is a quiet hollow
+// lamp with the screen's own word, not the yellow of doubt.
+describe("the header before ready", () => {
+  const NOW_MS = Date.UTC(2026, 9, 5, 12, 0, 0);
+  const lamps = ["lighting", "audio", "cameras", "prompter", "surface"];
+
+  it("says not read after a failed start, and pending while the app starts", () => {
+    for (const unread of ["not read", "pending"] as const) {
+      const items = buildMonitorItems(null, undefined, undefined, NOW_MS, unread);
+      for (const id of lamps) {
+        expect(items.find((item) => item.id === id)).toMatchObject({ detail: unread, status: "neutral" });
+      }
+    }
+  });
+
+  it("keeps a check that was read", () => {
+    const items = buildMonitorItems(
+      { checks: { lighting: { status: "ready" } } } as never,
+      undefined,
+      undefined,
+      NOW_MS,
+      "not read"
+    );
+    expect(items.find((item) => item.id === "lighting")?.status).toBe("ok");
+    expect(items.find((item) => item.id === "audio")).toMatchObject({ detail: "not read", status: "neutral" });
+  });
+
+  it("changes nothing once ready", () => {
+    const items = buildMonitorItems(null, undefined, undefined, NOW_MS);
+    expect(items.find((item) => item.id === "audio")?.status).toBe("attention");
   });
 });

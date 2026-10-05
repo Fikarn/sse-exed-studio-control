@@ -812,7 +812,7 @@ fn a_control_on_a_camera_that_is_not_held_is_refused_with_its_sentence() {
     let unreachable_2 =
         "CAM 2 does not answer at 172.16.16.85. Check that it is on and on the network.";
     let unreachable_1 =
-        "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC.";
+        "CAM 1 does not answer over Bluetooth. Check it is on and within reach.";
     assert_eq!(
         cameras.refused("cameras.set", iso(2)),
         refusal("CAMERA_UNREACHABLE", unreachable_2)
@@ -869,11 +869,11 @@ fn release_and_connect_hand_a_camera_back_and_take_it_again() {
     assert_eq!(cam2["tone"], "attention");
     assert_eq!(
         cam2["sentence"],
-        "CAM 2 is released to LUMIX Tether. Studio Control does not read it or send it anything until you connect it again."
+        "CAM 2 is released to LUMIX Tether. Connect it to control it here."
     );
     assert_eq!(
         cameras.camera(1)["sentence"],
-        "CAM 1 is released to the iPad. Studio Control does not read it or send it anything until you connect it again."
+        "CAM 1 is released to the iPad. Connect it to control it here."
     );
     assert_eq!(cam2["readAt"], Value::Null);
     assert_eq!(values(&cam2, "iso")["value"], Value::Null);

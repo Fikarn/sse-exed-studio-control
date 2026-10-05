@@ -452,7 +452,7 @@ impl CameraModel {
                 format!("{tag} is held: Studio Control reads it and sends only what you press.")
             }
             CameraState::Released => format!(
-                "{tag} is released to {}. Studio Control does not read it or send it anything until you connect it again.",
+                "{tag} is released to {}. Connect it to control it here.",
                 self.app
             ),
             CameraState::NotSetUp if self.bgh1 => format!("{tag} has no address. Enter it in Setup."),
@@ -473,7 +473,7 @@ impl CameraModel {
             )
         } else {
             format!(
-                "{tag} does not answer over Bluetooth. Check that it is on and within reach of this PC."
+                "{tag} does not answer over Bluetooth. Check it is on and within reach."
             )
         }
     }

@@ -139,9 +139,7 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
     const screen = unreportedScreen();
     expect(screenState(screen)).toBe("not-connected");
     expect(screenDraws(screenState(screen))).toBe(false);
-    expect(screenSentence(screen)).toBe(
-      "Windows has not reported the Prompter XL since Studio Control started. The script and the place are kept, and nothing is shown on any other screen."
-    );
+    expect(screenSentence(screen)).toBe("Windows has not reported the Prompter XL since Studio Control started.");
     expect(playRefusal(screen)?.code).toBe("PROMPTER_NOT_ON_GLASS");
     expect(screenSummary(screen)).toMatchObject({ reported: false, word: "NOT CONNECTED", tone: "error" });
   });
@@ -161,8 +159,7 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
         height: 720,
         refreshHz: 60,
         windowError: null,
-        sentence:
-          "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080 in Windows' display settings for the sharpest text.",
+        sentence: "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080.",
       },
       paused: false,
     });
@@ -179,8 +176,7 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
       word: "DUPLICATED",
       tone: "error",
       draws: false,
-      sentence:
-        "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.",
+      sentence: "The Prompter XL mirrors another screen. Choose Extend these displays.",
     });
     const failed = await reportScreen({ ...FULL, windowError: "  The window could not be created.  " });
     expect(failed.screen).toMatchObject({
@@ -189,8 +185,7 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
       tone: "error",
       draws: false,
       windowError: "The window could not be created.",
-      sentence:
-        "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself.",
+      sentence: "The window on the Prompter XL does not show. It opens again by itself.",
     });
     const gone = await reportScreen({ found: false, width: 1920 });
     expect(gone.screen).toMatchObject({
@@ -200,8 +195,7 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
       width: null,
       height: null,
       refreshHz: null,
-      sentence:
-        "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen.",
+      sentence: "Windows does not see the Prompter XL. Check its USB-C cable (15 W).",
     });
     const long = await reportScreen({ ...FULL, windowError: "é".repeat(400) });
     expect((long.screen as JsonObject).windowError).toBe("é".repeat(300));
@@ -414,9 +408,7 @@ describe("the fixture double's Prompter XL: the lamp", () => {
 
     const edited = prompterHealthCheck(full, "Intro");
     expect(edited).toMatchObject({ ok: false, status: "attention", word: "NOT UPDATED", notUpdated: true });
-    expect(edited.summary).toBe(
-      "Intro was edited after it went on the prompter. The prompter still shows the earlier text."
-    );
+    expect(edited.summary).toBe("Edited since it went on: the prompter still shows the earlier text.");
 
     const low = screenFromReport(LOW);
     expect(prompterHealthCheck(low, "Intro").word).toBe("NOT UPDATED");
@@ -476,9 +468,7 @@ describe("the fixture double's Prompter XL: the lamp", () => {
     const edited = await healthOf(call);
     expect(edited.status, "NOT UPDATED lights the lamp only").toBe("ok");
     expect(edited.check).toMatchObject({ ok: false, status: "attention", word: "NOT UPDATED", notUpdated: true });
-    expect(edited.check.summary).toBe(
-      "Talk was edited after it went on the prompter. The prompter still shows the earlier text."
-    );
+    expect(edited.check.summary).toBe("Edited since it went on: the prompter still shows the earlier text.");
 
     await reportScreen(GONE);
     expect(seen(events)).toEqual([
@@ -643,11 +633,7 @@ describe("the fixture double's Prompter XL: the hardware link's words", () => {
 
   it("finds a changed sentence", () => {
     // The guard itself: a word changed on one side only is not found.
-    expect(
-      inScreenRs(
-        "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself."
-      )
-    ).toBe(true);
+    expect(inScreenRs("The window on the Prompter XL does not show. It opens again by itself.")).toBe(true);
     expect(inScreenRs("Studio Control could not open a window on the Prompter XL.")).toBe(false);
     expect(inScreenRs("The Prompter XL is connected: 1920×1080 at 60 Hz.", ["1280×720 at 60 Hz"])).toBe(false);
   });

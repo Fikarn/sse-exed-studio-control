@@ -274,7 +274,10 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       // link answers: after it stops, the prompter comes back paused.
       { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
       shellExperience === "ready" ? workspaceTones : undefined,
-      now.getTime()
+      now.getTime(),
+      // Before ready a check never read is quiet: `pending` while the app
+      // starts, `not read` after a failed start (the recovery plate's word).
+      shellExperience === "ready" ? undefined : shellState.startupFailure ? "not read" : "pending"
     ),
     shellExperience === "ready" ? activeWorkspace : ""
   );

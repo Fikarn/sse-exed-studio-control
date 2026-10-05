@@ -199,21 +199,21 @@ impl PrompterScreen {
                 self.mode().unwrap_or_default()
             ),
             PrompterScreenState::LowResolution => format!(
-                "Windows runs the Prompter XL at {}×{}. Set it to {FULL_WIDTH_PX}×{FULL_HEIGHT_PX} in Windows' display settings for the sharpest text.",
+                "Windows runs the Prompter XL at {}×{}. Set it to {FULL_WIDTH_PX}×{FULL_HEIGHT_PX}.",
                 self.width.unwrap_or(0),
                 self.height.unwrap_or(0)
             ),
             PrompterScreenState::NotConnected if !self.reported => String::from(
-                "Windows has not reported the Prompter XL since Studio Control started. The script and the place are kept, and nothing is shown on any other screen.",
+                "Windows has not reported the Prompter XL since Studio Control started.",
             ),
             PrompterScreenState::NotConnected => String::from(
-                "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen.",
+                "Windows does not see the Prompter XL. Check its USB-C cable (15 W).",
             ),
             PrompterScreenState::Duplicated => String::from(
-                "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.",
+                "The Prompter XL mirrors another screen. Choose Extend these displays.",
             ),
             PrompterScreenState::NotShowing => String::from(
-                "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself.",
+                "The window on the Prompter XL does not show. It opens again by itself.",
             ),
         }
     }
@@ -322,13 +322,13 @@ pub struct PrompterHealthCheck {
 impl PrompterHealthCheck {
     /// `edited` names the script on the glass when it was edited after it
     /// went on. At the same tone, `NOT UPDATED` wins over `LOW RESOLUTION`:
-    /// it asks the operator for Update, on this page.
+    /// it asks the operator for Update, on this page. The sentence names no
+    /// script, so it keeps the state display's two lines (the polish,
+    /// 2026-10-05): the page names the script on the prompter.
     pub(crate) fn new(screen: &PrompterScreen, edited: Option<&str>) -> Self {
         let screen = screen.summary();
-        let not_updated = edited.map(|name| {
-            format!(
-                "{name} was edited after it went on the prompter. The prompter still shows the earlier text."
-            )
+        let not_updated = edited.map(|_| {
+            String::from("Edited since it went on: the prompter still shows the earlier text.")
         });
         let (status, word, summary) = match &not_updated {
             Some(sentence) if screen.tone <= PrompterCheckTone::Attention => (
@@ -524,7 +524,7 @@ mod tests {
         assert_eq!(edited.word, "NOT UPDATED");
         assert_eq!(
             edited.summary,
-            "Intro was edited after it went on the prompter. The prompter still shows the earlier text."
+            "Edited since it went on: the prompter still shows the earlier text."
         );
         assert!(edited.not_updated);
 
@@ -547,7 +547,7 @@ mod tests {
         );
         assert_eq!(
             check.whole_status_sentence(),
-            Some("Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen.")
+            Some("Windows does not see the Prompter XL. Check its USB-C cable (15 W).")
         );
     }
 

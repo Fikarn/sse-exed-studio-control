@@ -99,6 +99,50 @@
     color: var(--role-blue-text);
   }
 
+  /* The name holds its bold width at rest too (an invisible bold copy under
+     it), so the open tab's bold name moves nothing after it. */
+  .name {
+    display: inline-flex;
+    flex-direction: column;
+  }
+
+  .name::after {
+    content: attr(data-label);
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    font-weight: 700;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* The open tab and the room of its word (the polish, 2026-10-05): the word
+     is drawn invisible after the keyline, as wide as the lamp, gaps and word
+     the tab carries when it is not open, so no tab moves with the page. */
+  .slot {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .reserve {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    /* The button's own gap (8) and the state's margin (4) before the lamp;
+       the button's right padding and edge already stand after the name. */
+    margin-left: 12px;
+    visibility: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .reserveLamp {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex: none;
+  }
+
   .icon {
     display: inline-flex;
     width: 16px;

@@ -193,7 +193,7 @@ fn the_check_follows_the_screen_and_not_updated() {
     assert_eq!(check.status.as_str(), "attention");
     assert!(check
         .summary
-        .starts_with("Talk was edited after it went on the prompter."));
+        .starts_with("Edited since it went on:"));
 
     let gone = prompter
         .reply("prompter.screen.report", json!({ "found": false }))

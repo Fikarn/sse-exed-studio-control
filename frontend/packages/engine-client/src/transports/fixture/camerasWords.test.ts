@@ -83,16 +83,12 @@ describe("the fixture double's camera words, as the operator reads them", () => 
     });
     expect(STATE_TONES).toEqual({ held: "ok", released: "attention", "not-set-up": "attention", unreachable: "error" });
     expect(heldSentence(CAM2)).toBe("CAM 2 is held: Studio Control reads it and sends only what you press.");
-    expect(releasedSentence(CAM1)).toBe(
-      "CAM 1 is released to the iPad. Studio Control does not read it or send it anything until you connect it again."
-    );
-    expect(releasedSentence(CAM3)).toBe(
-      "CAM 3 is released to LUMIX Tether. Studio Control does not read it or send it anything until you connect it again."
-    );
+    expect(releasedSentence(CAM1)).toBe("CAM 1 is released to the iPad. Connect it to control it here.");
+    expect(releasedSentence(CAM3)).toBe("CAM 3 is released to LUMIX Tether. Connect it to control it here.");
     expect(notSetUpSentence(CAM1)).toBe("CAM 1 is not paired. Pair it in Setup, with the camera beside you.");
     expect(notSetUpSentence(CAM2)).toBe("CAM 2 has no address. Enter it in Setup.");
     expect(unreachableSentence(CAM1, null)).toBe(
-      "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC."
+      "CAM 1 does not answer over Bluetooth. Check it is on and within reach."
     );
     expect(unreachableSentence(CAM3, "172.16.16.85")).toBe(
       "CAM 3 does not answer at 172.16.16.85. Check that it is on and on the network."
@@ -476,11 +472,7 @@ describe("the fixture double's camera words: the hardware link's", () => {
         rust("{tag} is held: Studio Control reads it and sends only what you press.", [], tag)
       );
       expect(releasedSentence(model)).toBe(
-        rust(
-          "{tag} is released to {}. Studio Control does not read it or send it anything until you connect it again.",
-          [rustModel.app],
-          tag
-        )
+        rust("{tag} is released to {}. Connect it to control it here.", [rustModel.app], tag)
       );
       expect(notSetUpSentence(model)).toBe(
         rustModel.bgh1
@@ -490,7 +482,7 @@ describe("the fixture double's camera words: the hardware link's", () => {
       expect(unreachableSentence(model, "172.16.16.85")).toBe(
         rustModel.bgh1
           ? rust("{tag} does not answer at {}. Check that it is on and on the network.", ["172.16.16.85"], tag)
-          : rust("{tag} does not answer over Bluetooth. Check that it is on and within reach of this PC.", [], tag)
+          : rust("{tag} does not answer over Bluetooth. Check it is on and within reach.", [], tag)
       );
       expect(noLinkSentence(model)).toBe(
         rust("Studio Control has no link to {} yet: it comes with a later version.", [model.tag])
