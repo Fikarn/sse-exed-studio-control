@@ -95,13 +95,21 @@ export function formatMeterPercent(value: number) {
   return `${dbfsToMeterPercent(normalizedToDbfs(value)).toFixed(1)}%`;
 }
 
+/**
+ * The real minus sign (U+2212). The visual overhaul's polish (2026-10-05):
+ * every level the Console prints below zero carries it, not the ASCII hyphen
+ * `toFixed` gives (DESIGN.md §3), so a sign keeps the plus's width and the
+ * changing levels read like the fixed `−20 dB` beside them.
+ */
+export const MINUS = "−";
+
 // Why: shared infinity glyph so fader-style readouts and meter-style readouts
 // agree on the typography. Previously `formatAudioDb` returned the literal
 // `-inf dB` string while `formatMeterDb` returned `-∞`; the mixer lane patched
 // the divergence with a `.replace("-inf", "-∞")` shim, which broke any reader
 // that bypassed the shim.
-export const AUDIO_DB_NEG_INFINITY = "-∞ dB";
-export const AUDIO_METER_NEG_INFINITY = "-∞";
+export const AUDIO_DB_NEG_INFINITY = `${MINUS}∞ dB`;
+export const AUDIO_METER_NEG_INFINITY = `${MINUS}∞`;
 
 export function formatAudioDb(value: number) {
   const db = normalizedToFaderDb(value);
@@ -111,8 +119,9 @@ export function formatAudioDb(value: number) {
   const rounded = Number(db.toFixed(1));
   // Unity reads "+0.0 dB", as the deck's display prints it (the visual
   // overhaul's Console pull request: the deck and the screen say one thing).
-  const sign = rounded >= 0 ? "+" : "";
-  return `${sign}${Math.abs(rounded) === 0 ? "0.0" : rounded.toFixed(1)} dB`;
+  // A level that rounds to zero from below (-0) reads "+0.0 dB" too.
+  const sign = rounded < 0 ? MINUS : "+";
+  return `${sign}${Math.abs(rounded).toFixed(1)} dB`;
 }
 
 export function formatMeterDb(value: number) {
@@ -120,7 +129,9 @@ export function formatMeterDb(value: number) {
   if (!Number.isFinite(db)) {
     return AUDIO_METER_NEG_INFINITY;
   }
-  return `${db.toFixed(0)}`;
+  // A level just under full scale rounds to "0", never "−0".
+  const whole = Number(db.toFixed(0));
+  return whole < 0 ? `${MINUS}${Math.abs(whole)}` : String(Math.abs(whole));
 }
 
 export interface SendStatusInput {
@@ -192,13 +203,15 @@ export function formatAudioDayTime(value: string) {
 // Visual overhaul A, Slice 4b: what a locked bay says on each tier header —
 // the short phrase, in the operator's words, that names the lock and its way
 // out. The sentence itself stays in the state display and on each refused
-// control; a tier header has room for a phrase, not a paragraph.
+// control; a tier header has room for a phrase, not a paragraph. The visual
+// overhaul's polish (2026-10-05): OFFLINE names the hardware and the page's own
+// state word, as DISCONNECTED does ("unreachable" is Lighting's and Cameras').
 export function audioLockNote(label: string): string {
   switch (label) {
     case "NOT VERIFIED":
       return "locked · run the audio probe";
     case "OFFLINE":
-      return "locked · desk unreachable";
+      return "locked · TotalMix offline";
     case "DISCONNECTED":
       return "locked · UFX III disconnected";
     case "DISABLED":
@@ -239,6 +252,12 @@ function formatAudioActionFailureTitle(snapshot: AudioSnapshot | null) {
 // own channel numbers, so the general one stands for it.)
 const ASSUMED_REASON_CODES = new Set(["AUDIO_CONSOLE_OUT_OF_TOUCH", "AUDIO_CONSOLE_UNREAD_SINCE_START"]);
 
+// The visual overhaul's polish (2026-10-05, the owner's rule): the state
+// display's sentence keeps at most two lines, so every sentence this page
+// writes for it holds 70 characters or fewer. Each says what happened and,
+// where the way-out key does not, what to do; the key beside it names the
+// press, so a sentence need not. A sentence the hardware link sends
+// (`lastActionMessage`) is printed as it comes.
 export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatusDescriptor {
   const lastActionFailed = String(snapshot?.lastActionStatus ?? "idle") === "failed";
   const meteringSource = String(snapshot?.meteringSource ?? snapshot?.adapterMode ?? "").toLowerCase();
@@ -249,7 +268,9 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "DISABLED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "OSC control is switched off in Setup. The Console is read-only until it is switched back on.",
+      // Old: "OSC control is switched off in Setup. The Console is read-only
+      // until it is switched back on." (93 characters; Open Setup is the key).
+      warningBody: "OSC control is off in Setup, so the Console is read-only.",
       warningCode: null,
       warningTitle: "OSC DISABLED",
     };
@@ -263,7 +284,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "DISCONNECTED",
       tone: "error" satisfies StatusToneLike,
-      warningBody: "TotalMix reports the UFX III is disconnected. Check the interface's USB link and power.",
+      // Old: "… Check the interface's USB link and power." (87 characters).
+      warningBody: "TotalMix reports the UFX III disconnected. Check its USB and power.",
       warningCode: null,
       warningTitle: "CONSOLE DISCONNECTED",
     };
@@ -282,9 +304,10 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
-      warningBody:
-        unreachableMessage ??
-        "Audio may still pass, but the app cannot see or change the desk right now. Run the audio probe to check the link.",
+      // Old: "Audio may still pass, but the app cannot see or change the desk
+      // right now. Run the audio probe to check the link." (113 characters;
+      // Run audio probe is the key).
+      warningBody: unreachableMessage ?? "TotalMix did not answer. Audio may still pass through the desk.",
       warningCode: null,
       warningTitle: "CONSOLE UNREACHABLE",
     };
@@ -311,7 +334,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "STALE",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "No meter data has arrived from TotalMix for a few seconds. Run the audio probe to check the link.",
+      // Old: "… Run the audio probe to check the link." (97 characters).
+      warningBody: "No meter data has arrived from TotalMix for a few seconds.",
       warningCode: null,
       warningTitle: "RME METERING STALE",
     };
@@ -322,8 +346,10 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
-      warningBody:
-        "TotalMix is not sending meter data. In TotalMix Options › Settings › OSC, turn on Send Peak Level Data, then run the audio probe again.",
+      // Old: "TotalMix is not sending meter data. In TotalMix Options › Settings ›
+      // OSC, turn on Send Peak Level Data, then run the audio probe again."
+      // (135 characters; Run audio probe is the key).
+      warningBody: "TotalMix sends no meters. Turn on its Send Peak Level Data.",
       warningCode: null,
       warningTitle: "RME METERING OFFLINE",
     };
@@ -348,8 +374,10 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
         reason ??
         // 2026-10-04. Old: "Showing the last state the desk confirmed." New:
         // the strips may not match TotalMix. Reason: after a change TotalMix
-        // did not confirm, the strips show what the app sent.
-        "The strips may not match TotalMix. Press Sync from TotalMix to pull the current state before trusting the faders.",
+        // did not confirm, the strips show what the app sent. The polish
+        // (2026-10-05): "Press Sync from TotalMix to pull the current state"
+        // went (113 characters); the key beside it is Sync from TotalMix.
+        "The strips may not match TotalMix. Sync before trusting the faders.",
       warningCode: null,
       warningTitle: "STATE ASSUMED",
     };
@@ -361,10 +389,10 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       typeof snapshot?.lastActionCode === "string" && snapshot.lastActionCode.trim().length > 0
         ? snapshot.lastActionCode
         : null;
-    const actionMessage =
-      String(
-        snapshot?.lastActionMessage ?? "The last action failed. Press Sync from TotalMix to pull the current state."
-      ) || "The last action failed. Press Sync from TotalMix to pull the current state.";
+    // The polish (2026-10-05). Old fallback: "The last action failed. Press
+    // Sync from TotalMix to pull the current state." (75 characters).
+    const failedFallback = "The last action failed, so the strips may not match TotalMix.";
+    const actionMessage = String(snapshot?.lastActionMessage ?? failedFallback) || failedFallback;
     return {
       bannerEligible: true,
       label: "ACTION FAILED",
@@ -381,15 +409,18 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   // TotalMix reporting the interface back, a failed Sync followed by a good
   // action). The meters wait for a confirmed desk (`audioMeterSimulationState`),
   // so the display names that and offers the one press that reads the desk.
-  // Before, it read VERIFIED with still meters and no key.
+  // Before, it read VERIFIED with still meters and no key. The visual
+  // overhaul's polish (2026-10-05, the owner's two-line rule): the sentence
+  // keeps what happened, in the approved words; its second half, "Press Sync
+  // from TotalMix — it reads the desk and changes nothing.", went (136
+  // characters in all): the key beside it is Sync from TotalMix.
   const confidence = String(snapshot?.consoleStateConfidence ?? "unknown");
   if (meteringSource === "rme-totalmix-osc" && confidence !== "aligned" && confidence !== "verified") {
     return {
       bannerEligible: true,
       label: "SYNC NEEDED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody:
-        "The desk has not been read since the link changed, so the meters wait. Press Sync from TotalMix — it reads the desk and changes nothing.",
+      warningBody: "The desk has not been read since the link changed; the meters wait.",
       warningCode: null,
       warningTitle: "SYNC NEEDED",
     };

@@ -51,9 +51,11 @@
   pointer-events: none;
 }
 
+/* The number and TotalMix's word, centred on one line: the word stands with
+   its lamp, which has no baseline of its own. */
 .slotHead {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
@@ -62,6 +64,12 @@
 .slotNumber {
   font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   color: var(--text-text3);
+}
+
+/* An unnamed slot's name is "Slot 4": its number is hidden, so it reads once,
+   and the line keeps its height, so the name does not move. */
+.slot[data-named="false"] .slotNumber {
+  visibility: hidden;
 }
 
 .slotName {
@@ -73,27 +81,11 @@
   max-width: 100%;
 }
 
-/* A slot with no name of its own reads quieter than one TotalMix named. */
+/* A slot with no name of its own reads quieter than one TotalMix named. The
+   polish (2026-10-05): the slot TotalMix holds has no keyline of its own any
+   more (it was green, a form the system does not have); its word and lamp
+   (LampWord, ● ACTIVE or ● CHANGED) say it. */
 .slot[data-named="false"]:not([data-armed="true"]) .slotName {
   font-weight: 400;
   color: var(--text-text3);
-}
-
-.slotState {
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--role-green-text);
-}
-
-/* Changed since it was loaded: doubt, so yellow (system §4). */
-.slotState[data-state="changed"] {
-  color: var(--role-yellow-text);
-}
-
-/* The slot TotalMix holds: a keyline in the word's colour round the key. */
-.slot[data-current="true"]:not([data-armed="true"]) .slotKey {
-  border-color: var(--role-green-text);
-}
-
-.slot[data-slot-state="changed"]:not([data-armed="true"]) .slotKey {
-  border-color: var(--role-yellow-line);
 }

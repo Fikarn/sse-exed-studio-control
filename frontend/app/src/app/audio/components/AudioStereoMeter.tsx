@@ -2,28 +2,34 @@ import type { CSSProperties } from "react";
 
 import styles from "./AudioStereoMeter.module.css";
 import {
+  AUDIO_METER_NEG_INFINITY,
   dbfsToMeterPercent,
   formatMeterDb,
   formatMeterPercent,
   meterTone,
   METER_NOMINAL_DBFS,
+  MINUS,
   normalizedToDbfs,
 } from "../audioFormatting";
 
+// The visual overhaul's polish (2026-10-05): the marks print the real minus
+// (DESIGN.md §3); each mark's `data-meter-scale-mark` stays its number as
+// written in code ("-6"), the name the meter tests read it by.
 const METER_SCALE_MARKS = [
   { dbfs: 0, label: "0" },
-  { dbfs: -6, label: "-6" },
-  { dbfs: -12, label: "-12" },
-  { dbfs: -18, label: "-18" },
-  { dbfs: -24, label: "-24" },
-  { dbfs: -40, label: "-40" },
-  { dbfs: -60, label: "-60" },
+  { dbfs: -6, label: `${MINUS}6` },
+  { dbfs: -12, label: `${MINUS}12` },
+  { dbfs: -18, label: `${MINUS}18` },
+  { dbfs: -24, label: `${MINUS}24` },
+  { dbfs: -40, label: `${MINUS}40` },
+  { dbfs: -60, label: `${MINUS}60` },
 ];
 
 function formatPeakReadout(value: number) {
   const db = normalizedToDbfs(value);
-  if (!Number.isFinite(db)) return "-∞";
-  return db.toFixed(1);
+  if (!Number.isFinite(db)) return AUDIO_METER_NEG_INFINITY;
+  const rounded = Number(db.toFixed(1));
+  return rounded < 0 ? `${MINUS}${Math.abs(rounded).toFixed(1)}` : Math.abs(rounded).toFixed(1);
 }
 
 function meterPercent(value: number) {
@@ -153,8 +159,8 @@ export function AudioStereoMeter({
         <div className={styles.meterScale} aria-hidden="true" data-meter-scale="dbfs">
           {METER_SCALE_MARKS.map((mark) => (
             <span
-              data-meter-scale-mark={mark.label}
-              key={mark.label}
+              data-meter-scale-mark={String(mark.dbfs)}
+              key={mark.dbfs}
               style={{ "--meter-scale-position": `${dbfsToMeterPercent(mark.dbfs).toFixed(2)}%` } as CSSProperties}
             >
               {mark.label}

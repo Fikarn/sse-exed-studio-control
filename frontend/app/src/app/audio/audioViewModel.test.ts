@@ -6,6 +6,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 
 import {
   audioBankSizes,
+  audioGroupLabel,
   buildAudioViewModel,
   getAudioChannelGroup,
   toggleChannelGroupSelection,
@@ -236,5 +237,66 @@ describe("the Console under TotalMix's names", () => {
       consoleSnapshots: { ...audioSnapshot.consoleSnapshots, namesSavedAt: null, namesNote: null },
     });
     expect(silent.consoleSnapshotSource).toBeNull();
+  });
+
+  // The visual overhaul's polish (2026-10-05): the plate's title plate prints a
+  // group in the tier menu's word ("group FX"), not its id ("group fx").
+  it("names a strip's group in the tier menu's word", () => {
+    expect(audioGroupLabel("fx")).toBe("FX");
+    expect(audioGroupLabel("talent")).toBe("Talent");
+    expect(audioGroupLabel("remote")).toBe("Remote");
+  });
+});
+
+// The visual overhaul's polish (2026-10-05).
+describe("what the state display and the levels say of the desk", () => {
+  const none: AudioChannelGroupSelections = { "hardware-inputs": [], "software-playback": [] };
+  const snapshotOf = async (fixtureId: string) => {
+    const transport = createFixtureTransport(getFixtureScenario(fixtureId));
+    const snapshot = (await transport.request("audio.snapshot")) as unknown as AudioSnapshot;
+    await transport.dispose?.();
+    return snapshot;
+  };
+  const viewModelOf = (audioSnapshot: AudioSnapshot, appSnapshot: Record<string, unknown> | null = null) =>
+    buildAudioViewModel({ activeChannelGroups: none, appSnapshot, audioSnapshot, bankIndex: 0 });
+
+  // DESIGN.md §4: doubt is a dashed yellow keyline on a value the hardware
+  // link has not confirmed. Read from its own words only: the console
+  // confidence, an unreachable desk, a disconnected interface.
+  it("marks the levels in doubt while the desk is assumed, not verified or offline", async () => {
+    for (const fixtureId of ["audio-state-assumed", "audio-not-verified", "audio-osc-disabled", "audio-offline"]) {
+      expect(viewModelOf(await snapshotOf(fixtureId)).valuesInDoubt, fixtureId).toBe(true);
+    }
+  });
+
+  it("leaves the levels confirmed on an aligned desk, even after an action failed", async () => {
+    expect(viewModelOf(await snapshotOf("audio-populated")).valuesInDoubt).toBe(false);
+    expect(viewModelOf(await snapshotOf("audio-action-failed")).valuesInDoubt).toBe(false);
+  });
+
+  it("marks them in doubt when TotalMix reports the UFX III disconnected", async () => {
+    const aligned = await snapshotOf("audio-populated");
+    const disconnected = {
+      ...aligned,
+      consoleLink: { ...aligned.consoleLink, connection: "disconnected" },
+    } as unknown as AudioSnapshot;
+    expect(viewModelOf(disconnected).valuesInDoubt).toBe(true);
+  });
+
+  // Old: the resting sentence was the app snapshot's summary ("Setup ready.",
+  // or in a studio build the hardware link's debug line). New: the Console's
+  // own line. Reason: DESIGN.md §8, the sentence is about this page's hardware.
+  it("rests on the Console's own sentence, never the app's summary", async () => {
+    const simulated = viewModelOf(await snapshotOf("audio-populated"), { summary: "Setup ready." });
+    expect(simulated.status.label).toBe("SIMULATED");
+    expect(simulated.appSummary).toBe("Test mode: the console is simulated and nothing reaches TotalMix.");
+    const verified = viewModelOf({
+      ...(await snapshotOf("audio-populated")),
+      meteringSource: "rme-totalmix-osc",
+      meteringState: "live",
+      consoleStateConfidence: "aligned",
+    } as unknown as AudioSnapshot);
+    expect(verified.status.label).toBe("VERIFIED");
+    expect(verified.appSummary).toBe("TotalMix is answering and the strips match the desk.");
   });
 });

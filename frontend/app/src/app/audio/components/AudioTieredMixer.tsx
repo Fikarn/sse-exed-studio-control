@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { IconButton, MenuButton, Tooltip, type MenuEntry, type UseArmResult } from "@sse/design-system";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Key, MenuButton, Tooltip, type MenuEntry, type UseArmResult } from "@sse/design-system";
 
 import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
@@ -126,29 +125,34 @@ function AudioTier({
         {isInputs && viewModel.totalBanks > 1 ? (
           // The bank keys page both tiers (new pages program, Slice 3, decision
           // 3). Paging is not a press on the head: nothing in the pair lets the
-          // selected strip go.
+          // selected strip go. The visual overhaul's polish (2026-10-05): the
+          // keys are the design system's small Key with ‹ and ›, as every other
+          // page's pager (they were icon buttons with chevrons); an end of the
+          // banks is disabled, not locked, for paging is never refused.
           <span className={styles.bank} data-testid="audio-bank-keys" onClick={(event) => event.stopPropagation()}>
-            <IconButton
-              data-testid="audio-bank-previous"
+            <Key
+              size="small"
+              testId="audio-bank-previous"
+              aria-label="Previous bank"
               disabled={viewModel.clampedBankIndex <= 0}
-              icon={ChevronLeft}
-              label="Previous bank"
               onClick={onPreviousBank}
-              size="sm"
-            />
+            >
+              ‹
+            </Key>
             <Tooltip content={tier.bankReadout} placement="bottom">
               <span className={styles.bankReadout} data-testid={`audio-tier-bank-pill-${tier.id}`}>
                 {viewModel.clampedBankIndex + 1} / {viewModel.totalBanks}
               </span>
             </Tooltip>
-            <IconButton
-              data-testid="audio-bank-next"
+            <Key
+              size="small"
+              testId="audio-bank-next"
+              aria-label="Next bank"
               disabled={viewModel.clampedBankIndex >= viewModel.totalBanks - 1}
-              icon={ChevronRight}
-              label="Next bank"
               onClick={onNextBank}
-              size="sm"
-            />
+            >
+              ›
+            </Key>
           </span>
         ) : null}
         <span className={styles.detail}>
@@ -215,6 +219,7 @@ function AudioTier({
                 channel={channel}
                 clearDraftValueLater={clearDraftValueLater}
                 commitChannelContinuous={commitChannelContinuous}
+                doubt={viewModel.valuesInDoubt}
                 draftStore={draftStore}
                 feeding={viewModel.feedingChannelIds.includes(channel.id)}
                 getDraftValue={getDraftValue}

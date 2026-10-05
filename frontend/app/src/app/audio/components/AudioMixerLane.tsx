@@ -30,6 +30,8 @@ export interface AudioChannelLaneProps {
   channel: AudioChannelEntry;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
+  /** The desk has not confirmed the levels: the readout carries the dashed yellow keyline (DESIGN.md §4). */
+  doubt?: boolean;
   draftStore: AudioControlDraftStore;
   feeding: boolean;
   getDraftValue: (key: string, fallback: number) => number;
@@ -55,6 +57,7 @@ export function AudioChannelLane({
   channel,
   clearDraftValueLater,
   commitChannelContinuous,
+  doubt = false,
   draftStore,
   feeding,
   getDraftValue,
@@ -138,11 +141,14 @@ export function AudioChannelLane({
         {channel.name}
       </span>
 
+      {/* The visual overhaul's polish (2026-10-05): a level the desk has not
+          confirmed is drawn in doubt, a dashed yellow keyline on the value. */}
       <Readout
         className={styles.readout}
         size="readout"
         value={formatAudioDb(sendLevel).replace(/ dB$/, "")}
         unit="dB"
+        doubt={doubt}
         empty={!feeding && !channel.mute}
         testId={`audio-lane-readout-${channel.id}`}
       />

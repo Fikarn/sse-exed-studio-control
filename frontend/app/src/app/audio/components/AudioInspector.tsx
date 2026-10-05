@@ -12,6 +12,7 @@ import { channelOrdinalLabel, channelTypeLabel, type AudioChannelUpdate } from "
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import {
   audioChannelSupportsGain,
+  audioGroupLabel,
   getAudioChannelGroup,
   selectedChannelSendLevel,
   type AudioWorkspaceViewModel,
@@ -113,11 +114,13 @@ function AudioChannelPlate({
     clearDraftValueLater(gainDraftKey);
   };
 
-  // One line under the name: what the strip is, as the desk reports it.
+  // One line under the name: what the strip is, as the desk reports it. The
+  // visual overhaul's polish (2026-10-05): the group in its word, "group FX",
+  // as the tier's menu prints it (it printed the id, "group fx").
   const sub = [
     `${channelTypeLabel(channel.role)} ${channelOrdinalLabel(viewModel, channel)}`,
     channel.stereo ? "stereo" : "mono",
-    `group ${getAudioChannelGroup(channel)}`,
+    `group ${audioGroupLabel(getAudioChannelGroup(channel))}`,
   ].join(" · ");
 
   const menu = buildChannelMenu({
@@ -165,6 +168,7 @@ function AudioChannelPlate({
         channel={channel}
         clearDraftValueLater={clearDraftValueLater}
         commitChannelContinuous={commitChannelContinuous}
+        doubt={viewModel.valuesInDoubt}
         draftStore={draftStore}
         getDraftValue={getDraftValue}
         menuLock={menuLock}

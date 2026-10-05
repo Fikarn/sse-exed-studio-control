@@ -6,6 +6,7 @@ import {
   AUDIO_DB_NEG_INFINITY,
   AUDIO_FADER_UNITY,
   AUDIO_METER_NEG_INFINITY,
+  audioLockNote,
   dbfsToMeterPercent,
   deriveSendStatusLabel,
   describeAudioStatus,
@@ -137,21 +138,33 @@ describe("formatAudioDb / formatMeterDb", () => {
     expect(formatAudioDb(1)).toBe("+6.0 dB");
   });
 
-  it("formats negative values without a leading +", () => {
+  // The visual overhaul's polish (2026-10-05). Old: "-12.1 dB", the ASCII
+  // hyphen `toFixed` gives. New: "−12.1 dB". Reason: DESIGN.md §3, minus signs
+  // are real (U+2212), so a sign keeps the plus's width.
+  it("formats negative values with the real minus", () => {
     // Half-fader is -12.1 dB on RME's curve, and the old 0.80 unity reads true.
-    expect(formatAudioDb(0.5)).toBe("-12.1 dB");
-    expect(formatAudioDb(0.8)).toBe("-0.6 dB");
+    expect(formatAudioDb(0.5)).toBe("−12.1 dB");
+    expect(formatAudioDb(0.8)).toBe("−0.6 dB");
     const formatted = formatAudioDb(0.5);
-    expect(formatted).toMatch(/^-\d+\.\d dB$/);
+    expect(formatted).toMatch(/^−\d+\.\d dB$/);
+    expect(formatted).not.toContain("-");
   });
 
-  it("formats the bottom as the shared -∞ glyph", () => {
+  it("formats the bottom as the shared −∞ glyph", () => {
     expect(formatAudioDb(0)).toBe(AUDIO_DB_NEG_INFINITY);
     expect(formatMeterDb(0)).toBe(AUDIO_METER_NEG_INFINITY);
+    expect(AUDIO_DB_NEG_INFINITY).toBe("−∞ dB");
+    expect(AUDIO_METER_NEG_INFINITY).toBe("−∞");
   });
 
   it("formats a full-scale meter value as '0'", () => {
     expect(formatMeterDb(1)).toBe("0");
+  });
+
+  it("formats a meter level below full scale with the real minus, and never '−0'", () => {
+    expect(formatMeterDb(0.5)).toBe("−6");
+    // About −0.3 dBFS rounds to zero: "0", not "−0".
+    expect(formatMeterDb(0.97)).toBe("0");
   });
 });
 
@@ -229,13 +242,15 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
       ...fields,
     }) as unknown as AudioSnapshot;
 
-  it("names a desk nobody has read yet and says what to press", () => {
+  // The visual overhaul's polish (2026-10-05, the owner's two-line rule). Old
+  // title: "… and says what to press"; the sentence went on "Press Sync from
+  // TotalMix — it reads the desk and changes nothing." New: it says what
+  // happened, and its way-out key, Sync from TotalMix, names the press.
+  it("names a desk nobody has read yet, in two lines", () => {
     const status = describeAudioStatus(passedWithTotalMix({}));
     expect(status.label).toBe("SYNC NEEDED");
     expect(status.tone).toBe("attention");
-    expect(status.warningBody).toBe(
-      "The desk has not been read since the link changed, so the meters wait. Press Sync from TotalMix — it reads the desk and changes nothing."
-    );
+    expect(status.warningBody).toBe("The desk has not been read since the link changed; the meters wait.");
   });
 
   it("says for how long TotalMix was out of touch while ASSUMED (2026-10-01)", () => {
@@ -280,7 +295,10 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
       })
     );
     expect(status.label).toBe("OFFLINE");
-    expect(status.warningBody).toContain("Run the audio probe");
+    // The polish (2026-10-05). Old: the sentence ended "Run the audio probe to
+    // check the link." New: the way-out key, Run audio probe, says it.
+    expect(status.warningBody).toBe("TotalMix did not answer. Audio may still pass through the desk.");
+    expect(status.warningBody).not.toContain("Sync");
   });
 
   it("keeps the general ASSUMED sentence for unconfirmed changes and any other reason", () => {
@@ -333,5 +351,56 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
 
   it("does not apply to simulated metering", () => {
     expect(describeAudioStatus(passedWithTotalMix({ meteringSource: "simulated" })).label).toBe("SIMULATED");
+  });
+});
+
+// The visual overhaul's polish (2026-10-05, the owner's rule): the state
+// display's sentence keeps at most two lines, about 75 characters at its
+// width, so every sentence the page writes for it holds 70. The hardware
+// link's own sentences (`lastActionMessage`) are not the page's and are not
+// held here.
+describe("describeAudioStatus: the page's sentences fit the state display's two lines", () => {
+  const snapshotOf = (fields: Record<string, unknown>) =>
+    ({
+      oscEnabled: true,
+      status: "ready",
+      verified: true,
+      meteringSource: "rme-totalmix-osc",
+      meteringState: "live",
+      consoleStateConfidence: "aligned",
+      lastActionStatus: "succeeded",
+      lastActionCode: null,
+      lastActionMessage: null,
+      ...fields,
+    }) as unknown as AudioSnapshot;
+
+  const cases: Array<[string, Record<string, unknown>]> = [
+    ["DISABLED", { oscEnabled: false }],
+    ["DISCONNECTED", { consoleLink: { connection: "disconnected" } }],
+    ["OFFLINE", { status: "attention" }],
+    ["NOT VERIFIED", { status: "not-verified", verified: false }],
+    ["STALE", { meteringState: "stale" }],
+    ["OFFLINE", { meteringState: "offline" }],
+    ["ASSUMED", { consoleStateConfidence: "assumed" }],
+    ["ACTION FAILED", { lastActionStatus: "failed" }],
+    ["SYNC NEEDED", { consoleStateConfidence: "unknown" }],
+  ];
+
+  it.each(cases)("%s holds 70 characters or fewer", (label, fields) => {
+    const status = describeAudioStatus(snapshotOf(fields));
+    expect(status.label).toBe(label);
+    expect(status.warningBody).not.toBeNull();
+    expect(status.warningBody!.length, status.warningBody!).toBeLessThanOrEqual(70);
+  });
+});
+
+// The polish (2026-10-05): OFFLINE's lock note names the hardware and the
+// page's own word, as DISCONNECTED's does. Old: "locked · desk unreachable"
+// ("unreachable" is Lighting's and Cameras' state word).
+describe("audioLockNote", () => {
+  it("names the hardware and the page's state word", () => {
+    expect(audioLockNote("OFFLINE")).toBe("locked · TotalMix offline");
+    expect(audioLockNote("DISCONNECTED")).toBe("locked · UFX III disconnected");
+    expect(audioLockNote("NOT VERIFIED")).toBe("locked · run the audio probe");
   });
 });

@@ -18,9 +18,12 @@ test("SYNC NEEDED says why the meters wait, and its Sync from TotalMix lets them
   const workspace = page.getByTestId("audio-workspace");
 
   await expect(display).toContainText("SYNC NEEDED");
-  await expect(display).toContainText(
-    "The desk has not been read since the link changed, so the meters wait. Press Sync from TotalMix — it reads the desk and changes nothing."
-  );
+  // The visual overhaul's polish (2026-10-05, the owner's two-line rule). Old:
+  // "… so the meters wait. Press Sync from TotalMix — it reads the desk and
+  // changes nothing." New: what happened, in two lines; the key beside it is
+  // the press. Reason: the sentence keeps at most two lines.
+  await expect(display).toContainText("The desk has not been read since the link changed; the meters wait.");
+  await expect(display.getByTestId("audio-state-sync")).toHaveText("Sync from TotalMix");
   await expect(workspace).toHaveAttribute("data-canvas-metering", "false");
 
   await display.getByTestId("audio-state-sync").click();
