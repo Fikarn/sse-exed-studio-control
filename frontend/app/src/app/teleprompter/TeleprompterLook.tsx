@@ -1,17 +1,22 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { ControlRow, Key, Section, Segmented, Slider } from "@sse/design-system";
-import type { PrompterLookUpdateRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
+import { ControlRow, Key, Popover, Readouts, Section, Segmented, Slider, Tooltip } from "@sse/design-system";
+import type { PrompterLook, PrompterLookUpdateRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
-import { SIZE_RANGE } from "./teleprompterModel";
 import { TAKE, type PerformAction } from "./perform";
-import styles from "./TeleprompterPlate.module.css";
+import styles from "./TeleprompterLook.module.css";
 
-// The look (new pages program, Slice 6a; the proposal §4.1, board 1's plate):
-// one look for the glass, applied at once with one press or a release of a
-// slider, the words at the reading line kept where they are. The ranges are
-// the hardware link's (`look.rs`); a slider moves freely under the hand and
-// sends its value when it is let go.
+// The look (new pages program, Slice 6a; the proposal §4.1): one look for the
+// glass, applied at once with one press or a release of a slider, the words
+// at the reading line kept where they are. The ranges are the hardware link's
+// (`look.rs`); a slider moves freely under the hand and sends its value when
+// it is let go.
+//
+// The visual overhaul (2026-10-05): the plate shows the look's values, and
+// Change… opens them in a popover beside the section, never a dialog: the
+// three sliders, the text colour and the three toggles. The current colour and
+// each toggle's state are the Beige selection, not a yellow fill. Nothing in
+// it arms. The text size is a take-time key and stands in the cluster.
 
 interface Range {
   min: number;
@@ -27,9 +32,13 @@ const toShare = (value: number, range: Range) => (value - range.min) / (range.ma
 const fromShare = (share: number, range: Range) =>
   Math.round((range.min + share * (range.max - range.min)) / range.step) * range.step;
 
+const spacing = (value: number) => (value / 100).toFixed(1);
+const percent = (value: number) => `${value} %`;
+const onOff = (on: boolean) => (on ? "on" : "off");
+
 interface LookSliderProps {
   label: string;
-  detail: string;
+  tip: string;
   value: number;
   range: Range;
   format: (value: number) => string;
@@ -37,12 +46,22 @@ interface LookSliderProps {
   onCommit: (value: number) => void;
 }
 
-function LookSlider({ label, detail, value, range, format, testId, onCommit }: LookSliderProps) {
-  // The value under the hand while it moves; the look's own once let go.
+function LookSlider({ label, tip, value, range, format, testId, onCommit }: LookSliderProps) {
+  // The value under the hand while it moves; the look's own once let go. The
+  // page reads the prompter once a second while it plays: this is kept across
+  // those renders, so a hand on the slider is never overruled.
   const [moving, setMoving] = useState<number | null>(null);
   const shown = moving ?? value;
   return (
-    <ControlRow label={label} detail={detail} value={format(shown)} testId={testId}>
+    <ControlRow
+      label={
+        <Tooltip content={tip} placement="left">
+          <span>{label}</span>
+        </Tooltip>
+      }
+      value={format(shown)}
+      testId={testId}
+    >
       <Slider
         label={label}
         value={toShare(shown, range)}
@@ -59,6 +78,69 @@ function LookSlider({ label, detail, value, range, format, testId, onCommit }: L
   );
 }
 
+interface ChoiceProps<T extends string | boolean> {
+  label: string;
+  options: readonly { value: T; word: string; testId: string }[];
+  current: T;
+  testId: string;
+  onChoose: (value: T) => void;
+}
+
+/** A row of the popover: its words, and the choices with the current one as the selection. */
+function Choice<T extends string | boolean>({ label, options, current, testId, onChoose }: ChoiceProps<T>) {
+  return (
+    <div className={styles.choiceRow}>
+      <span className={styles.choiceLabel}>{label}</span>
+      <Segmented label={label} className={styles.choices} testId={testId}>
+        {options.map((option) => (
+          <Key
+            key={option.word}
+            mode="segmented"
+            size="small"
+            selected={current === option.value}
+            aria-pressed={current === option.value}
+            testId={option.testId}
+            onClick={() => {
+              if (current !== option.value) onChoose(option.value);
+            }}
+          >
+            {option.word}
+          </Key>
+        ))}
+      </Segmented>
+    </div>
+  );
+}
+
+/** An on/off setting of the look, as two choices. */
+function toggle(label: string, value: boolean, testId: string, onChoose: (on: boolean) => void) {
+  return (
+    <Choice
+      label={label}
+      current={value}
+      testId={testId}
+      options={[
+        { value: true, word: "On", testId: `${testId}-on` },
+        { value: false, word: "Off", testId: `${testId}-off` },
+      ]}
+      onChoose={onChoose}
+    />
+  );
+}
+
+/** The look's values, as the plate prints them. */
+function lookRows(look: PrompterLook) {
+  return [
+    { id: "spacing", label: "Line spacing", value: spacing(look.lineSpacingPercent) },
+    { id: "margins", label: "Margins, each side", value: percent(look.marginPercent) },
+    { id: "reading-line", label: "Reading line, from the top", value: percent(look.readingLinePercent) },
+    { id: "colour", label: "Text colour", value: look.textColour === "yellow" ? "Yellow" : "White" },
+    { id: "dim", label: "Dim text already read", value: onOff(look.dimReadText) },
+    { id: "across", label: "A line across at the reading line", value: onOff(look.readingLineAcross) },
+    { id: "numbers", label: "Paragraph numbers on the glass", value: onOff(look.paragraphNumbers) },
+  ];
+}
+
 export interface TeleprompterLookProps {
   snapshot: PrompterSnapshot;
   store: ShellStore;
@@ -66,116 +148,104 @@ export interface TeleprompterLookProps {
 }
 
 export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookProps) {
-  const { look, sizePx } = snapshot;
+  const { look } = snapshot;
+  const [open, setOpen] = useState(false);
+  // The section the popover stands beside (Section takes no ref: a wrapper).
+  const section = useRef<HTMLDivElement | null>(null);
+  // The key that opened the popover: a press on it closes it again, and the
+  // focus comes back to it; a press anywhere else closes it too.
+  const opener = useRef<HTMLSpanElement | null>(null);
   const update = (request: PrompterLookUpdateRequest) =>
     void perform(() => store.updatePrompterLook(request), false, TAKE);
-  const atStandard = sizePx === look.standardSizePx;
-  const smallest = sizePx <= SIZE_RANGE.min ? `The text is at its smallest, ${SIZE_RANGE.min} px.` : null;
-  const largest = sizePx >= SIZE_RANGE.max ? `The text is at its largest, ${SIZE_RANGE.max} px.` : null;
-  const toggle = (label: string, engaged: boolean, testId: string, request: PrompterLookUpdateRequest) => (
-    <div className={styles.toggleRow}>
-      <span className={styles.toggleLabel}>{label}</span>
-      <Key mode="toggle" size="small" engaged={engaged} testId={testId} onClick={() => update(request)}>
-        {engaged ? "On" : "Off"}
-      </Key>
-    </div>
-  );
 
   return (
-    <Section title="The look" detail="one look for the glass · applies at once" testId="teleprompter-look">
-      <div className={styles.sizeRow}>
-        <output className={styles.sizeReadout} data-testid="teleprompter-text-size">
-          <b>{sizePx} px</b> {atStandard ? "standard" : `standard ${look.standardSizePx}`}
-        </output>
-        <Key
-          size="small"
-          testId="teleprompter-size-down"
-          locked={smallest !== null}
-          reason={smallest ?? undefined}
-          aria-label="Smaller by 4 px"
-          onClick={() => void perform(() => store.setPrompterTextSize({ step: -1 }), false, TAKE)}
-        >
-          − 4
-        </Key>
-        <Key
-          size="small"
-          testId="teleprompter-size-up"
-          locked={largest !== null}
-          reason={largest ?? undefined}
-          aria-label="Larger by 4 px"
-          onClick={() => void perform(() => store.setPrompterTextSize({ step: 1 }), false, TAKE)}
-        >
-          + 4
-        </Key>
-        <Key
-          size="small"
-          testId="teleprompter-size-standard"
-          locked={atStandard}
-          reason="The text is at the standard size."
-          onClick={() => void perform(() => store.setPrompterTextSize({ standard: true }), false, TAKE)}
-        >
-          Standard
-        </Key>
-      </div>
-      <LookSlider
-        label="Line spacing"
-        detail="1.1–2.0"
-        value={look.lineSpacingPercent}
-        range={LINE_SPACING}
-        format={(value) => (value / 100).toFixed(1)}
-        testId="teleprompter-line-spacing"
-        onCommit={(value) => update({ lineSpacingPercent: value })}
-      />
-      <LookSlider
-        label="Margins"
-        detail="each side · 0–30 %"
-        value={look.marginPercent}
-        range={MARGINS}
-        format={(value) => `${value} %`}
-        testId="teleprompter-margins"
-        onCommit={(value) => update({ marginPercent: value })}
-      />
-      <LookSlider
-        label="Reading line"
-        detail="from the top · 20–60 %"
-        value={look.readingLinePercent}
-        range={READING_LINE}
-        format={(value) => `${value} %`}
-        testId="teleprompter-reading-line"
-        onCommit={(value) => update({ readingLinePercent: value })}
-      />
-      <div className={styles.toggleRow}>
-        <span className={styles.toggleLabel}>Text colour · on black, always</span>
-        <Segmented label="Text colour" testId="teleprompter-text-colour">
-          <Key
-            mode="segmented"
-            size="small"
-            engaged={look.textColour === "white"}
-            testId="teleprompter-colour-white"
-            onClick={() => update({ textColour: "white" })}
+    <div ref={section} className={styles.section}>
+      <Section
+        title={
+          <Tooltip
+            content="One look for the glass. A change applies at once, and the words at the reading line stay where they are."
+            placement="left"
           >
-            White
-          </Key>
-          <Key
-            mode="segmented"
-            size="small"
-            engaged={look.textColour === "yellow"}
-            testId="teleprompter-colour-yellow"
-            onClick={() => update({ textColour: "yellow" })}
-          >
-            Yellow
-          </Key>
-        </Segmented>
-      </div>
-      {toggle("Dim text already read", look.dimReadText, "teleprompter-dim-read", {
-        dimReadText: !look.dimReadText,
-      })}
-      {toggle("A line across at the reading line", look.readingLineAcross, "teleprompter-line-across", {
-        readingLineAcross: !look.readingLineAcross,
-      })}
-      {toggle("Paragraph numbers on the glass", look.paragraphNumbers, "teleprompter-paragraph-numbers", {
-        paragraphNumbers: !look.paragraphNumbers,
-      })}
-    </Section>
+            <span>The look</span>
+          </Tooltip>
+        }
+        actions={
+          <span ref={opener} className={styles.opener}>
+            <Key
+              size="small"
+              aria-expanded={open}
+              testId="teleprompter-look-open"
+              onClick={() => setOpen((was) => !was)}
+            >
+              Change…
+            </Key>
+          </span>
+        }
+        testId="teleprompter-look"
+      >
+        <Readouts rows={lookRows(look)} data-testid="teleprompter-look-values" />
+        <Popover
+          open={open}
+          anchor={section.current}
+          onClose={() => setOpen(false)}
+          title="The look"
+          placement="left-start"
+          width={407}
+          ignoreOutside={[opener]}
+          returnFocusTo={opener.current?.querySelector("button") ?? null}
+          initialFocus="first"
+          testId="teleprompter-look-popover"
+        >
+          <div className={styles.body}>
+            <LookSlider
+              label="Line spacing"
+              tip="From 1.1 to 2.0 times the text size."
+              value={look.lineSpacingPercent}
+              range={LINE_SPACING}
+              format={spacing}
+              testId="teleprompter-line-spacing"
+              onCommit={(value) => update({ lineSpacingPercent: value })}
+            />
+            <LookSlider
+              label="Margins"
+              tip="Each side, from 0 to 30 % of the glass."
+              value={look.marginPercent}
+              range={MARGINS}
+              format={percent}
+              testId="teleprompter-margins"
+              onCommit={(value) => update({ marginPercent: value })}
+            />
+            <LookSlider
+              label="Reading line"
+              tip="From the top, from 20 to 60 % of the glass."
+              value={look.readingLinePercent}
+              range={READING_LINE}
+              format={percent}
+              testId="teleprompter-reading-line"
+              onCommit={(value) => update({ readingLinePercent: value })}
+            />
+            <Choice<"white" | "yellow">
+              label="Text colour, on black"
+              current={look.textColour === "yellow" ? "yellow" : "white"}
+              testId="teleprompter-text-colour"
+              options={[
+                { value: "white", word: "White", testId: "teleprompter-colour-white" },
+                { value: "yellow", word: "Yellow", testId: "teleprompter-colour-yellow" },
+              ]}
+              onChoose={(textColour) => update({ textColour })}
+            />
+            {toggle("Dim text already read", look.dimReadText, "teleprompter-dim-read", (dimReadText) =>
+              update({ dimReadText })
+            )}
+            {toggle("A line across at the reading line", look.readingLineAcross, "teleprompter-line-across", (on) =>
+              update({ readingLineAcross: on })
+            )}
+            {toggle("Paragraph numbers on the glass", look.paragraphNumbers, "teleprompter-paragraph-numbers", (on) =>
+              update({ paragraphNumbers: on })
+            )}
+          </div>
+        </Popover>
+      </Section>
+    </div>
   );
 }

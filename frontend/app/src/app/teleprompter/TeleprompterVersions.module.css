@@ -1,0 +1,51 @@
+/* A script's earlier versions, in a popover beside the plate's title (the
+   visual overhaul, 2026-10-05): rows on hairlines, each with Bring back. */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--material-line);
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.version:last-child {
+  border-bottom: 0;
+}
+
+/* One line a version, so the popover's height is known. */
+.line {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.none {
+  padding: 8px 0;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+.pager {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  text-align: center;
+}

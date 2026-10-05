@@ -29,8 +29,12 @@ export interface PrompterStateView {
   sentence: string;
   /** The Prompter XL's mode (`1920×1080 · 60 Hz`), while Windows sees it. */
   meta: string | null;
-  /** The way out the state display offers (§8): Update, or Put on the prompter. */
-  wayOut: "update" | "put-on" | null;
+  /**
+   * The way out the state display offers (§8): Update, or Open file… while no
+   * script is kept. Put on the prompter is the plate's own key (the visual
+   * overhaul, 2026-10-05): one key, under the script it puts on.
+   */
+  wayOut: "update" | "open-file" | null;
 }
 
 /** The state display (§8): the Prompter XL's fault first, then `NOT UPDATED`, `LOW RESOLUTION`, `ON SCREEN`, `READY`. */
@@ -75,7 +79,7 @@ export function prompterStateView(
       ? "The Prompter XL is connected and blank. Choose a script and put it on the prompter."
       : "The Prompter XL is connected and blank. Open a script's file to put it on the prompter.",
     meta,
-    wayOut: hasScripts ? "put-on" : null,
+    wayOut: hasScripts ? null : "open-file",
   };
 }
 

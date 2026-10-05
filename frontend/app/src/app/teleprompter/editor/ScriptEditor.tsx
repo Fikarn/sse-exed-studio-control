@@ -597,7 +597,8 @@ export function ScriptEditor({
       <div className={styles.bar} role="toolbar" aria-label="The script's text">
         <Key
           size="small"
-          engaged={format.bold}
+          selected={format.bold}
+          aria-pressed={format.bold}
           testId="teleprompter-editor-bold"
           {...keepFocus}
           onClick={() => run("bold")}
@@ -606,7 +607,8 @@ export function ScriptEditor({
         </Key>
         <Key
           size="small"
-          engaged={format.italic}
+          selected={format.italic}
+          aria-pressed={format.italic}
           testId="teleprompter-editor-italic"
           {...keepFocus}
           onClick={() => run("italic")}
@@ -615,7 +617,8 @@ export function ScriptEditor({
         </Key>
         <Key
           size="small"
-          engaged={format.underline}
+          selected={format.underline}
+          aria-pressed={format.underline}
           testId="teleprompter-editor-underline"
           {...keepFocus}
           onClick={() => run("underline")}
@@ -684,7 +687,7 @@ export function ScriptEditor({
             ) : null}
           </>
         ) : null}
-        <span data-testid="teleprompter-editor-saved" data-save={save.kind}>
+        <span className={styles.saved} data-testid="teleprompter-editor-saved" data-save={save.kind}>
           {status}
         </span>
         <span className={styles.note}>

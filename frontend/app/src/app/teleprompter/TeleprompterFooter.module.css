@@ -1,0 +1,13 @@
+/* The Teleprompter's footer key and its popover (the visual overhaul,
+   2026-10-05). */
+
+.opener {
+  display: inline-flex;
+}
+
+.windowError {
+  margin: 12px 0 0;
+  color: var(--role-coral-text);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  overflow-wrap: anywhere;
+}

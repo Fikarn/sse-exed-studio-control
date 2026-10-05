@@ -1,7 +1,8 @@
-/* The Teleprompter's cluster (new pages program, Slice 6a): board 1's left
-   column. The state display first and fixed, the take under it, the paragraph
-   list taking what is left, the standing actions at the foot. Every value is
-   a token or a board dimension. */
+/* The Teleprompter's cluster (new pages program, Slice 6a; the visual
+   overhaul, 2026-10-05): the state display first and fixed, the latch slot,
+   the take under them — PLAY, BACK and TOP, the speed and the size side by
+   side as the deck's dials, the steps — the paragraph list taking what is
+   left, Clear at the foot. Nothing here moves or scrolls. */
 
 .cluster {
   display: flex;
@@ -26,28 +27,83 @@
   grid-row: 1 / span 2;
 }
 
-.speed {
+/* SPEED and SIZE side by side, as the deck's dials stand: each its word over
+   its value in a well, its keys under it. */
+.dials {
   display: grid;
-  grid-template-columns: 72px 1fr 72px;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  height: 56px;
+  flex: none;
 }
 
-.speedReadout {
+.dial {
   display: flex;
-  align-items: baseline;
-  justify-content: center;
+  flex-direction: column;
   gap: 8px;
-  padding-top: 16px;
-  border-radius: var(--radius-key);
-  background: var(--material-well);
-  color: var(--display-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  min-width: 0;
 }
 
-.speedReadout b {
-  color: var(--display-text);
-  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
+.cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  height: 56px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  min-width: 0;
+}
+
+.cellWord {
+  color: var(--text-text3);
+  font: var(--font-weight-bold) var(--font-size-tick) / 1 var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+}
+
+/* The value itself: the number in the word size, its unit and its standard
+   in the quiet ink at the label size. */
+.cellValue {
+  justify-content: flex-start;
+  height: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cellValue b,
+.cellValue > span:first-child {
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-word) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The speed's unit (the Readout's own), in the regular weight. */
+.cellValue > span:first-child > span {
+  font-weight: var(--font-weight-regular);
+}
+
+.dialKeys {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sizeKeys {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+
+.dialKeys > *,
+.sizeKeys > * {
+  padding: 0 10px;
 }
 
 .steps {
@@ -57,8 +113,8 @@
   flex: none;
 }
 
-/* The paragraph list takes the room between the steps and the standing
-   actions; it never scrolls (a longer script shows a window of it). */
+/* The paragraph list takes the room between the steps and Clear; it never
+   scrolls (a longer script shows a window of it). */
 .paragraphs {
   flex: 1 1 auto;
   min-height: 0;
@@ -71,7 +127,8 @@
   gap: 0;
   margin: 0;
   padding: 4px;
-  border-radius: var(--radius-key);
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
   background: var(--material-well);
   list-style: none;
 }
@@ -86,16 +143,16 @@
   height: 32px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-ctl);
+  border-radius: var(--radius-base);
   background: none;
-  color: var(--display-text);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
   text-align: left;
   cursor: pointer;
 }
 
 .paragraphRow:hover {
-  border-color: var(--display-text2);
+  border-color: var(--text-text4);
 }
 
 .paragraphRow:focus-visible {
@@ -103,13 +160,16 @@
   outline-offset: -2px;
 }
 
+/* The paragraph at the reading line: the selection's Beige keyline, 2 px. */
 .paragraphRow[data-current] {
-  border-color: var(--display-text);
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .paragraphNumber {
-  color: var(--display-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
+  color: var(--text-text3);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
@@ -124,33 +184,37 @@
 }
 
 .paragraphLength {
-  color: var(--display-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
+  color: var(--text-text3);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Open file… · Paste as a new script · New script, each as wide as its
-   words, and Clear under them across the cluster (board 1). */
-.standing {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.none {
+  margin: 0;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+/* Clear across the cluster, at the foot. */
+.clear {
   flex: none;
+  width: 100%;
 }
 
-.standingRow {
-  display: flex;
-  gap: 8px;
-}
-
-.standingRow > * {
-  flex: 1 1 auto;
-  white-space: nowrap;
+/* An armed key that keeps its height: the tag and the words side by side, as
+   Lighting's Save row does, so nothing under or over it moves while it
+   counts down (the state display's Update and Clear). */
+.armRow[data-armed="true"] {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 12px;
 }
 
 .reopened {
   margin: 0;
   color: var(--text-text);
-  font: 400 var(--font-size-body) / 1.45 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .fileInput {

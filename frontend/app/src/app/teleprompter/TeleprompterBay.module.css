@@ -2,7 +2,9 @@
    The strip over the copy, the copy across the bay (1,680 × 945), the whole
    script under it, then the cue keys and Go to paragraph. The shell
    (overhaul 3): the bay draws no margin, so the copy has its whole width,
-   between the cluster's hairline and the plate's. */
+   between the cluster's hairline and the plate's. The visual overhaul
+   (2026-10-05): every value in PT Sans with tabular figures, the labels in
+   the quiet ink, the state words the lamps' own. */
 
 .bay {
   display: flex;
@@ -15,9 +17,8 @@
 }
 
 /* The bay's head: what it shows (the live copy or the editor, Slice 6b)
-   beside the strip. */
-/* The rows over and under the copy keep the page's margin; the copy itself
-   has the bay's whole width (the shell, overhaul 3). */
+   beside the strip. The rows over and under the copy keep the page's margin;
+   the copy itself has the bay's whole width (the shell, overhaul 3). */
 .bayHead {
   display: flex;
   gap: 16px;
@@ -39,7 +40,8 @@
   min-width: 0;
   height: 64px;
   padding: 0 20px;
-  border-radius: var(--radius-screen);
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
   background: var(--material-well);
 }
 
@@ -51,44 +53,36 @@
 }
 
 .stripLabel {
-  color: var(--display-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.08em;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: var(--font-tracking-cap);
   text-transform: uppercase;
 }
 
 .stripValue {
   overflow: hidden;
-  color: var(--display-text);
-  font: 700 var(--font-size-value) / 1 var(--font-family-ui);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.stripMono {
-  color: var(--display-text);
-  font: 700 var(--font-size-value) / 1 var(--font-family-mono);
-  white-space: nowrap;
-}
-
 .stripHero {
-  color: var(--display-text);
-  font: 700 var(--font-size-hero) / 1 var(--font-family-mono);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-display) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .stripDetail {
-  color: var(--display-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
 }
 
 .runState {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  flex: none;
   margin-left: auto;
-  color: var(--display-text);
-  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
 /* The copy: a picture of the glass. Dimmed while the Prompter XL shows
@@ -98,7 +92,6 @@
   flex: none;
   width: 1680px;
   height: 945px;
-  border-radius: var(--radius-screen);
   overflow: hidden;
 }
 
@@ -106,22 +99,22 @@
   opacity: 0.45;
 }
 
+/* NOT ON THE GLASS: the frame's own mark over the dimmed copy, a lamp and its
+   word on the surface, in a coral keyline. */
 .notOnGlass {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: inline-flex;
   padding: 8px 12px;
   border: 1px solid var(--role-coral-text);
-  border-radius: var(--radius-pill);
-  background: var(--material-panel);
-  color: var(--role-coral-text);
-  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
+  border-radius: var(--radius-base);
+  background: var(--material-bg);
 }
 
 .nothing {
   margin: 0;
-  color: var(--text-text2);
-  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+  padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
 }
 
 .barHead {
@@ -130,11 +123,15 @@
   gap: 16px;
   margin-bottom: -8px;
   padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
-  color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.04em;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: var(--font-tracking-cap);
   text-transform: uppercase;
   flex: none;
+}
+
+.barWord {
+  color: var(--text-text2);
 }
 
 /* The whole script at one width: a segment a paragraph, cues as ticks, the
@@ -148,7 +145,7 @@
   height: 40px;
   padding: 4px;
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   background: var(--material-well);
   cursor: pointer;
   flex: none;
@@ -165,31 +162,32 @@
   height: 100%;
 }
 
-/* The display's own ink over the black well, as board 1 draws it: bright
-   for what is still to read, faint for what was read, in every theme. */
+/* The main ink over the black well: bright for what is still to read, faint
+   for what was read. */
 .segment {
   position: absolute;
   top: 0;
   bottom: 0;
   display: flex;
   align-items: flex-end;
-  border-radius: var(--radius-ctl);
-  background: color-mix(in srgb, var(--display-text) 24%, transparent);
+  border-radius: var(--radius-base);
+  background: color-mix(in srgb, var(--text-text) 24%, transparent);
   overflow: hidden;
 }
 
 .segment[data-read] {
-  background: color-mix(in srgb, var(--display-text) 9%, transparent);
+  background: color-mix(in srgb, var(--text-text) 9%, transparent);
 }
 
 .segmentNumber {
   padding: 0 0 4px 4px;
-  color: var(--display-text);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .segment[data-read] .segmentNumber {
-  color: var(--display-text2);
+  color: var(--text-text3);
 }
 
 .cueTick {
@@ -228,20 +226,20 @@
 }
 
 .cuesLabel {
-  color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.08em;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: var(--font-tracking-cap);
   text-transform: uppercase;
 }
 
 .cuesNone {
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .cueParagraph {
-  color: var(--text-text2);
-  font-family: var(--font-family-mono);
+  color: var(--text-text3);
+  font-variant-numeric: tabular-nums;
 }
 
 .cueText {
@@ -261,23 +259,25 @@
   flex: none;
 }
 
-.goToLabel {
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+/* Go to paragraph: the design system's field, its label over the number. */
+.goToWell {
+  width: 152px;
+  padding: 4px 12px;
 }
 
+/* The number itself: a target as tall as a small key. */
 .goToField {
-  width: 72px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--material-line2);
-  border-radius: var(--radius-ctl);
-  background: var(--material-well);
-  color: var(--display-text);
-  font: 400 var(--font-size-body) / 1 var(--font-family-mono);
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  outline: none;
 }
 
-.goToField:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.goToField::placeholder {
+  color: var(--text-text4);
 }

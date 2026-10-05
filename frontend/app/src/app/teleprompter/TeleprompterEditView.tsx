@@ -1,5 +1,6 @@
 import { useState, type Ref } from "react";
 
+import { LampWord, Readouts, Tooltip } from "@sse/design-system";
 import type { PrompterGlassSnapshot, PrompterScriptSummary, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
 import { ScriptEditor, type ScriptEditorHandle, type ScriptEditorMarks } from "./editor/ScriptEditor";
@@ -11,12 +12,17 @@ import styles from "./TeleprompterEditView.module.css";
 // glass shows now, a quarter of its size — the same glass component, never a
 // second layout — with what the edits change on it. The selected script is
 // not necessarily the one on the prompter.
+//
+// The visual overhaul (2026-10-05): the readouts are the design system's, the
+// run state and the reading line's state are words in capitals, and the
+// sentence on the quarter-size copy is the tooltip of its head; what an edit
+// does to the glass stays on screen.
 
 /** The quarter-size copy: a quarter of the Prompter XL's 1,920 px. */
 const QUARTER_WIDTH = 480;
 
 const QUARTER =
-  "While you edit, the glass shows here at a quarter of its size; Live copy brings back the full-size copy.";
+  "While you edit, the glass shows here at a quarter of its size. Live copy brings back the full-size copy.";
 
 export interface TeleprompterEditViewProps {
   script: PrompterScriptSummary;
@@ -52,12 +58,12 @@ export function TeleprompterEditView({
   const glassParagraphs = onGlass && glassSnapshot ? glassSnapshot.paragraphs : null;
 
   const note = !glass
-    ? `Put on the prompter puts ${script.name} on the glass, at its own place. ${QUARTER}`
+    ? `Put on the prompter puts ${script.name} on the glass, at its own place.`
     : onGlass && glass.notUpdated
-      ? `The presenter reads the text that went on the glass until you update the prompter. On Update, the same words stay at the reading line. ${QUARTER}`
+      ? "The presenter reads the text that went on the glass until you update the prompter. On Update, the same words stay at the reading line."
       : onGlass
-        ? `Edits change Studio Control's copy first; the glass keeps its text until you update the prompter. ${QUARTER}`
-        : `Edits to ${script.name} change nothing on the glass. Replace on the prompter puts it on, at its own place. ${QUARTER}`;
+        ? "Edits change Studio Control's copy first; the glass keeps its text until you update the prompter."
+        : `Edits to ${script.name} change nothing on the glass. Replace on the prompter puts it on, at its own place.`;
 
   // Which paragraphs the glass does not show as they are, and how many of its
   // own the text no longer holds (the glass's paragraphs, matched once each).
@@ -88,8 +94,10 @@ export function TeleprompterEditView({
       />
       <aside className={styles.glassNow} aria-label="On the glass now" data-testid="teleprompter-glass-now">
         <div className={styles.head}>
-          <span className={styles.label}>On the glass now</span>
-          <span className={styles.detail}>{glass ? glass.name : "nothing"}</span>
+          <Tooltip content={QUARTER} placement="left">
+            <span className={styles.label}>On the glass now</span>
+          </Tooltip>
+          <span className={styles.detail}>{glass ? glass.name : "—"}</span>
         </div>
         <div className={styles.quarter} data-on-glass={snapshot.screen.draws ? "" : undefined}>
           <PrompterGlass
@@ -102,29 +110,55 @@ export function TeleprompterEditView({
           />
         </div>
         {glass ? (
-          <dl className={styles.readouts} data-well="">
-            <dt>Place</dt>
-            <dd>
-              {place ?? "—"} · {glass.playing ? "playing" : glass.atEnd ? "at the end" : "paused"}
-            </dd>
-            {onGlass ? (
-              <>
-                <dt>Edited since it went on</dt>
-                <dd data-edited={changed ? "" : undefined} data-testid="teleprompter-edited-list">
-                  {editedList}
-                </dd>
-                <dt>At the reading line</dt>
-                <dd data-testid="teleprompter-edited-reading-line">{marks.readingLine?.state ?? "—"}</dd>
-              </>
-            ) : (
-              <>
-                <dt>You are editing</dt>
-                <dd>{script.name}</dd>
-              </>
-            )}
-          </dl>
+          <Readouts
+            className={styles.readouts}
+            rows={[
+              { id: "place", label: "Place", value: place ?? "—" },
+              {
+                id: "run",
+                label: "The prompter",
+                value: (
+                  <LampWord tone={glass.playing ? "ok" : "off"}>
+                    {glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused"}
+                  </LampWord>
+                ),
+              },
+              ...(onGlass
+                ? [
+                    {
+                      id: "edited",
+                      label: "Edited since it went on",
+                      value: (
+                        <span
+                          className={styles.edited}
+                          data-edited={changed ? "" : undefined}
+                          data-testid="teleprompter-edited-list"
+                        >
+                          {editedList}
+                        </span>
+                      ),
+                    },
+                    {
+                      id: "reading-line",
+                      label: "At the reading line",
+                      value: (
+                        <span
+                          className={styles.lineState}
+                          data-edited={marks.readingLine && marks.readingLine.state !== "unchanged" ? "" : undefined}
+                          data-testid="teleprompter-edited-reading-line"
+                        >
+                          {marks.readingLine?.state ?? "—"}
+                        </span>
+                      ),
+                    },
+                  ]
+                : [{ id: "editing", label: "You are editing", value: script.name }]),
+            ]}
+          />
         ) : (
-          <p className={styles.nothing}>Nothing on the prompter</p>
+          <p className={styles.nothing}>
+            <LampWord tone="off">Nothing on the prompter</LampWord>
+          </p>
         )}
         <p className={styles.note} data-testid="teleprompter-edit-note">
           {note}

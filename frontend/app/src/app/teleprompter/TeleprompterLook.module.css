@@ -1,0 +1,37 @@
+/* The look (the visual overhaul, 2026-10-05): its values on the plate, and
+   the popover that changes them beside the section. */
+
+.section {
+  flex: none;
+  min-width: 0;
+}
+
+.opener {
+  display: inline-flex;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* A choice's words at the left, its choices at the right, one row. */
+.choiceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.choiceLabel {
+  min-width: 0;
+  color: var(--text-text);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+.choices {
+  flex: none;
+  min-width: 136px;
+}
