@@ -37,14 +37,17 @@
 
 /* The tier's head: a section head (DESIGN.md §7) that also pages the banks.
    Laid out at zero width and filled to the tier, it never sets the tier's
-   width: the strips do. */
+   width: the strips do. The visual overhaul's polish (2026-10-05): its title,
+   bank keys and ⋯ stand on one foot 4 px above the heavy rule, as a Section
+   head with a key does (they were centred, the ⋯ 3 px off the rule). */
 .head {
   display: flex;
-  align-items: center;
+  align-items: end;
   gap: 12px;
   width: 0;
   min-width: 100%;
   height: 34px;
+  padding-bottom: 4px;
   border-bottom: 2px solid var(--material-line2);
   cursor: pointer;
 }

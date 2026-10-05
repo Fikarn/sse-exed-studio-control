@@ -164,7 +164,7 @@ fn a_recording_cam_1_that_stops_answering_is_left_recording() {
         cameras.refused("cameras.record.stop", json!({ "confirm": true })),
         refusal(
             "CAMERA_UNREACHABLE",
-            "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC."
+            "CAM 1 does not answer over Bluetooth. Check it is on and within reach."
         )
     );
     assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);

@@ -1,14 +1,16 @@
 /* The Console's plate (visual overhaul, the Console): the selection on one
    plate that never scrolls. Sections by type and the heavy rule, rows on
-   hairlines, wells only round the graph and the meter. */
+   hairlines, wells only round the graph and the meter. The visual overhaul's
+   polish (2026-10-05): the plates' shared rhythm, a 16 px gap and 16 16 20
+   padding, as Cameras', the Teleprompter's and Setup's (it was 20 and 16). */
 
 .plate {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   height: 100%;
   min-height: 0;
-  padding: 16px;
+  padding: 16px 16px 20px;
   overflow: hidden;
 }
 
@@ -102,12 +104,23 @@
   color: var(--role-yellow-text);
 }
 
+/* A send the desk has not confirmed: doubt, the dashed yellow keyline on the
+   value (DESIGN.md §4), as Cameras' plate draws a last-read value. An outline,
+   so nothing moves; the row's 10 px gap has room for it. */
+.mixValue[data-doubt] {
+  outline: 1px dashed var(--role-yellow-line);
+  outline-offset: 2px;
+  border-radius: var(--radius-base);
+}
+
 /* ---- Meter: the stereo meter and its readouts ---- */
 
+/* The readouts hang from the meter's top edge, on their hairlines like the
+   other mixes' rows (the polish, 2026-10-05: they floated at its middle). */
 .meterCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 16px;
 }
 
@@ -146,5 +159,5 @@
 .outputPlate {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }

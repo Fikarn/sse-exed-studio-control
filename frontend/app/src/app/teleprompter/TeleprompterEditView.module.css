@@ -1,6 +1,9 @@
 /* The bay's editor view (new pages program, Slice 6b; board 1's Edit
    script): the editor, and a 480 px column with the glass a quarter of its
-   size and what the edits change on it. */
+   size and what the edits change on it. The polish (2026-10-05): it keeps
+   the page's margin, as the rows over and under the live copy do (the shell,
+   overhaul 3, draws none in the bay), so the bar, the editor and the column
+   stand 16 px inside the bay's edges; its label in the strip's voice. */
 
 .view {
   display: grid;
@@ -8,6 +11,7 @@
   gap: 16px;
   flex: 1 1 auto;
   min-height: 0;
+  padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
 }
 
 .glassNow {
@@ -20,24 +24,13 @@
 .head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   height: 32px;
 }
 
 .label {
   color: var(--text-text3);
-  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
-  letter-spacing: var(--font-tracking-cap);
-  text-transform: uppercase;
-}
-
-.detail {
-  overflow: hidden;
-  color: var(--text-text);
-  font: var(--font-weight-bold) var(--font-size-label) / 1 var(--font-family-ui);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .quarter {

@@ -1,14 +1,16 @@
 import { useEffect, useRef } from "react";
 
-import { Button, Surface } from "@sse/design-system";
+import { Key } from "@sse/design-system";
 
 import styles from "../OperatorShell.module.css";
 import { useLiveCallback } from "./useLiveCallback";
 
 // Mirrors the DS Dialog focus contract (Dialog.tsx): trap Tab inside the modal,
-// close on Escape, and restore focus to the trigger on unmount. ShellDialog
-// keeps its hand-built Surface rendering (Slice 2 decision: augment, not
-// replace) so this adds the missing focus management without a visual change.
+// close on Escape, and restore focus to the trigger on unmount. The visual
+// overhaul's polish (2026-10-05): it is drawn as the design system's dialog
+// (the floating layer over a flat scrim, a 20 px PT Sans title, the sentence
+// in body type) with the design system's keys, and no backdrop blur. It keeps
+// its own markup for the window listener below.
 //
 // New pages program, Slice 3 (D6): the shell's window key handler used to catch
 // an Escape pressed after focus had left the dialog (a click on the backdrop, a
@@ -111,29 +113,27 @@ export function ShellDialog({
 
   return (
     <div className={styles.overlay} role="presentation">
-      <Surface
+      <section
         aria-labelledby="shell-dialog-title"
         aria-modal="true"
         className={styles.dialog}
-        padding="lg"
+        data-level="float"
+        data-material="plate"
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
-        tone="raised"
       >
-        <div className={styles.dialogTitle} id="shell-dialog-title">
+        <h2 className={styles.dialogTitle} id="shell-dialog-title">
           {title}
-        </div>
+        </h2>
         <p className={styles.dialogBody}>{body}</p>
         <div className={styles.dialogActions}>
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={onConfirm}>
+          <Key onClick={onCancel}>Cancel</Key>
+          <Key mode="primary" onClick={onConfirm}>
             {confirmLabel}
-          </Button>
+          </Key>
         </div>
-      </Surface>
+      </section>
     </div>
   );
 }

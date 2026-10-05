@@ -54,6 +54,7 @@ export interface AudioWorkspaceViewModel {
   };
   actionsAllowed: boolean;
   activeChannelGroups: AudioChannelGroupSelections;
+  /** The state display's sentence in the two resting states, SIMULATED and VERIFIED (no warning sentence). */
   appSummary: string;
   audioSnapshot: AudioSnapshot;
   bankStart: number;
@@ -110,6 +111,11 @@ export interface AudioWorkspaceViewModel {
     masterView: boolean;
     pfl: boolean;
   };
+  /**
+   * The desk has not confirmed what the page shows (DESIGN.md §4): the strips',
+   * the outputs' and the plate's levels carry the dashed yellow keyline.
+   */
+  valuesInDoubt: boolean;
   visibleStripCount: number;
   viewMode: "submix" | "master";
 }
@@ -156,6 +162,15 @@ const AUDIO_GROUP_LABELS: Record<AudioChannelGroup, string> = {
   remote: "Remote",
   talent: "Talent",
 };
+
+/**
+ * A group's word on screen ("FX"), as the tier's menu prints it. The visual
+ * overhaul's polish (2026-10-05): the plate's title plate printed the group's
+ * id ("group fx") under the same page's "FX".
+ */
+export function audioGroupLabel(group: AudioChannelGroup) {
+  return AUDIO_GROUP_LABELS[group];
+}
 
 const AUDIO_GROUP_ORDER: AudioChannelGroup[] = ["talent", "line", "bed", "fx", "remote"];
 
@@ -283,6 +298,40 @@ export function audioMeterSimulationState(snapshot: AudioSnapshot): AudioMeterSi
   return usesSimulatedMetering(snapshot) ? "simulated" : "live";
 }
 
+/**
+ * Whether the levels on the page are ones the desk has not confirmed. The
+ * visual overhaul's polish (2026-10-05; DESIGN.md §4, doubt is a dashed yellow
+ * keyline on the value itself): read from the hardware link's own words only —
+ * its console confidence is neither aligned nor verified (ASSUMED, SYNC
+ * NEEDED, a desk never read), it reports the desk unreachable (OFFLINE),
+ * or TotalMix reports the UFX III gone (DISCONNECTED). It is one flag for the
+ * whole desk: mapping `consoleLink.unconfirmedAddresses` to strips would mean
+ * reading OSC addresses, which is device logic and not the page's. A failed
+ * action on an aligned desk leaves the levels confirmed.
+ */
+export function audioValuesInDoubt(snapshot: AudioSnapshot): boolean {
+  const confidence = String(snapshot.consoleStateConfidence ?? "").toLowerCase();
+  return (
+    (confidence !== "aligned" && confidence !== "verified") ||
+    String(snapshot.status ?? "") === "attention" ||
+    snapshot.consoleLink?.connection === "disconnected"
+  );
+}
+
+/**
+ * The state display's sentence when nothing is wrong. The visual overhaul's
+ * polish (2026-10-05). Old: the app snapshot's summary ("Setup ready.", or in
+ * a studio build the hardware link's debug line), which was never the
+ * Console's. New: the Console's own resting line, short enough for the
+ * display's two lines (SIMULATED's is the first sentence of the hardware
+ * link's own simulated line).
+ */
+function restingSentence(status: ReturnType<typeof describeAudioStatus>) {
+  return status.label === "SIMULATED"
+    ? "Test mode: the console is simulated and nothing reaches TotalMix."
+    : "TotalMix is answering and the strips match the desk.";
+}
+
 export function isChannelFeedingMixTarget(channel: AudioChannelEntry, mixTargetId: string | null) {
   if (channel.mute || !mixTargetId) return false;
   return selectedChannelSendLevel(channel, mixTargetId) >= 0.01;
@@ -368,11 +417,11 @@ function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities
 }
 
 export function buildAudioViewModel({
-  appSnapshot,
   audioSnapshot,
   bankIndex,
   activeChannelGroups,
 }: {
+  /** No longer read (the polish, 2026-10-05): its summary was never the Console's sentence. */
   appSnapshot: SnapshotRecord | null;
   audioSnapshot: AudioSnapshot;
   bankIndex: number;
@@ -509,7 +558,7 @@ export function buildAudioViewModel({
       "hardware-inputs": activeHardwareInputGroups,
       "software-playback": activeSoftwarePlaybackGroups,
     },
-    appSummary: String(appSnapshot?.summary ?? audioSnapshot.summary ?? "Audio desk active."),
+    appSummary: restingSentence(status),
     audioSnapshot,
     bankStart,
     capabilities,
@@ -575,6 +624,7 @@ export function buildAudioViewModel({
       masterView: !capabilities.canUseMasterView,
       pfl: true,
     },
+    valuesInDoubt: audioValuesInDoubt(audioSnapshot),
     visibleStripCount,
     viewMode,
   };

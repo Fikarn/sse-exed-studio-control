@@ -29,17 +29,32 @@ test("renders startup and recovery fixture states", async ({ page }) => {
   await expect(page.getByText("What went wrong?")).toBeVisible();
   await expect(page.getByText("Where things are", { exact: true })).toBeVisible();
   await expect(page.getByText("Requested protocol")).toBeVisible();
-  await page.getByRole("button", { name: "App data" }).click();
+  // The visual overhaul's polish (2026-10-05): each folder's key stands on its
+  // path's row under Where things are and reads `Open`, so the keys are found
+  // by their ids (the plate's File paths went into that list).
+  await page.getByTestId("setup-recovery-open-app-data").click();
   await expect(page.getByText(/App data opened at/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-open-logs")).toBeVisible();
 
   await openFixture(page, "bootstrap-failed");
   await expect(page.getByTestId("setup-recovery-surface-state-display")).toContainText("STARTUP FAILED", {
     timeout: 10000,
   });
   await expect(page.getByText("What went wrong?")).toBeVisible();
-  await expect(page.getByText("File paths", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-paths")).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-open-backups")).toBeVisible();
+});
+
+// The visual overhaul's polish (2026-10-05): the screens before ready are not
+// Setup, so the header draws no tab as the current one, whichever page was
+// open last.
+test("no tab is the current one before ready", async ({ page }) => {
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  for (const fixture of ["startup-loading", "protocol-mismatch", "bootstrap-failed"]) {
+    await openFixture(page, fixture);
+    await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toBeVisible();
+    await expect(nav.locator('[aria-current="page"]'), fixture).toHaveCount(0);
+  }
 });
 
 // plan PR 6 / workstream D6: deeper assertions on the recovery surfaces
@@ -61,7 +76,7 @@ test("protocol-mismatch fixture exposes the documented diagnostic fields", async
 
   // Logs is the click-through that the operator uses to capture the
   // protocol-mismatch context.
-  await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-open-logs")).toBeVisible();
 });
 
 test("bootstrap-failed fixture surfaces archive + recovery affordances", async ({ page }) => {
@@ -73,8 +88,8 @@ test("bootstrap-failed fixture surfaces archive + recovery affordances", async (
   // The bootstrap-failed posture is the worst-case startup failure; the
   // operator needs an archive button to capture the runtime state for
   // hand-off + the runtime paths block to know where to look.
-  await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
-  await expect(page.getByText("File paths", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-open-backups")).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-paths")).toBeVisible();
 });
 
 test("startup-loading fixture hides every operator workspace surface", async ({ page }) => {
@@ -117,9 +132,10 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
     timeout: 10000,
   });
 
-  // The bay's sections, whole: they end on the screen. The shell (overhaul
-  // 3): the file paths are on the plate, and the last of them, the lowest
-  // text there is, ends on the screen too, with the plate unscrolled.
+  // The bay's sections, whole: they end on the screen. The visual overhaul's
+  // polish (2026-10-05): the file paths are the bay's last list, Where things
+  // are, and the last of them, the lowest text in the bay, ends on the screen
+  // too; the plate holds everything it shows, unscrolled.
   const cards = await page.getByTestId("setup-recovery-cards").boundingBox();
   expect(cards, "the sections should have a box").not.toBeNull();
   expect(cards!.y).toBeGreaterThanOrEqual(0);
@@ -186,9 +202,9 @@ test("every recovery band names a next step", async ({ page }) => {
   await expect(page.getByTestId("setup-recovery-retry")).toBeVisible();
 
   // Each band the surface shows carries an action or a named next step.
-  await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
-  await expect(page.getByText("File paths", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-open-backups")).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-open-logs")).toBeVisible();
+  await expect(page.getByTestId("setup-recovery-paths")).toBeVisible();
   await expect(page.getByRole("button", { name: /Export diagnostics/ }).first()).toBeVisible();
 });
 
@@ -204,6 +220,11 @@ test("the startup screen has no key (S3)", async ({ page }) => {
   const display = page.getByTestId(/startup-surface-state-display$/);
   await expect(display).toContainText("STARTING UP…");
   await expect(display.getByRole("button")).toHaveCount(0);
+  // The visual overhaul's polish (2026-10-05): the steps stand in the bay and
+  // the hardware's three checks on the plate, which has no key either.
+  await expect(page.getByTestId("startup-surface-bay").getByTestId("startup-steps")).toBeVisible();
+  await expect(page.getByTestId("startup-checks").locator("li")).toHaveCount(3);
+  await expect(page.getByTestId("startup-surface-plate").getByRole("button")).toHaveCount(0);
 });
 
 test("the recovery screen offers Reset the window layout beside Retry startup (S3, decision 2)", async ({ page }) => {

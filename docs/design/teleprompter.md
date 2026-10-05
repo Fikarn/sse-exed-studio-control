@@ -26,7 +26,7 @@ There is no third screen. Studio Control has no fallback (D12).
 | Standing actions    | Clear the prompter · press twice, at the foot; New script · Open file… · Paste as a new script in the page's ⋯ on the state display                                                                                                                                      |
 | Bay                 | the live copy of the Prompter XL's screen across the bay's full width, 1,680 × 945 (87.5 % of its pixels, the shell's bay since 2026-10-03); under it the script bar, the cue keys and Go to paragraph                                                                   |
 | Plate (440)         | the selected script (name and numbers, its ⋯; one key: Put on the prompter, or Replace / Update · press twice), the scripts with a ⋯ each (Removed is a view of the section's ⋯), then the look's values with Change…, a popover                                         |
-| Footer (40)         | `Prompter XL 1920×1080 · 60 Hz` · `On the glass Interview intro` · `Place ¶ 7 of 18 · 42 %` · `Speed 140 words/min` · `Left 3:12`, and `Prompter XL…`, the screen as Windows reports it                                                                                  |
+| Footer (40)         | `Prompter XL 1920×1080 · 60 Hz` and `Prompter XL…`, the screen as Windows reports it (since the visual overhaul's polish the place, the speed and the time left stand only in the bay's strip and the take block)                                                        |
 
 As on every page, nothing on it shows a key or a key hint (D6).
 
@@ -205,15 +205,15 @@ Setup / Support › Workstation shows the same facts in one line: `Prompter XL �
 
 ## 8. States
 
-| Word             | Tone      | Sentence (proposed)                                                                                                                                               | Way out                                   |
-| ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `ON SCREEN`      | ok        | "The Prompter XL shows Interview intro." followed by "Playing at 140 words a minute." / "Paused at paragraph 7 of 18." / "At the end."                            | —                                         |
-| `READY`          | ok        | "The Prompter XL is connected and blank. Choose a script and put it on the prompter."                                                                             | Put on the prompter (the selected script) |
-| `NOT UPDATED`    | attention | "Interview intro was edited after it went on the prompter. The prompter still shows the earlier text."                                                            | Update the prompter · press twice         |
-| `LOW RESOLUTION` | attention | "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080 in Windows' display settings for the sharpest text."                                               | —                                         |
-| `NOT CONNECTED`  | error     | "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen."        | —                                         |
-| `DUPLICATED`     | error     | "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays."        | —                                         |
-| `NOT SHOWING`    | error     | "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself." (the reason in small type) | —                                         |
+| Word             | Tone      | Sentence (two lines at most: the polish, D39)                                                                                                      | Way out                                   |
+| ---------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `ON SCREEN`      | ok        | "Interview intro is on the glass." followed by "Playing at 140 words a minute." / "Paused at paragraph 7 of 18." / "At the end."                   | —                                         |
+| `READY`          | ok        | "The Prompter XL is connected and blank. Put a script on it." ("… There is no script yet." with none)                                              | Put on the prompter (the selected script) |
+| `NOT UPDATED`    | attention | "Edited since it went on: the prompter still shows the earlier text."                                                                              | Update the prompter · press twice         |
+| `LOW RESOLUTION` | attention | "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080."                                                                                   | —                                         |
+| `NOT CONNECTED`  | error     | "Windows does not see the Prompter XL. Check its USB-C cable (15 W)." The script and the place are kept, and nothing is shown on any other screen. | —                                         |
+| `DUPLICATED`     | error     | "The Prompter XL mirrors another screen. Choose Extend these displays." (in Windows' display settings)                                             | —                                         |
+| `NOT SHOWING`    | error     | "The window on the Prompter XL does not show. It opens again by itself." (the reason at the plate's foot)                                          | —                                         |
 
 The armed row sits under the word, as it does on the Console: `Replace Intro with Outro on the prompter · press again · 4.5 s`. The header lamp shows the worst of these states: `Prompter ok`, `Prompter · not updated` or `Prompter · not connected`. `PLAY` locks while the Prompter XL is not connected, and every run key locks while nothing is on the prompter. A locked key takes the locked form (a dashed outline at 55 %) and shows its reason within reach.
 

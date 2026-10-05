@@ -77,9 +77,11 @@ async function renderRunner(controlSurface: JsonObject, runnerStage: "import" | 
   render(<PilotOnStore store={store} controlSurface={controlSurface} runnerStage={runnerStage} />);
 }
 
-/** The lamp of a Setup record row, found by the row's label. */
-function rowLamp(label: string) {
-  return screen.getByText(label).querySelector("[data-lamp]")?.getAttribute("data-lamp");
+/** How a Setup record row stands, found by the row's label. The visual
+ *  overhaul's polish (2026-10-05): the row carries no lamp beside its label
+ *  any more; its tone colours the value's words when it is not ok. */
+function rowTone(label: string) {
+  return screen.getByText(label).closest("[data-tone]")?.getAttribute("data-tone");
 }
 
 afterEach(() => {
@@ -87,19 +89,19 @@ afterEach(() => {
 });
 
 describe("Setup reads the Stream Deck bridge in the hardware link's words", () => {
-  it("Import: a serving bridge is lit ok, a bridge that could not bind is not", async () => {
+  it("Import: a serving bridge stands ok, a bridge that could not bind stands in fault", async () => {
     await renderRunner(SERVING);
-    expect(rowLamp("Companion link")).toBe("ok");
+    expect(rowTone("Companion link")).toBe("ok");
     cleanup();
 
     await renderRunner(REFUSED);
-    expect(rowLamp("Companion link")).toBe("attention");
+    expect(rowTone("Companion link")).toBe("error");
   });
 
-  it("Publish: a serving bridge is lit ok", async () => {
+  it("Publish: a serving bridge stands ok", async () => {
     await renderRunner(SERVING, "publish");
     await screen.findByRole("heading", { name: "Publish" });
-    expect(rowLamp("Companion profile")).toBe("ok");
+    expect(rowTone("Deck's bridge")).toBe("ok");
   });
 });
 

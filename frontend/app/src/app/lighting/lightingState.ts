@@ -18,7 +18,8 @@ export interface LightingStateInput {
   channelCount: number;
   fixtureOnCount: number;
   fixtureTotal: number;
-  /** When the page last saved a scene, on the studio's clock. */
+  /** When the page last saved a scene, on the studio's clock. The footer says
+   *  it (`saved · last 17:20`); the display no longer does. */
   lastSavedLabel: string | null;
   /** The light outputs are held: the hardware link sends the rig nothing. */
   outputsHeld?: boolean;
@@ -26,6 +27,7 @@ export interface LightingStateInput {
   previewMode: boolean;
   sceneModified: boolean;
   sceneName: string | null;
+  /** The bridge's universe. The footer says it (`Universe 1`); the display no longer does. */
   universe: number;
 }
 
@@ -34,34 +36,32 @@ export interface LightingState {
   tone: StateDisplayTone;
   /** The sentence under the word: what is true, in the operator's words. */
   sentence: string;
-  /** The line under the sentence: the scene, and when it was saved. */
+  /** The line under the sentence: the scene. */
   meta: string;
   /** True while the rig refuses writes: every rig control is outlined. */
   locked: boolean;
-  /** The short phrase a locked surface prints where the hand is. */
-  lockNote: string | null;
 }
 
+// The visual overhaul's polish (2026-10-05, the owner's rule): the state
+// display's sentence keeps at most two lines, so every sentence here holds at
+// most 70 characters (a 15-character bridge address included), says what
+// happened and what to do, and leaves the action to the way-out key beside it.
+// The meta line beside that key holds about 30 characters: it names the scene
+// alone. The universe and when the scene was saved are the footer's.
 export function deriveLightingState({
   bridgeIp,
   bridgeReachable,
   bridgeAnswering = null,
   bridgeSilentLabel = null,
-  lastSavedLabel,
   outputsHeld = false,
   previewDirty,
   previewMode,
   sceneModified,
   sceneName,
-  universe,
 }: LightingStateInput): LightingState {
-  const target = bridgeIp.trim() ? `${bridgeIp} · universe ${universe}` : `universe ${universe}`;
-  // The visual overhaul (2026-10-04): the line names the scene and when it was
-  // saved; how many fixtures are on is the LIGHTING key's, the channels the
-  // footer's.
-  const meta = sceneName
-    ? `Scene ${sceneName}${lastSavedLabel ? ` · saved ${lastSavedLabel}` : ""}`
-    : "No scene recalled";
+  const address = bridgeIp.trim();
+  const bridge = address ? `Bridge ${address}` : "The bridge";
+  const meta = sceneName ? `Scene ${sceneName}` : "No scene recalled";
 
   // UNREACHABLE is the probe's word: the bridge has not passed Setup's probe
   // (or its address changed since). The hardware link refuses a recall then,
@@ -72,10 +72,9 @@ export function deriveLightingState({
     return {
       word: "UNREACHABLE",
       tone: "error",
-      sentence: `The bridge at ${target} has not passed its probe, so recalls are refused.`,
+      sentence: `${bridge} has not passed its probe: recalls are refused.`,
       meta,
       locked: true,
-      lockNote: "locked · the bridge has not passed its probe",
     };
   }
 
@@ -85,14 +84,13 @@ export function deriveLightingState({
       tone: "info",
       // Saving puts the preview into the scene, never onto the rig: the rig
       // takes it when the scene is recalled (until 2026-09-28 this sentence
-      // said the save would reach the rig).
+      // said the save would reach the rig). The scene is the meta line's.
       sentence:
         previewDirty && sceneName
-          ? `You are editing offline. Save puts the edits into ${sceneName}; the rig takes them when it is recalled.`
+          ? "Editing offline: saved edits reach the rig when the scene is recalled."
           : "You are editing offline. The rig is unchanged.",
       meta,
       locked: false,
-      lockNote: null,
     };
   }
 
@@ -104,18 +102,19 @@ export function deriveLightingState({
   // is news whether the outputs are held or not, and the sentence then names
   // the hold too (the review of #260). It points at the bridge, never at
   // Setup's probe: a probe that fails mid-session locks the rig, which is what
-  // the owner ruled out, and the word clears by itself.
+  // the owner ruled out, and the word clears by itself. Held as well, Open
+  // Setup is the way to arm, so the sentence names the hold and leaves the
+  // way to the key.
   if (bridgeAnswering === false) {
     const since = bridgeSilentLabel ? ` since ${bridgeSilentLabel}` : "";
     return {
       word: "NOT ANSWERING",
       tone: "attention",
       sentence: outputsHeld
-        ? `The bridge at ${target} has not answered${since}, and the outputs are held until armed in Setup / Support. Check its power and cable.`
-        : `The bridge at ${target} has not answered${since}. Nothing is locked; this clears when it answers. Check its power and cable.`,
+        ? `The bridge has not answered${since}, and the outputs are held.`
+        : `The bridge has not answered${since}. Check its power and cable.`,
       meta,
       locked: false,
-      lockNote: null,
     };
   }
 
@@ -128,32 +127,28 @@ export function deriveLightingState({
     return {
       word: "HELD",
       tone: "attention",
-      sentence: "The light outputs are held: nothing is sent to the rig until they are armed in Setup / Support.",
+      sentence: "The light outputs are held: nothing is sent to the rig until armed.",
       meta,
       locked: false,
-      lockNote: null,
     };
   }
 
+  // The two ways back are the keys beside it: Save changes, Recall it again.
   if (sceneModified) {
     return {
       word: "UNSAVED",
       tone: "attention",
-      sentence: sceneName
-        ? `The rig no longer matches ${sceneName}. Save the changes into it, or recall it again to put them back.`
-        : "The rig no longer matches any saved scene.",
+      sentence: sceneName ? `The rig no longer matches ${sceneName}.` : "The rig no longer matches any saved scene.",
       meta,
       locked: false,
-      lockNote: null,
     };
   }
 
   return {
     word: "REACHABLE",
     tone: "ok",
-    sentence: `The bridge at ${target} is answering and the rig is following it.`,
+    sentence: `${bridge} is answering and the rig is following it.`,
     meta,
     locked: false,
-    lockNote: null,
   };
 }

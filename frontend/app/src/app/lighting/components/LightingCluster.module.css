@@ -73,3 +73,10 @@
   display: flex;
   flex: none;
 }
+
+/* The visual overhaul's polish (2026-10-05): the key at the column's foot
+   spans it, as the Teleprompter's Clear and Setup's Run all probes do; it
+   keeps its 28 px, and no longer changes width with its small print. */
+.foot > * {
+  flex: 1 1 auto;
+}

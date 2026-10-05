@@ -95,6 +95,26 @@ async function gotoFixture(page: Page, fixture: string) {
   );
 }
 
+/**
+ * The polish (2026-10-05, the owner's rule): the state display keeps its
+ * sentence to two lines and its meta beside the way-out key, and every
+ * sentence and meta is written to fit, so none is cut on any fixture.
+ */
+async function assertStateDisplayWhole(page: Page, fixture: string) {
+  const cut = await page.evaluate(() => {
+    const display = document.querySelector('[data-region="state-display"]');
+    if (!display) return null;
+    const sentence = display.querySelector<HTMLElement>("[data-state-sentence]");
+    const meta = display.querySelector<HTMLElement>("[data-state-meta]");
+    return {
+      sentence: sentence && sentence.scrollHeight > sentence.clientHeight + 1 ? sentence.textContent : null,
+      meta: meta && meta.scrollWidth > meta.clientWidth + 1 ? meta.textContent : null,
+    };
+  });
+  expect(cut?.sentence ?? null, `${fixture}: the state display's sentence is cut`).toBeNull();
+  expect(cut?.meta ?? null, `${fixture}: the state display's meta is cut`).toBeNull();
+}
+
 async function assertViewportFit(page: Page, size: Viewport, fixture: string) {
   const metrics = await page.evaluate(() => ({
     bodyScrollHeight: document.body?.scrollHeight ?? 0,
@@ -184,6 +204,7 @@ test.describe(`viewport ${STUDIO.label}`, () => {
       }
 
       await assertViewportFit(page, STUDIO, fixture);
+      await assertStateDisplayWhole(page, fixture);
       await expect(page).toHaveScreenshot(`${fixture}-${STUDIO.label}.png`, {
         mask: masksFor(page, fixture),
         maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
@@ -244,6 +265,27 @@ const STATE_FIXTURES = [
   "setup-map-prompter",
 ] as const;
 
+// The fixtures no capture draws: their state display says the whole of its
+// sentence and meta too (the polish, 2026-10-05).
+const UNCAPTURED_STATE_FIXTURES = [
+  "audio-osc-disabled",
+  "audio-ready-overview",
+  "audio-selected-channel",
+  "lighting-patch-overlap",
+  "lighting-populated-noselect",
+] as const;
+
+test.describe("the state display's sentence and meta, whole", () => {
+  test.use({ viewport: { width: 2560, height: 1440 } });
+
+  for (const fixture of UNCAPTURED_STATE_FIXTURES) {
+    test(fixture, async ({ page }) => {
+      await gotoFixture(page, fixture);
+      await assertStateDisplayWhole(page, fixture);
+    });
+  }
+});
+
 test.describe("state coverage", () => {
   test.use({ viewport: { width: 2560, height: 1440 } });
 
@@ -251,6 +293,7 @@ test.describe("state coverage", () => {
     test(`${fixture} @ 2560x1440`, async ({ page }) => {
       await gotoFixture(page, fixture);
       await assertViewportFit(page, { width: 2560, height: 1440, label: "2560x1440" }, fixture);
+      await assertStateDisplayWhole(page, fixture);
       await expect(page).toHaveScreenshot(`${fixture}-2560x1440.png`, {
         mask: masksFor(page, fixture),
         maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,

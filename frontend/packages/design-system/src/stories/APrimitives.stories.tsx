@@ -1,26 +1,31 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Bell, Ellipsis, Lightbulb, Pencil, Pin, Plus, Save, Trash2 } from "lucide-react";
+import { Bell, Ellipsis, Pencil, Pin, Plus, Save, Trash2 } from "lucide-react";
 
 import { Button } from "../components/Button";
-import { ColorPicker } from "../components/ColorPicker";
+import { ColorPicker, type ColorPickerSwatch } from "../components/ColorPicker";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { Crest } from "../components/Crest";
 import { Drawer } from "../components/Drawer";
+import { EmptyLine } from "../components/EmptyLine";
 import { Footer } from "../components/Footer";
 import { IconButton } from "../components/IconButton";
 import { ArmKey, Key, Segmented } from "../components/Key";
+import { Lamp, type LampTone } from "../components/Lamp";
 import { LampChip } from "../components/LampChip";
 import { LampWord, Latch, LatchSlot } from "../components/LampWord";
 import { Menu, type MenuEntry } from "../components/Menu";
 import { MenuButton } from "../components/MenuButton";
 import { Meter } from "../components/Meter";
-import { DegradedState, EmptyState, LoadingState } from "../components/OperationalState";
+import { LoadingState } from "../components/OperationalState";
 import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../components/Plate";
 import { Popover } from "../components/Popover";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { Groove, Slider } from "../components/Slider";
 import { StateDisplay } from "../components/StateDisplay";
 import { StatusBadge } from "../components/StatusBadge";
+import { Tab } from "../components/Tab";
+import { Tally } from "../components/Tally";
 import { Toast } from "../components/Toast";
 import { Tooltip } from "../components/Tooltip";
 import type { UseArmResult } from "../components/useArm";
@@ -30,8 +35,9 @@ import { Field, Readout, Screen } from "../components/Well";
 // 1; `docs/DESIGN.md`). Each board is a column-wrapping row of cards at the
 // cluster's inner width, on the one surface, and fits 2560×1440 without
 // scrolling. The page tests measure every board (ui-contract.spec.ts) and
-// capture the Sheet, which holds them all, and the board of the menus and
-// overlays open (storybook.spec.ts).
+// capture the Sheet, which holds them all but the header's, the Shell board,
+// which holds those, and the board of the menus and overlays open
+// (storybook.spec.ts).
 
 /** A card stands at the cluster's inner width (424 less its 24 px gutters). */
 const CARD_WIDTH = 376;
@@ -125,6 +131,7 @@ function KeyCards() {
           <Key mode="toggle" cap="Dim" engaged={engaged} onClick={() => setEngaged((v) => !v)} take />
           <Key mode="momentary" cap="Hold" live take />
           <Key mode="toggle" cap="Mono" locked reason={LOCK_REASON} take />
+          <Key mode="toggle" cap="Solo" engaged locked reason={LOCK_REASON} take />
           <Key mode="primary" locked reason="Nothing has changed since the scene was saved.">
             Save scene
           </Key>
@@ -275,7 +282,7 @@ function StateCards() {
           tone="ok"
           word="VERIFIED"
           sentence="Console · TotalMix on the UFX III"
-          meta="42 values confirmed · last sync 18:24"
+          meta="42 values confirmed"
           menu={
             <MenuButton
               buttonLabel="Audio menu"
@@ -390,7 +397,7 @@ function StateCards() {
         <div style={{ ...row, gap: 4 }}>
           <LampChip label="Surface" word="READY" tone="ok" />
           <LampChip label="Solo" word="LATCHED" tone="attention" latch />
-          <LampChip label="Lighting" word="NO BRIDGE" tone="error" />
+          <LampChip label="Lighting" word="UNREACHABLE" tone="error" />
           <LampChip label="Cameras" word="NOT SET UP" tone="neutral" />
           <LampChip label="Audio" word="ASSUMED" tone="attention" onClick={() => {}} />
         </div>
@@ -553,7 +560,7 @@ function PlateCards() {
       <Card title="Section · a title, then a detail">
         <div style={sections}>
           <Section title="Monitor">
-            <ControlRow label="Main level" value="+2.1 dB">
+            <ControlRow label="Main level" value="+2.1" unit="dB">
               <Slider label="Main level on the plate" value={0.86} unity={0.8172} />
             </ControlRow>
           </Section>
@@ -587,38 +594,16 @@ function PlateCards() {
           </Section>
         </div>
       </Card>
-      <Card title="EmptyState · no box, one key">
-        <EmptyState
-          title="No fixtures on the rig yet"
-          message="Add a fixture or import a profile."
-          action={{ label: "Add fixture", onClick: () => {} }}
-        />
-        <EmptyState
-          icon={Lightbulb}
-          title="No scene chosen"
-          message="Pick a scene in the rail to edit it."
-          action={{ label: "Show scenes", onClick: () => {}, variant: "ghost" }}
-        />
-        <div style={{ width: 280 }}>
-          <EmptyState
-            title="No cameras found"
-            message="Search for the cameras in Setup."
-            action={{ label: "Open Setup", onClick: () => {} }}
-          />
-        </div>
-      </Card>
-      <Card title="DegradedState · a yellow keyline">
-        <DegradedState
-          title="Bridge unreachable"
-          message="Lighting commands wait until the bridge answers."
-          actions={<Key size="small">Retry</Key>}
-        />
-        <div style={{ width: 280 }}>
-          <DegradedState
-            title="Bridge unreachable"
-            message="Commands wait for the bridge."
-            actions={<Key size="small">Retry</Key>}
-          />
+      {/* The visual overhaul's polish (2026-10-05): every empty list or
+          section is one EmptyLine; EmptyState and DegradedState, with their
+          icons, are used by no page and left the board. */}
+      <Card title="EmptyLine · words, a tooltip, the lamp, one key">
+        <EmptyLine>No other mix</EmptyLine>
+        <EmptyLine tip="A group switches its fixtures together.">No groups yet</EmptyLine>
+        <EmptyLine lamp>Nothing on the prompter</EmptyLine>
+        <EmptyLine action={<Key size="small">Add fixture…</Key>}>No fixtures on the rig yet</EmptyLine>
+        <div style={{ width: 200 }}>
+          <EmptyLine tip="Set the rig, then save it as a new scene.">No scenes saved yet in this show</EmptyLine>
         </div>
       </Card>
       <Card title="LoadingState · still bars">
@@ -651,6 +636,55 @@ function PlateCards() {
             onCancel={() => setConfirm(false)}
           />
         ) : null}
+      </Card>
+    </>
+  );
+}
+
+const LAMP_TONES: ReadonlyArray<readonly [LampTone, string]> = [
+  ["ok", "live and ok"],
+  ["attention", "engaged and attention"],
+  ["error", "error and hazard"],
+  ["info", "information"],
+  ["off", "off"],
+];
+
+// The visual overhaul's polish (2026-10-05): the shell's own primitives, on a
+// board of their own because the Sheet has no room for another card (the old
+// "Design System/Primitives" boards, which drew them with legacy looks, are
+// gone). The tabs with their pages' lamps and words and the locked tab the
+// screens before ready use; the lamps, each with its word; the REC tally in
+// its four states; the header's logotype.
+function ShellCards() {
+  return (
+    <>
+      <Card title="Tab · locked, a word, the open page, a value">
+        <div style={row}>
+          <Tab id="setup" label="Setup / Support" disabled />
+          <Tab id="lighting" label="Lighting" word="unreachable" tone="error" />
+          <Tab id="audio" label="Audio" active />
+          <Tab id="cameras" label="Cameras" word="not set up" tone="attention" />
+          <Tab id="teleprompter" label="Teleprompter" word="playing" value="2:31 left" tone="ok" />
+        </div>
+      </Card>
+      <Card title="Lamp · five tones, each with its word">
+        <div style={{ ...row, gap: 16 }}>
+          {LAMP_TONES.map(([tone, word]) => (
+            <span key={tone} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <Lamp tone={tone} />
+              <span style={quiet}>{word}</span>
+            </span>
+          ))}
+        </div>
+      </Card>
+      <Card title="Tally · at rest, recording, last known, not read">
+        <Tally name="REC" state={null} />
+        <Tally name="REC" state={{ detail: "CAM 1", tone: "error" }} />
+        <Tally name="REC" state={{ detail: "last known", tone: "attention", doubt: true }} />
+        <Tally name="REC" state={{ detail: "not read while released", tone: "attention" }} />
+      </Card>
+      <Card title="Crest · the header's logotype">
+        <Crest size="header" />
       </Card>
     </>
   );
@@ -746,6 +780,18 @@ const HELD_ARM: UseArmResult = {
 };
 
 const ISO_VALUES = ["200", "400", "800", "1600"];
+
+/** The eight colour tags (the owner's word, 2026-10-05): identity, not status, each in its stored slot. */
+const TAG_SWATCHES: readonly ColorPickerSwatch[] = [
+  { index: 0, name: "Clay", hex: "var(--tag-0)" },
+  { index: 1, name: "Ochre", hex: "var(--tag-1)" },
+  { index: 2, name: "Sand", hex: "var(--tag-2)" },
+  { index: 3, name: "Olive", hex: "var(--tag-3)" },
+  { index: 4, name: "Slate", hex: "var(--tag-4)" },
+  { index: 5, name: "Mist", hex: "var(--tag-5)" },
+  { index: 6, name: "Plum", hex: "var(--tag-6)" },
+  { index: 7, name: "Heather", hex: "var(--tag-7)" },
+];
 
 const valueRow: CSSProperties = {
   display: "flex",
@@ -873,20 +919,11 @@ function OverlaysOpen() {
       <ColorPicker
         x={560}
         y={1072}
-        swatches={[
-          { index: 0, name: "Sage", hex: "#99BA92" },
-          { index: 1, name: "Sand", hex: "#EDEBD1" },
-          { index: 2, name: "Sun", hex: "#F2DE6F" },
-          { index: 3, name: "Ember", hex: "#FF7D55" },
-          { index: 4, name: "Sky", hex: "#3A87E5" },
-          { index: 5, name: "Moss", hex: "#5E8A6A" },
-          { index: 6, name: "Clay", hex: "#CAA363" },
-          { index: 7, name: "Slate", hex: "#8D9389" },
-        ]}
+        swatches={TAG_SWATCHES}
         selectedIndex={2}
         onSelect={none}
         onClose={none}
-        ariaLabel="Pick a color tag for scene Warm wash"
+        ariaLabel="Pick a colour for scene Warm wash"
       />
 
       <At x={1080} y={1040}>
@@ -939,6 +976,14 @@ export const PlateAndOverlaysBoard: Story = {
   render: () => (
     <div style={board}>
       <PlateCards />
+    </div>
+  ),
+};
+export const ShellBoard: Story = {
+  name: "Shell",
+  render: () => (
+    <div style={board}>
+      <ShellCards />
     </div>
   ),
 };

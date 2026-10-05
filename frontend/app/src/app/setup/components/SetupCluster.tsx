@@ -36,7 +36,7 @@ export interface SetupClusterStep {
   hint: string;
   /** `done`, `current`, `pending` or `failed`: the lamp and the word read off it. */
   standing: "done" | "current" | "pending" | "failed";
-  /** The step the runner shows: the Beige selection. */
+  /** The step the runner shows, while the bay shows the runner: the Beige selection. */
   shown: boolean;
   /** A press on it arms first: the setup is published and the press would move it. */
   armsFirst: boolean;

@@ -214,12 +214,14 @@ export function formatLifecycleLabel(lifecycle: ShellState["lifecycle"]) {
   switch (lifecycle) {
     case "launching-process":
       return "Starting up";
+    // The polish (2026-10-05): the hardware link by its name, and no
+    // developer words (DESIGN §9).
     case "waiting-for-ready-event":
-      return "Waiting for Studio Control to answer";
+      return "Waiting for the hardware link to answer";
     case "waiting-for-health-snapshot":
-      return "Loading the health checks";
+      return "Reading the diagnostics";
     case "waiting-for-app-snapshot":
-      return "Loading workspaces";
+      return "Loading the pages";
     case "ready":
       return "Ready";
     case "failed":
@@ -263,6 +265,19 @@ export function formatShortTimestamp(value: string | number) {
   }).format(parsed);
 }
 
+/**
+ * The probes by the hardware they reach (DESIGN §9: name the hardware). The
+ * hardware link labels them "Control Surface Probe", "Lighting Bridge Probe"
+ * and "Audio OSC Probe"; Setup's rows, its record and its lines say the deck,
+ * the bridge and TotalMix, as the publish record and the fields beside them
+ * do (the polish, 2026-10-05).
+ */
+const PROBE_NAMES: Record<string, string> = {
+  "control-surface": "Deck",
+  lighting: "Lighting bridge",
+  audio: "TotalMix",
+};
+
 export function getCommissioningChecks(snapshot: SnapshotRecord | null): CommissioningCheck[] {
   const checks = snapshot?.checks;
   if (!Array.isArray(checks)) {
@@ -275,12 +290,13 @@ export function getCommissioningChecks(snapshot: SnapshotRecord | null): Commiss
       return [];
     }
 
+    const id = String(record.id ?? record.label ?? "check");
     return [
       {
         checkedAt: typeof record.checkedAt === "string" ? record.checkedAt : undefined,
         detail: String(record.detail ?? record.message ?? "Pending"),
-        id: String(record.id ?? record.label ?? "check"),
-        label: String(record.label ?? "Status"),
+        id,
+        label: PROBE_NAMES[id] ?? String(record.label ?? "Status"),
         status: asStatusTone(
           record.status === "passed" ? "ok" : record.status === "failed" ? "attention" : record.status,
           "attention"
@@ -664,7 +680,8 @@ export interface WorkspaceStateTones {
 const TONE_RANK: Record<StatusToneLike, number> = { error: 3, attention: 2, info: 1, ok: 0 };
 
 /** What the Lighting workspace shows as its own state, for the header lamp:
- *  no bridge, then held light outputs (Slice 11 — only an explicit `false` is a
+ *  unreachable (the bridge has not passed its probe: the page's own word since
+ *  the polish, 2026-10-05), then held light outputs (Slice 11 — only an explicit `false` is a
  *  hold, as on the hardware link, and it outranks an unsaved scene because
  *  nothing reaches the rig at all), then an unsaved scene. */
 export function deriveLightingWorkspaceTone(
@@ -672,7 +689,7 @@ export function deriveLightingWorkspaceTone(
   sceneDrift: boolean
 ): WorkspaceStateTone | null {
   if (lightingSnapshot?.reachable === false) {
-    return { tone: "error", word: "no bridge" };
+    return { tone: "error", word: "unreachable" };
   }
   // The bridge watch (2026-09-29): a bridge that stopped answering during the
   // session is amber and locks nothing, and it outranks a hold, as on the page.
@@ -704,7 +721,8 @@ export function buildMonitorItems(
   healthSnapshot: SnapshotRecord | null,
   latched?: LatchedShellState,
   workspaceTones?: WorkspaceStateTones,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  unread?: "pending" | "not read"
 ) {
   const checks =
     healthSnapshot && typeof healthSnapshot.checks === "object" && healthSnapshot.checks
@@ -794,6 +812,27 @@ export function buildMonitorItems(
     },
   ];
 
+  // Before ready (the polish, 2026-10-05): a check never read is a quiet,
+  // hollow lamp with the screen's own word, `pending` while the app starts
+  // and `not read` after a failed start, as the start-up steps and the
+  // recovery plate print it; never the yellow of doubt.
+  if (unread) {
+    const read: Record<string, unknown> = {
+      lighting: checks.lighting?.status,
+      audio: checks.audio?.status,
+      cameras: camerasCheck?.status,
+      prompter: prompterCheck?.status,
+      surface: checks.controlSurface?.status,
+    };
+    for (const item of items) {
+      if (read[item.id] === undefined) {
+        item.status = "neutral";
+        item.detail = unread;
+        item.value = undefined;
+      }
+    }
+  }
+
   // Found, to check (2026-09-28): an automatic backup that failed, or none for
   // two days, lit no lamp. A chip after the five lamps, only while it is so:
   // D19's five lamps stand as they are, and a press opens Setup / Support,
@@ -853,7 +892,8 @@ export interface HeaderItem {
   detail: string;
   /** A value after the word that changes, in PT Sans. */
   value?: string;
-  status: "ok" | "attention" | "error" | "info";
+  /** `neutral` only before ready, for a check never read. */
+  status: "ok" | "attention" | "error" | "info" | "neutral";
   target?: string;
   /** The page whose tab carries this lamp. */
   tab?: string;
@@ -874,11 +914,17 @@ export interface HeaderItem {
 export function headerItems(items: readonly HeaderItem[], activeWorkspace: string) {
   const rec = items.find((item) => item.id === "latched:rec") ?? null;
   const lightingWord = items.find((item) => item.id === "lighting")?.detail;
-  const lamps = items.filter((item) => {
-    if (item === rec) return false;
-    if (item.page !== undefined && item.page === activeWorkspace) return false;
-    if (item.id === "latched:scene-drift" && lightingWord === "unsaved") return false;
-    return true;
-  });
+  const lamps = items
+    .filter((item) => {
+      if (item === rec) return false;
+      if (item.page !== undefined && item.page === activeWorkspace) return false;
+      if (item.id === "latched:scene-drift" && lightingWord === "unsaved") return false;
+      return true;
+    })
+    // The polish (2026-10-05): Lighting has a Solo of its own, latched in its
+    // own latch slot, so there the Console's latch says whose it is.
+    .map((item) =>
+      item.id === "latched:solo" && activeWorkspace === "lighting" ? { ...item, label: "Audio solo" } : item
+    );
   return { lamps, rec };
 }

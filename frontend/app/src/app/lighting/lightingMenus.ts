@@ -1,4 +1,5 @@
 import type { MenuContent, MenuEntry } from "@sse/design-system";
+import type { LightingPaletteKind } from "@sse/engine-client";
 
 import { deleteArmId } from "./editor/useLightingArming";
 import { lightingColorTagName } from "./lightingColorTags";
@@ -9,7 +10,10 @@ import { lightingColorTagName } from "./lightingColorTags";
 // (`menu={{ ...menu, arm }}`) and owns the dialogs an item opens. The
 // "Delete …" items are the menu's destructive item: they arm in place, and the
 // second press deletes (every delete here can be undone, or is a group, which
-// leaves its fixtures in the rig).
+// leaves its fixtures in the rig). The visual overhaul's polish (2026-10-05):
+// a fixture's and a group's power is a toggle that says its value (`Light …
+// on`, `Group … off`, DESIGN.md §9), as their plate keys do; until then it
+// read "Turn off" or "Turn on".
 
 export type LightingMenu = Omit<MenuContent, "arm">;
 
@@ -113,9 +117,11 @@ export function buildGroupMenu(options: GroupMenuOptions): LightingMenu {
     head: { title: group.name, detail },
     items: [
       {
+        kind: "check",
         id: "power",
-        label: group.on ? "Turn off" : "Turn on",
-        onSelect: options.onTogglePower,
+        label: "Group",
+        checked: group.on,
+        onCheckedChange: () => options.onTogglePower(),
         testId: `${testIdPrefix}-power`,
       },
       { id: "inspect", label: "Show on the plate", onSelect: options.onInspect, testId: `${testIdPrefix}-inspect` },
@@ -170,9 +176,11 @@ export function buildFixtureMenu(options: FixtureMenuOptions): LightingMenu {
   const rotation = Math.round(fixture.spatialRotation ?? 0);
   const items: MenuEntry[] = [
     {
+      kind: "check",
       id: "power",
-      label: fixture.on ? "Turn off" : "Turn on",
-      onSelect: options.onTogglePower,
+      label: "Light",
+      checked: fixture.on,
+      onCheckedChange: () => options.onTogglePower(),
       testId: `${testIdPrefix}-power`,
     },
     {
@@ -246,7 +254,8 @@ export function buildFixtureMenu(options: FixtureMenuOptions): LightingMenu {
 }
 
 export interface PaletteMenuOptions {
-  palette: { id: string; name: string; colorIndex?: number | null };
+  /** A colour-temperature palette (`kind: "cct"`) shows no tag, so its menu offers no Colour…. */
+  palette: { id: string; name: string; colorIndex?: number | null; kind?: LightingPaletteKind };
   detail: string;
   first: boolean;
   last: boolean;
@@ -261,39 +270,44 @@ export interface PaletteMenuOptions {
 
 export function buildPaletteMenu(options: PaletteMenuOptions): LightingMenu {
   const { palette, detail, first, last, lockedReason = null, testIdPrefix } = options;
+  const items: MenuEntry[] = [
+    {
+      id: "edit",
+      label: "Edit…",
+      onSelect: options.onEdit,
+      disabledReason: lockedReason,
+      testId: `${testIdPrefix}-edit`,
+    },
+    {
+      id: "earlier",
+      label: "Move earlier",
+      onSelect: options.onMoveEarlier,
+      disabledReason: lockedReason ?? (first ? "it is first" : null),
+      testId: `${testIdPrefix}-earlier`,
+    },
+    {
+      id: "later",
+      label: "Move later",
+      onSelect: options.onMoveLater,
+      disabledReason: lockedReason ?? (last ? "it is last" : null),
+      testId: `${testIdPrefix}-later`,
+    },
+  ];
+  // The visual overhaul's polish (2026-10-05): a colour-temperature palette's
+  // dot is its colour, so it offers no tag that would show nowhere.
+  if (palette.kind !== "cct") {
+    items.push({
+      id: "colour",
+      label: "Colour…",
+      value: colourValue(palette.colorIndex),
+      onSelect: options.onColour,
+      disabledReason: lockedReason,
+      testId: `${testIdPrefix}-colour`,
+    });
+  }
   return {
     head: { title: palette.name, detail },
-    items: [
-      {
-        id: "edit",
-        label: "Edit…",
-        onSelect: options.onEdit,
-        disabledReason: lockedReason,
-        testId: `${testIdPrefix}-edit`,
-      },
-      {
-        id: "earlier",
-        label: "Move earlier",
-        onSelect: options.onMoveEarlier,
-        disabledReason: lockedReason ?? (first ? "it is first" : null),
-        testId: `${testIdPrefix}-earlier`,
-      },
-      {
-        id: "later",
-        label: "Move later",
-        onSelect: options.onMoveLater,
-        disabledReason: lockedReason ?? (last ? "it is last" : null),
-        testId: `${testIdPrefix}-later`,
-      },
-      {
-        id: "colour",
-        label: "Colour…",
-        value: colourValue(palette.colorIndex),
-        onSelect: options.onColour,
-        disabledReason: lockedReason,
-        testId: `${testIdPrefix}-colour`,
-      },
-    ],
+    items,
     destructive: {
       id: deleteArmId.palette(palette.id),
       label: "Delete palette…",

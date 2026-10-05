@@ -125,7 +125,14 @@ describe("Setup's Verify step and the deck's four pages", () => {
     await user.click(within(step()).getByRole("button", { name: "DIM key" }));
 
     press("/api/deck/audio-action", "dialPress", "3");
-    await waitFor(() => expect(pulsing()).toEqual(["DIAL 3"]));
+    // The visual overhaul's polish (2026-10-05): a dial's push prints Push
+    // under its strip cell; its name says which dial it is.
+    await waitFor(() =>
+      expect(
+        [...step().querySelectorAll<HTMLElement>('[data-echo="true"]')].map((cell) => cell.getAttribute("aria-label"))
+      ).toEqual(["DIAL 3 dial push"])
+    );
+    expect(pulsing()).toEqual(["Push"]);
     expect(tab("AUDIO").getAttribute("data-active")).toBe("true");
     expect(within(step()).getByRole("button", { name: "DIM key" }).getAttribute("data-selected")).toBe("true");
     await store.dispose();

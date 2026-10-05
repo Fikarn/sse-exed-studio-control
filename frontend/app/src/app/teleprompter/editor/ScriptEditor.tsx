@@ -687,11 +687,10 @@ export function ScriptEditor({
             ) : null}
           </>
         ) : null}
+        {/* The polish (2026-10-05): what an edit does to the glass is the note
+            beside the editor's alone, so the status line no longer repeats it. */}
         <span className={styles.saved} data-testid="teleprompter-editor-saved" data-save={save.kind}>
           {status}
-        </span>
-        <span className={styles.note}>
-          {onGlass ? "Studio Control's copy · the glass changes only on Update" : "Not on the prompter"}
         </span>
       </div>
     </div>

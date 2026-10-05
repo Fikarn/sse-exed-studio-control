@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
-import { Field, Key, LampWord, Readouts, Section, type LampTone } from "@sse/design-system";
+import { Field, Key, LampWord, Readouts, Section } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
 
 import {
@@ -8,7 +8,6 @@ import {
   describeBackupKind,
   formatBackupTimestamp,
   getSupportBackups,
-  healthCheckTone,
   RESTORE_HOLD_SENTENCE,
   type SnapshotRecord,
   withRestoreDetail,
@@ -16,12 +15,12 @@ import {
 import { exportShellDiagnostics, openShellPath, resetWindowLayout } from "../shellCommands";
 import { RestoreConfirmDialog, restoreKindOf, type RestorePrompt } from "./components/RestoreConfirmDialog";
 import { useLiveCallback } from "../shared/useLiveCallback";
+import { HardwareChecks } from "../startup/HardwareChecks";
 import { PreReadyState } from "../startup/PreReadyState";
 import styles from "./SetupRecoverySurface.module.css";
 import {
   type ActionFeedback,
-  formatFailureCode,
-  formatFailureStage,
+  formatFailureMeta,
   formatFileSize,
   formatPathLabel,
   getFailureTitle,
@@ -40,17 +39,22 @@ const BACKUPS_A_PAGE = 8;
 /** The log's last lines the plate has room for. */
 const LOG_LINES = 12;
 
-/** A check of the hardware, as the recovery plate prints it: one word with its lamp. */
-function checkWord(status: unknown, failed: boolean): { word: string; tone: LampTone } {
-  // Nothing was read: a start that failed reads no health at all (the
-  // handshake fails before it), so the three say so, not doubt.
-  if (status === undefined) return failed ? { word: "not read", tone: "off" } : { word: "pending", tone: "off" };
-  const tone = healthCheckTone(status);
-  if (tone === "ok") return { word: "ready", tone: "ok" };
-  if (tone === "error") return { word: "failed", tone: "error" };
-  if (tone === "attention") return { word: "needs attention", tone: "attention" };
-  return { word: "pending", tone: "off" };
-}
+/** Why Restore path is locked for an archive, under the key and as its reason. */
+const ARCHIVE_REFUSED = "The path is a backup archive. While the saved data does not open, choose a database backup.";
+
+/** The places "Where things are" lists, in this order; any other the hardware link sends follows them. */
+const PLACE_ORDER = ["backupDir", "appDataDir", "logsDir", "logFilePath", "dbPath", "exportsDir"];
+/** The folders a key opens, on the folder's own row: the action and the key's test id (the ids from before). */
+const FOLDER_KEYS: Record<string, { actionId: string; testId: string }> = {
+  backupDir: { actionId: "open-archive", testId: "setup-recovery-open-backups" },
+  appDataDir: { actionId: "open-app-data", testId: "setup-recovery-open-app-data" },
+  logsDir: { actionId: "open-logs", testId: "setup-recovery-open-logs" },
+  exportsDir: { actionId: "open-diagnostics", testId: "setup-recovery-open-diagnostics" },
+};
+const placeRank = (key: string) => {
+  const rank = PLACE_ORDER.indexOf(key);
+  return rank === -1 ? PLACE_ORDER.length : rank;
+};
 
 export function SetupRecoverySurface({
   appSnapshot,
@@ -96,13 +100,13 @@ export function SetupRecoverySurface({
   // archive was refused.
   const lastBackup = backups.find((backup) => backup.kind === "database") ?? null;
   const storageFailed = failure?.code === "STORAGE_CORRUPT" || failure?.code === "STORAGE_MIGRATION_FAILED";
+  // The visual overhaul's polish (2026-10-05): the page's own sentence fits
+  // the display's two lines; Retry startup, beside it, names the first way out.
   const summary =
     failure?.message ??
-    String(
-      healthSnapshot?.summary ?? "Studio Control needs operator recovery. Retry startup, or restore the latest backup."
-    );
+    String(healthSnapshot?.summary ?? "Studio Control did not start. If a retry fails, restore a backup.");
   const detailEntries = Object.entries(asRecord(healthSnapshot?.details) ?? {});
-  const pathEntries = Object.entries(runtimePaths);
+  const pathEntries = Object.entries(runtimePaths).sort(([left], [right]) => placeRank(left) - placeRank(right));
   const recentLogExcerpt = readLogExcerpt(healthSnapshot?.recentLogExcerpt).slice(-LOG_LINES);
   // The hardware link answers the backup requests here only in recovery
   // mode — after a storage failure it stays up for exactly that (2026-09
@@ -114,19 +118,6 @@ export function SetupRecoverySurface({
   // archive in the field is locked here, with the reason on screen, rather
   // than refused by the hardware link after the question.
   const archiveRefused = storageFailed && chosenPath !== "" && restoreKindOf(chosenPath, backups) === "archive";
-  // Slice 8 (system §9): name the hardware. The deck, the bridge and the desk.
-  const diagnosticsChecks = [
-    { key: "controlSurface", label: "The deck" },
-    { key: "lighting", label: "The bridge" },
-    { key: "audio", label: "The desk" },
-  ].map(({ key, label }) => {
-    const check = asRecord(asRecord(healthSnapshot?.checks)?.[key]);
-    return {
-      detail: String(check?.summary ?? `${label} reported nothing at startup.`),
-      label,
-      ...checkWord(check?.status, failure !== null),
-    };
-  });
   // What the restore can do here, said before the keys, so a locked key never
   // reads as one that would work.
   const restoreHint = storageFailed
@@ -165,7 +156,7 @@ export function SetupRecoverySurface({
         }
       } catch (error) {
         setFeedback({
-          message: error instanceof Error ? error.message : "The incident recovery action failed.",
+          message: error instanceof Error ? error.message : "The action failed.",
           tone: "error",
         });
       } finally {
@@ -211,14 +202,17 @@ export function SetupRecoverySurface({
     };
   };
 
-  const folder = (label: string, path: string, actionId: string, testId: string) => (
+  // A folder's key, on its row: the row names the place, so the key reads
+  // `Open`, and its accessible name says which.
+  const folder = (name: string, path: string, actionId: string, testId: string) => (
     <Key
       size="small"
+      aria-label={`Open ${name.toLowerCase()}`}
       disabled={!path.trim() || busy}
       testId={testId}
-      onClick={() => void performAction(actionId, () => openReferencePath(label, path))}
+      onClick={() => void performAction(actionId, () => openReferencePath(name, path))}
     >
-      {label}
+      Open
     </Key>
   );
 
@@ -235,7 +229,7 @@ export function SetupRecoverySurface({
       word={getFailureTitle(failure).toUpperCase()}
       sentence={summary}
       code={failure?.code ?? undefined}
-      meta={`${formatFailureCode(failure)} · ${failure ? `at ${formatFailureStage(failure.stage)}` : "while running"}`}
+      meta={formatFailureMeta(failure)}
       actions={
         <Key size="small" mode="primary" testId="setup-recovery-retry" onClick={onRequestRestart}>
           Retry startup
@@ -276,17 +270,9 @@ export function SetupRecoverySurface({
       plate={
         <div className={styles.column} data-testid="setup-recovery-diagnostics">
           <Section title="Diagnostics">
-            <ul className={styles.checks}>
-              {diagnosticsChecks.map((check) => (
-                <li key={check.label} className={styles.check}>
-                  <span className={styles.checkTitle}>{check.label}</span>
-                  <LampWord tone={check.tone} className={styles.checkWord}>
-                    {check.word}
-                  </LampWord>
-                  <span className={styles.hint}>{check.detail}</span>
-                </li>
-              ))}
-            </ul>
+            {/* The visual overhaul's polish (2026-10-05): the start-up plate's
+                list as well; a check never read is its name and NOT READ. */}
+            <HardwareChecks healthSnapshot={healthSnapshot} failed={failure !== null} />
             <div className={styles.keys}>
               <Key
                 size="small"
@@ -322,27 +308,8 @@ export function SetupRecoverySurface({
                 ))}
               </ul>
             ) : (
-              <p className={styles.hint}>
-                Startup failed before Studio Control could write detailed incident evidence.
-              </p>
+              <p className={styles.hint}>Startup failed before the hardware link reported what happened.</p>
             )}
-          </Section>
-
-          <Section title="File paths">
-            <ul className={styles.list} data-testid="setup-recovery-paths">
-              {pathEntries.length > 0 ? (
-                pathEntries.map(([key, value]) => (
-                  <li key={key}>
-                    <span className={styles.listLabel}>{formatPathLabel(key)}</span>
-                    <span className={styles.hint}>{value}</span>
-                  </li>
-                ))
-              ) : (
-                <li>
-                  <span className={styles.hint}>No file paths were attached to this startup failure.</span>
-                </li>
-              )}
-            </ul>
           </Section>
 
           {recentLogExcerpt.length > 0 ? (
@@ -378,6 +345,11 @@ export function SetupRecoverySurface({
         </Section>
 
         <Section title="Restore">
+          {/* The visual overhaul's polish (2026-10-05): each key under what it
+              acts on, Restore latest under the latest backup and Restore path
+              under the field (they stood together under the left half, 700 px
+              from the field). A refusal is the locked form, its reason the
+              sentence printed above it; `disabled` is only the busy moment. */}
           <div className={styles.restore}>
             <div className={styles.latest}>
               <Readouts
@@ -409,33 +381,45 @@ export function SetupRecoverySurface({
                 />
               }
             />
-          </div>
-          <div className={styles.keys}>
-            <Key
-              disabled={!engineRequestsAvailable || !lastBackup || busy}
-              testId="setup-recovery-restore-latest"
-              onClick={() => {
-                if (!lastBackup) {
-                  return;
+            <div className={styles.keys}>
+              <Key
+                locked={!engineRequestsAvailable || !lastBackup}
+                reason={!engineRequestsAvailable ? restoreHint : "No database backup yet."}
+                disabled={busy}
+                testId="setup-recovery-restore-latest"
+                onClick={() => {
+                  if (!lastBackup) {
+                    return;
+                  }
+                  setRestorePrompt({ actionId: "restore-latest", path: lastBackup.path });
+                }}
+              >
+                Restore latest…
+              </Key>
+            </div>
+            <div className={styles.pathKeys}>
+              <Key
+                locked={!engineRequestsAvailable || !chosenPath || archiveRefused}
+                reason={
+                  archiveRefused
+                    ? ARCHIVE_REFUSED
+                    : !engineRequestsAvailable
+                      ? restoreHint
+                      : "Name a file inside the backups folder."
                 }
-                setRestorePrompt({ actionId: "restore-latest", path: lastBackup.path });
-              }}
-            >
-              Restore latest…
-            </Key>
-            <Key
-              disabled={!engineRequestsAvailable || !chosenPath || archiveRefused || busy}
-              testId="setup-recovery-restore-path"
-              onClick={() => setRestorePrompt({ actionId: "restore-path", path: chosenPath })}
-            >
-              Restore path…
-            </Key>
+                disabled={busy}
+                testId="setup-recovery-restore-path"
+                onClick={() => setRestorePrompt({ actionId: "restore-path", path: chosenPath })}
+              >
+                Restore path…
+              </Key>
+              {archiveRefused ? (
+                <p className={styles.reason} data-testid="setup-recovery-archive-refused">
+                  {ARCHIVE_REFUSED}
+                </p>
+              ) : null}
+            </div>
           </div>
-          {archiveRefused ? (
-            <p className={styles.reason} data-testid="setup-recovery-archive-refused">
-              The path is a backup archive. While the saved data does not open, choose a database backup.
-            </p>
-          ) : null}
         </Section>
 
         <Section
@@ -449,7 +433,11 @@ export function SetupRecoverySurface({
                 const chosen = backup.path === chosenPath;
                 return (
                   <li key={backup.path}>
-                    {/* A press puts the backup's path in the field; nothing is restored. */}
+                    {/* A press puts the backup's path in the field; nothing is restored.
+                        The visual overhaul's polish (2026-10-05): the row leads
+                        with the backup's local time and kind, as Support's and
+                        the restore question name it; the file name (its time in
+                        UTC, which read against the local one) follows, quiet. */}
                     <button
                       className={styles.backupRow}
                       aria-pressed={chosen}
@@ -458,10 +446,11 @@ export function SetupRecoverySurface({
                       onClick={() => setRestorePath(backup.path)}
                       type="button"
                     >
-                      <span className={styles.backupName}>{backup.name}</span>
-                      <span className={styles.backupMeta}>
-                        {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
-                        {describeBackupKind(backup.kind)}
+                      <span className={styles.backupWhen}>
+                        {formatBackupTimestamp(backup.modifiedAt)} · {describeBackupKind(backup.kind)}
+                      </span>
+                      <span className={styles.backupMeta} data-cut-by-design="">
+                        {formatFileSize(backup.sizeBytes)} · {backup.name}
                       </span>
                     </button>
                   </li>
@@ -470,8 +459,7 @@ export function SetupRecoverySurface({
             </ol>
           ) : (
             <p className={styles.hint}>
-              No backup list was published before startup failed. Name a file inside the backups folder above and
-              restore it directly.
+              No backup list came before startup failed. Type a backup's path in the field above and restore it.
             </p>
           )}
           {pages > 1 ? (
@@ -501,18 +489,33 @@ export function SetupRecoverySurface({
           ) : null}
         </Section>
 
+        {/* The visual overhaul's polish (2026-10-05): one list of the places,
+            each path on its row with the key that opens its folder. The bay's
+            keys and the plate's File paths named the same folders twice, and
+            the exports folder by two names. */}
         <Section title="Where things are">
-          <div className={styles.keys}>
-            {folder("Backups", String(runtimePaths.backupDir ?? ""), "open-archive", "setup-recovery-open-backups")}
-            {folder("App data", String(runtimePaths.appDataDir ?? ""), "open-app-data", "setup-recovery-open-app-data")}
-            {folder(
-              "Diagnostics",
-              String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""),
-              "open-diagnostics",
-              "setup-recovery-open-diagnostics"
+          <ul className={styles.places} data-testid="setup-recovery-paths">
+            {pathEntries.length > 0 ? (
+              pathEntries.map(([key, value]) => {
+                const name = formatPathLabel(key);
+                const path = String(value);
+                const opens = FOLDER_KEYS[key];
+                return (
+                  <li key={key} className={styles.place}>
+                    <span className={styles.placeName}>{name}</span>
+                    <span className={styles.placePath}>{path}</span>
+                    {opens ? folder(name, path, opens.actionId, opens.testId) : null}
+                  </li>
+                );
+              })
+            ) : (
+              <li className={styles.place}>
+                <span className={`${styles.hint} ${styles.placeNone}`}>
+                  No file paths were attached to this startup failure.
+                </span>
+              </li>
             )}
-            {folder("Logs", String(runtimePaths.logsDir ?? ""), "open-logs", "setup-recovery-open-logs")}
-          </div>
+          </ul>
         </Section>
       </div>
 

@@ -529,10 +529,12 @@ export function useLightingSceneEditor({
     if (!bridgeReachable && !previewMode) {
       // Skip the IPC entirely when the bridge is unreachable — the engine
       // would just reject it. Surface a single non-error toast so the
-      // operator knows recall is preview-only and not a failed action.
+      // operator knows recall is preview-only and not a failed action. The
+      // visual overhaul's polish (2026-10-05): in UNREACHABLE's words; it said
+      // "not answering", which is another state's word.
       toast.push({
         message:
-          "The bridge is not answering, so this only shows what the scene holds. Open Setup to check the bridge.",
+          "The bridge has not passed its probe, so this only shows what the scene holds. Open Setup to check the bridge.",
         tone: "attention",
       });
       return;

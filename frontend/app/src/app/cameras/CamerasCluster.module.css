@@ -1,12 +1,14 @@
 /* The Cameras page's cluster: board 2's left column. The state display first
    and fixed, the latch slot, the take under it, the three cameras, what the
    deck's dials set, the pictures and the Recent list. The visual overhaul
-   (2026-10-05): every colour and size is the design system's. */
+   (2026-10-05): every colour and size is the design system's. Its polish:
+   the column keeps the 16 px rhythm every page's cluster keeps, so the latch
+   slot stands where it stands on every other page. */
 
 .cluster {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;
@@ -21,24 +23,28 @@
   flex: none;
 }
 
-/* While CAM 1 records the key is a hazard: the red lamp beside the word,
-   the hint under them. */
+/* While CAM 1 records the key is a hazard: the coral lamp beside the word,
+   the hint under them. The polish (2026-10-05): a row that wraps, so the lamp
+   stands 8 px from REC and the pair is centred on the key; the grid it
+   replaces let the hint widen the lamp's track, and the lamp stood far from
+   its word. The row direction is said, since the stack's is a column. */
 .rec[data-key-mode="hazard"] {
-  display: grid;
-  grid-template-columns: auto auto;
+  flex-direction: row;
+  flex-wrap: wrap;
   align-content: center;
   justify-content: center;
-  column-gap: 10px;
-  row-gap: 10px;
+  column-gap: 8px;
+  row-gap: 6px;
 }
 
 .rec[data-key-mode="hazard"] > span:last-child {
-  grid-column: 1 / -1;
+  flex-basis: 100%;
   justify-content: center;
 }
 
 /* Doubt on the take-time key: the last thing CAM 1 reported, not a fact now.
-   The dashed yellow keyline at full strength: it is to be read. */
+   The dashed yellow keyline at full strength: it is to be read. Under the
+   cap one line, in yellow: when it was last known and why STOP is locked. */
 .recDoubt {
   opacity: 1;
   border: 1px dashed var(--role-yellow-line);
@@ -50,13 +56,8 @@
   border-color: var(--role-yellow-line);
 }
 
-.recDoubt > span:nth-child(2) {
-  color: var(--text-text);
-}
-
-.recWhy {
+.recDoubt > span:last-child {
   color: var(--role-yellow-text);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 /* What is known about the take: label · value rows on hairlines, one line
@@ -72,8 +73,9 @@
   gap: 8px;
 }
 
+/* The value in the readouts' regular weight (the polish, 2026-10-05). */
 .takeValue b {
-  font: 700 var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  font: 400 var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   color: var(--text-text);
 }
@@ -147,13 +149,16 @@
   outline-offset: 2px;
 }
 
-/* The tag and the words; the row leaves the ⋯ its room at the right. */
+/* The tag and the words; the row leaves the ⋯ its room at the right. The
+   polish (2026-10-05): 24 px, the tag's 20 with the ⋯ centred beside it, so
+   the column's 16 px rhythm has its room above the Recent list's five rows
+   at two lines each. */
 .cameraHead {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
-  min-height: 28px;
+  min-height: 24px;
   padding-right: 36px;
 }
 
@@ -170,11 +175,13 @@
   min-width: 0;
 }
 
+/* The polish (2026-10-05): the small facts on the keys and in the Recent
+   rows are label 14, the secondary facts' size; tick 13 is the plot's. */
 .cameraMeta {
   min-width: 0;
   overflow: hidden;
   color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -201,7 +208,7 @@
 
 .cameraValuesTag {
   flex: none;
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .cameraValues[data-kind="doubt"] {
@@ -304,6 +311,6 @@
 
 .recentSource {
   color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.15 var(--font-family-ui);
   white-space: nowrap;
 }

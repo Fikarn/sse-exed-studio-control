@@ -1,7 +1,7 @@
-import { SetupStepScreen, SetupFactCard, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
+import { SetupStepScreen, SetupFactCard, SetupRecordSection, SetupRecordRow } from "../components/SetupStepScreen";
 import { formatBackupTimestamp, healthCheckTone } from "../../shellData";
 import { Key } from "@sse/design-system";
-import { runnerStepOrder } from "../setupPilotModel";
+import { hardwareProfileWord } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
 /** Runner step 5: publish the setup, which unlocks the pages and exports a backup. */
@@ -12,7 +12,6 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
     lastBackup,
     startup,
     isReady,
-    backups,
     busyAction,
     lightingBridgeIp,
     lightingUniverse,
@@ -22,28 +21,33 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
     pages,
     totalControlCount,
     controlSurface,
-    echoControlId,
   } = editor.state;
-  const { bayHead, notPassedProbes, backKey, setupState, publishOverrideRecorded, clusterSteps } = editor.chrome;
+  const { stepEyebrow, notPassedProbes, backKey, setupState, publishOverrideRecorded } = editor.chrome;
   const { invokePrimaryAction } = editor.actions;
   const overriding = notPassedProbes.length > 0;
+  // The deck's bridge: its address, and its standing only when it is not ok.
+  const bridge = healthCheckTone(controlSurface?.status);
   return (
     <>
       {activeStepId === "publish" ? (
         <SetupStepScreen
-          head={bayHead}
-          eyebrow={`Step ${runnerStepOrder.length} of ${runnerStepOrder.length}`}
+          eyebrow={stepEyebrow}
           title="Publish"
           lead="Publishing unlocks Lighting, Audio, Cameras and Teleprompter, exports a backup and opens the Console. Once published, the deck's pages, the bridge and the desk are live for the next session."
-          rules={[
-            {
-              id: "probes",
-              text: overriding
-                ? `${notPassedProbes.length} of ${setupState.probeCount} probes have not passed: publishing asks first, and records the override with the time.`
-                : "Every probe passed.",
-              tone: overriding ? "attention" : "ok",
-            },
-          ]}
+          // The visual overhaul's polish (2026-10-05): a rule only while a
+          // press needs it read; "Every probe passed." said again what the
+          // state display, the Probes section and the footer say.
+          rules={
+            overriding
+              ? [
+                  {
+                    id: "probes",
+                    text: `${notPassedProbes.length} of ${setupState.probeCount} probes have not passed: publishing asks first, and records the override with the time.`,
+                    tone: "attention",
+                  },
+                ]
+              : []
+          }
           facts={
             <>
               <SetupFactCard
@@ -81,14 +85,17 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
           // What the press changes, while it changes something.
           note={!isReady && !overriding ? "Publish exports a backup, then opens the Console." : undefined}
           record={
-            <>
-              {/* What publish commits, as the hardware link holds it: the
-                  addresses and the counts, not a repeat of the probe
-                  sentences the cluster already prints. */}
-              <SetupRecordHeading>What publish records</SetupRecordHeading>
+            // What publish commits, as the hardware link holds it: the
+            // addresses and the counts, not a repeat of the probe sentences
+            // the cluster already prints. The visual overhaul's polish
+            // (2026-10-05): "The steps above, as done" and the backups went
+            // (the cluster's steps print each step's word, the latest backup
+            // is the fact beside the keys and the plate's), and a value is
+            // coloured only when it stands in doubt or in fault.
+            <SetupRecordSection title="What publish records">
               <SetupRecordRow
                 label="Hardware profile"
-                value={String(commissioningSnapshot?.hardwareProfile ?? "not reported")}
+                value={hardwareProfileWord(commissioningSnapshot?.hardwareProfile, "not reported")}
               />
               <SetupRecordRow
                 label="Lighting bridge"
@@ -104,10 +111,13 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
                 value={`${pages.length} pages · ${totalControlCount} controls`}
                 tone={pages.length > 0 ? "ok" : "attention"}
               />
+              {/* The bridge's own address (its sentence when it reports
+                  none); whether the deck's export is current is the
+                  cluster's Control surface probe's word. */}
               <SetupRecordRow
-                label="Companion profile"
-                value={String(controlSurface?.summary ?? "not exported yet")}
-                tone={healthCheckTone(controlSurface?.status) === "ok" ? "ok" : "attention"}
+                label="Deck's bridge"
+                value={String(controlSurface?.baseUrl ?? controlSurface?.summary ?? "not reported")}
+                tone={bridge === "ok" || bridge === "error" ? bridge : "attention"}
               />
               <SetupRecordRow
                 label="Override"
@@ -115,40 +125,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
                 tone={publishOverrideRecorded ? "attention" : "off"}
                 testId={publishOverrideRecorded ? "setup-publish-override-note" : undefined}
               />
-              <SetupRecordHeading>The steps above, as done</SetupRecordHeading>
-              {clusterSteps.slice(0, -1).map((step, index) => (
-                <SetupRecordRow
-                  key={step.id}
-                  label={`${index + 1} · ${step.label}`}
-                  value={
-                    step.id === "probe"
-                      ? `${setupState.passedProbeCount} of ${setupState.probeCount} probes passed`
-                      : step.id === "import"
-                        ? String(controlSurface?.summary ?? "not exported yet")
-                        : step.id === "map"
-                          ? `${pages.length} pages · ${totalControlCount} controls mapped`
-                          : echoControlId
-                            ? "a control echoed"
-                            : "not confirmed this session"
-                  }
-                  tone={step.standing === "done" ? "ok" : step.standing === "failed" ? "error" : "attention"}
-                />
-              ))}
-              <SetupRecordHeading>Backups</SetupRecordHeading>
-              {backups.length > 0 ? (
-                backups
-                  .slice(0, 3)
-                  .map((backup) => (
-                    <SetupRecordRow
-                      key={backup.path}
-                      label={backup.name}
-                      value={formatBackupTimestamp(backup.modifiedAt)}
-                    />
-                  ))
-              ) : (
-                <SetupRecordRow label="None yet" value="Publish exports one" tone="attention" />
-              )}
-            </>
+            </SetupRecordSection>
           }
           testId="setup-screen-publish"
         />

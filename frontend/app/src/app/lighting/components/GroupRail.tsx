@@ -2,7 +2,7 @@ import { useState } from "react";
 import { DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
-import { Key, type MenuContent } from "@sse/design-system";
+import { EmptyLine, Key, type MenuContent } from "@sse/design-system";
 
 import type { LightingMenu } from "../lightingMenus";
 import { GroupKey } from "./GroupKey";
@@ -79,8 +79,14 @@ export function GroupRail({
     onReorderGroup(String(active.id), at + 1 < order.length ? order[at + 1]! : null);
   };
 
+  // The visual overhaul's polish (2026-10-05): the design system's empty line,
+  // one line, its hint the words' tooltip (DESIGN.md §9).
   if (groups.length === 0) {
-    return <p className={styles.empty}>No groups yet. A group switches its fixtures together.</p>;
+    return (
+      <EmptyLine tip="A group switches its fixtures together." className={styles.emptyLine}>
+        No groups yet
+      </EmptyLine>
+    );
   }
 
   if (needle && filtered.length === 0) {

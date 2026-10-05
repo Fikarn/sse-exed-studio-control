@@ -1,7 +1,10 @@
 /* The Teleprompter's plate (new pages program, Slice 6a; the visual
    overhaul, 2026-10-05): the selected script's title plate and its one key,
    the scripts as rows with a ⋯ each, the look. Nothing scrolls: a long list is
-   paged, and the versions and the look's settings open beside the plate. */
+   paged, and the versions and the look's settings open beside the plate.
+   The polish (2026-10-05): the scripts are rows divided by hairlines (DESIGN
+   §5: lists are never cards, the well is for displays), the selected one in
+   the one 2 px keyline round the row and its ⋯. */
 
 .plate {
   display: flex;
@@ -15,6 +18,11 @@
 
 .plateKey {
   display: inline-flex;
+}
+
+/* A fact of the title plate's line: it never breaks inside itself. */
+.subPart {
+  white-space: nowrap;
 }
 
 /* The one key under the title, at one height whatever it is. */
@@ -39,24 +47,24 @@
   margin: 0;
 }
 
-.none {
-  padding: 8px 0;
-  color: var(--text-text3);
-  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
-}
-
 .scripts {
   flex: none;
   min-height: 0;
 }
 
+/* The rows touch, a hairline over the first and under each: 48 px a row. */
 .scriptList {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--material-line);
   list-style: none;
+}
+
+.scriptList > li {
+  border-bottom: 1px solid var(--material-line);
 }
 
 /* A script's row: the row selects, its ⋯ stands inside its edge. */
@@ -79,29 +87,29 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  min-height: 48px;
+  min-height: 47px;
   padding: 4px 48px 4px 12px;
-  border: 1px solid var(--material-line);
+  border: 0;
   border-radius: var(--radius-base);
-  background: var(--material-well);
+  background: none;
   color: var(--text-text);
   text-align: left;
   cursor: pointer;
 }
 
 .scriptRow:hover {
-  border-color: var(--text-text4);
+  background: var(--material-hover);
 }
 
+/* Inside the row: the rows touch. */
 .scriptRow:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-/* The selected script: the Beige keyline, 2 px. */
+/* The selected script: the Beige keyline, 2 px, round the row and its ⋯. */
 .scriptRow[data-selected] {
-  border-color: var(--accent);
-  outline: 1px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -125,16 +133,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A removed script's row: nothing to press but its ⋯, so no box at all, only
+   the list's hairline under it. */
 .removedRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 48px;
+  min-height: 47px;
   padding: 4px 8px 4px 12px;
-  border: 1px solid var(--material-line);
-  border-radius: var(--radius-base);
-  background: var(--material-well);
   color: var(--text-text);
 }
 

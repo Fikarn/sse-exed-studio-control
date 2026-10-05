@@ -2,15 +2,17 @@
    system's tokens. The title plate, the sections and the readouts are the
    design system's (`PlateHead`, `Section`, `Readouts`, `ControlRow`); what is
    here is the plate's own: its column, the key row, the placement row and its
-   fields, the palettes, the member rows and the DMX peek. It never scrolls. */
+   fields, the palettes, the member rows and the DMX peek. It never scrolls.
+   The visual overhaul's polish (2026-10-05): the column keeps the 16 px
+   rhythm and the 16 16 20 padding of every other plate (it was 20 and 16). */
 
 .inspector {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   height: 100%;
   min-height: 0;
-  padding: 16px;
+  padding: 16px 16px 20px;
   overflow: hidden;
   color: var(--text-text);
   font-family: var(--font-family-ui);
@@ -54,8 +56,10 @@
   margin: 0;
 }
 
+/* The visual overhaul's polish (2026-10-05): the labels are a secondary
+   fact, label 14 (DESIGN.md §3); the tick size is the plot's alone. */
 .placementRow dt {
-  font: var(--font-weight-regular) var(--font-size-tick) / 1.2 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-label) / 1.2 var(--font-family-ui);
   color: var(--text-text3);
   white-space: nowrap;
 }

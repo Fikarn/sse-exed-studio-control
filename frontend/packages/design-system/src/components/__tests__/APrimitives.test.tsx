@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ArmKey, Key, Segmented } from "../Key";
+import { ColorPicker } from "../ColorPicker";
 import { Drawer } from "../Drawer";
+import { EmptyLine } from "../EmptyLine";
 import { LampWord, Latch, LatchSlot } from "../LampWord";
 import { Meter } from "../Meter";
 import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../Plate";
@@ -184,6 +186,39 @@ describe("Key", () => {
     const css = cssOf("Key.module.css");
     // Atrium: the locked form is a dashed edge on no face at 55 %.
     expect(css).toMatch(/\.locked \{[^}]*opacity: 0\.55;\s*background: transparent;\s*border-style: dashed/);
+  });
+
+  // The visual overhaul's polish (2026-10-05). Old: a locked key dropped its
+  // state, so a muted strip or a dimmed room read as open while the desk was
+  // offline. New: it keeps it, the word and the dashed edge in yellow while
+  // engaged and in green while live, still unlit at 55 %, before the segmented
+  // rules so a locked group keeps its hairlines.
+  it("a locked key keeps its state: engaged in yellow, live in green, still dashed and unlit", () => {
+    const reason = "Console controls stay locked until the audio probe passes.";
+    const { rerender } = render(
+      <Key mode="toggle" cap="Solo" engaged locked reason={reason}>
+        solo
+      </Key>
+    );
+    const key = screen.getByRole("button");
+    expect(key).toHaveAttribute("data-engaged");
+    expect(key).toHaveAttribute("aria-disabled", "true");
+    expect(key).not.toHaveAttribute("data-lit");
+    rerender(
+      <Key mode="momentary" cap="Hold" live locked reason={reason}>
+        hold
+      </Key>
+    );
+    expect(screen.getByRole("button")).toHaveAttribute("data-live");
+    expect(screen.getByRole("button")).not.toHaveAttribute("data-lit");
+    const css = cssOf("Key.module.css");
+    expect(css).toMatch(
+      /^\s*\.locked\[data-engaged\] \{\s*color: var\(--role-yellow-text\);\s*border-color: var\(--role-yellow-line\);\s*\}/m
+    );
+    expect(css).toMatch(
+      /^\s*\.locked\[data-live\] \{\s*color: var\(--role-green-text\);\s*border-color: var\(--role-green-text\);\s*\}/m
+    );
+    expect(css.search(/^\s*\.locked\[data-engaged\] \{/m)).toBeLessThan(css.indexOf(".segmented .key {"));
   });
 
   it("keys never travel: no transform on hover", () => {
@@ -813,6 +848,20 @@ describe("Plate sections", () => {
     expect(css).toMatch(/\.readoutLabel,\s*\.readoutValue \{[^}]*border-bottom: 1px solid var\(--material-line\)/);
   });
 
+  // The visual overhaul's polish (2026-10-05). Old: the title plate centred
+  // its key, so the plate's ⋯ stood lower the more the sub-line held; a
+  // section head centred its row, so a head with a key stood taller and the
+  // key sat on the rule. New: the key stands on the title's line; the section
+  // head's row stands 4 px above the rule, with or without keys.
+  it("the title plate's key stands on the title's line; a section head's row stands 4 px above its rule", () => {
+    const css = cssOf("Plate.module.css");
+    expect(css).toMatch(/\.head \{[^}]*align-items: flex-start/);
+    expect(css).toMatch(
+      /\.sectionHead \{[^}]*align-items: last baseline;\s*align-content: end;[^}]*min-height: 28px;[^}]*padding-bottom: 4px;\s*border-bottom: 2px solid/
+    );
+    expect(css).toMatch(/\.sectionActions \{[^}]*align-self: end/);
+  });
+
   it("a control row prints its value with the unit at half size in the quiet ink", () => {
     render(
       <ControlRow label="Phones 1" value="-7.2" unit="dB" testId="cr">
@@ -824,6 +873,93 @@ describe("Plate sections", () => {
     expect(cssOf("Plate.module.css")).toMatch(
       /\.controlUnit \{\s*font-size: var\(--font-size-tick\);\s*color: var\(--text-text3\)/
     );
+  });
+});
+
+// The visual overhaul's polish (2026-10-05): the one form of an empty list or
+// section. Old: four forms page by page (body 16 or label 14, the second or
+// the quiet ink, Adelia capitals, a helper sentence after the words). New: one
+// quiet line, the explanation in its tooltip, an optional lamp and one key.
+describe("EmptyLine", () => {
+  it("is one quiet line whose text is exactly its words", () => {
+    render(<EmptyLine testId="empty">No scenes saved yet</EmptyLine>);
+    const line = screen.getByTestId("empty");
+    expect(line.tagName).toBe("P");
+    expect(line).toHaveAttribute("data-empty-line");
+    expect(line.textContent).toBe("No scenes saved yet");
+    expect(line.querySelector("[data-lamp]")).toBeNull();
+    const css = cssOf("EmptyLine.module.css");
+    expect(css).toMatch(
+      /\.emptyLine \{[^}]*margin: 0;\s*font: var\(--font-weight-regular\) var\(--font-size-body\)[^}]*color: var\(--text-text3\);\s*white-space: nowrap/
+    );
+    expect(css).toMatch(/\.words \{[^}]*min-width: 0;\s*overflow: hidden;\s*text-overflow: ellipsis/);
+    expect(rulesOf("EmptyLine.module.css")).not.toMatch(/border|background|box-shadow/);
+  });
+
+  it("sets the latch slot's hollow lamp before the words, with no text of its own", () => {
+    render(
+      <EmptyLine lamp testId="empty">
+        Nothing on the prompter
+      </EmptyLine>
+    );
+    const line = screen.getByTestId("empty");
+    const lamp = line.querySelector("[data-lamp]");
+    expect(lamp).toHaveAttribute("data-lamp", "off");
+    expect(lamp).not.toHaveAttribute("data-lit");
+    expect(lamp).toHaveAttribute("aria-hidden", "true");
+    expect(line.firstElementChild).toBe(lamp);
+    expect(line.textContent).toBe("Nothing on the prompter");
+  });
+
+  it("puts the explanation in the words' tooltip and one key at the end", () => {
+    render(
+      <EmptyLine
+        tip="A group switches its fixtures together."
+        action={<Key size="small">Add group</Key>}
+        testId="empty"
+      >
+        No groups yet
+      </EmptyLine>
+    );
+    const line = screen.getByTestId("empty");
+    const words = screen.getByText("No groups yet");
+    const trigger = words.closest("[aria-describedby]");
+    expect(trigger).not.toBeNull();
+    expect(document.getElementById(trigger!.getAttribute("aria-describedby")!)).toHaveTextContent(
+      "A group switches its fixtures together."
+    );
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    const key = screen.getByRole("button", { name: "Add group" });
+    expect(line.lastElementChild).toContainElement(key);
+  });
+});
+
+// The visual overhaul's polish (2026-10-05). Old: the Clear key read "Clear
+// color tag", and with no tag chosen the focus started on the first swatch,
+// which read as chosen. New: the words say "colour", as the menus do, and the
+// focus starts on Clear colour, the current choice.
+describe("ColorPicker", () => {
+  const swatches = [
+    { index: 0, name: "Clay", hex: "var(--tag-0)" },
+    { index: 1, name: "Ochre", hex: "var(--tag-1)" },
+    { index: 2, name: "Sand", hex: "var(--tag-2)" },
+  ];
+
+  it("says colour, and starts on Clear colour when no tag is chosen", () => {
+    const { rerender } = render(
+      <ColorPicker x={10} y={10} swatches={swatches} selectedIndex={null} onSelect={() => {}} onClose={() => {}} />
+    );
+    expect(screen.getByRole("group", { name: "Pick a colour" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Colour swatches" })).toBeInTheDocument();
+    const clear = screen.getByRole("button", { name: "Clear colour" });
+    expect(clear).toHaveAttribute("aria-pressed", "true");
+    expect(clear).toHaveAttribute("data-autofocus");
+    expect(screen.getByRole("button", { name: "Clay" })).not.toHaveAttribute("data-autofocus");
+    rerender(
+      <ColorPicker x={10} y={10} swatches={swatches} selectedIndex={2} onSelect={() => {}} onClose={() => {}} />
+    );
+    expect(screen.getByRole("button", { name: "Sand (current)" })).toHaveAttribute("data-autofocus");
+    expect(screen.getByRole("button", { name: "Clear colour" })).not.toHaveAttribute("data-autofocus");
   });
 });
 

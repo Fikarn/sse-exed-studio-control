@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { CommissioningCheck } from "../shellData";
-import { deriveSetupState } from "./setupState";
+import { UNPUBLISH_ARMED_SENTENCE } from "./setupPilotModel";
+import { degradedSentence, deriveSetupState } from "./setupState";
 
 // 2026-09 production readiness, Slice 8 (finding F14): the hardware link's
 // health status moves on its own now — `attention` when a port could not be
@@ -32,7 +33,9 @@ const base = {
 };
 
 describe("deriveSetupState with the hardware link's health", () => {
-  it("attention with a probe not green reads DEGRADED with the health sentence", () => {
+  // The polish (2026-10-05): the hardware link's health summary is a report
+  // that runs far past the display's two lines; DEGRADED names the probes.
+  it("attention with a probe not green reads DEGRADED and names the probe", () => {
     const state = deriveSetupState({
       ...base,
       checks: deckNotGreen,
@@ -42,8 +45,21 @@ describe("deriveSetupState with the hardware link's health", () => {
     });
     expect(state.word).toBe("DEGRADED");
     expect(state.tone).toBe("attention");
-    expect(state.sentence).toContain("could not bind");
+    expect(state.sentence).toBe("Published, but Control surface needs attention.");
     expect(state.wayOut).toBe("run-probes");
+  });
+
+  it("names every probe that did not pass, by its hardware, within the display's two lines", () => {
+    // The labels Setup reads (getCommissioningChecks names the probes by their hardware).
+    const allOff: CommissioningCheck[] = [
+      { ...green[0]!, label: "TotalMix", status: "attention" },
+      { ...green[1]!, status: "error" },
+      { ...green[2]!, label: "Deck", status: "attention" },
+    ];
+    const sentence = degradedSentence(allOff);
+    expect(sentence).toBe("Published, but TotalMix, Lighting bridge and Deck need attention.");
+    expect(sentence.length).toBeLessThanOrEqual(70);
+    expect(degradedSentence(green)).toBe("Published, but a probe needs attention.");
   });
 
   it("error keeps the DEGRADED word with the error tone", () => {
@@ -111,5 +127,25 @@ describe("deriveSetupState with the hardware link's health", () => {
     for (const checks of [[], deckNotGreen, green]) {
       expect(deriveSetupState({ ...unpublished, checks }).meta).toBeNull();
     }
+  });
+
+  // The visual overhaul's polish (2026-10-05; the owner's rule): the state
+  // display's sentence keeps at most two lines, about 75 characters, so every
+  // sentence the page builds for it is at most 70; a meta beside a way-out
+  // key has about 30. The hardware link's own sentences are its to keep short.
+  it("the page's own sentences fit two lines, and a meta beside a way-out key fits its room", () => {
+    const own = { ...base, commissioningSummary: null, healthSummary: null, healthTone: "ok" as const };
+    for (const state of [
+      deriveSetupState({ ...own, checks: [], published: false }),
+      deriveSetupState({ ...own, checks: deckNotGreen }),
+      deriveSetupState({ ...own, checks: [] }),
+      deriveSetupState({ ...own, checks: green }),
+    ]) {
+      expect(state.sentence.length, state.sentence).toBeLessThanOrEqual(70);
+      if (state.wayOut !== null && state.meta !== null) {
+        expect(state.meta.length, state.meta).toBeLessThanOrEqual(30);
+      }
+    }
+    expect(UNPUBLISH_ARMED_SENTENCE.length, UNPUBLISH_ARMED_SENTENCE).toBeLessThanOrEqual(70);
   });
 });

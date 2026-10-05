@@ -1,9 +1,11 @@
 /* The recovery screen (the shell, overhaul 3; the visual overhaul,
    2026-10-05): drawn by type and hairlines like every page. The bay holds what
-   to do: what went wrong, the restore, the backups, where things are; the
-   plate holds what the hardware reported. Sections are Adelia heads over the
-   heavy rule (the design system's `Section`), lists are rows under hairlines,
-   every key is the design system's `Key`, and nothing is a card or scrolls. */
+   to do: what went wrong, the restore, the backups, where things are (each
+   path on its row with its folder's key, since the polish); the plate holds
+   what the hardware reported (its checks are the shared `HardwareChecks`).
+   Sections are Adelia heads over the heavy rule (the design system's
+   `Section`), lists are rows under hairlines, every key is the design
+   system's `Key`, and nothing is a card or scrolls. */
 
 .column {
   display: flex;
@@ -48,15 +50,21 @@
   font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
+/* The protocol readouts end where the latest backup's does: the Restore
+   grid's left column (the visual overhaul's polish, 2026-10-05; 480 px left
+   one bay with two value edges). */
 .facts {
-  max-width: 480px;
+  max-width: calc((100% - 24px) / 2);
 }
 
+/* Two columns, each key in the row under what it acts on: Restore latest
+   under the latest backup, Restore path under the field. */
 .restore {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
-  gap: 24px;
+  column-gap: 24px;
+  row-gap: 12px;
 }
 
 .latest {
@@ -93,6 +101,16 @@
   gap: 8px;
 }
 
+/* Restore path and, for an archive, the reason under it; the key keeps its
+   own width (a key in a column stretches without `align-items`). */
+.pathKeys {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
 .reason {
   margin: 0;
   color: var(--role-yellow-text);
@@ -107,11 +125,13 @@
   list-style: none;
 }
 
-/* A backup: one row under a hairline; pressing it puts its path in the field. */
+/* A backup: one row under a hairline; pressing it puts its path in the field.
+   Its time and kind first and whole; the size and the file name after them,
+   the name giving way if ever the row is short. */
 .backupRow {
   appearance: none;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -143,18 +163,20 @@
   outline-offset: -2px;
 }
 
-.backupName {
-  min-width: 0;
-  overflow: hidden;
+.backupWhen {
   font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .backupMeta {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-text3);
   font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -170,9 +192,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- the plate ----------------------------------------------------------- */
-
-.checks {
+/* Where things are: a place a row, its name, its path (it wraps, never cut)
+   and, for a folder, the key that opens it at the right. */
+.places {
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -180,29 +202,35 @@
   list-style: none;
 }
 
-/* A check: the hardware's name and its word, what it said under them. */
-.check {
+.place {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 12px;
-  row-gap: 4px;
-  padding: 10px 0;
+  column-gap: 16px;
+  min-height: 44px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--material-line);
 }
 
-.checkTitle {
+.placeName {
+  min-width: 0;
   color: var(--text-text);
-  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
-.checkWord {
-  justify-self: end;
+.placePath {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
-.check .hint {
+/* No path attached: the sentence across the row. */
+.placeNone {
   grid-column: 1 / -1;
 }
+
+/* ---- the plate ----------------------------------------------------------- */
 
 .list {
   display: flex;

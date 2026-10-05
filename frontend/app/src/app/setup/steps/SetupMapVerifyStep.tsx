@@ -1,8 +1,8 @@
 import { Key, Segmented } from "@sse/design-system";
 
-import { SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
+import { SetupStepScreen, SetupRecordSection, SetupRecordRow } from "../components/SetupStepScreen";
 import styles from "../SetupSupportPilot.module.css";
-import { controlKindWord, type ControlSurfaceControl, deckKeySlots, runnerStepOrder } from "../setupPilotModel";
+import { controlKindWord, type ControlSurfaceControl, deckKeySlots } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
 /** The keys of a Stream Deck +, above its strip: places 1 to 8. */
@@ -21,12 +21,13 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
     selectedControl,
     totalControlCount,
   } = editor.state;
-  const { bayHead, primaryKey, backKey } = editor.chrome;
+  const { stepEyebrow, primaryKey, backKey } = editor.chrome;
   const verifying = activeStepId === "verify";
 
   // One control of the deck as the screen draws it: its word, the Beige
   // selection, and a lit fill for the moment the deck reports a press of it.
-  const cell = (control: ControlSurfaceControl, className: string) => (
+  // `word` prints another word than the control's label; the name keeps it.
+  const cell = (control: ControlSurfaceControl, className: string, word?: string) => (
     <button
       key={control.id}
       type="button"
@@ -37,7 +38,7 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
       data-page-key={control.pageNav ? "" : undefined}
       onClick={() => setSelectedControlId(control.id)}
     >
-      <span>{control.label}</span>
+      <span>{word ?? control.label}</span>
     </button>
   );
 
@@ -54,8 +55,7 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
     <>
       {activeStepId === "map" || verifying ? (
         <SetupStepScreen
-          head={bayHead}
-          eyebrow={`Step ${verifying ? 4 : 3} of ${runnerStepOrder.length}`}
+          eyebrow={stepEyebrow}
           title={verifying ? "Verify live echo" : "Map bindings"}
           lead={
             verifying
@@ -121,10 +121,19 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
                     {strip.map((control) => cell(control, styles.stripCell))}
                   </div>
                 ) : null}
+                {/* The visual overhaul's polish (2026-10-05): a dial's push
+                    prints Push, for the strip cell above it names the dial;
+                    its name still says which dial it is. */}
                 <div className={styles.deckDials} data-testid="setup-deck-dials">
                   {dialColumns.map((column, index) => (
                     <div key={index + 1} className={styles.dialColumn}>
-                      {column.map((control) => cell(control, styles.dialChip))}
+                      {column.map((control) =>
+                        cell(
+                          control,
+                          styles.dialChip,
+                          control.type === "dial-press" && strip.length > 0 ? "Push" : undefined
+                        )
+                      )}
                     </div>
                   ))}
                 </div>
@@ -141,25 +150,34 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
           }
           record={
             <>
-              <SetupRecordHeading>{verifying ? "The control pressed" : "The control chosen"}</SetupRecordHeading>
-              <SetupRecordRow
-                label={selectedControl?.label ?? "Choose a control"}
-                value={selectedControl ? controlKindWord(selectedControl.type) : "—"}
-                tone={verifying && selectedControl?.id === echoControlId ? "ok" : "off"}
-              />
-              {selectedControl ? <p className={styles.checkDetail}>{selectedControl.description}</p> : null}
-              <SetupRecordHeading>The deck as Studio Control holds it</SetupRecordHeading>
-              <SetupRecordRow label="Pages" value={String(pages.length)} tone={pages.length > 0 ? "ok" : "attention"} />
-              <SetupRecordRow
-                label="Controls"
-                value={String(totalControlCount)}
-                tone={totalControlCount > 0 ? "ok" : "attention"}
-              />
-              <SetupRecordRow
-                label="Hardware link"
-                value={liveTransportRequested ? "LIVE" : "SAMPLE DATA"}
-                tone={liveTransportRequested ? "ok" : "off"}
-              />
+              <SetupRecordSection title={verifying ? "The control pressed" : "The control chosen"}>
+                {/* While the deck reports its press, the kind is a lit word. */}
+                <SetupRecordRow
+                  label={selectedControl?.label ?? "Choose a control"}
+                  value={selectedControl ? controlKindWord(selectedControl.type) : "—"}
+                  tone={verifying && selectedControl?.id === echoControlId ? "ok" : "off"}
+                  word={verifying && selectedControl?.id === echoControlId}
+                />
+                {selectedControl ? <p className={styles.checkDetail}>{selectedControl.description}</p> : null}
+              </SetupRecordSection>
+              <SetupRecordSection title="The deck as Studio Control holds it">
+                <SetupRecordRow
+                  label="Pages"
+                  value={String(pages.length)}
+                  tone={pages.length > 0 ? "ok" : "attention"}
+                />
+                <SetupRecordRow
+                  label="Controls"
+                  value={String(totalControlCount)}
+                  tone={totalControlCount > 0 ? "ok" : "attention"}
+                />
+                <SetupRecordRow
+                  label="Hardware link"
+                  value={liveTransportRequested ? "LIVE" : "SAMPLE DATA"}
+                  tone={liveTransportRequested ? "ok" : "off"}
+                  word
+                />
+              </SetupRecordSection>
             </>
           }
           testId={`setup-screen-${activeStepId}`}

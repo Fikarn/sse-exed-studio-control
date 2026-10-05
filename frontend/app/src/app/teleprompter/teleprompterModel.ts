@@ -11,6 +11,7 @@ import type {
 import { glassParagraphs, type GlassParagraph } from "./glass/glassText";
 import type { PrompterGlassText } from "./glass/PrompterGlass";
 import { formatDuration } from "./prompterTime";
+import { armName } from "./useTeleprompterArming";
 
 // The Teleprompter page's model (new pages program, Slice 6a): what the page
 // shows, worked out from what the hardware link reports — the prompter's state
@@ -37,7 +38,14 @@ export interface PrompterStateView {
   wayOut: "update" | "open-file" | null;
 }
 
-/** The state display (§8): the Prompter XL's fault first, then `NOT UPDATED`, `LOW RESOLUTION`, `ON SCREEN`, `READY`. */
+/**
+ * The state display (§8): the Prompter XL's fault first, then `NOT UPDATED`, `LOW RESOLUTION`, `ON SCREEN`, `READY`.
+ *
+ * The visual overhaul's polish (2026-10-05, the owner's rule): the display's
+ * sentence keeps two lines, so every sentence built here holds at most 70
+ * characters, a script's name cut as the armed row cuts it (`armName`). It
+ * says what happened; the way-out key beside it names what to do.
+ */
 export function prompterStateView(
   snapshot: PrompterSnapshot,
   check: PrompterHealthCheck | null,
@@ -52,7 +60,7 @@ export function prompterStateView(
     const sentence =
       check?.word === "NOT UPDATED"
         ? check.summary
-        : `${glass.name} was edited after it went on the prompter. The prompter still shows the earlier text.`;
+        : "Edited since it went on: the prompter still shows the earlier text.";
     return { tone: "attention", word: "NOT UPDATED", sentence, meta, wayOut: "update" };
   }
   if (screen.tone !== "ok") {
@@ -67,7 +75,7 @@ export function prompterStateView(
     return {
       tone: "ok",
       word: "ON SCREEN",
-      sentence: `The Prompter XL shows ${glass.name}. ${doing}`,
+      sentence: `${armName(glass.name)} is on the glass. ${doing}`,
       meta,
       wayOut: null,
     };
@@ -76,8 +84,8 @@ export function prompterStateView(
     tone: "ok",
     word: "READY",
     sentence: hasScripts
-      ? "The Prompter XL is connected and blank. Choose a script and put it on the prompter."
-      : "The Prompter XL is connected and blank. Open a script's file to put it on the prompter.",
+      ? "The Prompter XL is connected and blank. Put a script on it."
+      : "The Prompter XL is connected and blank. There is no script yet.",
     meta,
     wayOut: hasScripts ? null : "open-file",
   };
@@ -268,9 +276,12 @@ export function cueKeys(cues: readonly PrompterCue[]): PrompterCue[] {
   return cues.slice(0, 24);
 }
 
-/** `4:19 at 140 · 581 words` */
+/**
+ * `4:19 at 140 words/min`: a script's row, a removed one's and its menu's head. The visual overhaul's
+ * polish (2026-10-05): the pace carries its unit, and the words are the plate head's alone (`scriptDetail`).
+ */
 export function scriptLine(script: PrompterScriptSummary): string {
-  return `${formatDuration(script.lengthSeconds)} at ${script.speedWpm} · ${script.readWords.toLocaleString("en-GB")} words`;
+  return `${formatDuration(script.lengthSeconds)} at ${script.speedWpm} words/min`;
 }
 
 /** `14:02`, the studio's local time of a saved-data time. */
@@ -280,12 +291,25 @@ export function clockTime(isoTime: string): string {
   return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
 }
 
-/** The plate's line under the script's name. */
-export function scriptDetail(script: PrompterScriptSummary): string {
-  const from = script.sourceFileName ? `From ${script.sourceFileName} · ` : "";
+/**
+ * The plate's line under the script's name, in its parts: where it came from (`null` for a script made
+ * here), then its facts. The plate breaks the line only between the facts (the visual overhaul's polish,
+ * 2026-10-05); a long file name may still break within itself.
+ */
+export function scriptDetailParts(script: PrompterScriptSummary): { from: string | null; facts: string[] } {
   const paragraphs = `${script.paragraphCount} ${script.paragraphCount === 1 ? "paragraph" : "paragraphs"}`;
+  const words = `${script.readWords.toLocaleString("en-GB")} words`;
   const saved = clockTime(script.changedAt);
-  return `${from}${paragraphs} · ${scriptLine(script)}${saved ? ` · saved ${saved}` : ""}`;
+  return {
+    from: script.sourceFileName ? `From ${script.sourceFileName}` : null,
+    facts: [paragraphs, scriptLine(script), words, ...(saved ? [`saved ${saved}`] : [])],
+  };
+}
+
+/** The plate's line under the script's name, as one line of words. */
+export function scriptDetail(script: PrompterScriptSummary): string {
+  const { from, facts } = scriptDetailParts(script);
+  return [...(from ? [from] : []), ...facts].join(" · ");
 }
 
 /** Cut the glass's text once, as the glass does (`glassText.ts`). */

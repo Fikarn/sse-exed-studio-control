@@ -173,7 +173,7 @@ describe("AppShellFrame", () => {
     { id: "audio", label: "Audio" },
   ];
   const monitorItems = [
-    { id: "lighting", label: "Lighting", detail: "no bridge", status: "error" as const, tab: "lighting" },
+    { id: "lighting", label: "Lighting", detail: "unreachable", status: "error" as const, tab: "lighting" },
     { id: "audio", label: "Audio", detail: "failed", status: "error" as const, tab: "audio" },
     { id: "surface", label: "Surface", detail: "ready", status: "ok" as const },
     { id: "latched:solo", label: "Solo", detail: "latched", status: "attention" as const, target: "Audio" },
@@ -226,6 +226,14 @@ describe("AppShellFrame", () => {
     expect(screen.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-current", "page");
     // The active tab carries no word: its page's state display says it.
     expect(screen.queryByTestId("shell-lamp-audio")).toBeNull();
+    // The polish (2026-10-05): but it keeps the word's room, unseen and
+    // unspoken, so the tabs after it do not move with the page.
+    const audioTab = screen.getByRole("button", { name: "Audio" });
+    expect(audioTab).not.toHaveAttribute("aria-describedby");
+    const reserve = nav.querySelectorAll("[data-tab-reserve]");
+    expect(reserve).toHaveLength(1);
+    expect(reserve[0]).toHaveAttribute("aria-hidden", "true");
+    expect(reserve[0]!.querySelector("[data-lamp], [data-testid]")).toBeNull();
     expect(nav.querySelector('[data-testid="shell-lamp-lighting"]')).toHaveAttribute("data-tone", "error");
     expect(screen.getByTestId("shell-lamp-surface")).toHaveTextContent("Surface");
     expect(screen.getByTestId("shell-lamp-latched-solo")).toHaveAttribute("data-latch");

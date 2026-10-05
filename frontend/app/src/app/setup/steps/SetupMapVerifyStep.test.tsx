@@ -41,7 +41,7 @@ const lights: ControlSurfacePage = {
 
 function renderMap(page: ControlSurfacePage) {
   const editor = {
-    chrome: { backKey: null, bayHead: null, primaryKey: null },
+    chrome: { backKey: null, primaryKey: null, stepEyebrow: null },
     props: { liveTransportRequested: false },
     state: {
       activeStepId: "map",

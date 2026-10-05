@@ -104,23 +104,19 @@ export interface CamerasStateView {
   wayOut: CamerasWayOut | null;
 }
 
-/** How many of the cameras are held, and what CAM 1's take is known to do. */
+/**
+ * How many of the cameras are held; of a camera that does not answer, when it last did. The
+ * visual overhaul's polish (2026-10-05): the meta stands beside the way-out key, which leaves
+ * it about 30 characters, so it says only what nothing else on the page says. CAM 1's take is
+ * the REC section's and the header tally's, and the camera list says which camera is held.
+ */
 function metaLine(snapshot: CamerasSnapshot, spoken: CameraSnapshot): string {
-  const held = snapshot.cameras.filter((camera) => camera.state === "held").length;
-  const parts = [`${held} of ${snapshot.cameras.length} held`];
   if (spoken.state === "unreachable") {
     const last = clockTime(spoken.readAt);
-    parts.unshift(last ? `Last answer ${last}` : "No answer since the start");
+    return last ? `Last answer ${last}` : "No answer since the start";
   }
-  const main = cameraOf(snapshot, 1);
-  if (main?.state === "held") {
-    parts.push(main.recording.recording === true ? "CAM 1 recording" : "CAM 1 not recording");
-  } else if (main?.state === "unreachable" && main.recording.recording === true) {
-    parts.push("CAM 1 last known recording");
-  } else if (main?.state === "released") {
-    parts.push("CAM 1 not read");
-  }
-  return parts.join(" · ");
+  const held = snapshot.cameras.filter((camera) => camera.state === "held").length;
+  return `${held} of ${snapshot.cameras.length} held`;
 }
 
 /**
@@ -147,7 +143,9 @@ export function camerasStateView(snapshot: CamerasSnapshot): CamerasStateView | 
       tone: pictures.tone,
       word: pictures.word,
       sentence: pictures.sentence,
-      meta: `The camera controls still work · ${snapshot.cameras.length} of ${snapshot.cameras.length} held`,
+      // Every camera is held here, as the camera list says: the meta keeps to
+      // what the sentence leaves out, in the room beside Look again.
+      meta: "Camera controls still work",
       wayOut: { kind: "look-again", label: "Look again" },
     };
   }
@@ -196,9 +194,13 @@ export function recKeyView(main: CameraSnapshot | null): RecKeyView {
     case "unreachable": {
       if (main.recording.recording === true) {
         const last = clockTime(main.readAt);
+        // The visual overhaul's polish (2026-10-05): one line under the cap,
+        // when it was last known and the lock's reason, so the take-time key
+        // holds two lines with room at its edges; the whole sentence is the
+        // reason.
         return {
           kind: "last-known",
-          hint: `last known: recording${last ? ` · ${last}` : ""}`,
+          hint: `last known${last ? ` ${last}` : ""} · STOP is locked until CAM 1 answers`,
           reason: "STOP is locked until CAM 1 answers. The take is left as it was.",
         };
       }
@@ -298,7 +300,11 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
   ];
 }
 
-/** The footer's words for the take. */
+/**
+ * The footer's words for the take. The visual overhaul's polish (2026-10-05): CAM 1 held and
+ * not recording reads `not recording`, the take's own word on the page, as the footer's other
+ * forms already say `recording`.
+ */
 export function recordingWord(main: CameraSnapshot | null, stopArmed: boolean, nowMs: number): string {
   const key = recKeyView(main);
   if (!main || main.state === "not-set-up") return "CAM 1 · not set up";
@@ -308,7 +314,7 @@ export function recordingWord(main: CameraSnapshot | null, stopArmed: boolean, n
     return `CAM 1 · last known recording${last ? ` at ${last}` : ""}`;
   }
   if (main.state === "unreachable") return "CAM 1 · does not answer";
-  if (key.kind !== "recording") return "CAM 1 · stopped";
+  if (key.kind !== "recording") return "CAM 1 · not recording";
   if (stopArmed) return "CAM 1 · recording · stop armed";
   const length = takeReadouts(main, nowMs)[0];
   return length?.value ? `CAM 1 · recording · ${length.value} counted here` : "CAM 1 · recording · length not known";
@@ -630,24 +636,15 @@ export function pictureRows(snapshot: CamerasSnapshot): PictureRowView[] {
 }
 
 /**
- * The footer's words for the pictures: `test pictures · 3 / 3`, `test pictures · 2 / 3 ·
- * CAM 2 missing`, or `none · vMix Outputs 2 to 4` when none arrives.
+ * The footer's words for the pictures: `test pictures · 3 of 3`, `test pictures · 2 of 3 ·
+ * CAM 2 missing`, or `none · vMix Outputs 2 to 4` when none arrives. The visual overhaul's
+ * polish (2026-10-05): a count reads `n of m`, as everywhere on the page.
  */
 export function picturesWord(snapshot: CamerasSnapshot): string {
   const { source, state } = snapshot.pictures;
   if (state === "no-pictures") return `none · ${source}`;
   const total = snapshot.cameras.length;
   const missing = snapshot.cameras.filter((camera) => !pictureShows(camera));
-  const count = `${source} · ${total - missing.length} / ${total}`;
+  const count = `${source} · ${total - missing.length} of ${total}`;
   return missing.length === 0 ? count : `${count} · ${missing.map((camera) => camera.tag).join(", ")} missing`;
-}
-
-/** `3 / 3 held`, or the first camera that is not: `2 / 3 held · CAM 3 unreachable`. */
-export function heldWord(snapshot: CamerasSnapshot): string {
-  const held = snapshot.cameras.filter((camera) => camera.state === "held").length;
-  const spoken = worstCamera(snapshot);
-  const total = snapshot.cameras.length;
-  return spoken && spoken.state !== "held"
-    ? `${held} / ${total} held · ${spoken.tag} ${spoken.word.toLowerCase()}`
-    : `${held} / ${total} held`;
 }

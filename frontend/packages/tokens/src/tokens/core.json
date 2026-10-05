@@ -23,7 +23,7 @@
     },
     "brown": {
       "$value": "#CAA363",
-      "$description": "Brown: reserve"
+      "$description": "Brown: reserve; the colour tag Ochre"
     },
     "coral": {
       "$value": "#FF7D55",
@@ -39,7 +39,7 @@
     },
     "sky": {
       "$value": "#C9D4DA",
-      "$description": "Sky: reserve"
+      "$description": "Sky: reserve; the colour tag Mist"
     },
     "black": {
       "$value": "#000000",
@@ -355,6 +355,41 @@
       "6500": {
         "$value": "{sse.sky}"
       }
+    }
+  },
+  "tag": {
+    "$description": "The operator's colour tags for scenes, groups and palettes: identity, not status. Quiet tints drawn from the brand, clear of Green, Yellow, Coral, Blue and Beige, so a tag never reads as live, engaged, an error or the selection. The stored colour index (0 to 7) keeps its slot (the owner's word, 2026-10-05).",
+    "0": {
+      "$value": "#B9806C",
+      "$description": "Clay (was Rose)"
+    },
+    "1": {
+      "$value": "{sse.brown}",
+      "$description": "Ochre, the palette's reserve Brown (was Orange)"
+    },
+    "2": {
+      "$value": "#D3C4A0",
+      "$description": "Sand (was Yellow)"
+    },
+    "3": {
+      "$value": "#A3A36F",
+      "$description": "Olive (was Lime)"
+    },
+    "4": {
+      "$value": "#7E93A6",
+      "$description": "Slate (was Emerald)"
+    },
+    "5": {
+      "$value": "{sse.sky}",
+      "$description": "Mist, the palette's reserve Sky (was Cyan)"
+    },
+    "6": {
+      "$value": "#A3809B",
+      "$description": "Plum (was Violet)"
+    },
+    "7": {
+      "$value": "#C69CB0",
+      "$description": "Heather (was Pink)"
     }
   },
   "prompterGlass": {

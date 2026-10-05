@@ -157,15 +157,15 @@ export function screenSentence(screen: PrompterScreen): string {
     case "connected":
       return `The Prompter XL is connected: ${screenMode(screen) ?? ""}.`;
     case "low-resolution":
-      return `Windows runs the Prompter XL at ${screen.width ?? 0}×${screen.height ?? 0}. Set it to ${FULL_WIDTH_PX}×${FULL_HEIGHT_PX} in Windows' display settings for the sharpest text.`;
+      return `Windows runs the Prompter XL at ${screen.width ?? 0}×${screen.height ?? 0}. Set it to ${FULL_WIDTH_PX}×${FULL_HEIGHT_PX}.`;
     case "not-connected":
       return screen.reported
-        ? "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen."
-        : "Windows has not reported the Prompter XL since Studio Control started. The script and the place are kept, and nothing is shown on any other screen.";
+        ? "Windows does not see the Prompter XL. Check its USB-C cable (15 W)."
+        : "Windows has not reported the Prompter XL since Studio Control started.";
     case "duplicated":
-      return "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.";
+      return "The Prompter XL mirrors another screen. Choose Extend these displays.";
     case "not-showing":
-      return "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself.";
+      return "The window on the Prompter XL does not show. It opens again by itself.";
   }
 }
 
@@ -221,11 +221,7 @@ export function prompterHealthCheck(screen: PrompterScreen, edited: string | nul
   const summary = screenSummary(screen);
   const [status, word, sentence]: [PrompterCheckTone, string, string] =
     edited !== null && TONE_RANK[summary.tone] <= TONE_RANK.attention
-      ? [
-          "attention",
-          "NOT UPDATED",
-          `${edited} was edited after it went on the prompter. The prompter still shows the earlier text.`,
-        ]
+      ? ["attention", "NOT UPDATED", "Edited since it went on: the prompter still shows the earlier text."]
       : [summary.tone, summary.word, summary.sentence];
   return { ok: status === "ok", status, word, summary: sentence, notUpdated: edited !== null, screen: summary };
 }

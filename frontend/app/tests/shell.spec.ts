@@ -59,7 +59,7 @@ test("Setup's modes, steps and the Map's pages and deck keys answer clicks", asy
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 
   // Import, then Probe, then Map, the way the operator walks them.
-  await page.getByRole("button", { name: "Download profile" }).click();
+  await page.getByRole("button", { name: "Export and continue" }).click();
   await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
@@ -180,12 +180,19 @@ test("audio solo latches a monitor-strip chip that survives workspace switches",
   // Re-latch and confirm the chip stands on every other page.
   await soloButton.click();
   await expect(soloLatch).toBeVisible();
+  await page.getByRole("button", { name: "Teleprompter", exact: true }).click();
+  await expect(soloChip).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-latched-solo")).toHaveText("Solo");
+  // The polish (2026-10-05): Lighting has a Solo of its own, so there the
+  // Console's latch says whose it is.
   await page.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
-  await expect(soloChip).toBeVisible();
+  const audioSoloChip = page.getByRole("button", { name: /Open Audio for Audio solo/ });
+  await expect(audioSoloChip).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-latched-solo")).toHaveText("Audio solo");
 
   // The chip's click target is the owning workspace, not Setup.
-  await soloChip.click();
+  await audioSoloChip.click();
   await expect(page.getByTestId("audio-workspace")).toBeVisible();
   await expect(soloChip).toHaveCount(0);
 });
@@ -230,7 +237,7 @@ for (const { fixture, tab, label, band, tone, word } of [
     label: "Lighting",
     band: "lighting-state-display",
     tone: "error",
-    word: "no bridge",
+    word: "unreachable",
   },
   {
     fixture: "lighting-bridge-silent",
@@ -332,7 +339,7 @@ for (const { fixture, tab, label, band, tone, word } of [
 // once commissioning is published the operator can leave it from the tabs.
 test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
   await openFixture(page, "setup-ready");
-  await expect(page.getByText("Commissioning runner")).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Commissioning runner" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
   await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
     "aria-current",
@@ -425,7 +432,7 @@ test("the crash hook is absent unless the fixture URL asks for it", async ({ pag
 // again its marker moves into the entry script and this fails. (New pages
 // program, Slice 1: Planning and its chunk are gone.)
 const WORKSPACE_CHUNKS = {
-  LightingWorkspace: "lighting-stage-lock-note",
+  LightingWorkspace: "lighting-scenes-section",
   AudioWorkspace: "audio-monitor-bar",
   SetupSupportPilot: "setup-screen-support",
 } as const;
@@ -482,4 +489,30 @@ test("lazy workspace loads", async ({ page }) => {
       () => (window as unknown as { __sawWorkspaceLoading: { loading: boolean } }).__sawWorkspaceLoading.loading
     )
   ).toBe(false);
+});
+
+// The polish (2026-10-05): the open tab keeps the room of its word, so no tab
+// moves when the page changes and the tab just pressed stays under the
+// pointer (DESIGN §1).
+test("no tab moves when the page changes", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  // The baseline once the shell is ready: before it, the tabs carry other
+  // words (pending), and the faces may still be loading.
+  await expectWorkspaceMounted(page, "setup");
+  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+  await page.evaluate(() => document.fonts.ready);
+  const lefts = () =>
+    nav.evaluate((element) =>
+      [...element.querySelectorAll("button")].map((button) => Math.round(button.getBoundingClientRect().left))
+    );
+  const first = await lefts();
+  for (const label of ["Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"]) {
+    await nav.getByRole("button", { name: label, exact: true }).click();
+    await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
+    expect(await lefts(), `the tabs on ${label}`).toEqual(first);
+  }
 });

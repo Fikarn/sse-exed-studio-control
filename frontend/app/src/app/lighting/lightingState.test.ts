@@ -42,18 +42,18 @@ describe("deriveLightingState and held light outputs", () => {
     expect(state.word).toBe("NOT ANSWERING");
     expect(state.tone).toBe("attention");
     expect(state.locked).toBe(false);
-    expect(state.lockNote).toBeNull();
-    expect(state.sentence).toBe(
-      "The bridge at 10.1.0.1 · universe 1 has not answered since 10:42. Nothing is locked; this clears when it answers. Check its power and cable."
+    expect(state.sentence).toBe("The bridge has not answered since 10:42. Check its power and cable.");
+    expect(deriveLightingState({ ...base, bridgeAnswering: false }).sentence).toBe(
+      "The bridge has not answered. Check its power and cable."
     );
-    expect(deriveLightingState({ ...base, bridgeAnswering: false }).sentence).toContain("has not answered. Nothing");
     // It never sends the operator to Setup's probe: a probe that fails
     // mid-session locks the rig (the review of #260).
     expect(state.sentence).not.toMatch(/probe|Setup/);
   });
 
   // The review of #260: a silent bridge outranks a hold, so its sentence names
-  // the hold, and nothing claims that what is pressed is sent.
+  // the hold, and nothing claims that what is pressed is sent. Open Setup, the
+  // key beside it, is the way to arm.
   it("names the hold when the outputs are held too", () => {
     const state = deriveLightingState({
       ...base,
@@ -62,9 +62,7 @@ describe("deriveLightingState and held light outputs", () => {
       outputsHeld: true,
     });
     expect(state.word).toBe("NOT ANSWERING");
-    expect(state.sentence).toBe(
-      "The bridge at 10.1.0.1 · universe 1 has not answered since 10:42, and the outputs are held until armed in Setup / Support. Check its power and cable."
-    );
+    expect(state.sentence).toBe("The bridge has not answered since 10:42, and the outputs are held.");
   });
 
   it("a failed probe and Preview outrank a silent bridge; a silent bridge outranks a hold", () => {
@@ -77,10 +75,13 @@ describe("deriveLightingState and held light outputs", () => {
     expect(deriveLightingState({ ...base, bridgeAnswering: null }).word).toBe("REACHABLE");
   });
 
-  it("armed and reachable is REACHABLE, and Preview's sentence names the scene", () => {
+  it("armed and reachable is REACHABLE, and Preview's sentence says when the rig takes a saved edit", () => {
     expect(deriveLightingState(base).word).toBe("REACHABLE");
-    expect(deriveLightingState({ ...base, previewMode: true, previewDirty: true }).sentence).toContain(
-      "Save puts the edits into Warm wash"
+    expect(deriveLightingState({ ...base, previewMode: true, previewDirty: true }).sentence).toBe(
+      "Editing offline: saved edits reach the rig when the scene is recalled."
+    );
+    expect(deriveLightingState({ ...base, previewMode: true }).sentence).toBe(
+      "You are editing offline. The rig is unchanged."
     );
   });
 });
@@ -88,21 +89,46 @@ describe("deriveLightingState and held light outputs", () => {
 // The visual overhaul (2026-10-04): UNREACHABLE is the probe's word. The
 // hardware link refuses a recall then, and nothing else; until then the
 // sentence said nothing pressed would reach the rig. The meta line names the
-// scene and when it was saved, and no count another control prints.
+// scene, and no count another control prints.
 describe("deriveLightingState's words", () => {
   it("UNREACHABLE says the probe has not passed and that recalls are refused", () => {
     const state = deriveLightingState({ ...base, bridgeReachable: false });
-    expect(state.sentence).toBe(
-      "The bridge at 10.1.0.1 · universe 1 has not passed its probe, so recalls are refused."
-    );
+    expect(state.sentence).toBe("Bridge 10.1.0.1 has not passed its probe: recalls are refused.");
     expect(state.sentence).not.toMatch(/nothing you press/);
     expect(state.locked).toBe(true);
-    expect(state.lockNote).toBe("locked · the bridge has not passed its probe");
+    expect(deriveLightingState({ ...base, bridgeReachable: false, bridgeIp: " " }).sentence).toBe(
+      "The bridge has not passed its probe: recalls are refused."
+    );
   });
 
-  it("the meta line names the scene and when it was saved", () => {
+  it("REACHABLE names the bridge by its address", () => {
+    expect(deriveLightingState(base).sentence).toBe("Bridge 10.1.0.1 is answering and the rig is following it.");
+  });
+
+  // The visual overhaul's polish (2026-10-05): the meta line beside a way-out
+  // key holds about 30 characters, so it names the scene alone; when it was
+  // saved is the footer's (`saved · last 17:20`).
+  it("the meta line names the scene alone", () => {
     expect(deriveLightingState(base).meta).toBe("Scene Warm wash");
-    expect(deriveLightingState({ ...base, lastSavedLabel: "17:20" }).meta).toBe("Scene Warm wash · saved 17:20");
+    expect(deriveLightingState({ ...base, lastSavedLabel: "17:20" }).meta).toBe("Scene Warm wash");
     expect(deriveLightingState({ ...base, sceneName: null }).meta).toBe("No scene recalled");
+  });
+
+  // The owner's rule (2026-10-05): the sentence keeps at most two lines, about
+  // 75 characters at the display's width, so every sentence holds 70 at most,
+  // the longest bridge address and a silent time included.
+  it("every sentence the page builds holds 70 characters at most", () => {
+    const longest = { ...base, bridgeIp: "192.168.100.200", bridgeSilentLabel: "10:42" };
+    const states = [
+      deriveLightingState(longest),
+      deriveLightingState({ ...longest, bridgeReachable: false }),
+      deriveLightingState({ ...longest, previewMode: true }),
+      deriveLightingState({ ...longest, previewMode: true, previewDirty: true }),
+      deriveLightingState({ ...longest, bridgeAnswering: false }),
+      deriveLightingState({ ...longest, bridgeAnswering: false, outputsHeld: true }),
+      deriveLightingState({ ...longest, outputsHeld: true }),
+      deriveLightingState({ ...longest, sceneModified: true, sceneName: null }),
+    ];
+    for (const state of states) expect(state.sentence.length, state.sentence).toBeLessThanOrEqual(70);
   });
 });

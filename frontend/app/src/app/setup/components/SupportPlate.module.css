@@ -30,6 +30,12 @@
   flex: 1;
 }
 
+/* A number's unit after a space: half its size, the quiet ink (the scale's %). */
+.unit {
+  font-size: var(--font-size-tick);
+  color: var(--text-text3);
+}
+
 .outputsWord {
   justify-self: end;
 }

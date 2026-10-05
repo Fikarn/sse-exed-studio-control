@@ -15,6 +15,11 @@ import styles from "./Tab.module.css";
 // names each device once; the active tab carries none, because the page's own
 // state display says it. The tab's name stays the page's name alone: the word
 // describes the tab and is never part of its name.
+//
+// The polish (2026-10-05): the open tab keeps the room its word takes when
+// it is not open (`reserve`, drawn invisible after its keyline), so no tab
+// moves when the page changes and the tab just pressed stays under the
+// pointer (system §1: controls never move).
 export interface TabProps {
   id: string;
   label: string;
@@ -22,13 +27,18 @@ export interface TabProps {
   active?: boolean;
   disabled?: boolean;
   onClick?: () => void;
-  /** The page's state word, beside its lamp (`no bridge`, `ready`). */
+  /** The page's state word, beside its lamp (`unreachable`, `ready`). */
   word?: string;
   /** A value after the word that changes, in PT Sans (`2:31 left`). */
   value?: string;
   tone?: SharedStatusTone;
   /** The word's test id (the header's lamp ids, `shell-lamp-<page>`). */
   wordTestId?: string;
+  /**
+   * The open tab's word and value, never shown: they hold the tab's width so
+   * the tabs after it stay where they were. No lamp, test id or description.
+   */
+  reserve?: { word: string; value?: string };
   className?: string;
 }
 
@@ -47,11 +57,12 @@ export const Tab = ({
   value,
   tone = "neutral",
   wordTestId,
+  reserve,
   className,
 }: TabProps) => {
   const wordId = useId();
   const classes = [styles.tab, active ? styles.active : "", className].filter(Boolean).join(" ");
-  return (
+  const button = (
     <button
       type="button"
       data-nav-id={id}
@@ -65,7 +76,9 @@ export const Tab = ({
       aria-describedby={word ? wordId : undefined}
     >
       {icon ? <span className={styles.icon}>{icon}</span> : null}
-      <span>{label}</span>
+      <span className={styles.name} data-label={label}>
+        {label}
+      </span>
       {word ? (
         <span id={wordId} className={[styles.state, styles[tone]].join(" ")} data-tone={tone} data-testid={wordTestId}>
           <Lamp tone={lampToneFor(tone)} />
@@ -74,5 +87,16 @@ export const Tab = ({
         </span>
       ) : null}
     </button>
+  );
+  if (!active || !reserve) return button;
+  return (
+    <span className={styles.slot}>
+      {button}
+      <span className={styles.reserve} aria-hidden="true" data-tab-reserve="">
+        <span className={styles.reserveLamp} />
+        <span className={styles.word}>{reserve.word}</span>
+        {reserve.value ? <span className={styles.value}>{reserve.value}</span> : null}
+      </span>
+    </span>
   );
 };

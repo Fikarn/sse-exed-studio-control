@@ -5,6 +5,7 @@ import { createShellStore, type JsonObject, type StartupFailure } from "@sse/eng
 import { createFixtureTransport } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
+import { formatBackupTimestamp } from "../shellData";
 import { SetupRecoverySurface } from "./SetupRecoverySurface";
 
 // Found, to check (2026-09-28): the recovery screen's `Restore latest` and
@@ -107,11 +108,17 @@ describe("the recovery screen's restore keys ask first", () => {
     await store.dispose();
   });
 
+  // The visual overhaul's polish (2026-10-05): a refused restore is the locked
+  // form (dashed, 55 %, its reason within reach), not the busy moment's
+  // `disabled`, which it was drawn as.
   it("Restore latest waits while the list holds no database backup", async () => {
     const store = await renderRecovery({ backups: [ARCHIVE], failure: STORAGE_CORRUPT });
 
     expect(screen.getByText("No database backup yet")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Restore latest…" }) as HTMLButtonElement).disabled).toBe(true);
+    const latest = screen.getByRole("button", { name: "Restore latest…" }) as HTMLButtonElement;
+    expect(latest.getAttribute("aria-disabled")).toBe("true");
+    expect(latest.disabled).toBe(false);
+    expect(latest.getAttribute("title")).toBe("No database backup yet.");
     await store.dispose();
   });
 
@@ -133,12 +140,72 @@ describe("the recovery screen's restore keys ask first", () => {
 
     fireEvent.click(screen.getByTestId("setup-recovery-backup-0"));
     expect(screen.getByTestId("setup-recovery-backup-0").getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByRole("button", { name: "Restore path…" }) as HTMLButtonElement).disabled).toBe(true);
+    const restorePath = () => screen.getByRole("button", { name: "Restore path…" });
+    expect(restorePath().getAttribute("aria-disabled")).toBe("true");
+    expect(restorePath().getAttribute("title")).toContain("choose a database backup");
     expect(screen.getByTestId("setup-recovery-archive-refused").textContent).toContain("choose a database backup");
 
     fireEvent.click(screen.getByTestId("setup-recovery-backup-1"));
-    expect((screen.getByRole("button", { name: "Restore path…" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(restorePath().getAttribute("aria-disabled")).toBeNull();
+    expect((restorePath() as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByTestId("setup-recovery-archive-refused")).toBeNull();
+    await store.dispose();
+  });
+});
+
+// The visual overhaul's polish (2026-10-05): one list of the places in the
+// bay, each folder's key on its row (the bay's keys and the plate's File paths
+// named the same folders twice), and backup rows that lead with the local time.
+describe("the recovery screen's places and backups", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("lists each place once, in order, with its folder's key on its row", async () => {
+    // The six places the hardware link attaches to a start that failed, in
+    // its own order (main.rs); the list puts the folders a hand opens first.
+    const APP_DATA = "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native";
+    const store = await renderRecovery({
+      failure: {
+        ...STORAGE_CORRUPT,
+        paths: {
+          appDataDir: APP_DATA,
+          logsDir: `${APP_DATA}\\logs`,
+          logFilePath: `${APP_DATA}\\logs\\studio-control.log`,
+          dbPath: `${APP_DATA}\\studio-control.sqlite3`,
+          backupDir: BACKUPS,
+          exportsDir: `${APP_DATA}\\exports`,
+        },
+      },
+    });
+
+    const rows = within(screen.getByTestId("setup-recovery-paths")).getAllByRole("listitem");
+    expect(rows.map((row) => row.firstElementChild?.textContent)).toEqual([
+      "Backups folder",
+      "App data",
+      "Logs",
+      "Log file",
+      "Database path",
+      "Exports",
+    ]);
+    const backupsKey = within(rows[0]!).getByTestId("setup-recovery-open-backups");
+    expect(backupsKey.textContent).toBe("Open");
+    expect(backupsKey.getAttribute("aria-label")).toBe("Open backups folder");
+    expect(within(rows[1]!).getByTestId("setup-recovery-open-app-data")).toBeTruthy();
+    expect(within(rows[2]!).getByTestId("setup-recovery-open-logs")).toBeTruthy();
+    expect(within(rows[3]!).queryByRole("button")).toBeNull();
+    expect(within(rows[4]!).queryByRole("button")).toBeNull();
+    expect(within(rows[5]!).getByTestId("setup-recovery-open-diagnostics")).toBeTruthy();
+    expect(screen.queryByText("File paths")).toBeNull();
+    await store.dispose();
+  });
+
+  it("leads a backup's row with its local time and kind, the size and file name after", async () => {
+    const store = await renderRecovery({ failure: STORAGE_CORRUPT });
+
+    const row = screen.getByTestId("setup-recovery-backup-1");
+    expect(row.firstElementChild?.textContent).toBe(`${formatBackupTimestamp(DATABASE.modifiedAt)} · database backup`);
+    expect(row.lastElementChild?.textContent).toBe(`80.0 KB · ${DATABASE.name}`);
     await store.dispose();
   });
 });

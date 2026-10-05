@@ -24,7 +24,9 @@ import {
 test("renders the setup/support pilot shell from fixtures", async ({ page }) => {
   await openFixture(page, "setup-required");
 
-  await expect(page.getByText("Commissioning runner")).toBeVisible();
+  // The visual overhaul's polish (2026-10-05): the bay's head went; the
+  // runner is the cluster's list of steps, named so.
+  await expect(page.getByRole("tablist", { name: "Commissioning runner" })).toBeVisible();
   // Visual overhaul A, Slice 2 (plan D1): Setup is a workspace inside the one
   // shell (old assertion: no navigation, PreReadyFrame); before commissioning
   // is published the operator workspaces are locked.
@@ -43,7 +45,7 @@ test("walks the fixture-backed commissioning runner and support actions", async 
   await openFixture(page, "setup-required");
 
   await page.getByRole("tab", { name: /Import profile/i }).click();
-  await page.getByRole("button", { name: "Download profile" }).click();
+  await page.getByRole("button", { name: "Export and continue" }).click();
   await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
 
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
@@ -73,7 +75,7 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   // Same entry as the walk-through: the Import step first, so the Probe tab
   // opens without the skip-ahead prompt.
   await page.getByRole("tab", { name: /Import profile/i }).click();
-  await page.getByRole("button", { name: "Download profile" }).click();
+  await page.getByRole("button", { name: "Export and continue" }).click();
   await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
 
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
@@ -83,7 +85,8 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   // run reported is read off the notice it wrote.
   const feedback = page.getByTestId("setup-feedback");
   await expect(feedback).toContainText("2 of 3 probes passed");
-  await expect(feedback).toContainText("Lighting Bridge Probe: Bridge 0.0.0.0 did not answer");
+  await expect(feedback).toContainText("Lighting bridge: Bridge 0.0.0.0 did not answer");
+  await expect(feedback).not.toContainText("..");
   // A failed probe never advances the runner on its own.
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
 
@@ -96,7 +99,7 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   await page.getByTestId("setup-step-primary").click();
   const dialog = page.getByRole("dialog", { name: "Publish with failing probes?" });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Lighting Bridge Probe");
+  await expect(dialog).toContainText("Lighting bridge");
   await expect(dialog).toContainText("did not answer");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
@@ -174,10 +177,10 @@ test.describe("a published setup unpublishes only at a second press", () => {
     await expect(step).toHaveAttribute("data-armed", "true");
     const display = page.getByTestId("setup-state-display");
     // The visual overhaul (2026-10-05): the armed row says where the second
-    // press goes; the sentence says that it unpublishes.
+    // press goes; the sentence says that it unpublishes, and what locks (in
+    // the display's two lines since the polish, 2026-10-05).
     await expect(display).toContainText("Go to Probe hardware · press again");
-    await expect(display).toContainText("A second press unpublishes");
-    await expect(display).toContainText("Lighting, Audio, Cameras and Teleprompter lock");
+    await expect(display).toContainText("Unpublishing locks Lighting, Audio, Cameras and Teleprompter.");
     await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
 
     await page.clock.fastForward(PAST_THE_DWELL_MS);
@@ -231,7 +234,7 @@ test.describe("a published setup unpublishes only at a second press", () => {
     await page.getByTestId("setup-state-run-probes").click();
     await expect(page.getByTestId("setup-state-run-probes")).toHaveAttribute("data-armed", "true");
     const display = page.getByTestId("setup-state-display");
-    await expect(display).toContainText("Lighting, Audio, Cameras and Teleprompter lock");
+    await expect(display).toContainText("Unpublishing locks Lighting, Audio, Cameras and Teleprompter.");
     await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
     await page.clock.resume();
   });
@@ -295,9 +298,10 @@ test("setup-degraded fixture surfaces the recovery + support entry points", asyn
 
 // New pages program, Slice SW (D22): "the step screen needs no scroll at
 // 1280x800 (SET-11)" went with the size. Slice 7 had made its contract this
-// case's stronger one — a commissioning step is a screen at the height the step
-// needs, on screen without scrolling — and its one key this case did not name,
-// Support's, joins the list here.
+// case's stronger one — a commissioning step is on screen without scrolling —
+// and its one key this case did not name, Support's, joins the list here. The
+// visual overhaul's polish (2026-10-05): the step screen fills the bay, its
+// content at the top, and still nothing scrolls.
 test("the Publish keys and every probe result are fully visible without scrolling (C4)", async ({ page }) => {
   await openFixture(page, "setup-ready");
 
@@ -339,7 +343,7 @@ test("degraded: the display offers Run all probes and Publish becomes Publish wi
   const dialog = page.getByRole("dialog", { name: "Publish with failing probes?" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Lighting bridge");
-  await expect(dialog).toContainText("Control surface");
+  await expect(dialog).toContainText("Deck");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
 });
@@ -619,11 +623,11 @@ test("the Runner binds no key: Shift+S types in a field, Tab moves focus, Enter 
   await expect(page.getByTestId("setup-step-import")).toHaveAttribute("data-standing", "current");
 
   // Enter with focus off every key runs nothing. It used to run the step's
-  // main key (here Download profile, which also opens Probe hardware)
+  // main key (here Export and continue, which also opens Probe hardware)
   // whatever had focus.
   await importHeading.click();
   await page.keyboard.press("Enter");
-  await expect(primary).toHaveText("Download profile");
+  await expect(primary).toHaveText("Export and continue");
   await expect(importHeading).toBeVisible();
   await expect(page.getByTestId("setup-feedback")).toHaveCount(0);
 
@@ -717,9 +721,12 @@ test("Setup prints no key hints: the footer, the Console key, the bay head (S3)"
   await expectWorkspaceMounted(page, "setup");
 
   // The footer keeps its telemetry and loses "Ctrl+K Command palette", "?
-  // Shortcuts" and "Ctrl+3 Back to the console".
+  // Shortcuts" and "Ctrl+3 Back to the console". The visual overhaul's polish
+  // (2026-10-05): its Commissioning and App went (the state word and About say
+  // them); the step and the probes stay, counted as the cluster counts them.
   const footer = page.getByTestId("setup-health-bar");
-  await expect(footer).toContainText("Commissioning");
+  await expect(footer).toContainText("Probes 3 of 3 passed");
+  await expect(footer).not.toContainText("Commissioning");
   for (const hint of ["Command palette", "Shortcuts", "Back to the console", "Ctrl"]) {
     await expect(footer).not.toContainText(hint);
   }
@@ -842,6 +849,22 @@ test.describe("Setup / Support after the visual overhaul", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("setup-state-run-probes")).toBeVisible();
     await page.clock.resume();
+  });
+
+  // The visual overhaul's polish (2026-10-05): the step shown is the Beige
+  // selection only while the bay shows the runner; on Support and the
+  // cameras' setup no step is shown, so none is selected.
+  test("a step is the selection only while the bay shows the runner", async ({ page }) => {
+    await openSetupPage(page, "setup-ready");
+    const cluster = page.getByTestId("setup-cluster");
+    await expect(cluster.getByRole("tab", { selected: true })).toHaveAttribute("data-testid", "setup-step-publish");
+    for (const mode of ["support", "cameras"]) {
+      await cluster.getByTestId(`setup-mode-${mode}`).click();
+      await expect(cluster.getByTestId(`setup-mode-${mode}`)).toHaveAttribute("aria-pressed", "true");
+      await expect(cluster.getByRole("tab", { selected: true })).toHaveCount(0);
+    }
+    await cluster.getByTestId("setup-mode-runner").click();
+    await expect(cluster.getByRole("tab", { selected: true })).toHaveAttribute("data-testid", "setup-step-publish");
   });
 
   test("the page's ⋯ holds the standing commands, with their keys' test ids", async ({ page }) => {

@@ -170,9 +170,11 @@
   gap: 12px;
 }
 
+/* The value as the design system's control rows print theirs: 20 px, the
+   regular weight (the polish, 2026-10-05). */
 .focusValue {
   color: var(--text-text);
-  font: 700 var(--font-size-word) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-word) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -194,18 +196,29 @@
   display: inline-flex;
 }
 
-/* What a press-twice setting is, as the camera reports it. */
+/* What a press-twice setting is, as the camera reports it: the value and a
+   note beside it, as the take's rows in the cluster draw theirs. The polish
+   (2026-10-05): the value in the readouts' regular weight; doubt the dashed
+   yellow keyline on the value alone, `last read` outside it, so the keyline
+   ends inside the column; an absent value the quiet note. */
 .reported {
-  font-weight: 700;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-.reported[data-doubt] {
+.reportedValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.reportedValue[data-doubt] {
   color: var(--role-yellow-text);
   outline: 1px dashed var(--role-yellow-line);
   outline-offset: 2px;
 }
 
 .reportedNote {
-  font-weight: 400;
   color: var(--text-text2);
+  font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }

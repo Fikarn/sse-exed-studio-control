@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Key, MenuButton, type UseArmResult } from "@sse/design-system";
 
-import { SetupField, SetupFactCard, SetupRecordHeading, SetupStepScreen } from "../components/SetupStepScreen";
+import { SetupField, SetupRecordSection, SetupStepScreen } from "../components/SetupStepScreen";
 import { formatBackupTimestamp, describeBackupKind, type SupportBackupEntry } from "../../shellData";
 import { formatFileSize } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
@@ -34,7 +34,11 @@ function BackupRow({
   const rowRef = useRef<HTMLLIElement | null>(null);
   return (
     <li ref={rowRef} className={styles.backupRow} data-selected={chosen ? "" : undefined}>
-      {/* A press puts the backup's path in the field; nothing is restored. */}
+      {/* A press puts the backup's path in the field; nothing is restored.
+          The visual overhaul's polish (2026-10-05): the row leads with when
+          and what, in local time; the file's name, written in UTC, is the
+          quiet second line, and gives way when it is long (the ⋯ menu's head
+          holds it whole). */}
       <button
         type="button"
         className={styles.backupPick}
@@ -42,10 +46,11 @@ function BackupRow({
         data-testid={`support-backup-${index}`}
         onClick={onChoose}
       >
-        <span className={styles.backupName}>{backup.name}</span>
-        <span className={styles.backupMeta}>
-          {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
-          {describeBackupKind(backup.kind)}
+        <span className={styles.backupWhen}>
+          {formatBackupTimestamp(backup.modifiedAt)} · {describeBackupKind(backup.kind)}
+        </span>
+        <span className={styles.backupMeta} data-cut-by-design="">
+          {formatFileSize(backup.sizeBytes)} · {backup.name}
         </span>
       </button>
       <MenuButton
@@ -73,9 +78,7 @@ function BackupRow({
 /** Support mode's screen: backup and recovery: export, verify, restore, and the backups on disk. */
 export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
   const { supportSnapshot } = editor.props;
-  const { bayHead } = editor.chrome;
-  const { backups, lastBackup, setRestorePath, runtimePaths, restorePath, busyAction, setRestorePrompt, arm } =
-    editor.state;
+  const { backups, setRestorePath, runtimePaths, restorePath, busyAction, setRestorePrompt, arm } = editor.state;
   const { performAction, exportSupportBackup, verifyBackup, openReferencePath } = editor.actions;
   const busy = busyAction !== null;
   const pages = Math.max(1, Math.ceil(backups.length / BACKUPS_A_PAGE));
@@ -96,32 +99,26 @@ export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
     </Key>
   );
 
+  // The visual overhaul's polish (2026-10-05): no eyebrow (the cluster's
+  // switch names the view), and no "Latest backup" fact: the list's first row
+  // is the latest, the record's head counts them, and the plate says both
+  // again.
   return (
     <SetupStepScreen
-      head={bayHead}
-      eyebrow="Support"
       title="Backup and recovery"
       lead={String(
         supportSnapshot?.restoreSummary ??
           "Verify a backup, or restore a backup archive or a database backup from the backups folder; then run the probes again before going back to work."
       )}
       facts={
-        <>
-          <SetupFactCard
-            label="Latest backup"
-            value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "None yet"}
-            standing={backups.length === 1 ? "1 backup" : `${backups.length} backups`}
-            tone={backups.length > 0 ? "ok" : "attention"}
-          />
-          <SetupField
-            label="Restore from path"
-            wide
-            placeholder={String(runtimePaths?.backupDir ?? "a file inside the backups folder")}
-            value={restorePath}
-            testId="support-restore-path-field"
-            onChange={(event) => setRestorePath(event.target.value)}
-          />
-        </>
+        <SetupField
+          label="Restore from path"
+          wide
+          placeholder={String(runtimePaths?.backupDir ?? "a file inside the backups folder")}
+          value={restorePath}
+          testId="support-restore-path-field"
+          onChange={(event) => setRestorePath(event.target.value)}
+        />
       }
       actions={
         <>
@@ -161,71 +158,76 @@ export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
       note="A restore asks first: it replaces the saved data, and a database backup restarts the hardware link. Export a backup before you restore."
       record={
         <>
-          <SetupRecordHeading>Backups</SetupRecordHeading>
-          {backups.length > 0 ? (
-            <ol className={styles.backupList} data-testid="support-backup-list">
-              {shown.map((backup, offset) => {
-                const index = page * BACKUPS_A_PAGE + offset;
-                return (
-                  <BackupRow
-                    key={backup.path}
-                    backup={backup}
-                    index={index}
-                    chosen={backup.path === chosenPath}
-                    busy={busy}
-                    arm={arm}
-                    onChoose={() => setRestorePath(backup.path)}
-                    onVerify={() => void performAction("verify-backup", () => verifyBackup(backup.path))}
-                    onRestore={() => setRestorePrompt({ actionId: "restore-path", path: backup.path })}
-                  />
-                );
-              })}
-            </ol>
-          ) : (
-            <p className={styles.empty}>No backups yet. Export the first one before any restore.</p>
-          )}
-          {pages > 1 ? (
-            <div className={styles.pager} data-testid="support-backup-pager">
-              <Key
-                size="small"
-                aria-label="Newer backups"
-                disabled={page === 0}
-                testId="support-backup-newer"
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-              >
-                ‹
-              </Key>
-              <span className={styles.pagerPlace}>
-                {page + 1} / {pages}
-              </span>
-              <Key
-                size="small"
-                aria-label="Older backups"
-                disabled={page >= pages - 1}
-                testId="support-backup-older"
-                onClick={() => setPage((current) => Math.min(pages - 1, current + 1))}
-              >
-                ›
-              </Key>
+          <SetupRecordSection
+            title="Backups"
+            detail={backups.length === 0 ? undefined : backups.length === 1 ? "1 backup" : `${backups.length} backups`}
+          >
+            {backups.length > 0 ? (
+              <ol className={styles.backupList} data-testid="support-backup-list">
+                {shown.map((backup, offset) => {
+                  const index = page * BACKUPS_A_PAGE + offset;
+                  return (
+                    <BackupRow
+                      key={backup.path}
+                      backup={backup}
+                      index={index}
+                      chosen={backup.path === chosenPath}
+                      busy={busy}
+                      arm={arm}
+                      onChoose={() => setRestorePath(backup.path)}
+                      onVerify={() => void performAction("verify-backup", () => verifyBackup(backup.path))}
+                      onRestore={() => setRestorePrompt({ actionId: "restore-path", path: backup.path })}
+                    />
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className={styles.empty}>No backups yet. Export the first one before any restore.</p>
+            )}
+            {pages > 1 ? (
+              <div className={styles.pager} data-testid="support-backup-pager">
+                <Key
+                  size="small"
+                  aria-label="Newer backups"
+                  disabled={page === 0}
+                  testId="support-backup-newer"
+                  onClick={() => setPage((current) => Math.max(0, current - 1))}
+                >
+                  ‹
+                </Key>
+                <span className={styles.pagerPlace}>
+                  {page + 1} / {pages}
+                </span>
+                <Key
+                  size="small"
+                  aria-label="Older backups"
+                  disabled={page >= pages - 1}
+                  testId="support-backup-older"
+                  onClick={() => setPage((current) => Math.min(pages - 1, current + 1))}
+                >
+                  ›
+                </Key>
+              </div>
+            ) : null}
+          </SetupRecordSection>
+          <SetupRecordSection title="Where things are">
+            <div className={styles.folders}>
+              {folder(
+                "Backups",
+                String(supportSnapshot?.backupDir ?? runtimePaths?.backupDir ?? ""),
+                "open-archive-path",
+                "support-open-backups"
+              )}
+              {folder("App data", String(runtimePaths?.appDataDir ?? ""), "open-app-data", "support-open-app-data")}
+              {folder(
+                "Diagnostics",
+                String(runtimePaths?.exportsDir ?? runtimePaths?.appDataDir ?? ""),
+                "open-diagnostics-dir",
+                "support-open-diagnostics"
+              )}
+              {folder("Logs", String(runtimePaths?.logsDir ?? ""), "open-logs", "support-open-logs")}
             </div>
-          ) : null}
-          <SetupRecordHeading>Where things are</SetupRecordHeading>
-          <div className={styles.folders}>
-            {folder(
-              "Backups",
-              String(supportSnapshot?.backupDir ?? runtimePaths?.backupDir ?? ""),
-              "open-archive-path",
-              "support-open-backups"
-            )}
-            {folder("App data", String(runtimePaths?.appDataDir ?? ""), "open-app-data", "support-open-app-data")}
-            {folder(
-              "Diagnostics",
-              String(runtimePaths?.exportsDir ?? runtimePaths?.appDataDir ?? ""),
-              "open-diagnostics-dir",
-              "support-open-diagnostics"
-            )}
-            {folder("Logs", String(runtimePaths?.logsDir ?? ""), "open-logs", "support-open-logs")}
-          </div>
+          </SetupRecordSection>
         </>
       }
       testId="setup-screen-support"

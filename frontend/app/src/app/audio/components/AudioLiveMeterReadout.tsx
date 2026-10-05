@@ -3,7 +3,7 @@ import type { AudioMeterEntry, ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioLiveMeterReadout.module.css";
 import { INSPECTOR_DB_HYSTERESIS, INSPECTOR_READOUT_INTERVAL_MS } from "../audioConstants";
-import { METER_OVER_DBFS, METER_PEAK_WARNING_DBFS } from "../audioFormatting";
+import { AUDIO_METER_NEG_INFINITY, METER_OVER_DBFS, METER_PEAK_WARNING_DBFS, MINUS } from "../audioFormatting";
 import {
   clampMeterDbfs,
   METER_FLOOR_DBFS,
@@ -32,17 +32,19 @@ function liveEntry(store: ShellStore, kind: MeterKind, meterId: string | null): 
   return kind === "channel" ? (frame.channels[meterId] ?? null) : (frame.mixTargets[meterId] ?? null);
 }
 
+// The visual overhaul's polish (2026-10-05): the plate's readouts print the
+// real minus (DESIGN.md §3), as every other level on the Console does.
 function emptyReadoutPair(): MeterReadoutPair {
   return {
-    left: { text: "-∞", value: null },
-    right: { text: "-∞", value: null },
+    left: { text: AUDIO_METER_NEG_INFINITY, value: null },
+    right: { text: AUDIO_METER_NEG_INFINITY, value: null },
   };
 }
 
 function formatQuantizedDbfs(dbfs: number, exactSilence: boolean, previous: MeterReadoutSlot): MeterReadoutSlot {
   const clampedDbfs = clampMeterDbfs(dbfs);
   if (!Number.isFinite(dbfs) || (exactSilence && clampedDbfs <= METER_FLOOR_DBFS)) {
-    return { text: "-∞", value: null };
+    return { text: AUDIO_METER_NEG_INFINITY, value: null };
   }
 
   if (previous.value !== null && Math.abs(clampedDbfs - previous.value) < INSPECTOR_DB_HYSTERESIS) {
@@ -50,7 +52,7 @@ function formatQuantizedDbfs(dbfs: number, exactSilence: boolean, previous: Mete
   }
 
   const value = Math.round(clampedDbfs);
-  return { text: String(value), value };
+  return { text: value < 0 ? `${MINUS}${Math.abs(value)}` : String(Math.abs(value)), value };
 }
 
 function levelIsExactlySilent(

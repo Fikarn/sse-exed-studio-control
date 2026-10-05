@@ -79,8 +79,27 @@ export const runnerStepOrder: RunnerStepId[] = ["import", "probe", "map", "verif
 export const UNPUBLISH_WINDOW_MS = 3000;
 export const UNPUBLISH_ARM_LABEL = "Unpublish the setup";
 /** What the state display says while that press is armed: what gets locked
- *  (two lines of the display; the armed row says what the press does). */
-export const UNPUBLISH_ARMED_SENTENCE = "A second press unpublishes: Lighting, Audio, Cameras and Teleprompter lock.";
+ *  (two lines of the display, at most 70 characters, the owner's rule of
+ *  2026-10-05; the armed row says what the press does and that it presses
+ *  again). */
+export const UNPUBLISH_ARMED_SENTENCE = "Unpublishing locks Lighting, Audio, Cameras and Teleprompter.";
+
+/** The hardware link's default profile (`DEFAULT_HARDWARE_PROFILE` in
+ *  native/rust-engine/src/app_state.rs), in words. */
+const HARDWARE_PROFILE_WORDS: Record<string, string> = {
+  "sse-fixed-studio-v1": "SSE studio · v1",
+};
+
+/** A hardware profile as the screen names it (the visual overhaul's polish,
+ *  2026-10-05): the default profile's id in words, any other name as the
+ *  hardware link sends it, and `missing` when it sends none. */
+export function hardwareProfileWord(profile: unknown, missing: string): string {
+  if (profile === undefined || profile === null) {
+    return missing;
+  }
+  const id = String(profile);
+  return HARDWARE_PROFILE_WORDS[id] ?? id;
+}
 
 /** A control's kind on the deck, in the operator's words. */
 export function controlKindWord(type: string): string {

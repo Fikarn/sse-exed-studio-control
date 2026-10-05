@@ -52,18 +52,25 @@
   outline-offset: -2px;
 }
 
-.backupName {
+/* When and what, read first (the visual overhaul's polish, 2026-10-05). */
+.backupWhen {
   min-width: 0;
   overflow: hidden;
   font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Its size and its file's name, quiet; a long name gives way by design. */
 .backupMeta {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-text3);
   font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The row's ⋯, drawn inside its edge. */
@@ -87,8 +94,9 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Under a record section's head, which keeps its own gap. */
 .empty {
-  margin: 10px 0 0;
+  margin: 0;
   color: var(--text-text2);
   font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }
@@ -97,5 +105,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
 }

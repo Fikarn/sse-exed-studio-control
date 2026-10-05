@@ -42,7 +42,7 @@ export function heldSentence(model: CameraModel): string {
 }
 
 export function releasedSentence(model: CameraModel): string {
-  return `${model.tag} is released to ${model.app}. Studio Control does not read it or send it anything until you connect it again.`;
+  return `${model.tag} is released to ${model.app}. Connect it to control it here.`;
 }
 
 /** A camera that is not set up; in a build with no link to it, that there is none yet, not what to enter. */
@@ -56,7 +56,7 @@ export function notSetUpSentence(model: CameraModel, hasLink = true): string {
 /** A held camera that does not answer: over Bluetooth (CAM 1), or at its address. */
 export function unreachableSentence(model: CameraModel, address: string | null): string {
   return model.camera === 1
-    ? "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC."
+    ? "CAM 1 does not answer over Bluetooth. Check it is on and within reach."
     : `${model.tag} does not answer at ${address ?? "its address"}. Check that it is on and on the network.`;
 }
 

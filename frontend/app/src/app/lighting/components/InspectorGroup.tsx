@@ -21,9 +21,10 @@ import styles from "./LightingInspector.module.css";
 
 // The visual overhaul's Lighting page (2026-10-04): a group on the plate. Its
 // title plate (its name, how many of its fixtures are on, its ⋯: the same
-// menu as its key in the cluster, Delete group… last, arming in place); Turn
-// on or off; and its fixtures, each a row that opens the fixture, with a ⋯
-// that takes it out of the group (not a delete: the fixture stays in the rig).
+// menu as its key in the cluster, Delete group… last, arming in place); its
+// Group key (lit while all are on); and its fixtures, each a row that opens
+// the fixture, with a ⋯ that takes it out of the group (not a delete: the
+// fixture stays in the rig).
 
 const MEMBER_ROWS = 14;
 
@@ -114,15 +115,20 @@ export function InspectorGroup({
       </div>
 
       <div className={styles.keyRow}>
+        {/* The visual overhaul's polish (2026-10-05): a toggle keeps one name
+            and its fill and hint say the state, in the group key's words;
+            until then a lit key read "Turn group off". */}
         <Key
           mode="toggle"
           size="large"
           live={allOn}
           aria-pressed={allOn}
           disabled={busy || fixtures.length === 0}
+          hint={allOn ? "on" : onCount > 0 ? `${onCount} of ${fixtures.length} on` : "off"}
+          testId="lighting-plate-group-power"
           onClick={() => onTogglePower(groupId, !allOn)}
         >
-          {allOn ? "Turn group off" : "Turn group on"}
+          Group
         </Key>
       </div>
 

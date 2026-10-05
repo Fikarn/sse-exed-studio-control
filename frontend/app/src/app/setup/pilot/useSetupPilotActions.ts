@@ -169,7 +169,9 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     if (notPassed.length > 0) {
       return {
         message: `${results.length - notPassed.length} of ${results.length} probes passed — ${notPassed
-          .map((check) => `${check.label}: ${check.detail}`)
+          // A detail ends in its own full stop; the line adds one after the
+          // last (the polish, 2026-10-05: it read "probe.. Fix").
+          .map((check) => `${check.label}: ${check.detail.replace(/\.$/, "")}`)
           .join("; ")}. Fix the field it names, then press Run all probes again.`,
         tone: "error" as const,
       };
@@ -282,8 +284,11 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
   };
 
   const primaryActionLabel = useMemo(() => {
+    // The visual overhaul's polish (2026-10-05): the key says the step's verb
+    // (it writes the export to a folder, as Export only does) and that it moves
+    // on, as Continue to verify does. It read "Download profile".
     if (activeStepId === "import") {
-      return "Download profile";
+      return "Export and continue";
     }
     if (activeStepId === "probe") {
       return "Run all probes";

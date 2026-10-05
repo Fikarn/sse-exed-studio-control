@@ -35,7 +35,13 @@ test("the Inputs heading's bank keys page both rows, reach Line 1–8 and are di
 
   // Bank 1: the keys are there, beside the bank readout the heading prints on
   // every bank once there is more than one. One pair, on the Inputs heading only.
+  // The visual overhaul's polish (2026-10-05): they are the design system's
+  // small keys with ‹ and ›, as every other page's pager (they were icon
+  // buttons with chevrons); an end of the banks is disabled, never locked.
   await expect(inputsHeading.getByTestId("audio-bank-previous")).toBeVisible();
+  await expect(previous).toHaveText("‹");
+  await expect(next).toHaveText("›");
+  await expect(previous).not.toHaveAttribute("aria-disabled", "true");
   await expect(inputsHeading.getByTestId("audio-bank-next")).toBeVisible();
   await expect(page.getByTestId("audio-tier-label-software-playback").getByTestId("audio-bank-next")).toHaveCount(0);
   await expect(previous).toHaveAccessibleName("Previous bank");
@@ -251,8 +257,10 @@ test("typed entry offers Reset to the default on a knob, the strip's gain and a 
   dialog = page.getByRole("dialog", { name: "Set FX 3/4 send level" });
   await dialog.getByLabel("Fader level").fill("-10");
   await dialog.getByRole("button", { name: "Set value" }).click();
-  // Whole-text checks: "-10.0 dB" contains "0.0 dB".
-  await expect(fxReadout).toHaveText("-10.0 dB");
+  // Whole-text checks: "−10.0 dB" contains "0.0 dB". The visual overhaul's
+  // polish (2026-10-05): the readout prints the real minus (it was "-10.0
+  // dB"); the typed "-10" stays the keyboard's hyphen.
+  await expect(fxReadout).toHaveText("−10.0 dB");
   await fxFader.focus();
   await page.keyboard.press("Enter");
   dialog = page.getByRole("dialog", { name: "Set FX 3/4 send level" });

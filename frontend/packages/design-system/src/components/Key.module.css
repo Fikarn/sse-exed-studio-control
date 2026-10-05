@@ -157,6 +157,21 @@
     color: var(--text-text);
   }
 
+  /* The visual overhaul's polish (2026-10-05): a locked key keeps its state,
+     the word and the dashed edge in its hue, still at 55 % and unlit. Engaged
+     reads as doubt (DESIGN.md §4), live in green, so a muted strip or a dimmed
+     room stays visible while the desk is offline. Before the segmented rules,
+     so a locked group keeps its hairlines and only its choice's word in yellow. */
+  .locked[data-engaged] {
+    color: var(--role-yellow-text);
+    border-color: var(--role-yellow-line);
+  }
+
+  .locked[data-live] {
+    color: var(--role-green-text);
+    border-color: var(--role-green-text);
+  }
+
   /* Selected: the Beige keyline, 2 px, the only colour selection has. The
      edge is the first pixel and an inset outline the second, so the key keeps
      its size and casts no shadow. Focus replaces the outline with the ring. */

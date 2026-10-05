@@ -56,9 +56,11 @@
   min-width: 0;
 }
 
+/* The dial's word: Adelia at 14, the size of every other small Adelia word
+   (the polish, 2026-10-05: 13 is for the plot's numerals, never read to act). */
 .cellWord {
   color: var(--text-text3);
-  font: var(--font-weight-bold) var(--font-size-tick) / 1 var(--font-family-display);
+  font: var(--font-weight-bold) var(--font-size-label) / 1 var(--font-family-display);
   letter-spacing: var(--font-tracking-display);
   text-transform: uppercase;
 }
@@ -139,6 +141,8 @@
   list-style: none;
 }
 
+/* A paragraph's row: a list row at the body size, pressed during a take (the
+   polish, 2026-10-05); its number and length the secondary facts at 14. */
 .paragraphRow {
   appearance: none;
   display: grid;
@@ -152,7 +156,7 @@
   border-radius: var(--radius-base);
   background: none;
   color: var(--text-text);
-  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-ui);
   text-align: left;
   cursor: pointer;
 }
@@ -175,6 +179,7 @@
 
 .paragraphNumber {
   color: var(--text-text3);
+  font-size: var(--font-size-label);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -191,13 +196,8 @@
 
 .paragraphLength {
   color: var(--text-text3);
+  font-size: var(--font-size-label);
   font-variant-numeric: tabular-nums;
-}
-
-.none {
-  margin: 0;
-  color: var(--text-text3);
-  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 /* Clear across the cluster, at the foot. */

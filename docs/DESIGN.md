@@ -12,17 +12,17 @@ From the operator's chair, in one glance and without reading a sentence: is it s
 
 Every page is one grid: **header · cluster · bay · plate · footer**, 80 · 440 | 1680 | 440 · 40. There is no page top bar; the cluster's first element is the state. The one surface is 2560×1440, fullscreen.
 
-| Region        | What it is                                                                                                                                         | Size (px) |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------: |
-| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                    |   80 high |
-| Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                              |  440 wide |
-| State display | a black display, fixed height: lamp and word, the page's ⋯ at its top right, the hardware link's sentence, the way-out key; nothing below it moves |  180 high |
-| Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched"           |   56 high |
-| Bay           | the page's picture: strips, the plot, the glass, the step screen; the shell draws no margin in it, the page keeps its own                          | 1680 wide |
-| Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                  |  440 wide |
-| Footer        | telemetry as `Label value` items and one action key                                                                                                |   40 high |
+| Region        | What it is                                                                                                                                                     | Size (px) |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------: |
+| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                                |   80 high |
+| Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                                          |  440 wide |
+| State display | a black display, fixed height: lamp and word, the page's ⋯ at its top right, the hardware link's sentence (two lines), the way-out key; nothing below it moves |  180 high |
+| Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched"                       |   56 high |
+| Bay           | the page's picture: strips, the plot, the glass, the step screen; the shell draws no margin in it, the page keeps its own                                      | 1680 wide |
+| Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                              |  440 wide |
+| Footer        | telemetry as `Label value` items and one action key                                                                                                            |   40 high |
 
-The header reads left to right: the product's name in SSE Adelia at the frame's 32 px margin, alone over the cluster; the tabs, Setup / Support · Lighting · Audio · Cameras · Teleprompter, each page's tab carrying its page's lamp and state word (16 px), the open page's none, because its state display says it; the deck's lamp, `Surface`, and a `Backup` chip only while the automatic backup failed or is overdue; the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself; the `REC` tally in a slot of its own that never moves, quiet at rest and the latch form in coral while CAM 1 records; the clock; and the SSE logotype alone at the right, 40 px high with half its height clear on every side, never a lockup. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer. Density never comes from the type; the sizes stay.
+The header reads left to right: the product's name in SSE Adelia at the frame's 32 px margin, alone over the cluster; the tabs, Setup / Support · Lighting · Audio · Cameras · Teleprompter, each page's tab carrying its page's lamp and state word (16 px), the open page's none, because its state display says it, though it keeps the word's room (drawn unseen after its keyline) and every name holds its bold width, so no tab moves when the page changes; the deck's lamp, `Surface`, and a `Backup` chip only while the automatic backup failed or is overdue; the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself (on Lighting, which has a Solo of its own, the Console's reads `AUDIO SOLO`); the `REC` tally in a slot of its own that never moves, quiet at rest and the latch form in coral while CAM 1 records; the clock; and the SSE logotype alone at the right, 40 px high with half its height clear on every side, never a lockup. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer; no tab is the current one, and a lamp never read is hollow and says `pending`, or `not read` after a start that failed. Density never comes from the type; the sizes stay.
 
 Every take-time key has one fixed home. A latch goes into the latch slot, never above or between keys, so nothing a hand reaches for during a take is ever pushed.
 
@@ -71,11 +71,13 @@ The surface is the brand's Dark Green pulled almost to black: a trace of hue, no
 
 Hue names the family, form names the meaning, and colour never stands alone: a lit fill means on, a lamp and its word mean look here, a keyline encloses a value or a word. A lamp always has its word beside it.
 
-Hazards are a coral lamp and a word on a dark key, never a coral fill: 48 V on, and `REC` while the main camera records. Doubt is a dashed yellow keyline on the value itself: a value the hardware link has not confirmed, or a last known value from a device that stopped answering. A locked control is a dashed edge at 55 %, and says why on hover.
+Hazards are a coral lamp and a word on a dark key, never a coral fill: 48 V on, and `REC` while the main camera records. Doubt is a dashed yellow keyline on the value itself: a value the hardware link has not confirmed, or a last known value from a device that stopped answering. A locked control is a dashed edge at 55 %, and says why on hover; a locked key keeps its state: engaged, its word and dashed edge in yellow; live, in green.
 
 Text pairs that hold 4.5:1 (tested from the token values): the inks on every surface and well; black on Green, Yellow, Coral and Beige Light; Beige on Burgundy; Beige Light and the second ink on Dark Green. Never coral or the quiet ink on Dark Green.
 
 The meter ramp and the colour-temperature track are signal, not status: green to −18 dBFS, yellow to −3, coral above; warm to cool.
+
+The operator's colour tags on scenes, groups and palettes are identity, not status: eight quiet tints, `--tag-0` to `--tag-7` (Clay, Ochre, Sand, Olive, Slate, Mist, Plum, Heather), clear of every role colour; Ochre and Mist are the palette's reserve Brown and Sky. A saved tag keeps its slot, and a colour-temperature palette carries none: its temperature colours it.
 
 There is one theme, Studio.
 
@@ -90,7 +92,7 @@ Flat and matte, three planes and one floating layer:
 | Well           | `--material-well`  | the state display, readouts, sliders' and meters' wells, fields, the plot: one step down, 1 px `--material-line` edge |
 | Floating layer | `--material-raise` | menus, popovers, dialogs, drawers, toasts: a 1 px `--material-line2` edge, a 1 px black outline and one soft shadow   |
 
-A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px). One radius, 4 px, everywhere (a lamp is a circle).
+A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px), the head's row standing 4 px above it with or without keys. One radius, 4 px, everywhere (a lamp is a circle).
 
 No gradient except signal (the meter ramp, the colour-temperature track), no glow, no inner highlight, no shadow except on the floating layer. The tooltip is the one light surface (Beige with black text), so it reads as a note. Fader and slider caps are matte and light, so a position reads from 3 m.
 
@@ -110,14 +112,15 @@ Nothing on an idle surface animates. Hover changes an edge or a colour, never a 
 
 ## 7. The components
 
-Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page; the board "Menus and overlays, open" holds the floating layers open.
+Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page (the header's `Tab`, `Lamp`, `Tally` and `Crest` on the board "Shell"); the board "Menus and overlays, open" holds the floating layers open.
 
 - **Shell**: the header (the product's name, `Tab`s with their pages' lamps, a `LampChip` for the deck and for each latch, the `Tally` for `REC`, the clock, the logotype) and the `Footer`; one plate slot that every page fills (`ShellRegion`).
 - **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys, the page's ⋯ as `menu` at its top right; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, on every page, `Section`, the take-time keys.
-- **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
+- **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover; it keeps its state, an engaged one in yellow, a live one in green), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
 - **Lamps**: `Lamp`, `LampChip` (header), `LampWord` (rows and tags), `StatusBadge` (a keyline word).
 - **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track, and a ▲ under the track for a value kept elsewhere, a scene's saved level, yellow while the value has left it), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
+- **Empty**: `EmptyLine`, an empty list or section: one quiet line in PT Sans body, the explanation as its tooltip, an optional hollow lamp (as the latch slot's "Nothing latched") and at most one key. Pages draw no empty state of their own.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
 - **Setup**: its step keys (an `ArmKey` with the step's number, name and word; on a published setup it reads `press twice` and arms in its own height) and its probe rows (the name, a `LampWord`, the answer under it) are the page's own, built from these, and so are the deck's map and the Support sections.
 
@@ -125,9 +128,11 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 
 Every state word is the hardware link's, in capitals with its lamp. Its sentence is printed as the link gives it. A raw code prints small under the sentence and is never the first thing read. Every state sentence says what happened and what to do, and the way out is a key in the same display.
 
+The sentence keeps two lines, so every state sentence is written to fit them, about 70 characters, whether the hardware link or the page writes it; the way-out key beside it names the action, so the sentence need not. The meta fits beside the way-out key, about 30 characters. Should a name ever make either longer (a snapshot load's failure names its slot first), the display says the whole of it on hover. The page tests hold that none is cut on any fixture.
+
 | Page         | Words                                                                                                                                       |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`                                    |
+| Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`; a snapshot: `ACTIVE`, `CHANGED`   |
 | Lighting     | `REACHABLE` · `HELD`, `NOT ANSWERING`, `UNSAVED` · `UNREACHABLE` · `PREVIEW`; a scene: `ON RIG`, `UNSAVED`, `PREVIEW` (the deck's `RECALL`) |
 | Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                                                      |
 | Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`                                       |

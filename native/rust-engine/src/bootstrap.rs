@@ -215,9 +215,9 @@ pub fn validate_protocol_version(requested_protocol_version: &str) -> Result<(),
         return Ok(());
     }
 
-    // The start-up screen prints this sentence as it is.
+    // The start-up screen prints this sentence as it is, in two lines.
     Err(format!(
-        "The app asked for protocol {} and the hardware link speaks protocol {}: the two files are of different builds.",
+        "The app speaks protocol {}, the hardware link protocol {}: different builds.",
         requested_protocol_version, SUPPORTED_PROTOCOL_VERSION
     ))
 }
@@ -863,9 +863,11 @@ mod tests {
     #[test]
     fn protocol_validation_rejects_mismatched_version() {
         let error = validate_protocol_version("99").expect_err("mismatched protocol should fail");
-        assert!(error.contains("asked for protocol 99"), "{error}");
+        assert!(error.contains("speaks protocol 99"), "{error}");
         assert!(
-            error.contains(&format!("speaks protocol {SUPPORTED_PROTOCOL_VERSION}")),
+            error.contains(&format!(
+                "hardware link protocol {SUPPORTED_PROTOCOL_VERSION}"
+            )),
             "{error}"
         );
         // The start-up screen prints it, so it names neither program by its

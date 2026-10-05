@@ -31,6 +31,12 @@ import { pausePageClock } from "./helpers/pageClock";
 // painter's canvas, the fixture double's simulated metering and the meter
 // formatters; the move changed none of the cases.
 
+// The visual overhaul's polish (2026-10-05): the scales print the real minus
+// (DESIGN.md §3). A dBFS mark's `data-meter-scale-mark` keeps its number as
+// written in code ("-6"), which helpers/meter-canvas.ts reads; its text is
+// "−6".
+const DBFS_SCALE_TEXT = EXPECTED_DBFS_SCALE_LABELS.map((label) => label.replace(/^-/, "−"));
+
 test("renders unclipped dBFS scale labels beside every audio meter", async ({ page }) => {
   await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "audio-populated");
@@ -49,7 +55,7 @@ test("renders unclipped dBFS scale labels beside every audio meter", async ({ pa
   expect(meterAudit.length).toBeGreaterThan(0);
   expect(meterAudit.filter((entry) => entry.scaleCount !== 1)).toEqual([]);
   for (const entry of meterAudit) {
-    expect(entry.labels).toEqual(EXPECTED_DBFS_SCALE_LABELS);
+    expect(entry.labels).toEqual(DBFS_SCALE_TEXT);
   }
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 selected-channel");
 
@@ -234,8 +240,9 @@ test("stabilizes audio inspector meter readouts during meter-only ticks", async 
     };
   });
 
-  expect(readoutMetrics.levelText).toMatch(/(-∞|-?\d+)\s*\/\s*(-∞|-?\d+)/);
-  expect(readoutMetrics.peakHoldText).toMatch(/(-∞|-?\d+)\s*\/\s*(-∞|-?\d+)/);
+  // The polish (2026-10-05): the real minus (it was the ASCII hyphen).
+  expect(readoutMetrics.levelText).toMatch(/^(−∞|−?\d+)\s*\/\s*(−∞|−?\d+)$/);
+  expect(readoutMetrics.peakHoldText).toMatch(/^(−∞|−?\d+)\s*\/\s*(−∞|−?\d+)$/);
   expect(readoutMetrics.mutations).toBeLessThanOrEqual(18);
 
   const finalLevelBox = await levelReadout.boundingBox();
@@ -417,6 +424,7 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   // still the desk's, on the same dBFS fill.
   // The visual overhaul's Console pull request: the fader scale is printed once
   // per tier, in the gutter beside its first strip (it was beside every strip).
+  // The polish (2026-10-05): its marks below unity print the real minus.
   const hardwareMeterVars = await page.getByTestId("audio-hardware-inputs-tier").evaluate((tier) => {
     const track = tier.querySelector('[data-testid="audio-strip-audio-input-9"] [data-meter-track]');
     return {
@@ -428,7 +436,7 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   });
   expect(hardwareMeterVars.left).toBeCloseTo(((20 * Math.log10(0.72) + 60) / 60) * 100, 1);
   expect(hardwareMeterVars.scaleLabels).toEqual(
-    expect.arrayContaining(["+6", "0", "-6", "-12", "-20", "-30", "-40", "-60"])
+    expect.arrayContaining(["+6", "0", "−6", "−12", "−20", "−30", "−40", "−60"])
   );
 });
 
@@ -570,7 +578,7 @@ test("maps audio meters to the documented dBFS scale", () => {
   expect(normalizedToDbfs(1)).toBeCloseTo(0, 5);
   expect(normalizedToDbfs(0.5)).toBeCloseTo(-6.0206, 4);
   expect(normalizedToDbfs(0.1)).toBeCloseTo(-20, 5);
-  expect(formatMeterDb(0.5)).toBe("-6");
+  expect(formatMeterDb(0.5)).toBe("−6");
   expect(dbfsToMeterPercent(-60)).toBe(0);
   expect(dbfsToMeterPercent(-30)).toBe(50);
   expect(dbfsToMeterPercent(0)).toBe(100);

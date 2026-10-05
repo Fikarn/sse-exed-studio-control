@@ -133,6 +133,7 @@ export function AudioOutputs({
             actionsAllowed={actionsAllowed}
             clearDraftValueLater={clearDraftValueLater}
             commitMixTargetContinuous={commitMixTargetContinuous}
+            doubt={viewModel.valuesInDoubt}
             draftStore={draftStore}
             getDraftValue={getDraftValue}
             lockedReason={lockedReason}
@@ -158,6 +159,7 @@ function AudioOutputRow({
   actionsAllowed,
   clearDraftValueLater,
   commitMixTargetContinuous,
+  doubt,
   draftStore,
   getDraftValue,
   lockedReason,
@@ -176,6 +178,8 @@ function AudioOutputRow({
   actionsAllowed: boolean;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
+  /** The desk has not confirmed the level: the readout carries the dashed yellow keyline (DESIGN.md §4). */
+  doubt: boolean;
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   lockedReason?: string;
@@ -297,12 +301,15 @@ function AudioOutputRow({
           {mixTarget.name}
         </span>
       </Key>
+      {/* The visual overhaul's polish (2026-10-05): a level the desk has not
+          confirmed is drawn in doubt, as the strips' are. */}
       <Readout
         className={styles.level}
         size="readout"
         align="right"
         value={formatAudioDb(volume).replace(/ dB$/, "")}
         unit="dB"
+        doubt={doubt}
         testId={`audio-lane-readout-${mixTarget.id}`}
       />
       <Key

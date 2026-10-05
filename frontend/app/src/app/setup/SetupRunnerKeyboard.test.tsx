@@ -115,7 +115,7 @@ describe("the Runner binds no key of its own (new pages S3, D6)", () => {
     expect(screen.queryByTestId("setup-feedback")).toBeNull();
     expect(screen.getByRole("heading", { name: "Import the Companion profile" })).toBeTruthy();
 
-    // D6 keeps Enter on the focused control: "Download profile" writes the
+    // D6 keeps Enter on the focused control: "Export and continue" writes the
     // export and opens Probe hardware, as a click does.
     screen.getByTestId("setup-step-primary").focus();
     await user.keyboard("{Enter}");

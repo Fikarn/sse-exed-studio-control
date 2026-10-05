@@ -9,8 +9,8 @@ import type { SetupPilotState } from "./useSetupPilotState";
 import type { SetupPilotActions } from "./useSetupPilotActions";
 
 /** The pieces every screen of the pilot shares: the cluster's steps, the setup
- *  state word, the armed row's words, the primary and back keys, the bay's
- *  head, and which probes have not passed. Derivations only. */
+ *  state word, the armed row's words, the primary and back keys, the runner
+ *  step's eyebrow, and which probes have not passed. Derivations only. */
 export function useSetupPilotChrome({
   props,
   state,
@@ -39,9 +39,11 @@ export function useSetupPilotChrome({
   const { performAction, openReferencePath, invokePrimaryAction, primaryActionLabel, moveStepSelection } = actions;
   // The runner's steps as the cluster prints them: done, current (the step the
   // setup is at and has not done), pending or failed, with a probe failure on
-  // the step that runs the probes. The step shown is the Beige selection, and
-  // on a published setup every step before it arms first (a forward step asks
-  // in "Skip ahead?", and Publish, where a published setup stands, goes
+  // the step that runs the probes. The step shown, while the bay shows the
+  // runner, is the Beige selection (the visual overhaul's polish, 2026-10-05:
+  // on Support and the cameras' setup no step is shown, so none carries it),
+  // and on a published setup every step before it arms first (a forward step
+  // asks in "Skip ahead?", and Publish, where a published setup stands, goes
   // nowhere).
   const clusterSteps: SetupClusterStep[] = runnerSteps.map((step, index) => ({
     hint: step.hint,
@@ -55,7 +57,7 @@ export function useSetupPilotChrome({
           : step.id === activeStepId
             ? "current"
             : "pending",
-    shown: step.id === activeStepId,
+    shown: mode === "runner" && step.id === activeStepId,
     armsFirst: isReady && index < stepIndex,
   }));
 
@@ -116,21 +118,15 @@ export function useSetupPilotChrome({
       </ArmKey>
     ) : null;
 
-  // The bay's head: what the bay shows, its sentence in the tooltip.
-  const bayHead = (
+  // The visual overhaul's polish (2026-10-05): the bay's head went (the well
+  // starts on the frame's top line, and the cluster's switch names the view).
+  // What the runner is moved to the step's eyebrow, as its tooltip.
+  const stepEyebrow = (
     <Tooltip
-      content={
-        mode === "runner"
-          ? `Step ${stepIndex + 1} of ${runnerStepOrder.length}. Each step is finished before the next one opens; the last commits everything above it.`
-          : mode === "cameras"
-            ? "What Studio Control holds for each camera. Not a step of the runner."
-            : "What to do when something is wrong, and the backups to do it from."
-      }
+      content="Each step is finished before the next one opens; the last commits everything above it."
       placement="bottom"
     >
-      <span className={styles.bayTitle}>
-        {mode === "runner" ? "Commissioning runner" : mode === "cameras" ? "Camera setup" : "Support"}
-      </span>
+      <span>{`Step ${stepIndex + 1} of ${runnerStepOrder.length}`}</span>
     </Tooltip>
   );
 
@@ -147,7 +143,7 @@ export function useSetupPilotChrome({
     openEngineLog,
     primaryKey,
     backKey,
-    bayHead,
+    stepEyebrow,
     publishOverrideRecorded,
     notPassedProbes,
   };

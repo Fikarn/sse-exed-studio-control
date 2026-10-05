@@ -5,7 +5,7 @@ import { Key, Latch, LatchSlot, MenuButton, StateDisplay, type MenuEntry, type U
 import styles from "./AudioCluster.module.css";
 import type { AudioArmedAction } from "../audioArming";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
-import { formatAudioTimestamp, type AudioFeedbackTone } from "../audioFormatting";
+import { type AudioFeedbackTone } from "../audioFormatting";
 import type { AudioLoadReport } from "../audioLoadReport";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioOutputs } from "./AudioOutputs";
@@ -120,19 +120,23 @@ export function AudioCluster({
   const actionsAllowed = viewModel.actionsAllowed;
   const consoleLink = snapshot.consoleLink;
 
-  // The meta line: the engine's own counts and the time it last confirmed
-  // them. Never a count the snapshot does not carry (non-negotiable 4).
+  // The meta line: the engine's own counts. Never a count the snapshot does
+  // not carry (non-negotiable 4). The visual overhaul's polish (2026-10-05, the
+  // owner's rule: beside a way-out key the meta holds about 30 characters).
+  // Old: "12 values confirmed · 3 unconfirmed · last sync 23 Apr 2026, 18:24".
+  // New: "12 values confirmed", or "12 confirmed · 3 unconfirmed". Reason: the
+  // footer prints the last sync whole, and the second count says what the
+  // first counts.
   const meta = useMemo(() => {
-    const parts: string[] = [];
-    if (typeof consoleLink?.confirmedSends === "number") {
-      parts.push(`${consoleLink.confirmedSends} values confirmed`);
+    const confirmed = typeof consoleLink?.confirmedSends === "number" ? consoleLink.confirmedSends : null;
+    const unconfirmed = typeof consoleLink?.unconfirmedSends === "number" ? consoleLink.unconfirmedSends : 0;
+    if (unconfirmed > 0) {
+      return confirmed === null
+        ? `${unconfirmed} values unconfirmed`
+        : `${confirmed} confirmed · ${unconfirmed} unconfirmed`;
     }
-    if (typeof consoleLink?.unconfirmedSends === "number" && consoleLink.unconfirmedSends > 0) {
-      parts.push(`${consoleLink.unconfirmedSends} unconfirmed`);
-    }
-    parts.push(`last sync ${formatAudioTimestamp(snapshot.lastConsoleSyncAt)}`);
-    return parts.join(" · ");
-  }, [consoleLink?.confirmedSends, consoleLink?.unconfirmedSends, snapshot.lastConsoleSyncAt]);
+    return confirmed === null ? undefined : `${confirmed} values confirmed`;
+  }, [consoleLink?.confirmedSends, consoleLink?.unconfirmedSends]);
 
   const wayOut = wayOutFor(status.label);
   const stateActions = (
@@ -210,6 +214,10 @@ export function AudioCluster({
   // locked reasons and tooltips read the sentence alone.
   const failureCode = status.warningCode ?? undefined;
   const stateSentence = status.warningBody ?? viewModel.appSummary;
+  // Why a refused key is locked, in the desk's own words: the outputs' and the
+  // snapshot keys' reason, and since the visual overhaul's polish (2026-10-05)
+  // the latch's Clear all's.
+  const deskLockReason = status.warningBody ?? `The desk is ${status.label}.`;
 
   return (
     <div
@@ -230,6 +238,7 @@ export function AudioCluster({
             ? {
                 text: `${armedRowWords(armedAction, viewModel)} · press again to apply`,
                 timeoutMs: armedAction.timeoutMs,
+                armedAt: armedAction.armedAt,
               }
             : null
         }
@@ -245,7 +254,9 @@ export function AudioCluster({
 
       {/* The shell (overhaul 3): the latch slot, the same on every page. Solo
           and a clip stand side by side in it; nothing above or between the
-          keys. */}
+          keys. The visual overhaul's polish (2026-10-05): a refused Clear is
+          locked (dashed, 55 %, its reason on hover) like every key the desk
+          refuses, not disabled, which is the busy form. */}
       <LatchSlot testId="audio-latch-slot">
         {viewModel.soloedChannels.length > 0 ? (
           <Latch
@@ -256,7 +267,8 @@ export function AudioCluster({
                 testId="audio-topbar-solo"
                 aria-label="Clear all solo"
                 onClick={onClearAllSolo}
-                disabled={!actionsAllowed}
+                locked={!actionsAllowed}
+                reason={deskLockReason}
               >
                 Clear all
               </Key>
@@ -276,7 +288,8 @@ export function AudioCluster({
                 testId="audio-clip-clear-clips"
                 aria-label="Clear clips"
                 onClick={() => onClearClips()}
-                disabled={!viewModel.capabilities.canClearClips}
+                locked={!viewModel.capabilities.canClearClips}
+                reason="OSC control is off"
               >
                 Clear
               </Key>
@@ -304,7 +317,7 @@ export function AudioCluster({
 
       <AudioSnapshotKeys
         actionsAllowed={viewModel.capabilities.canRecallConsoleSnapshot}
-        lockedReason={status.warningBody ?? `The desk is ${status.label}.`}
+        lockedReason={deskLockReason}
         armedActionKey={armedAction?.key ?? null}
         busyAction={busyAction}
         onLoadSnapshot={onLoadSnapshot}

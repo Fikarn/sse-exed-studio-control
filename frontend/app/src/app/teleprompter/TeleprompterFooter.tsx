@@ -3,24 +3,25 @@ import { useRef, useState } from "react";
 import { Footer, Key, Popover, Readouts } from "@sse/design-system";
 import type { PrompterSnapshot } from "@sse/engine-client";
 
-import type { GlassParagraph } from "./glass/glassText";
-import { formatDuration } from "./prompterTime";
-import { placeView, screenMode } from "./teleprompterModel";
+import { screenMode } from "./teleprompterModel";
 import styles from "./TeleprompterFooter.module.css";
 
 // The Teleprompter's footer (new pages program, Slice 6a; board 1): the
-// Prompter XL, what is on the glass, the place, the speed and the time left.
+// Prompter XL's mode.
 //
 // The visual overhaul (2026-10-05): its one action key opens the Prompter XL
 // as Windows reports it, in a popover over the footer: the state in the
 // hardware link's word, the resolution, the refresh and how Windows shows it.
 // The key never moves. The window's own reason, while it stands, is on the
 // plate too, since a reason is never only in a popover.
+//
+// The polish (2026-10-05): the footer repeats nothing the page prints above
+// it, so what is on the prompter, the place, the speed and the time left are
+// the bay strip's and the speed dial's alone. The mode stays: the state
+// display leaves it out beside its Update key.
 
 export interface TeleprompterFooterProps {
   snapshot: PrompterSnapshot;
-  cut: readonly GlassParagraph[];
-  timeLeft: number | null;
 }
 
 /** The Prompter XL's readouts, as Windows reports them through the shell. */
@@ -52,9 +53,7 @@ function screenRows(snapshot: PrompterSnapshot) {
   ];
 }
 
-export function TeleprompterFooter({ snapshot, cut, timeLeft }: TeleprompterFooterProps) {
-  const glass = snapshot.glass;
-  const place = glass && cut.length > 0 ? placeView(glass, cut).text : "—";
+export function TeleprompterFooter({ snapshot }: TeleprompterFooterProps) {
   const [open, setOpen] = useState(false);
   // The key that opens the readouts: a press on it closes them again, and the
   // focus comes back to it.
@@ -63,13 +62,7 @@ export function TeleprompterFooter({ snapshot, cut, timeLeft }: TeleprompterFoot
     <>
       <Footer
         testId="teleprompter-footer"
-        items={[
-          { id: "screen", label: "Prompter XL", value: screenMode(snapshot) ?? snapshot.screen.word },
-          { id: "glass", label: "On the glass", value: glass ? glass.name : "—" },
-          { id: "place", label: "Place", value: place },
-          { id: "speed", label: "Speed", value: glass ? `${glass.speedWpm} words/min` : "—" },
-          { id: "left", label: "Left", value: timeLeft !== null ? formatDuration(timeLeft) : "—" },
-        ]}
+        items={[{ id: "screen", label: "Prompter XL", value: screenMode(snapshot) ?? snapshot.screen.word }]}
         action={
           <span ref={opener} className={styles.opener}>
             <Key

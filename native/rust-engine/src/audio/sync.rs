@@ -191,7 +191,7 @@ pub(super) fn pull_console_state(
                 db_path,
                 "AUDIO_GLOBAL_OSC_UNBOUND",
                 format!(
-                    "Studio Control is not listening on TotalMix's Global OSC port {}. Another program may hold it, or metering is off; check Setup and try again.",
+                    "Studio Control is not listening on TotalMix's port {}. Check Setup.",
                     config.receive_port + 3
                 ),
                 None,
@@ -252,7 +252,8 @@ pub(super) fn pull_console_state(
             db_path,
             "AUDIO_SYNC_NO_ECHO",
             cause.failure(format!(
-                "TotalMix did not answer on the Global OSC remote (send {} → receive {}). Check that remote 4 is In Use in Global OSC mode with these ports.",
+                // Two lines in the state display (the polish, 2026-10-05).
+                "TotalMix did not answer on remote 4 ({} → {}). Check Global OSC.",
                 config.send_port + 3,
                 config.receive_port + 3
             )),
@@ -265,8 +266,8 @@ pub(super) fn pull_console_state(
             db_path,
             "AUDIO_SYNC_INCOMPLETE",
             cause.failure(format!(
-                "TotalMix was still sending after {} ms ({} values so far), so the console state is incomplete. Press Sync again.",
-                timing.timeout_ms, progress.parsed_messages
+                "TotalMix was still sending after {} ms: the state is incomplete.",
+                timing.timeout_ms
             )),
             Some(ConsoleConfidence::Unknown),
         ));

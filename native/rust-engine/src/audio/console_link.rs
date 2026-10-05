@@ -342,10 +342,11 @@ fn apply_console_activity_locked(
 pub(crate) const AUDIO_CONSOLE_OUT_OF_TOUCH: &str = "AUDIO_CONSOLE_OUT_OF_TOUCH";
 
 /// The Console's sentence for an assumed desk after TotalMix was out of
-/// touch.
+/// touch, in the state display's two lines (D39): its `Sync from TotalMix`
+/// key says what to do.
 pub(crate) fn out_of_touch_sentence(mark: OutOfTouch) -> String {
     format!(
-        "TotalMix was out of touch for {}, so a change made there meanwhile may be missing. Press Sync from TotalMix.",
+        "TotalMix was out of touch for {}: a change made there may be missing.",
         out_of_touch_words(mark.secs)
     )
 }
@@ -356,7 +357,7 @@ pub(crate) const AUDIO_CONSOLE_UNREAD_SINCE_START: &str = "AUDIO_CONSOLE_UNREAD_
 
 /// The Console's sentence for it.
 pub(crate) const UNREAD_SINCE_START_SENTENCE: &str =
-    "Studio Control has not read the desk since it started. Press Sync from TotalMix.";
+    "Studio Control has not read the desk since it started.";
 
 /// At a start on the real TotalMix (the owner's decision, 2026-10-02): a
 /// console saved as aligned, or as assumed (from the last session, with

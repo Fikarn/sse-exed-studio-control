@@ -274,7 +274,10 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       // link answers: after it stops, the prompter comes back paused.
       { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
       shellExperience === "ready" ? workspaceTones : undefined,
-      now.getTime()
+      now.getTime(),
+      // Before ready a check never read is quiet: `pending` while the app
+      // starts, `not read` after a failed start (the recovery plate's word).
+      shellExperience === "ready" ? undefined : shellState.startupFailure ? "not read" : "pending"
     ),
     shellExperience === "ready" ? activeWorkspace : ""
   );
@@ -304,7 +307,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
 
   let surface: ReactNode;
   if (shellExperience === "startup") {
-    surface = <StartupSurface lifecycle={shellState.lifecycle} />;
+    surface = <StartupSurface lifecycle={shellState.lifecycle} healthSnapshot={shellState.healthSnapshot} />;
   } else if (setupModalActive && shellExperience === "ready") {
     surface = (
       <SetupSurface
@@ -377,7 +380,9 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   return (
     <>
       <AppShellFrame
-        activeWorkspace={activeWorkspace}
+        // Before ready no page is open: the start-up and recovery screens are
+        // not Setup, so no tab is drawn as the current one (polish, 2026-10-05).
+        activeWorkspace={shellExperience === "ready" ? activeWorkspace : ""}
         clock={clock}
         cluster={workspaceRegions}
         plate={workspaceRegions}

@@ -183,6 +183,12 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(snapshotDeck.getByRole("button")).toHaveCount(8);
   await expect(page.getByTestId("audio-snapshot-name-1")).toHaveText("Mix 1");
   await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("active");
+  // The visual overhaul's polish (2026-10-05). Old: a lone green word and a
+  // green keyline round the key. New: TotalMix's word with its lamp, a state
+  // word (● ACTIVE). Reason: DESIGN.md §4 and §8, a state word stands with its
+  // lamp, and the system has no green keyline.
+  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveAttribute("data-tone", "ok");
+  await expect(page.getByTestId("audio-snapshot-state-1").locator("[data-lamp]")).toHaveCount(1);
   await expect(page.getByTestId("audio-snapshot-slot-1")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-snapshot-name-3")).toHaveText("Panel & Q&A");
   // The visual overhaul's Console pull request. Old: a slot TotalMix does not
@@ -218,6 +224,9 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.locator('[data-plate-section="preamp"]')).toHaveCount(0);
   await expect(page.getByTestId("audio-plate-head")).toContainText("stereo");
   await expect(page.getByTestId("audio-plate-head")).not.toContainText("linked");
+  // The visual overhaul's polish (2026-10-05): the group in the tier menu's
+  // word (it printed the id, "group fx").
+  await expect(page.getByTestId("audio-plate-head")).toContainText("group FX");
   await page.getByTestId("audio-strip-audio-input-9").click();
   await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Preamp");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48 V");
@@ -386,9 +395,11 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   const assumedDisplay = page.getByTestId("audio-state-display");
   await expect(assumedDisplay).toContainText("ASSUMED");
   // Slice 8 (system §9): the hardware is the desk; "the console" is this
-  // workspace. The sentence also names the key that gets the operator out.
+  // workspace. The visual overhaul's polish (2026-10-05, the owner's two-line
+  // rule). Old: the sentence also named the key ("Press Sync from TotalMix to
+  // pull the current state …"). New: the key beside it names the press.
   await expect(assumedDisplay).toContainText(/the strips may not match totalmix/i);
-  await expect(assumedDisplay).toContainText(/press sync from totalmix/i);
+  await expect(assumedDisplay.getByTestId("audio-state-sync")).toHaveText("Sync from TotalMix");
 
   await openFixture(page, "audio-not-verified");
   // 2026-09 audit remediation, Slice 1: until the audio probe passes every
@@ -433,9 +444,10 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // The state display carries the engine's word and its sentence (old: the
   // band's title "CONSOLE UNREACHABLE").
   await expect(page.getByTestId("audio-state-display")).toContainText("OFFLINE");
-  await expect(
-    page.getByText("TotalMix did not answer on the Global OSC remote", { exact: false }).first()
-  ).toBeVisible();
+  await expect(page.getByText("TotalMix did not answer on remote 4", { exact: false }).first()).toBeVisible();
+  // The visual overhaul's polish (2026-10-05): the tiers' lock note names the
+  // hardware and the page's word (it read "locked · desk unreachable").
+  await expect(page.getByTestId("audio-tier-lock-note-hardware-inputs")).toHaveText("locked · TotalMix offline");
 
   await openFixture(page, "audio-action-failed");
   // Visual overhaul A, Slice 4a. Old: the sentence read
@@ -500,6 +512,14 @@ test("audio-not-verified outlines every console write on the bay and prints the 
   await expect(loadKey).toHaveAttribute("aria-disabled", "true");
   await expect(loadKey).toHaveAttribute("title", reason);
   expect(await loadKey.evaluate((node) => getComputedStyle(node).borderStyle)).toBe("dashed");
+  // The visual overhaul's polish (2026-10-05). Old: the solo latch's Clear all
+  // was disabled, a solid edge and grey words, with no reason. New: it is
+  // locked like every key the desk refuses, with the same reason. Reason:
+  // DESIGN.md §4, a locked control is a dashed edge at 55 % and says why.
+  const clearAllSolo = page.getByTestId("audio-topbar-solo");
+  await expect(clearAllSolo).toHaveAttribute("aria-disabled", "true");
+  await expect(clearAllSolo).toHaveAttribute("title", reason);
+  expect(await clearAllSolo.evaluate((node) => getComputedStyle(node).borderStyle)).toBe("dashed");
 
   // The lock is the engine's, so it lifts the moment the probe passes.
   await page.getByTestId("audio-state-probe").click();
@@ -507,6 +527,35 @@ test("audio-not-verified outlines every console write on the bay and prints the 
   await expect(strip.getByTestId("audio-lane-phantom-audio-input-9")).not.toHaveAttribute("aria-disabled", "true");
   await expect(loadKey).not.toHaveAttribute("aria-disabled", "true");
   await expect(loadKey).toHaveAttribute("title", "Press twice to load in TotalMix");
+  await expect(clearAllSolo).not.toHaveAttribute("aria-disabled", "true");
+});
+
+// The visual overhaul's polish (2026-10-05; DESIGN.md §4): a level the desk has
+// not confirmed is in doubt, a dashed yellow keyline on the value itself — the
+// strips' readouts, the outputs' and the plate's other mixes — as Cameras
+// draws a camera's last-read values. A confirmed desk draws none.
+test("audio-state-assumed draws every level in doubt, and a confirmed desk none", async ({ page }) => {
+  // Both fixtures open with FX 3/4 on the plate and Main Out the mix target, so
+  // the plate's other mixes are Phones 1 and Phones 2.
+  await openFixture(page, "audio-state-assumed");
+  await expect(page.getByTestId("audio-state-display")).toContainText("ASSUMED");
+  await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
+  const levels = [
+    page.getByTestId("audio-lane-readout-audio-input-9"),
+    page.getByTestId("audio-lane-readout-audio-mix-main"),
+    page.getByTestId("audio-send-value-audio-mix-phones-a"),
+  ];
+  for (const level of levels) {
+    await expect(level).toHaveAttribute("data-doubt", "");
+  }
+
+  await openFixture(page, "audio-populated");
+  await expect(page.getByTestId("audio-state-display")).toContainText("SIMULATED");
+  await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
+  for (const level of levels) {
+    await expect(level).toBeVisible();
+    await expect(level).not.toHaveAttribute("data-doubt", "");
+  }
 });
 
 test("switches audio output targets without a full-domain refresh", async ({ page }) => {
@@ -887,6 +936,12 @@ test("the plate's other mixes: a row per mix, its menu makes it the mix target",
   await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toHaveCount(0);
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-b")).toContainText("Phones 2");
+  // The visual overhaul's polish (2026-10-05). Old: the value printed "-1.9
+  // dB" as one string in the main ink. New: the real minus, and the unit at
+  // half size in the quiet ink, as the strips' and the outputs' readouts.
+  const phonesSend = page.getByTestId("audio-send-value-audio-mix-phones-a");
+  await expect(phonesSend).toHaveText(/^[−+]\d+\.\d dB$/);
+  await expect(phonesSend.locator("span")).toHaveText(/^\s*dB$/);
   // 2026-10-04. Old: the row's ⋯ held the send's four modes (Pre fader, Mute
   // send, Link L+R, Solo send) above "Make mix target". New: "Make mix target"
   // alone. Reason: the app only kept the modes; they never reached TotalMix,
@@ -945,9 +1000,10 @@ test("formats audio faders with RME's TotalMix fader curve", () => {
   expect(faderDbToNormalized(0)).toBeCloseTo(836 / 1023, 5);
   expect(faderDbToNormalized(-6)).toBeCloseTo(649 / 1023, 5);
   // The visual overhaul's Console pull request: unity reads "+0.0 dB", as the
-  // deck's display prints it (it read "0.0 dB").
+  // deck's display prints it (it read "0.0 dB"). The polish (2026-10-05): a
+  // level below unity carries the real minus (it was "-0.6 dB").
   expect(formatAudioDb(AUDIO_FADER_UNITY)).toBe("+0.0 dB");
-  expect(formatAudioDb(0.8)).toBe("-0.6 dB");
+  expect(formatAudioDb(0.8)).toBe("−0.6 dB");
   expect(formatAudioDb(1)).toBe("+6.0 dB");
 });
 

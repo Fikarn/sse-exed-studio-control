@@ -64,6 +64,41 @@ describe("the startup screen has no key", () => {
     render(<StartupSurface lifecycle="waiting-for-ready-event" />);
     expect(screen.getByTestId("startup-steps-section").textContent).toContain("1 of 4 done");
   });
+
+  // The visual overhaul's polish (2026-10-05): the frame of the recovery
+  // screen (DESIGN §2). The steps stand in the bay, each with its word beside
+  // its lamp; the hardware's three checks stand on the plate, pending until
+  // the hardware link reports them, and the plate has no key either.
+  it("puts the steps in the bay and the three checks, pending, on the plate", () => {
+    render(<StartupSurface lifecycle="waiting-for-ready-event" />);
+    const bay = screen.getByTestId("startup-surface-bay");
+    expect(within(bay).getByTestId("startup-steps-section")).toBeTruthy();
+    expect(within(bay).getAllByText("Done")).toHaveLength(1);
+    expect(within(bay).getAllByText("Pending")).toHaveLength(3);
+
+    const plate = screen.getByTestId("startup-surface-plate");
+    expect(within(plate).getAllByText("pending")).toHaveLength(3);
+    expect(within(plate).queryAllByRole("button")).toEqual([]);
+  });
+
+  it("reads the checks once the hardware link has reported them", () => {
+    render(
+      <StartupSurface
+        lifecycle="waiting-for-app-snapshot"
+        healthSnapshot={{
+          checks: {
+            controlSurface: { status: "ready", summary: "The deck's bridge is ready." },
+            lighting: { status: "not-verified" },
+          },
+        }}
+      />
+    );
+    const plate = screen.getByTestId("startup-surface-plate");
+    expect(within(plate).getByText("ready")).toBeTruthy();
+    expect(within(plate).getByText("The deck's bridge is ready.")).toBeTruthy();
+    expect(within(plate).getByText("needs attention")).toBeTruthy();
+    expect(within(plate).getByText("pending")).toBeTruthy();
+  });
 });
 
 describe("the recovery screen: Reset the window layout beside Retry startup", () => {

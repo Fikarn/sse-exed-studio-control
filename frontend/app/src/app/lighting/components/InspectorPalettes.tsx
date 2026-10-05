@@ -11,9 +11,10 @@ import styles from "./LightingInspector.module.css";
 
 // The visual overhaul's Lighting page (2026-10-04): the palettes as tiles, four
 // to a row. A press on a tile applies it to the selection; its ⋯ (and a
-// right-click on it) holds Edit…, Move earlier, Move later, Colour… and Delete
-// palette…, which arms in place (until then the browser's own confirm asked).
-// A new palette and an edit open the same small form beside the pool.
+// right-click on it) holds Edit…, Move earlier, Move later, Colour… (an
+// intensity palette's alone) and Delete palette…, which arms in place (until
+// then the browser's own confirm asked). A new palette and an edit open the
+// same small form beside the pool.
 
 interface PaletteDraft {
   id: string | null;
@@ -318,7 +319,10 @@ function PaletteTile({
   onDelete,
 }: PaletteTileProps) {
   const tileRef = useRef<HTMLDivElement | null>(null);
-  const tag = lightingColorTagHex(palette.colorIndex);
+  // The visual overhaul's polish (2026-10-05): a colour-temperature palette
+  // shows no tag; its temperature's dot already gives it a colour, and its
+  // menu offers no Colour… (a stored tag stays, unseen).
+  const tag = palette.kind === "cct" ? null : lightingColorTagHex(palette.colorIndex);
   const value = `${Math.round(palette.value)} ${KIND_UNIT[palette.kind]}`;
   const menu = buildPaletteMenu({
     palette,

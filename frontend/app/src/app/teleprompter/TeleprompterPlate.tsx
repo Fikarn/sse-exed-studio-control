@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import {
   ArmKey,
   ARM_TIMEOUT_MS,
+  EmptyLine,
   Key,
   LampWord,
   MenuButton,
@@ -19,7 +20,7 @@ import { RenameDialog } from "../shared/RenameDialog";
 import { TeleprompterLook } from "./TeleprompterLook";
 import { TeleprompterVersions } from "./TeleprompterVersions";
 import { buildRemovedMenu, buildScriptMenu, buildScriptsViewMenu, type OnPrompter } from "./teleprompterMenus";
-import { scriptDetail, scriptLine } from "./teleprompterModel";
+import { scriptDetailParts, scriptLine } from "./teleprompterModel";
 import type { PerformAction } from "./perform";
 import { teleprompterArmKey, UPDATE_ARM_KEY } from "./useTeleprompterArming";
 import styles from "./TeleprompterPlate.module.css";
@@ -41,6 +42,12 @@ const SCRIPT_NAME_MAX_CHARS = 80;
 // the Scripts section's ⋯ switches to; a removed script's menu holds Restore
 // and Delete for good, which arms in place. The Prompter XL's readouts moved to
 // the footer's key; the reason its window does not show stays here, on screen.
+//
+// The visual overhaul's polish (2026-10-05): the scripts are rows on
+// hairlines, not wells; while the Prompter XL draws nothing, no green says the
+// script is on it (the plate's status reads NOT ON THE GLASS, the row's lamp is
+// hollow); the title plate's line breaks only between its parts; an empty list
+// is the design system's empty line.
 
 /** The scripts the list has room for; more are paged, never scrolled (system §10). */
 const SCRIPT_ROOM = 10;
@@ -99,6 +106,8 @@ function useScriptVersions(store: ShellStore, selected: PrompterScriptSummary | 
 interface ScriptRowProps {
   script: PrompterScriptSummary;
   selected: boolean;
+  /** The Prompter XL draws the text: the script on the prompter is on the glass too. */
+  draws: boolean;
   menu: ReturnType<typeof buildScriptMenu>;
   arm: UseArmResult;
   onSelect: () => void;
@@ -109,9 +118,10 @@ interface ScriptRowProps {
 /**
  * A script's row: the row selects it, and its ⋯ stands inside the row's
  * edge, beside it, since a key cannot hold a key. A right-click anywhere on
- * the row opens the same menu.
+ * the row opens the same menu. The script on the prompter says so; its lamp is
+ * green only while the Prompter XL draws it, hollow while nothing is drawn.
  */
-function ScriptRow({ script, selected, menu, arm, onSelect, keyRef }: ScriptRowProps) {
+function ScriptRow({ script, selected, draws, menu, arm, onSelect, keyRef }: ScriptRowProps) {
   const row = useRef<HTMLDivElement>(null);
   return (
     <div ref={row} className={styles.row}>
@@ -127,7 +137,7 @@ function ScriptRow({ script, selected, menu, arm, onSelect, keyRef }: ScriptRowP
           <b>{script.name}</b>
           <span>{scriptLine(script)}</span>
         </span>
-        {script.onPrompter ? <LampWord tone="ok">On prompter</LampWord> : null}
+        {script.onPrompter ? <LampWord tone={draws ? "ok" : "off"}>On prompter</LampWord> : null}
       </button>
       <span ref={keyRef} className={styles.rowMenu}>
         <MenuButton
@@ -165,6 +175,30 @@ function RemovedRow({ script, menu, arm }: RemovedRowProps) {
         menu={{ ...menu, arm }}
       />
     </li>
+  );
+}
+
+/**
+ * The title plate's line under the script's name. Each fact keeps to one line
+ * with the `·` after it, so the line breaks only between them (never "4:09 at"
+ * over "140"); the file name may break within itself, or a long one would run
+ * past the plate, but never before its `·`. Its words are `scriptDetail`'s.
+ */
+function ScriptDetail({ script }: { script: PrompterScriptSummary }) {
+  const { from, facts } = scriptDetailParts(script);
+  return (
+    <>
+      {from ? <>{from}&nbsp;· </> : null}
+      {facts.map((fact, index) => (
+        <Fragment key={index}>
+          <span className={styles.subPart}>
+            {fact}
+            {index < facts.length - 1 ? " ·" : null}
+          </span>
+          {index < facts.length - 1 ? " " : null}
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -281,7 +315,11 @@ export function TeleprompterPlate({
           {
             id: "prompter",
             label: "The prompter",
-            value: glass?.notUpdated ? (
+            // The bay's own words while the Prompter XL draws nothing: no green
+            // then (the visual overhaul's polish, 2026-10-05).
+            value: !snapshot.screen.draws ? (
+              <LampWord tone="error">Not on the glass</LampWord>
+            ) : glass?.notUpdated ? (
               <LampWord tone="attention">Not updated</LampWord>
             ) : (
               <LampWord tone="ok">On prompter</LampWord>
@@ -318,7 +356,7 @@ export function TeleprompterPlate({
         {selected ? (
           <PlateHead
             title={selected.name}
-            sub={scriptDetail(selected)}
+            sub={<ScriptDetail script={selected} />}
             action={
               <span ref={plateKey} className={styles.plateKey}>
                 <MenuButton
@@ -384,9 +422,10 @@ export function TeleprompterPlate({
         className={styles.scripts}
         testId="teleprompter-scripts"
       >
-        {showRemoved ? (
+        {rows.length === 0 ? (
+          <EmptyLine>{showRemoved ? "Nothing is removed" : "No scripts yet"}</EmptyLine>
+        ) : showRemoved ? (
           <ul className={styles.scriptList}>
-            {rows.length === 0 ? <li className={styles.none}>Nothing is removed.</li> : null}
             {rows.map((script) => (
               <RemovedRow
                 key={script.id}
@@ -402,12 +441,12 @@ export function TeleprompterPlate({
           </ul>
         ) : (
           <ul className={styles.scriptList}>
-            {rows.length === 0 ? <li className={styles.none}>No scripts yet.</li> : null}
             {rows.map((script) => (
               <li key={script.id}>
                 <ScriptRow
                   script={script}
                   selected={script.id === selected?.id}
+                  draws={snapshot.screen.draws}
                   menu={scriptMenu(script, false)}
                   arm={arm}
                   onSelect={() => void onSelect(script.id)}

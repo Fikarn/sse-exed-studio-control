@@ -28,10 +28,13 @@ export const teleprompterMenuArmId = {
 /** The key a menu's destructive item arms with that id (`Menu`'s rule). */
 export const menuArmKey = (id: string) => `menu:${id}`;
 
-/** The characters of a name the state display's armed row has room for beside its words. */
+/** The characters of a name the state display has room for beside its words. */
 const ARM_NAME_ROOM = 20;
 
-/** A script's name in the armed row, cut so `· press again` stays in view. */
+/**
+ * A script's name in the armed row, cut so `· press again` stays in view; and in a sentence the page
+ * builds for the state display, which keeps its two lines (`prompterStateView`).
+ */
 export function armName(name: string): string {
   return name.length > ARM_NAME_ROOM ? `${name.slice(0, ARM_NAME_ROOM - 1)}…` : name;
 }

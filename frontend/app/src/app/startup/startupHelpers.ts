@@ -50,25 +50,29 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
   // shared vocabulary, so the surfaces no longer translate at the call site.
   const reachedTone: StatusTone = lifecycle === "ready" ? "ok" : "info";
 
+  // The visual overhaul's polish (2026-10-05): the steps in the screen's words
+  // (DESIGN §9): the hardware link, not "Studio Control" or "both halves";
+  // no "Handshake", "Health", "Workspaces" or "commissioning". The plate lists
+  // the three checks beside them, so the Diagnostics step does not name them.
   return [
     {
-      description: "Start the part of Studio Control that talks to the desk, the rig and the deck.",
-      label: "Start up",
+      description: "The part of Studio Control that talks to the desk, the rig and the deck.",
+      label: "Start the hardware link",
       tone: done(0) ? reachedTone : "neutral",
     },
     {
-      description: "Wait for Studio Control to confirm both halves of this install are the same version.",
-      label: "Handshake",
+      description: "The hardware link and the app confirm they are the same version.",
+      label: "Version check",
       tone: done(1) ? reachedTone : "neutral",
     },
     {
-      description: "Load what the desk, the rig and the deck report about themselves.",
-      label: "Health",
+      description: "Read what the hardware reports.",
+      label: "Diagnostics",
       tone: done(2) ? reachedTone : "neutral",
     },
     {
-      description: "Load where you were and whether commissioning has published.",
-      label: "Workspaces",
+      description: "Load the page last used and whether Setup is published.",
+      label: "Pages",
       tone: done(3) ? reachedTone : "neutral",
     },
   ];
@@ -92,8 +96,9 @@ export function formatFailureCode(failure: StartupFailure | null): string {
     return "Protocol mismatch";
   }
   // Slice 8 (system §9): the two codes Studio Control raises about itself
-  // humanize to "Engine …", a word operator copy does not use.
-  if (code === "ENGINE_STARTUP_FAILED") {
+  // humanize to "Engine …", a word operator copy does not use. The visual
+  // overhaul's polish (2026-10-05): nor "Bootstrap".
+  if (code === "ENGINE_STARTUP_FAILED" || code === "BOOTSTRAP_FAILED") {
     return "Startup failed";
   }
   if (code === "ENGINE_READY_TIMEOUT") {
@@ -125,21 +130,55 @@ export function formatFailureCode(failure: StartupFailure | null): string {
 // Visual overhaul A, Slice 8 (system §9): the stage the engine reports is a
 // token ("frontend-bootstrap", "ready-event", "protocol-negotiation"); the
 // recovery display names the step in the operator's words and never invents
-// one the engine did not report.
+// one the engine did not report. The visual overhaul's polish (2026-10-05):
+// `startup`, one spelling with STARTUP FAILED and Retry startup.
 export function formatFailureStage(stage: string): string {
   switch (stage) {
     case "bootstrap":
     case "frontend-bootstrap":
-      return "start-up";
+      return "startup";
     case "ready-event":
       return "ready";
     case "protocol-negotiation":
-      return "version check";
+      return "the version check";
     // Slice 5: the engine was up and stopped during the session.
     case "runtime":
       return "running";
     default:
       return stage.replace(/[_-]+/g, " ");
+  }
+}
+
+/**
+ * The recovery display's meta line: the one fact the word above it does not
+ * say, in at most 30 characters, the room beside Retry startup.
+ *
+ * The visual overhaul's polish (2026-10-05): it read `<code> · at <stage>`,
+ * which repeated the word (`Protocol mismatch · at version check` under
+ * PROTOCOL MISMATCH; the bay prints the code as well) and ran past the room.
+ * The code's words stand where they say more than the word (which saved-data
+ * step failed, a start that timed out); the stage stands where it is not the
+ * start itself, which the word and the key already say.
+ */
+export function formatFailureMeta(failure: StartupFailure | null): string | undefined {
+  if (!failure) {
+    return undefined;
+  }
+  if (
+    failure.code === "STORAGE_CORRUPT" ||
+    failure.code === "STORAGE_MIGRATION_FAILED" ||
+    failure.code === "ENGINE_READY_TIMEOUT"
+  ) {
+    return formatFailureCode(failure);
+  }
+  switch (failure.stage) {
+    case "bootstrap":
+    case "frontend-bootstrap":
+      return undefined;
+    case "runtime":
+      return `While ${formatFailureStage(failure.stage)}`;
+    default:
+      return `At ${formatFailureStage(failure.stage)}`;
   }
 }
 
@@ -174,8 +213,8 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
   // sentence says it whole.
   //
   // Slice 8 gave every non-protocol failure the same word, so the stage no
-  // longer branches: what failed is the start-up, whichever step it stopped
-  // at, and the display's meta line names the step.
+  // longer branches: what failed is the startup, whichever step it stopped
+  // at, and the display's meta line names the step (formatFailureMeta).
   return "Startup failed";
 }
 

@@ -2,6 +2,7 @@ import { useRef } from "react";
 
 import {
   ArmKey,
+  EmptyLine,
   Key,
   LampWord,
   LatchSlot,
@@ -40,7 +41,10 @@ import styles from "./CamerasCluster.module.css";
 // each arrives, and who changed what. The visual overhaul (2026-10-05): each
 // camera's key has its ⋯ beside it, with the same menu as its small picture
 // and the plate's title; the state words are the hardware link's, in
-// capitals; the helper sentences are the section heads' tooltips.
+// capitals; the helper sentences are the section heads' tooltips. The
+// polish (2026-10-05): the last-known REC key says when and why STOP is
+// locked on one line under its cap, and an empty Recent list is the design
+// system's empty line.
 
 /** The rows the Recent list has room for: what the hardware link sends. */
 const RECENT_ROOM = 5;
@@ -217,7 +221,11 @@ export function CamerasCluster({
         }
         // The REC key and the plate's own keys say that they are armed; the
         // row says what the second press does.
-        armed={armed ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs } : null}
+        armed={
+          armed
+            ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs, armedAt: armed.armedAt }
+            : null
+        }
         data-camera={state.camera}
         testId="cameras-state-display"
         menu={
@@ -281,11 +289,7 @@ export function CamerasCluster({
             data-rec={rec.kind}
             data-doubt={rec.kind === "last-known" ? "" : undefined}
             testId="cameras-rec"
-          >
-            {rec.kind === "last-known" ? (
-              <span className={styles.recWhy}>STOP is locked until CAM 1 answers</span>
-            ) : null}
-          </Key>
+          />
         )}
         <Readouts
           className={styles.take}
@@ -379,9 +383,8 @@ export function CamerasCluster({
             The recent actions could not be read. The cameras' state above is as the cameras report it.
           </p>
         ) : recent.length === 0 ? (
-          <p className={styles.fine} data-testid="cameras-recent-empty">
-            Nothing yet. A take, a format, a look and who holds a camera show here, with who did it.
-          </p>
+          // The head's tooltip says what the list holds.
+          <EmptyLine testId="cameras-recent-empty">Nothing yet</EmptyLine>
         ) : (
           <ol className={styles.recent}>
             {recent.map((row) => (

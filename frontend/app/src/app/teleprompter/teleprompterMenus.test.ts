@@ -87,7 +87,7 @@ describe("a script's menu", () => {
   it("names the script, and hands another script's Replace to the plate's key", () => {
     const onReplace = vi.fn();
     const menu = buildScriptMenu(options({ script: OUTRO, onReplace }));
-    expect(menu.head).toEqual({ title: "04 Outro", detail: "1:13 at 140 · 171 words" });
+    expect(menu.head).toEqual({ title: "04 Outro", detail: "1:13 at 140 words/min" });
     expect(ids(menu.items)).toEqual(["select", "replace", "edit", "—", "rename", "versions", "—", "remove"]);
     expect(item(menu.items, "replace")).toMatchObject({
       label: "Replace on the prompter…",

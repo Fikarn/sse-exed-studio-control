@@ -1,4 +1,4 @@
-import { ArmKey, Section, Tooltip } from "@sse/design-system";
+import { ArmKey, LampWord, Section, Tooltip } from "@sse/design-system";
 
 import styles from "./AudioSnapshotKeys.module.css";
 import { audioSnapshotLoadKey } from "../audioArming";
@@ -14,7 +14,13 @@ import type { AudioConsoleSnapshotEntry } from "../../shellData";
 // key previews what a load would change: a press twice loads the slot in
 // TotalMix, and the key says what TotalMix reports of it. Visual overhaul, the
 // Console: where the names come from is the head's tooltip, and a slot with
-// no name of its own is printed quieter.
+// no name of its own is printed quieter. The visual overhaul's polish
+// (2026-10-05). Old: the slot TotalMix holds had a green keyline round its key
+// and a lone lowercase green "active"; an unnamed slot printed its number over
+// "Slot 4". New: TotalMix's word is a state word with its lamp (● ACTIVE,
+// ● CHANGED), as Lighting's ● ON RIG, and no keyline; an unnamed slot says
+// "Slot 4" once. Reason: the system has no green keyline (DESIGN.md §4), and a
+// state word stands with its lamp (§8).
 
 export interface AudioSnapshotKeysProps {
   /** `capabilities.canRecallConsoleSnapshot`: a load is a console write. */
@@ -66,6 +72,8 @@ export function AudioSnapshotKeys({
         {slots.map((entry) => {
           const armed = armedActionKey === audioSnapshotLoadKey(entry.slot);
           const current = entry.state === "active" || entry.state === "changed";
+          const stateWord = slotStateWord(entry.state);
+          const stateTestId = `audio-snapshot-state-${entry.slot}`;
           return (
             <div
               key={entry.slot}
@@ -94,20 +102,23 @@ export function AudioSnapshotKeys({
                 {/* One column: the slot's number and TotalMix's word on the
                     first line, the name under them. Armed, the LOAD? tag
                     stands before the name and the first line goes, so the key
-                    keeps its size and nothing in the grid moves. */}
+                    keeps its size and nothing in the grid moves. An unnamed
+                    slot's name is "Slot 4", so its number is hidden (the line
+                    keeps its height). A slot TotalMix does not hold keeps an
+                    empty state element, so the line reads nothing. */}
                 <span className={styles.slotBody}>
                   {armed ? null : (
                     <span className={styles.slotHead}>
                       <span className={styles.slotNumber} aria-hidden="true">
                         {entry.slot}
                       </span>
-                      <span
-                        className={styles.slotState}
-                        data-state={entry.state}
-                        data-testid={`audio-snapshot-state-${entry.slot}`}
-                      >
-                        {slotStateWord(entry.state)}
-                      </span>
+                      {stateWord ? (
+                        <LampWord tone={entry.state === "changed" ? "attention" : "ok"} testId={stateTestId}>
+                          {stateWord}
+                        </LampWord>
+                      ) : (
+                        <span data-testid={stateTestId} />
+                      )}
                     </span>
                   )}
                   <span className={styles.slotName} data-testid={`audio-snapshot-name-${entry.slot}`}>

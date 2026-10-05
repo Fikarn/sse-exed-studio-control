@@ -527,7 +527,10 @@ fn audio_sync_refuses_when_the_global_slot_is_unbound() {
     match error {
         AudioCommandError::Rejected(code, message) => {
             assert_eq!(code, "AUDIO_GLOBAL_OSC_UNBOUND");
-            assert!(message.contains("Global OSC port"), "{message}");
+            assert!(
+                message.contains("not listening on TotalMix's port"),
+                "{message}"
+            );
         }
         other => panic!("unexpected error: {other:?}"),
     }
@@ -912,7 +915,7 @@ fn out_of_touch_makes_a_verified_console_assumed_and_says_for_how_long() {
     let message = snapshot.last_action_message.unwrap_or_default();
     assert_eq!(
         message,
-        "TotalMix was out of touch for 31 s, so a change made there meanwhile may be missing. Press Sync from TotalMix."
+        "TotalMix was out of touch for 31 s: a change made there may be missing."
     );
     crate::operator_words::assert_operator_words(&message);
     assert!(
@@ -1015,7 +1018,7 @@ fn a_start_makes_a_verified_console_assumed_until_a_sync() {
     let message = snapshot.last_action_message.unwrap_or_default();
     assert_eq!(
         message,
-        "Studio Control has not read the desk since it started. Press Sync from TotalMix."
+        "Studio Control has not read the desk since it started."
     );
     crate::operator_words::assert_operator_words(&message);
     // A Console closed while assumed, here with TotalMix out of touch, says

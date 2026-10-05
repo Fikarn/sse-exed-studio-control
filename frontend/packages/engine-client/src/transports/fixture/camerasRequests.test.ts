@@ -342,7 +342,7 @@ describe("the fixture double's cameras: the record (CAM 1, D14)", () => {
     cameras.stopAnswering(1);
     expect(await refused("cameras.record.stop", { confirm: true })).toEqual({
       code: "CAMERA_UNREACHABLE",
-      sentence: "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC.",
+      sentence: "CAM 1 does not answer over Bluetooth. Check it is on and within reach.",
     });
   });
 });
@@ -364,8 +364,7 @@ describe("the fixture double's cameras: who holds a camera (D13)", () => {
       state: "released",
       word: "RELEASED",
       tone: "attention",
-      sentence:
-        "CAM 2 is released to LUMIX Tether. Studio Control does not read it or send it anything until you connect it again.",
+      sentence: "CAM 2 is released to LUMIX Tether. Connect it to control it here.",
       readAt: null,
     });
     expect(await refused("cameras.release", { camera: 2, confirm: true })).toEqual({
