@@ -3,6 +3,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Key } from "@sse/design-system";
 
 import { PreReadyState } from "./PreReadyState";
+import styles from "./RecoveryBands.module.css";
 
 // 2026-09 production readiness, Slice 9 (finding F10): one boundary around
 // whatever the bay is showing. A render error inside Lighting used to take the
@@ -46,20 +47,32 @@ export class WorkspaceErrorBoundary extends Component<WorkspaceErrorBoundaryProp
       return this.props.children;
     }
 
+    // The visual overhaul (2026-10-05): the word is the area's short name
+    // (`SETUP STOPPED`, not `SETUP / SUPPORT STOPPED`, which the 440 px
+    // display cut), the display's sentence one line so the error's own words
+    // stand under it, and the whole sentence in the bay, where nothing cuts it.
+    const area = this.props.area.split(" / ")[0] ?? this.props.area;
     return (
       <PreReadyState
         tone="error"
-        word={`${this.props.area} stopped`.toUpperCase()}
-        sentence="This area hit a problem and stopped drawing. The rest of Studio Control keeps working and the hardware link keeps running, so the desk, the rig and the deck hold their current state."
+        word={`${area} stopped`.toUpperCase()}
+        sentence="This area stopped drawing."
         code={error.message}
-        meta="Reload this area to bring it back · if it stops again, export diagnostics from Setup / Support"
         actions={
           <Key size="small" mode="primary" testId="workspace-boundary-reload" onClick={this.props.onReset}>
             Reload this area
           </Key>
         }
         testId="workspace-boundary"
-      />
+      >
+        <p className={styles.sentence}>
+          This area hit a problem and stopped drawing. The rest of Studio Control keeps working and the hardware link
+          keeps running, so the desk, the rig and the deck hold their current state.
+        </p>
+        <p className={styles.nextStep}>
+          Reload this area to bring it back. If it stops again, export diagnostics from Setup / Support.
+        </p>
+      </PreReadyState>
     );
   }
 }

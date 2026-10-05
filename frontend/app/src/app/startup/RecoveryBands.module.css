@@ -1,10 +1,18 @@
-/* Visual overhaul A, Slice 7: the line a failed screen shows under its keys,
-   naming the next step, so nothing on it is a dead end. The shell (overhaul
-   3): the recovery screen's own sections moved to its own stylesheet; the
-   root boundary's line is what is left here. */
+/* The screens that stopped (the visual overhaul, 2026-10-05): their whole
+   sentence in the bay, in the hardware link's voice as the state display
+   prints it, and the line that names the next step, so nothing on them is a
+   dead end. */
+
+.sentence {
+  margin: 0;
+  max-width: 1200px;
+  color: var(--text-text);
+  font: italic var(--font-weight-regular) var(--font-size-word) / 1.3 var(--font-family-serif);
+}
 
 .nextStep {
   margin: 0;
-  font: 400 var(--font-size-label) / 1.45 var(--font-family-ui);
+  max-width: 1200px;
   color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }

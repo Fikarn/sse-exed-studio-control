@@ -11,14 +11,7 @@ import { buildStartupSteps, stepStatusLabel } from "./startupHelpers";
 // nothing to do but wait. One screen for every page since 2026-09-28: Setup
 // had a copy of its own, which differed by a sentence.
 
-export function StartupSurface({
-  lifecycle,
-  opensSetup = false,
-}: {
-  lifecycle: ShellState["lifecycle"];
-  /** Setup is the page that opens, not the Console. */
-  opensSetup?: boolean;
-}) {
+export function StartupSurface({ lifecycle }: { lifecycle: ShellState["lifecycle"] }) {
   const steps = buildStartupSteps(lifecycle);
   const done = steps.filter((step) => step.tone !== "neutral").length;
 
@@ -30,9 +23,9 @@ export function StartupSurface({
       // sentence is what is happening, the meta line what comes next, and the
       // stage with the steps' count heads the steps under it.
       sentence="Connecting to the desk, the rig and the deck."
-      meta={
-        opensSetup ? "Setup opens once Studio Control is ready." : "The Console opens once Studio Control is ready."
-      }
+      // Which page opens is not known until the start is done (D1: the page
+      // last used); the line said "Setup opens" on every start.
+      meta="The page last used opens once Studio Control is ready."
       testId="startup-surface"
       cluster={
         <Section

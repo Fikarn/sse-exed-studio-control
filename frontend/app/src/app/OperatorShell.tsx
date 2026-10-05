@@ -304,7 +304,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
 
   let surface: ReactNode;
   if (shellExperience === "startup") {
-    surface = <StartupSurface lifecycle={shellState.lifecycle} opensSetup={setupModalActive} />;
+    surface = <StartupSurface lifecycle={shellState.lifecycle} />;
   } else if (setupModalActive && shellExperience === "ready") {
     surface = (
       <SetupSurface

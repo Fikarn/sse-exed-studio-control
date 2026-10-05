@@ -40,6 +40,10 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
     "ready",
   ] as const;
   const currentIndex = stages.indexOf(lifecycle as (typeof stages)[number]);
+  // A stage is the wait for its step: a step is done once the stage after it
+  // has begun (the visual overhaul, 2026-10-05; each step read done one stage
+  // early, Handshake while the handshake was still awaited).
+  const done = (step: number) => currentIndex > step;
   // STA-08: reserve the success-green tone for the fully-ready lifecycle.
   // Mid-boot, reached steps read as neutral, not healthy green, so an
   // in-progress boot no longer paints predominantly green. Slice 11: the
@@ -50,22 +54,22 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
     {
       description: "Start the part of Studio Control that talks to the desk, the rig and the deck.",
       label: "Start up",
-      tone: currentIndex >= 0 ? reachedTone : "neutral",
+      tone: done(0) ? reachedTone : "neutral",
     },
     {
       description: "Wait for Studio Control to confirm both halves of this install are the same version.",
       label: "Handshake",
-      tone: currentIndex >= 1 ? reachedTone : "neutral",
+      tone: done(1) ? reachedTone : "neutral",
     },
     {
       description: "Load what the desk, the rig and the deck report about themselves.",
       label: "Health",
-      tone: currentIndex >= 2 ? reachedTone : "neutral",
+      tone: done(2) ? reachedTone : "neutral",
     },
     {
       description: "Load where you were and whether commissioning has published.",
       label: "Workspaces",
-      tone: currentIndex >= 3 ? reachedTone : "neutral",
+      tone: done(3) ? reachedTone : "neutral",
     },
   ];
 }
@@ -148,22 +152,27 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
   // integrity check, or one a migration could not upgrade, is the operator's
   // data asking for attention — restore a backup from Setup / Support.
   if (startupFailure?.code === "STORAGE_CORRUPT" || startupFailure?.code === "STORAGE_MIGRATION_FAILED") {
-    return "Saved data needs attention";
+    return "Saved data damaged";
   }
 
   // 2026-09 production readiness, Slice 5 (F09): the hardware link stopped
   // during the session; the sentence says whether Studio Control restarts
   // it on its own or is waiting for the operator.
   if (startupFailure?.code === "ENGINE_EXITED") {
-    return "The hardware link stopped";
+    return "Link stopped";
   }
 
   // Slice 5 (F19): a second copy of the app was refused; the first one is
   // the one to use.
   if (startupFailure?.code === "ENGINE_ALREADY_RUNNING") {
-    return "Studio Control is already open";
+    return "Already open";
   }
 
+  // The visual overhaul (2026-10-05, the owner's answer): every word fits the
+  // 440 px display at its 28 px size (`SAVED DATA NEEDS ATTENTION`, `THE
+  // HARDWARE LINK STOPPED` and `STUDIO CONTROL IS ALREADY OPEN` were cut); the
+  // sentence says it whole.
+  //
   // Slice 8 gave every non-protocol failure the same word, so the stage no
   // longer branches: what failed is the start-up, whichever step it stopped
   // at, and the display's meta line names the step.
@@ -201,7 +210,9 @@ export function formatPathLabel(key: string) {
     case "appDataDir":
       return "App data";
     case "backupDir":
-      return "Backup archive";
+      return "Backups folder";
+    case "exportsDir":
+      return "Exports";
     case "dbPath":
       return "Database path";
     case "logFilePath":
