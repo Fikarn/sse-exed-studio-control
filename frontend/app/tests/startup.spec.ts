@@ -133,6 +133,28 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
   await expectNoDocumentScroll(page);
 });
 
+// The visual overhaul (2026-10-05): an area that stopped drawing says so in a
+// word that fits the display, its short name (`PROMPTER STOPPED`).
+test("an area that stopped: its word fits, nothing scrolls, no line is cut", async ({ page }) => {
+  for (const [crash, tab, word] of [
+    ["setup", "Setup / Support", "SETUP STOPPED"],
+    ["lighting", "Lighting", "LIGHTING STOPPED"],
+    ["cameras", "Cameras", "CAMERAS STOPPED"],
+    ["teleprompter", "Teleprompter", "PROMPTER STOPPED"],
+  ] as const) {
+    await openFixture(page, "audio-populated", { crash });
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: tab, exact: true })
+      .click();
+    await expect(page.getByTestId("workspace-boundary-state-display")).toContainText(word);
+    await expect(page.getByTestId("workspace-boundary-bay")).toContainText("The rest of Studio Control keeps working");
+    const room = await measureRoom(page);
+    expect(room.scrolls, `${crash}: every column holds what it shows`).toEqual([]);
+    expect(room.cut, `${crash}: no line is cut`).toEqual([]);
+  }
+});
+
 // The visual overhaul (2026-10-05): on every screen before ready nothing
 // scrolls and no line is cut, the display's word included (the owner chose
 // shorter words where the 440 px display cut them).

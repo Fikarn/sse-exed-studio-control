@@ -62,7 +62,11 @@ export function measureRoom(page: Page): Promise<SetupRoom> {
   return page.evaluate(() => {
     const columns = [
       ...document.querySelectorAll<HTMLElement>(
-        "[data-region=cluster] > *, [data-region=bay] > *, [data-region=plate] > *, [data-region=bay] main"
+        // The page's columns, the bay's main, the step screen's well (which
+        // clips a screen taller than the bay) and the screens' before ready
+        // bay (which clips what it holds).
+        "[data-region=cluster] > *, [data-region=bay] > *, [data-region=plate] > *, [data-region=bay] main, " +
+          "[data-region=bay] [data-screen] > [data-well], [data-region=bay] [data-pre-ready]"
       ),
     ];
     const scrolls = columns

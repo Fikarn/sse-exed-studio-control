@@ -28,6 +28,11 @@ export interface StateDisplayArmed {
   progress?: number;
   /** The arm window: the bar runs its own countdown, so no ticking state. */
   timeoutMs?: number;
+  /**
+   * When the arm began. A new arm (another key armed while one was) restarts
+   * the bar: it is keyed on this, as the menu's armed item's bar is.
+   */
+  armedAt?: number;
 }
 
 export interface StateDisplayProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
@@ -107,6 +112,7 @@ export function StateDisplay({
             )}
             <span className={styles.bar} aria-hidden="true">
               <i
+                key={armed.armedAt}
                 className={armed.timeoutMs ? styles.barCountdown : undefined}
                 style={
                   {

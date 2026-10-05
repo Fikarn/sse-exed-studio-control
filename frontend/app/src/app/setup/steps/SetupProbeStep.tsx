@@ -92,7 +92,7 @@ export function SetupProbeStep({ editor }: { editor: SetupPilot }) {
                 <div key={check.id} className={styles.probeRecord}>
                   <SetupRecordRow
                     label={check.label}
-                    value={probeWord(check.status)}
+                    value={probeWord(check.status).toUpperCase()}
                     tone={probeTone(check.status)}
                     testId={`setup-probe-record-${check.id}`}
                   />

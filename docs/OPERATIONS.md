@@ -129,7 +129,7 @@ The links to the real cameras are not built yet. In the studio's build every cam
 - **Release**, press twice, hands the camera to the iPad (CAM 1) or to LUMIX Tether (CAM 2, CAM 3). Studio Control then neither reads it nor sends to it, and a take it records goes on. `Connect` takes it back. It is the plate's key, or `Release CAM n…` in a camera's menu: in the selected camera's menu it arms in place and the second press releases; in another camera's menu it selects that camera and arms the plate's key, and the second press is there.
 - **The camera wins.** A change made on the camera shows on the page within about a second.
 - **Recent** lists the five newest camera actions and who did each. `All actions…` opens Setup / Support, which lists the actions of every page.
-- **`Read all cameras again`** reads the three once and sends nothing. **`Camera setup`** opens Setup / Support's `CAMERAS`.
+- **`Read all cameras again`** reads the three once and sends nothing. **`Camera setup`** opens Setup / Support's `Cameras`.
 
 The state display speaks of the camera that is worst off, and of the selected one among equals.
 
@@ -178,7 +178,7 @@ On a published setup, a step, `Back to …` and `Run all probes` read `press twi
 
 **Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` reads `ARMED` or `HELD`, with `Armed` and `Held` under it; arming sends the current state at once. `Prompter XL` shows what Windows reports.
 
-**Cameras.** `CAMERAS` holds what Studio Control needs for each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. It names the vMix output each picture comes from, CAM 1 Output 2, CAM 2 Output 3 and CAM 3 Output 4, which are set in vMix and not here. Saving sends nothing to a camera. `Forget CAM n…`, the last item of the camera's `⋯` (or a right-click on it), removes a pairing or an address: it asks in the menu, press again. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked.
+**Cameras.** `Cameras` shows `Camera setup`: what Studio Control needs for each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. It names the vMix output each picture comes from, CAM 1 Output 2, CAM 2 Output 3 and CAM 3 Output 4, which are set in vMix and not here. Saving sends nothing to a camera. `Forget CAM n…`, the last item of the camera's `⋯` (or a right-click on it), removes a pairing or an address: it asks in the menu, press again. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked.
 
 **Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest…` restores it. They are on the plate and in its `⋯`. The Support screen lists every backup, eight a page: press one to put its path in the field, then `Verify path` or `Restore path…`; each backup's `⋯` has `Verify` and `Restore…`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. Every restore comes back with the light outputs held: arm them with `Light outputs` when the rig should follow.
 

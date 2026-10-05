@@ -119,7 +119,7 @@ The pictures, with vMix running and its Outputs 2, 3 and 4 sent over NDI:
 Until the links to the cameras are built:
 
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
-- [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
+- [ ] `Camera setup` opens Setup / Support's `Cameras`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
 - [ ] Setup / Support's About ends with `NDI® is a registered trademark of Vizrt NDI AB · ndi.video`, as words.
 - [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a beige outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC`, on every page, and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.

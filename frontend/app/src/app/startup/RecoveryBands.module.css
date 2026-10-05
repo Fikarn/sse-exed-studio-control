@@ -10,6 +10,15 @@
   font: italic var(--font-weight-regular) var(--font-size-word) / 1.3 var(--font-family-serif);
 }
 
+/* The error's own words: small, never the first thing read, whole. */
+.code {
+  margin: 0;
+  max-width: 1200px;
+  overflow-wrap: anywhere;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
 .nextStep {
   margin: 0;
   max-width: 1200px;

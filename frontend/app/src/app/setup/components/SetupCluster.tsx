@@ -183,6 +183,15 @@ export function SetupCluster({
     },
   ];
 
+  // The way out's own key says it is armed; the armed row is for the others
+  // (the Teleprompter's rule). While the row shows, it takes the display's
+  // foot whole and the way-out key gives way: beside the key the row's words
+  // were cut. A press on the hidden key would only have armed it instead.
+  const armedRow =
+    armed && armedWords && !(probesArmed && state.wayOut === "run-probes")
+      ? { text: `${armedWords} · press again`, timeoutMs: armed.timeoutMs, armedAt: armed.armedAt }
+      : null;
+
   return (
     <div className={styles.cluster} data-setup-cluster="" data-testid="setup-cluster">
       <StateDisplay
@@ -192,14 +201,8 @@ export function SetupCluster({
         // the armed row says what the second press does.
         sentence={unpublishArmed ? UNPUBLISH_ARMED_SENTENCE : state.sentence}
         meta={armed ? undefined : (state.meta ?? undefined)}
-        // The way out's own key says it is armed; the armed row is for the
-        // others (the Teleprompter's rule), so everything fits the display.
-        armed={
-          armed && armedWords && !(probesArmed && state.wayOut === "run-probes")
-            ? { text: `${armedWords} · press again`, timeoutMs: armed.timeoutMs }
-            : null
-        }
-        actions={stateActions}
+        armed={armedRow}
+        actions={armedRow ? undefined : stateActions}
         data-toolbar-primary="title"
         testId="setup-state-display"
         menu={

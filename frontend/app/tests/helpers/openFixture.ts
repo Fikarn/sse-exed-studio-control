@@ -15,7 +15,7 @@ export async function openFixture(
   fixtureId: string,
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
-    crash?: "setup" | "lighting" | "audio";
+    crash?: "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
   }
 ) {
   const params = new URLSearchParams({

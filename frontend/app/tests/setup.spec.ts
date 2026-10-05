@@ -674,7 +674,11 @@ test("Workstation's window keys sit after UI scale, and in the browser they do n
   // New pages program, Slice SW (D22, SW-3): the Windowed key went with the
   // shell's windowed layout; the screen is always shown fullscreen.
   await expect(windowKeys.getByRole("button")).toHaveText(["Studio fullscreen", "Reset the window layout"]);
-  await expect(plate.getByTestId("support-workstation")).toContainText("kept for the next launch");
+  // The visual overhaul (2026-10-05): that the window is kept for the next
+  // launch is the reset key's tooltip.
+  await plate.getByTestId("support-window-reset").hover();
+  await expect(page.getByRole("tooltip")).toContainText("kept for the next launch");
+  await page.mouse.move(0, 720);
 
   const scaleBox = await plate.getByTestId("support-scale-switch").boundingBox();
   const windowBox = await windowKeys.boundingBox();
@@ -786,7 +790,8 @@ test.describe("Setup / Support after the visual overhaul", () => {
     for (const [keyId, underId] of [
       ["setup-step-probe", "setup-step-map"],
       ["setup-step-back", null],
-      ["setup-run-all-probes", "setup-probe-lighting"],
+      // Run all probes is the cluster's last key: nothing stands under it.
+      ["setup-run-all-probes", null],
     ] as const) {
       const key = page.getByTestId(keyId);
       const before = await key.boundingBox();
@@ -822,6 +827,20 @@ test.describe("Setup / Support after the visual overhaul", () => {
     expect(armed!.y).toBe(before!.y);
     expect(armed!.y + armed!.height).toBeLessThanOrEqual(box!.y + box!.height);
     await page.keyboard.press("Escape");
+    await page.clock.resume();
+  });
+
+  test("an armed row beside a way-out key takes the display's foot, and says it whole", async ({ page }) => {
+    await openSetupPage(page, "setup-degraded", { clock: true });
+    const display = page.getByTestId("setup-state-display");
+    await pausePageClock(page);
+    await page.getByTestId("setup-step-probe").click();
+    // The way out gives way while another key is armed: the row's words are not cut.
+    await expect(display).toContainText("Go to Probe hardware · press again");
+    await expect(page.getByTestId("setup-state-run-probes")).toHaveCount(0);
+    expect((await measureRoom(page)).cut, "no line is cut").toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("setup-state-run-probes")).toBeVisible();
     await page.clock.resume();
   });
 
