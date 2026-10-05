@@ -217,7 +217,11 @@ export function CamerasCluster({
         }
         // The REC key and the plate's own keys say that they are armed; the
         // row says what the second press does.
-        armed={armed ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs } : null}
+        armed={
+          armed
+            ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs, armedAt: armed.armedAt }
+            : null
+        }
         data-camera={state.camera}
         testId="cameras-state-display"
         menu={

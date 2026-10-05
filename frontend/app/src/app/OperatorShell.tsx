@@ -377,7 +377,9 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   return (
     <>
       <AppShellFrame
-        activeWorkspace={activeWorkspace}
+        // Before ready no page is open: the start-up and recovery screens are
+        // not Setup, so no tab is drawn as the current one (polish, 2026-10-05).
+        activeWorkspace={shellExperience === "ready" ? activeWorkspace : ""}
         clock={clock}
         cluster={workspaceRegions}
         plate={workspaceRegions}

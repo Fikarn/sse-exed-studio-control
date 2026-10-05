@@ -230,6 +230,7 @@ export function AudioCluster({
             ? {
                 text: `${armedRowWords(armedAction, viewModel)} · press again to apply`,
                 timeoutMs: armedAction.timeoutMs,
+                armedAt: armedAction.armedAt,
               }
             : null
         }

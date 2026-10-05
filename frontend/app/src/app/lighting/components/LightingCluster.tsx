@@ -346,7 +346,13 @@ export function LightingCluster(props: LightingClusterProps) {
         sentence={state.sentence}
         meta={state.meta}
         armed={
-          arm.armed ? { text: `${armedWords ?? arm.armed.label} · press again`, timeoutMs: arm.armed.timeoutMs } : null
+          arm.armed
+            ? {
+                text: `${armedWords ?? arm.armed.label} · press again`,
+                timeoutMs: arm.armed.timeoutMs,
+                armedAt: arm.armed.armedAt,
+              }
+            : null
         }
         actions={stateActions}
         data-toolbar-primary="title"

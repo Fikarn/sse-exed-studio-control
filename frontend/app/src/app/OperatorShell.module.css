@@ -14,9 +14,11 @@
   min-width: 0;
 }
 
-/* The shell's own dialogs (restart, close). The shell (overhaul 3): the
-   recovery screen's sections moved to its own stylesheet, and the classes no
-   screen read any more went with them. */
+/* The shell's own dialogs (Retry startup?, Restart the hardware link?, Close
+   Studio Control?). The visual overhaul's polish (2026-10-05): drawn as the
+   design system's dialog (Dialog.module.css): the floating layer over a flat
+   scrim of the well colour, never a backdrop blur; a 20 px PT Sans title in
+   sentence case, the sentence in body type, the keys at the right. */
 
 .overlay {
   position: fixed;
@@ -24,40 +26,71 @@
   z-index: var(--z-dialog);
   display: grid;
   place-items: center;
-  padding: clamp(20px, 4vw, 48px);
-  background: color-mix(in srgb, var(--color-background-950) 74%, transparent);
-  backdrop-filter: blur(10px);
+  padding: 20px;
+  background: color-mix(in srgb, var(--material-well) 60%, transparent);
 }
 
 .dialog {
-  width: min(560px, 100%);
-  display: grid;
-  gap: var(--space-4);
-  /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
-  box-shadow: var(--elevation-plate), var(--elevation-float);
+  width: min(720px, calc(100vw - 40px));
+  padding: 20px 24px 24px;
+  border-radius: var(--radius-base);
+  border: 1px solid var(--material-line2);
+  background: var(--material-raise);
+  box-shadow: var(--elevation-float);
+  color: var(--text-text);
+  outline: none;
+}
+
+.dialog:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .dialogTitle {
   margin: 0;
-  font: var(--font-weight-bold) var(--operator-font-size-title-lg, 28px) / 1.15 var(--font-family-ui);
-  letter-spacing: 0;
+  font: var(--font-weight-bold) var(--font-size-word) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
 }
 
 .dialogBody {
-  margin: 0;
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-body) / 1.6 var(--font-family-ui);
+  margin: 12px 0 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .dialogActions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: no-preference) {
   .overlay {
-    backdrop-filter: none;
+    animation: shellDialogOverlayIn var(--motion-duration-enter) var(--motion-easing-out);
+  }
+
+  .dialog {
+    animation: shellDialogPanelIn var(--motion-duration-enter) var(--motion-easing-out);
+  }
+}
+
+@keyframes shellDialogOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shellDialogPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

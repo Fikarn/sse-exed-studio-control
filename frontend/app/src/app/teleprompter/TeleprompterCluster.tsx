@@ -253,7 +253,7 @@ export function TeleprompterCluster({
         // armed row says what the second press of any other key does.
         armed={
           armed && !(updateArmed && state.wayOut === "update")
-            ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs }
+            ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs, armedAt: armed.armedAt }
             : null
         }
         testId="teleprompter-state-display"

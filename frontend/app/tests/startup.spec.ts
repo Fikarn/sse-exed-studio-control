@@ -42,6 +42,18 @@ test("renders startup and recovery fixture states", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
 });
 
+// The visual overhaul's polish (2026-10-05): the screens before ready are not
+// Setup, so the header draws no tab as the current one, whichever page was
+// open last.
+test("no tab is the current one before ready", async ({ page }) => {
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  for (const fixture of ["startup-loading", "protocol-mismatch", "bootstrap-failed"]) {
+    await openFixture(page, fixture);
+    await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toBeVisible();
+    await expect(nav.locator('[aria-current="page"]'), fixture).toHaveCount(0);
+  }
+});
+
 // plan PR 6 / workstream D6: deeper assertions on the recovery surfaces
 // the original test glossed over. Each test below isolates one failure
 // posture so a regression in that specific posture surfaces against the
