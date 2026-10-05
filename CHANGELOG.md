@@ -8,6 +8,17 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The header's tabs stay where they are when the page changes: the open tab keeps the room of its word. Lighting's tab says `unreachable`, as its page does; on Lighting the Console's latch reads `AUDIO SOLO`. Before the app is ready the lamps are hollow and read `pending`, or `not read` after a failed start (#311).
+- Every state display's sentence fits its two lines: the long ones are shorter (the Prompter XL's, a camera released or out of Bluetooth reach, TotalMix's Global OSC, the protocol). Point at a sentence cut short to read it whole (#311).
+- A locked key keeps its state: a solo, a mix target or `LIGHTING` on shows its word and dashed edge in yellow or green while it is locked, instead of looking off (#311).
+- The Console marks every level TotalMix has not confirmed with a dashed yellow keyline, and at rest says its own sentence, not Setup's. Levels print the real minus (−3.8 dB); the snapshot TotalMix holds reads `ACTIVE`; the bank keys are ‹ › (#311).
+- Lighting's colour tags are quiet tints from the brand (Clay, Ochre, Sand, Olive, Slate, Mist, Plum, Heather); each saved tag keeps its slot, and a colour-temperature palette has none. The plate's on/off keys read `Light`, `Group`, `Selection` (#311).
+- The Lighting plot names the door and the booth window and draws no camera until the cameras' places are known; it no longer says `locked` while the bridge is unreachable, and the Scenes head says `recalls refused` (#311).
+- Cameras: `REC`'s lamp stands by its word; the plate's Connect and Try again are plain keys; a last-read value has its dashed keyline on the value alone, and the caption names the camera once (#311).
+- Teleprompter: scripts are rows on hairlines with their pace in words a minute; the footer shows the Prompter XL's mode alone; cues stand upright; the cue keys, Go to paragraph and Go are one row; Edit script keeps the page's margin (#311).
+- Setup / Support: the step screen fills the bay, its title at the plate's size; the probes are named by their hardware (Deck, Lighting bridge, TotalMix); Import's key reads `Export and continue`; backups lead with their time (#311).
+- The start-up screen lists its steps across the middle and the hardware on the right; the recovery screen lists each place once with its `Open` key. The shell's own dialogs look like every other dialog (#311).
+
 - Setup / Support is drawn anew: on a published setup the steps, `Back to …` and `Run all probes` read `press twice` and arm dark red with a countdown, in their own height; `Export backup`, `Open the log` and `Back to the Console` are the state display's `⋯`; the deck's map is drawn as the deck, the page key dark green and the strip one strip; the helper sentences are tooltips; the Support plate fits without scrolling (#310).
 - Support lists the backups eight a page, each with a `⋯` (Verify, `Restore…`, which asks as before); a camera's `Forget CAM n…` is its `⋯`'s last item and asks, press again; the light outputs read `ARMED` or `HELD` (#310).
 - The recovery screen's keys are one kind; it says the whole sentence and its code in the middle, and `NOT READ` for what it could not ask. Its words fit the display: `LINK STOPPED`, `SAVED DATA DAMAGED`, `ALREADY OPEN`. `Back to Console`, which could not leave it, went (#310).

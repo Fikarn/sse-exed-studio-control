@@ -40,7 +40,7 @@ The state display reads one of six words.
 - `HELD`: the light outputs are held, and nothing is sent to the rig. `Open Setup` goes to the `Light outputs` switch.
 - `UNSAVED`: the rig differs from the scene on the rig, as the deck's `RECALL` says too (a `Highlight`, a `Solo`, an `Identify` and a running fade do not count). `Save changes` writes the rig into that scene. `Recall it again` puts the scene back.
 - `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits. The `Grand master` waits while previewing: it acts on the rig itself.
-- `UNREACHABLE`: the bridge has not passed its probe (or its address changed since). A recall is refused, and `LIGHTING`, the `Grand master` and the Save row are locked; the rest still reaches the rig, `CUT ALL` first. `Open Setup`, run the bridge probe, publish again.
+- `UNREACHABLE`: the bridge has not passed its probe (or its address changed since). A recall is refused: the Scenes head says `recalls refused`, and a scene row still shows its scene on the plate. `LIGHTING`, the `Grand master` and the Save row are locked; the rest still reaches the rig, the plot and `CUT ALL` included. `Open Setup`, run the bridge probe, publish again.
 
 Held is not a blackout: the rig keeps its last look. Scenes and fixtures still move on screen. `DMX monitor` (the state display's `⋯`) shows every channel as it is sent, or as it would be while held.
 
@@ -51,7 +51,7 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **All lights.** `LIGHTING` switches every fixture on or off. `CUT ALL` takes them all to off: press, and press again within 3 s, as the deck's `ALL OFF`. A cut, or `LIGHTING` off, also ends a `Highlight`, a `Solo` and every `Identify` or `Find` flash, so the rig goes dark; in Preview it cuts the preview only. `Grand master` is one level over them all.
 - **The plot** is the room at its real metres, with a ruler on its top and left edge. Its `⋯` in the bar under it, or a right-click on its floor, frames the rig or fits the room, chooses what it shows, the symbol key, and saves or clears views `1`, `2`, `3`; a press on a saved view recalls it.
 - **Select** a fixture on the plot. While `Add to selection` is lit, a press adds or removes one and a dragged box adds several. The bar under the plot names the selection; `Clear` empties it. Press a group's key to switch it on or off; its `⋯` shows it on the plate, renames, colours or deletes it.
-- **Set** the selection in the plate: `Turn on`, `Turn off`, `Intensity`, `Colour temperature`, `Palettes`. A small mark under a slider is the level the scene on the rig keeps, yellow while the rig has left it. Double-click a slider to type a value. `Edit…` beside `Placement` opens the place on the plot, which the rig does not use. The plate's title `⋯` (or a right-click on the fixture on the plot) holds `Delete fixture…`, which arms in place.
+- **Set** the selection in the plate: `Light`, lit while the fixture is on (a group's plate has `Group`, several fixtures `Selection`), `Intensity`, `Colour temperature`, `Palettes`. A small mark under a slider is the level the scene on the rig keeps, yellow while the rig has left it. Double-click a slider to type a value. `Edit…` beside `Placement` opens the place on the plot, which the rig does not use. The plate's title `⋯` (or a right-click on the fixture on the plot) holds `Delete fixture…`, which arms in place.
 - **Palettes.** A press applies a palette to the selection; its `⋯` edits, moves, colours or deletes it.
 - **Find a light.** `Identify` flashes one fixture, `Find` the selection in turn. `Highlight` holds the selection at full, `Solo` takes all others to off; while either is on it stands under the state display with `Off`. Press the key again to end it; `CUT ALL`, `LIGHTING` off and the deck's `ALL OFF` end it too.
 - **Undo** takes back the newest of 25 steps: a scene saved or deleted, a fixture added or deleted. It takes back no recall and no level. It keeps its steps when you leave the page and come back, and forgets them at a restore or a restart of the hardware link, when the saved data they name may have changed. A step whose scene or fixture was deleted since, on the deck or on screen, or whose scene was renamed, is refused and says why.
@@ -68,7 +68,7 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **Groups.** A row's `⋯` shows only some groups (Talent, Line, Bed, FX, Remote); the heading then says which, and `Show all` brings every strip back.
 - **Plate.** The whole strip, without scrolling: its preamp (an input's), the other mixes it feeds (a row's `⋯` makes that mix the target) and its meter. Each section's `⋯` holds its switches. The equaliser, the Low Cut and the dynamics are set in TotalMix.
 - **Solo and clip.** The latch slot names the soloed strips, with `Clear all`; a clip latches beside it, with `Clear`.
-- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot, then again while it reads `LOAD?`, to load it in TotalMix; the Console then reads the desk. A double-click only arms it. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
+- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `ACTIVE`, with a green lamp, is the one TotalMix has loaded, `CHANGED`, with a yellow lamp, that it changed since. Press a slot, then again while it reads `LOAD?`, to load it in TotalMix; the Console then reads the desk. A double-click only arms it. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
 - **The page's `⋯`** holds `Sync from TotalMix`, which reads the desk and changes nothing on it, `Run audio probe`, `Clear clips`, `Peak hold`, `Reset peaks` and `Open Setup`.
 
 The state display reads `VERIFIED` when the probe has passed, meter data arrives and the desk has been read. Otherwise:
@@ -83,7 +83,7 @@ The state display reads `VERIFIED` when the probe has passed, meter data arrives
 | `DISCONNECTED`  | TotalMix reports the UFX III gone                                                           | Check its USB and power |
 | `ACTION FAILED` | The last action failed                                                                      | Any action that works   |
 
-A change counts as confirmed when TotalMix reports it; a send or a solo turned off also counts when TotalMix's list of that mix leaves it out, as TotalMix lists no send at or below −65 dB. A change TotalMix does not report reads `ASSUMED`. One TotalMix reports with another value goes back to TotalMix's value: the desk wins, and for a switch `Recent actions` shows it as a change at TotalMix.
+A change counts as confirmed when TotalMix reports it; a send or a solo turned off also counts when TotalMix's list of that mix leaves it out, as TotalMix lists no send at or below −65 dB. A change TotalMix does not report reads `ASSUMED`. While TotalMix has not confirmed the desk, every level the Console prints (the strips', the outputs' and the plate's other mixes) carries a dashed yellow keyline; the state display counts the values TotalMix confirmed, and the last sync is in the footer. One TotalMix reports with another value goes back to TotalMix's value: the desk wins, and for a switch `Recent actions` shows it as a change at TotalMix.
 
 The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never runs the probe by itself: `OFFLINE` stays after TotalMix is back, until you press `Run audio probe`. If it keeps failing, check TotalMix against [HARDWARE.md](HARDWARE.md).
 
@@ -140,7 +140,7 @@ The state display speaks of the camera that is worst off, and of the selected on
 | `NOT SET UP`  | No pairing or no address, or no link in this version           | `Camera setup`                                |
 | `UNREACHABLE` | It does not answer; its last values are amber, its keys locked | Check that it is on and in reach; `Try again` |
 
-While CAM 1 is `UNREACHABLE` after it reported recording, `REC` reads `last known: recording` and the stop is locked until it answers: the take is left as it was. Stop it on the camera if it must end.
+While CAM 1 is `UNREACHABLE` after it reported recording, `REC` reads `last known 09:11 · STOP is locked until CAM 1 answers`: the take is left as it was. Stop it on the camera if it must end.
 
 ## Stream Deck
 
@@ -168,9 +168,9 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 
 **The runner's steps**
 
-1. `Import profile` exports the Stream Deck's profile for Companion. Start Companion first; in Companion, import it with `Full Reset & Import`.
+1. `Import profile` exports the Stream Deck's profile for Companion into the exports folder the screen names: `Export and continue` also opens `Probe hardware`, `Export only` does not. Start Companion first; in Companion, import it with `Full Reset & Import`.
 2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. Each probe saves the address it asks, whether it passes or not: the lights and the Console follow it. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed until the probes run again, even after the lamp turns `ready`: Setup reads `SETUP REQUIRED` before a publish, `DEGRADED` after one with the override. On a published setup, running the probes again unpublishes it first (below).
-3. `Map bindings` shows the deck's four pages as the profile draws them: the eight keys (the page key dark green, a dark key black), the strip under them, and each dial under its cell of the strip.
+3. `Map bindings` shows the deck's four pages as the profile draws them: the eight keys (the page key dark green, a dark key black), the strip under them, and each dial under its cell of the strip: its push reads `PUSH`, then its two turns.
 4. `Verify live echo`: a control pressed on the deck lights its cell on screen. A key of another page turns the screen to that page.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
 

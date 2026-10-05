@@ -71,11 +71,13 @@ The surface is the brand's Dark Green pulled almost to black: a trace of hue, no
 
 Hue names the family, form names the meaning, and colour never stands alone: a lit fill means on, a lamp and its word mean look here, a keyline encloses a value or a word. A lamp always has its word beside it.
 
-Hazards are a coral lamp and a word on a dark key, never a coral fill: 48 V on, and `REC` while the main camera records. Doubt is a dashed yellow keyline on the value itself: a value the hardware link has not confirmed, or a last known value from a device that stopped answering. A locked control is a dashed edge at 55 %, and says why on hover.
+Hazards are a coral lamp and a word on a dark key, never a coral fill: 48 V on, and `REC` while the main camera records. Doubt is a dashed yellow keyline on the value itself: a value the hardware link has not confirmed, or a last known value from a device that stopped answering. A locked control is a dashed edge at 55 %, and says why on hover; a locked key keeps its state: engaged, its word and dashed edge in yellow; live, in green.
 
 Text pairs that hold 4.5:1 (tested from the token values): the inks on every surface and well; black on Green, Yellow, Coral and Beige Light; Beige on Burgundy; Beige Light and the second ink on Dark Green. Never coral or the quiet ink on Dark Green.
 
 The meter ramp and the colour-temperature track are signal, not status: green to −18 dBFS, yellow to −3, coral above; warm to cool.
+
+The operator's colour tags on scenes, groups and palettes are identity, not status: eight quiet tints, `--tag-0` to `--tag-7` (Clay, Ochre, Sand, Olive, Slate, Mist, Plum, Heather), clear of every role colour; Ochre and Mist are the palette's reserve Brown and Sky. A saved tag keeps its slot, and a colour-temperature palette carries none: its temperature colours it.
 
 There is one theme, Studio.
 
@@ -90,7 +92,7 @@ Flat and matte, three planes and one floating layer:
 | Well           | `--material-well`  | the state display, readouts, sliders' and meters' wells, fields, the plot: one step down, 1 px `--material-line` edge |
 | Floating layer | `--material-raise` | menus, popovers, dialogs, drawers, toasts: a 1 px `--material-line2` edge, a 1 px black outline and one soft shadow   |
 
-A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px). One radius, 4 px, everywhere (a lamp is a circle).
+A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px), the head's row standing 4 px above it with or without keys. One radius, 4 px, everywhere (a lamp is a circle).
 
 No gradient except signal (the meter ramp, the colour-temperature track), no glow, no inner highlight, no shadow except on the floating layer. The tooltip is the one light surface (Beige with black text), so it reads as a note. Fader and slider caps are matte and light, so a position reads from 3 m.
 
@@ -110,14 +112,15 @@ Nothing on an idle surface animates. Hover changes an edge or a colour, never a 
 
 ## 7. The components
 
-Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page; the board "Menus and overlays, open" holds the floating layers open.
+Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page (the header's `Tab`, `Lamp`, `Tally` and `Crest` on the board "Shell"); the board "Menus and overlays, open" holds the floating layers open.
 
 - **Shell**: the header (the product's name, `Tab`s with their pages' lamps, a `LampChip` for the deck and for each latch, the `Tally` for `REC`, the clock, the logotype) and the `Footer`; one plate slot that every page fills (`ShellRegion`).
 - **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys, the page's ⋯ as `menu` at its top right; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, on every page, `Section`, the take-time keys.
-- **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
+- **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover; it keeps its state, an engaged one in yellow, a live one in green), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
 - **Lamps**: `Lamp`, `LampChip` (header), `LampWord` (rows and tags), `StatusBadge` (a keyline word).
 - **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track, and a ▲ under the track for a value kept elsewhere, a scene's saved level, yellow while the value has left it), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
+- **Empty**: `EmptyLine`, an empty list or section: one quiet line in PT Sans body, the explanation as its tooltip, an optional hollow lamp (as the latch slot's "Nothing latched") and at most one key. Pages draw no empty state of their own.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
 - **Setup**: its step keys (an `ArmKey` with the step's number, name and word; on a published setup it reads `press twice` and arms in its own height) and its probe rows (the name, a `LampWord`, the answer under it) are the page's own, built from these, and so are the deck's map and the Support sections.
 
@@ -129,7 +132,7 @@ The sentence keeps two lines, so every state sentence is written to fit them, ab
 
 | Page         | Words                                                                                                                                       |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`                                    |
+| Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`; a snapshot: `ACTIVE`, `CHANGED`   |
 | Lighting     | `REACHABLE` · `HELD`, `NOT ANSWERING`, `UNSAVED` · `UNREACHABLE` · `PREVIEW`; a scene: `ON RIG`, `UNSAVED`, `PREVIEW` (the deck's `RECALL`) |
 | Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                                                      |
 | Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`                                       |

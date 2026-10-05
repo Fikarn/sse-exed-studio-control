@@ -42,6 +42,13 @@ Left by pull request 2 for the page pull requests:
 - A locked key's reason is the browser's own tooltip (`title`); DESIGN.md §9 keeps a lock's reason on screen. Each page settles it as it moves. (Cameras, pull request 6: a camera's lock stands on screen in the state display, the plate's connection well and each section's head; a format or look the camera refuses now says why under its row; a step key at the end of the camera's values keeps its reason in the tooltip. Teleprompter, pull request 7: `PLAY`'s lock is the state display's sentence; Remove's stands in its menu item; the Prompter XL window's reason stands at the foot of the plate; a speed, size or step key at its end keeps its reason in the tooltip. Setup, pull request 8: the Console's lock stands in its `⋯` item, the plate's `Restore latest…` and `Verify latest` say under them why they wait, a camera's in its rows, and the recovery screen's restore says what it can do above its keys.)
 - The state display cut a long sentence at two lines, and its meta line beside a way-out key: on Cameras, `UNREACHABLE` CAM 1 read "… within reach of th…" and "Last answer 09:11 · 2 of 3 held · C…". Settled by pull request 11 (D39): every state sentence and meta is written to fit, and the page tests hold that none is cut.
 
+Left by pull request 11 (polish):
+
+- The Lighting plot draws no camera until the owner gives CAM 1 to CAM 3's places (D39): roughly where each stands, in metres from the backdrop wall's west corner, and which way it faces.
+- A development run's simulated rig (`native/rust-engine/src/lighting_backend.rs`) still places its fixtures by fractions, so the plot bunches them in the room's first metre there; the page tests' rig stands in metres since this pull request. An engine change of its own.
+- The design system still exports primitives no page uses (`StatusDot`, `PlotPill`, `PlotMeta`, `ChipStrip`, `EmptyState`, `DegradedState`, the small `Crest` sizes); their boards went with this pull request. Remove them with their CSS and tests, then re-seed the allowlists.
+- Lighting gives some lock reasons as the browser's own tooltip (`title`): the grand master, the Patch keys, the empty view slots. DESIGN.md §9 keeps a lock's reason on screen.
+
 ### The Cameras page (was Slice 9)
 
 Built, in two pull requests, against the simulated cameras and from board 2 (`docs/design/boards/A-cameras-2.html`), as D10, D11 and D19 amend it.
