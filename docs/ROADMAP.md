@@ -32,7 +32,7 @@ The owner asked on 2026-10-03 for the pages to look and work as one premium inst
 - [x] 8. Setup / Support and recovery: the steps' one armed form, the standing row into the page's `⋯`, the deck's map as the deck, menus on the plate, the backups and the cameras, recovery on one key family (#310)
 - [x] 9. The deck's Companion 5 profile, and one read of every display (#294)
 - [x] 10. The deck's look: labels drawn in PT Sans and SSE Adelia, the screen's palette and forms (#297)
-- [x] 11. Polish: a critique of every capture, the fixes, the app shown to the owner (this pull request)
+- [x] 11. Polish: a critique of every capture, the fixes, the app shown to the owner (#311)
 
 Left by pull request 2 for the page pull requests:
 
