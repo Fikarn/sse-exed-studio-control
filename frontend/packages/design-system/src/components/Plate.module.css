@@ -1,9 +1,12 @@
 @layer components {
   /* The title plate: the one Dark Green surface on a working page. Only
-     --text-text and --text-text2 sit on it; coral and --text-text3 fail 4.5:1. */
+     --text-text and --text-text2 sit on it; coral and --text-text3 fail 4.5:1.
+     The visual overhaul's polish (2026-10-05): the key stands at the top, on
+     the title's line, so the plate's ⋯ is at the same height on every page
+     whatever the sub-line under the title holds. */
   .head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
     min-width: 0;
@@ -52,15 +55,19 @@
   }
 
   /* The section head: the Adelia word and its quiet detail on one baseline,
-     the keys at the right, the brand's heavy rule under the row. */
+     the keys at the right, the brand's heavy rule under the row. The visual
+     overhaul's polish (2026-10-05): the row stands on the rule's foot, 4 px
+     above it, so the title is the same distance from the rule with or without
+     keys, and no key touches the rule (a head with a 28 px key is 34 px). */
   .sectionHead {
     display: grid;
     grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
-    align-items: baseline;
-    align-content: center;
+    align-items: last baseline;
+    align-content: end;
     column-gap: 12px;
     min-height: 28px;
     min-width: 0;
+    padding-bottom: 4px;
     border-bottom: 2px solid var(--material-line2);
   }
 
@@ -88,7 +95,7 @@
 
   .sectionActions {
     grid-column: 3;
-    align-self: center;
+    align-self: end;
     display: inline-flex;
     align-items: center;
     gap: 8px;

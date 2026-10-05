@@ -13,10 +13,13 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // `tests/__visual__/storybook.spec.ts-snapshots/`.
 //
 // Of the A primitives the Sheet is captured, which holds every primitive at
-// rest, and the boards of the overlays held open (their names end ", open");
-// `ui-contract.spec.ts` measures every one of their pages. The shell's stories
-// are gone (2026-09-28): `visual-review.spec.ts` captures the same boards
-// from the same fixtures.
+// rest but the header's, the Shell board, which holds those (the tabs, the
+// lamps, the REC tally and the logotype), and the boards of the overlays held
+// open (their names end ", open"); `ui-contract.spec.ts` measures every one of
+// their pages. The shell's page stories are gone (2026-09-28):
+// `visual-review.spec.ts` captures the same boards from the same fixtures. The
+// visual overhaul's polish (2026-10-05): the old "Design System/Primitives"
+// boards are gone too, their components retired or on the A primitives boards.
 //
 // New pages program, Slice SW (D22): Studio Control runs on Windows at
 // 2560×1440. Off Windows Playwright skips the comparison (`ignoreSnapshots`),
@@ -42,7 +45,13 @@ const index = JSON.parse(readFileSync(indexPath, "utf-8")) as StorybookIndex;
 const A_PRIMITIVES = "Design System/A primitives";
 const stories: StoryEntry[] = Object.values(index.entries)
   .map((entry) => ({ id: entry.id, name: entry.name, title: entry.title }))
-  .filter((story) => story.title !== A_PRIMITIVES || story.name.startsWith("Sheet") || story.name.endsWith(", open"));
+  .filter(
+    (story) =>
+      story.title !== A_PRIMITIVES ||
+      story.name.startsWith("Sheet") ||
+      story.name === "Shell" ||
+      story.name.endsWith(", open")
+  );
 
 for (const story of stories) {
   test(`${story.title} — ${story.name}`, async ({ page }) => {

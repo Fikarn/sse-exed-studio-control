@@ -8,11 +8,11 @@
   --sse-beige: #EDEBD1; /** Beige: the selection keyline, the tooltip, text on Burgundy */
   --sse-beige-light: #F6F5E8; /** Beige Light: the main ink */
   --sse-yellow: #F2DE6F; /** Yellow: engaged and attention, doubt */
-  --sse-brown: #CAA363; /** Brown: reserve */
+  --sse-brown: #CAA363; /** Brown: reserve; the colour tag Ochre */
   --sse-coral: #FF7D55; /** Coral: error and hazard, a destructive command */
   --sse-burgundy: #671919; /** Burgundy: the armed form (Beige text) */
   --sse-blue: #3A87E5; /** Blue: information and preview */
-  --sse-sky: #C9D4DA; /** Sky: reserve */
+  --sse-sky: #C9D4DA; /** Sky: reserve; the colour tag Mist */
   --sse-black: #000000; /** text on a lit fill */
   --material-bg: #0B1311; /** the one surface: header, columns, bay, footer */
   --material-key: #111A17; /** the face of a key */
@@ -51,6 +51,12 @@
   --signal-cct-4400: #F0DFB8;
   --signal-cct-5000: #EBE5D2;
   --signal-cct-5600: #D4DDE2;
+  --tag-0: #B9806C; /** Clay (was Rose) */
+  --tag-2: #D3C4A0; /** Sand (was Yellow) */
+  --tag-3: #A3A36F; /** Olive (was Lime) */
+  --tag-4: #7E93A6; /** Slate (was Emerald) */
+  --tag-6: #A3809B; /** Plum (was Violet) */
+  --tag-7: #C69CB0; /** Heather (was Pink) */
   --prompter-glass-floor: #000000; /** the glass's background, black in every look */
   --prompter-glass-text: #ffffff; /** white text, the standard */
   --prompter-glass-text-yellow: #ffd84a; /** yellow text, the look's other colour */
@@ -269,6 +275,8 @@
   --signal-meter-over: var(--sse-coral); /** above -3 dBFS */
   --signal-peak: var(--text-text2); /** the 2 px peak tick */
   --signal-cct-6500: var(--sse-sky);
+  --tag-1: var(--sse-brown); /** Ochre, the palette's reserve Brown (was Orange) */
+  --tag-5: var(--sse-sky); /** Mist, the palette's reserve Sky (was Cyan) */
   --elevation-key-fill: var(--material-key); /** deprecated: the face of a key */
   --elevation-plate-fill: var(--material-bg); /** deprecated: plates are the one surface */
   --elevation-cap-fill: var(--role-cap-fill); /** deprecated: the cap's colour */

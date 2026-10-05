@@ -7,16 +7,19 @@ import { Popover } from "./Popover";
 // Visual overhaul B (DESIGN.md §5, §9): the colour-tag picker, a popover at
 // the pointer or under the key that opened it. The swatches are keys of the
 // tag's own colour (data, not the page's palette); the chosen one carries the
-// Beige keyline and a mark; "Clear color tag" is the last key. The arrows,
+// Beige keyline and a mark; "Clear colour" is the last key. The arrows,
 // Home and End move over the keys, Enter or Space picks one; it closes on a
-// press outside or Esc and gives the focus back.
+// press outside or Esc and gives the focus back. The visual overhaul's polish
+// (2026-10-05): the words say "colour", as the menus do, and with no tag
+// chosen the focus starts on Clear colour, the current choice, so the first
+// swatch never reads as chosen.
 
 export interface ColorPickerSwatch {
   /** Stable index — what gets persisted. */
   index: number;
   /** Display name for screen readers + tooltip. */
   name: string;
-  /** Render color (hex). */
+  /** Render colour: a hex or a tag token (`var(--tag-0)`). */
   hex: string;
 }
 
@@ -27,14 +30,14 @@ export interface ColorPickerProps {
   y: number;
   /** Palette of swatches. Order is the rendered order. */
   swatches: readonly ColorPickerSwatch[];
-  /** Currently selected swatch index, or `null` for no color tag. */
+  /** Currently selected swatch index, or `null` for no colour tag. */
   selectedIndex: number | null;
   /** Fires when the user picks a swatch (passes the swatch index) or clears
    *  (passes `null`). The picker closes before it runs. */
   onSelect: (index: number | null) => void;
   /** Fires when the picker should close: outside click, Esc, or after a select. */
   onClose: () => void;
-  /** Optional aria label. Default: "Pick a color". */
+  /** Optional aria label. Default: "Pick a colour". */
   ariaLabel?: string;
 }
 
@@ -45,7 +48,7 @@ export function ColorPicker({ x, y, swatches, selectedIndex, onSelect, onClose, 
   const anchor = useMemo(() => ({ x, y }), [x, y]);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const order = useMemo(() => [...swatches.map((swatch) => swatch.index), CLEAR], [swatches]);
-  const chosen = selectedIndex !== null && order.includes(selectedIndex) ? selectedIndex : (order[0] ?? CLEAR);
+  const chosen = selectedIndex !== null && order.includes(selectedIndex) ? selectedIndex : CLEAR;
   const [focusIndex, setFocusIndex] = useState<number>(chosen);
 
   const focusSlot = useCallback((index: number) => {
@@ -105,11 +108,11 @@ export function ColorPicker({ x, y, swatches, selectedIndex, onSelect, onClose, 
       open
       anchor={anchor}
       onClose={() => onClose()}
-      label={ariaLabel ?? "Pick a color"}
+      label={ariaLabel ?? "Pick a colour"}
       placement="bottom-start"
     >
       <div ref={gridRef} className={styles.picker} onKeyDown={onKeyDown}>
-        <div className={styles.swatches} role="group" aria-label="Color tag swatches">
+        <div className={styles.swatches} role="group" aria-label="Colour swatches">
           {swatches.map((swatch) => {
             const selected = selectedIndex === swatch.index;
             return (
@@ -142,7 +145,7 @@ export function ColorPicker({ x, y, swatches, selectedIndex, onSelect, onClose, 
           onPointerEnter={() => focusSlot(CLEAR)}
           onClick={() => activate(null)}
         >
-          Clear color tag
+          Clear colour
         </button>
       </div>
     </Popover>

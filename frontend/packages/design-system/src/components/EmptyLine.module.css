@@ -1,0 +1,44 @@
+/* An empty list or section (the visual overhaul's polish, 2026-10-05): one
+   line in PT Sans body in the quiet ink, never a box or an icon. The words give
+   way first, with an ellipsis; the key at the end keeps its size. */
+@layer components {
+  .emptyLine {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+    color: var(--text-text3);
+    white-space: nowrap;
+  }
+
+  /* The latch slot's hollow lamp, at its size. */
+  .lamp {
+    width: 10px;
+    height: 10px;
+  }
+
+  .words {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* With a tip the tooltip's wrapper and trigger stand between the line and
+     the words: they give way with the words, so the ellipsis still shows. */
+  .tip {
+    display: flex;
+    min-width: 0;
+  }
+
+  .tip > *,
+  .tip > * > * {
+    min-width: 0;
+  }
+
+  .action {
+    flex: none;
+    margin-left: auto;
+  }
+}

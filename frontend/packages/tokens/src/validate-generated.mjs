@@ -16,6 +16,8 @@ for (const relativePath of required) {
 // fails here before it reaches a render.
 const css = readFileSync(path.join(packageDir, "generated/tokens.css"), "utf8");
 const FAMILIES = [
+  // The colour tags (the polish, 2026-10-05): a stale build lacks them.
+  "--tag-0",
   "--sse-green",
   "--sse-dark-green",
   "--sse-beige-light",

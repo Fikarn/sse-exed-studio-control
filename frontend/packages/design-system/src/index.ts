@@ -16,6 +16,8 @@ export { Meter } from "./components/Meter";
 export type { MeterProps } from "./components/Meter";
 export { PlateHead, Section, Fields, Readouts, ControlRow, Danger } from "./components/Plate";
 export type { ControlRowProps, PlateHeadProps, ReadoutRow, ReadoutsProps, SectionProps } from "./components/Plate";
+export { EmptyLine } from "./components/EmptyLine";
+export type { EmptyLineProps } from "./components/EmptyLine";
 export { Drawer } from "./components/Drawer";
 export type { DrawerProps } from "./components/Drawer";
 export { ShellRegion, useShellRegion } from "./components/shellRegions";
