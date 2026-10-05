@@ -191,9 +191,7 @@ fn the_check_follows_the_screen_and_not_updated() {
     let check = prompter_health_check(prompter.path()).expect("the check");
     assert_eq!(check.word, "NOT UPDATED");
     assert_eq!(check.status.as_str(), "attention");
-    assert!(check
-        .summary
-        .starts_with("Edited since it went on:"));
+    assert!(check.summary.starts_with("Edited since it went on:"));
 
     let gone = prompter
         .reply("prompter.screen.report", json!({ "found": false }))

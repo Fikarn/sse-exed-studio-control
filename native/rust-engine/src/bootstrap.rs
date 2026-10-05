@@ -865,7 +865,9 @@ mod tests {
         let error = validate_protocol_version("99").expect_err("mismatched protocol should fail");
         assert!(error.contains("speaks protocol 99"), "{error}");
         assert!(
-            error.contains(&format!("hardware link protocol {SUPPORTED_PROTOCOL_VERSION}")),
+            error.contains(&format!(
+                "hardware link protocol {SUPPORTED_PROTOCOL_VERSION}"
+            )),
             "{error}"
         );
         // The start-up screen prints it, so it names neither program by its

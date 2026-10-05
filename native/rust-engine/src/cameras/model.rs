@@ -455,10 +455,12 @@ impl CameraModel {
                 "{tag} is released to {}. Connect it to control it here.",
                 self.app
             ),
-            CameraState::NotSetUp if self.bgh1 => format!("{tag} has no address. Enter it in Setup."),
-            CameraState::NotSetUp => format!(
-                "{tag} is not paired. Pair it in Setup, with the camera beside you."
-            ),
+            CameraState::NotSetUp if self.bgh1 => {
+                format!("{tag} has no address. Enter it in Setup.")
+            }
+            CameraState::NotSetUp => {
+                format!("{tag} is not paired. Pair it in Setup, with the camera beside you.")
+            }
             CameraState::Unreachable => unreachable.to_string(),
         }
     }
@@ -472,9 +474,7 @@ impl CameraModel {
                 address.unwrap_or("its address")
             )
         } else {
-            format!(
-                "{tag} does not answer over Bluetooth. Check it is on and within reach."
-            )
+            format!("{tag} does not answer over Bluetooth. Check it is on and within reach.")
         }
     }
 

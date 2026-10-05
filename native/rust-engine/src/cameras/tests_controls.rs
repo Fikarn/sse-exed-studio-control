@@ -811,8 +811,7 @@ fn a_control_on_a_camera_that_is_not_held_is_refused_with_its_sentence() {
     take_announced();
     let unreachable_2 =
         "CAM 2 does not answer at 172.16.16.85. Check that it is on and on the network.";
-    let unreachable_1 =
-        "CAM 1 does not answer over Bluetooth. Check it is on and within reach.";
+    let unreachable_1 = "CAM 1 does not answer over Bluetooth. Check it is on and within reach.";
     assert_eq!(
         cameras.refused("cameras.set", iso(2)),
         refusal("CAMERA_UNREACHABLE", unreachable_2)
