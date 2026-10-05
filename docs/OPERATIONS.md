@@ -164,23 +164,23 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 
 ## Setup / Support
 
-`RUNNER`, `SUPPORT` and `CAMERAS` choose what the bay shows. The plate on the right is always Support. `CONSOLE` opens the Console.
+`Runner`, `Support` and `Cameras` choose what the bay shows. The plate on the right is always Support. The state display's `⋯` holds `Export backup`, `Open the log` and `Back to the Console`, which opens the Console once the setup is published. A step's sentence, and a section's, is the tooltip on its name.
 
 **The runner's steps**
 
-1. `Import profile` exports the Stream Deck's profile for Companion.
-2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed until the probes run again, even after the lamp turns `ready`: Setup reads `SETUP REQUIRED` before a publish, `DEGRADED` after one with the override. On a published setup, running the probes again unpublishes it first (below).
-3. `Map bindings` shows the deck's four pages as the app holds them: the keys and the strip where the deck has them, each dial under its cell of the strip.
-4. `Verify live echo`: a control pressed on the deck pulses on screen. A key of another page turns the screen to that page.
+1. `Import profile` exports the Stream Deck's profile for Companion. Start Companion first; in Companion, import it with `Full Reset & Import`.
+2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. Each probe saves the address it asks, whether it passes or not: the lights and the Console follow it. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed until the probes run again, even after the lamp turns `ready`: Setup reads `SETUP REQUIRED` before a publish, `DEGRADED` after one with the override. On a published setup, running the probes again unpublishes it first (below).
+3. `Map bindings` shows the deck's four pages as the profile draws them: the eight keys (the page key dark green, a dark key black), the strip under them, and each dial under its cell of the strip.
+4. `Verify live echo`: a control pressed on the deck lights its cell on screen. A key of another page turns the screen to that page.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
 
-On a published setup, a press on a step, on `Back to …` or on `Run all probes` arms first: the state display says that `Lighting`, `Audio`, `Cameras` and `Teleprompter` would lock, and a second press within 3 s unpublishes the setup. They stay locked until `Publish setup` is pressed again. The devices and the deck keep working. A press on `Publish`, the step a published setup stands on, does nothing. Leave the runner alone during a session; the Console has its own `Run audio probe`.
+On a published setup, a step, `Back to …` and `Run all probes` read `press twice`. The first press arms the key, dark red with a 3 s countdown, in its own place and height; the state display says where the second press goes and that `Lighting`, `Audio`, `Cameras` and `Teleprompter` would lock, and a second press within 3 s unpublishes the setup. They stay locked until `Publish setup` is pressed again. The devices and the deck keep working. A press on `Publish`, the step a published setup stands on, does nothing. Leave the runner alone during a session; the Console has its own `Run audio probe`.
 
-**Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` is `ARMED` or `HELD`; arming sends the current state at once. `Prompter XL` shows what Windows reports.
+**Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` reads `ARMED` or `HELD`, with `Armed` and `Held` under it; arming sends the current state at once. `Prompter XL` shows what Windows reports.
 
-**Cameras.** `CAMERAS` holds what Studio Control needs for each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. It names the vMix output each picture comes from, CAM 1 Output 2, CAM 2 Output 3 and CAM 3 Output 4, which are set in vMix and not here. Saving sends nothing to a camera. `Forget` removes a pairing or an address. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked.
+**Cameras.** `CAMERAS` holds what Studio Control needs for each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. It names the vMix output each picture comes from, CAM 1 Output 2, CAM 2 Output 3 and CAM 3 Output 4, which are set in vMix and not here. Saving sends nothing to a camera. `Forget CAM n…`, the last item of the camera's `⋯` (or a right-click on it), removes a pairing or an address: it asks in the menu, press again. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked.
 
-**Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. Every restore comes back with the light outputs held: arm them with `Light outputs` when the rig should follow.
+**Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest…` restores it. They are on the plate and in its `⋯`. The Support screen lists every backup, eight a page: press one to put its path in the field, then `Verify path` or `Restore path…`; each backup's `⋯` has `Verify` and `Restore…`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. Every restore comes back with the light outputs held: arm them with `Light outputs` when the rig should follow.
 
 **Diagnostics.** `Export diagnostics` writes a report. `Open the log` opens the log. While the text plays, the log gets one line a minute from the prompter, `Prompter, the last minute: …`: the longest its lock was held and waited for, and by what; what it saved, refused and failed to save, and its longest write; and how many anchors went to the glass and the page. After a take that stuttered, it says where the time went.
 
@@ -192,8 +192,9 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 
 | You see                      | It means                    | Do this                               |
 | ---------------------------- | --------------------------- | ------------------------------------- |
-| `SAVED DATA NEEDS ATTENTION` | The saved data is damaged   | `Restore latest` on that screen       |
-| `THE HARDWARE LINK STOPPED`  | It stopped in the session   | Wait; after 4 stops, `Retry startup`  |
+| `SAVED DATA DAMAGED`         | The saved data is damaged   | `Restore latest…` on that screen      |
+| `LINK STOPPED`               | It stopped in the session   | Wait; after 4 stops, `Retry startup`  |
+| `ALREADY OPEN`               | The app runs already        | Use the window that is open           |
 | Another word at the start    | The link did not start      | `Export diagnostics`, `Retry startup` |
 | `AUDIO STOPPED` and the like | A page failed to draw       | `Reload this area`                    |
 | A device does not follow     | The link may be stuck       | `Restart the hardware link…`          |
@@ -212,7 +213,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | Wrong display                | It opened where it was last | `Reset the window layout`             |
 | Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
 
-The hardware link restarts by itself after a stop, three times in five minutes; the Console then reads `ASSUMED` until `Sync from TotalMix`. At the recovery screen only a database backup restores: `Restore latest`, which takes the newest database backup, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs held.
+The hardware link restarts by itself after a stop, three times in five minutes; the Console then reads `ASSUMED` until `Sync from TotalMix`. At the recovery screen only a database backup restores: `Restore latest…`, which takes the newest database backup, or press one in the list and `Restore path…` (an archive there is locked, and the screen says why). It asks first. The link restarts into it, with the light outputs held.
 
 Closing asks first. It resets and recalls nothing: TotalMix keeps its state, the light output stops and the fixtures hold their last levels.
 
