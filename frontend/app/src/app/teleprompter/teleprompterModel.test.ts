@@ -98,10 +98,12 @@ describe("the state display", () => {
     );
   });
 
-  it("is READY with the way out Put on while the glass is blank", () => {
+  it("is READY while the glass is blank, with Open file… as the way out while no script is kept", () => {
     const blank = prompterStateView(snapshot({ glass: null }), null, true);
-    expect(blank).toMatchObject({ tone: "ok", word: "READY", wayOut: "put-on" });
-    expect(prompterStateView(snapshot({ glass: null }), null, false).wayOut).toBeNull();
+    // The visual overhaul (2026-10-05): Put on is the plate's key; the display
+    // offers Open file… while no script is kept.
+    expect(blank).toMatchObject({ tone: "ok", word: "READY", wayOut: null });
+    expect(prompterStateView(snapshot({ glass: null }), null, false).wayOut).toBe("open-file");
   });
 
   it("puts the Prompter XL's fault first, in the hardware link's word and sentence", () => {

@@ -79,11 +79,13 @@ The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 
 ## Teleprompter
 
-- [ ] `Paste as a new script` takes text copied from Word or an e-mail, with no permission prompt.
-- [ ] `Open file…` loads a Word document.
+- [ ] `Paste as a new script`, in the page's `⋯` on the state display, takes text copied from Word or an e-mail, with no permission prompt.
+- [ ] `Open file…`, in the same `⋯`, loads a Word document.
 - [ ] In `Edit script`, typing, Enter, Ctrl+Z, Ctrl+Y and the bar's `Bold`, `Italic`, `Underline`, `Add cue` and `Paste` work.
 - [ ] Ctrl+V pastes into the editor and keeps the formatting; Ctrl+B, Ctrl+I and Ctrl+U do nothing.
-- [ ] Replacing the script on the prompter needs the second press.
+- [ ] Replacing the script on the prompter needs the second press. A script's `⋯` (or a right-click on its row) `Replace on the prompter…` selects it and arms the plate's key, dark red with a countdown; nothing changes on the glass until that key is pressed again.
+- [ ] `− 4`, `+ 4` and `Standard` beside the speed change the text size on the glass, also with nothing on the prompter. `Change…` under the look opens it beside the plate; a slider changes the glass when it is let go, also while the text scrolls.
+- [ ] A removed script's `⋯` (the Scripts `⋯`, Removed): `Delete for good…` turns dark red with "press again" in the menu, and the second press deletes it.
 - [ ] After a restart the script and the place are still there, paused.
 - [ ] With the Prompter XL plugged in, and again with it unplugged, the app is fullscreen on the studio display within a few seconds, and `shell.log` names the Prompter XL among the screens and says `connected`.
 - [ ] With the studio display switched off and on again, the app is back on it, fullscreen, within a few seconds.

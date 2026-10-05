@@ -97,19 +97,20 @@ The presenter reads the script on the Prompter XL, in a window of Studio Control
 - **`NOT CONNECTED`.** Windows does not see the Prompter XL. A text that scrolled is paused at its place, and `PLAY` is locked. Everything else works on the page's copy, and the place it sets is where the script comes back.
 - **`DUPLICATED`.** Windows shows a copy of another screen on the Prompter XL. Nothing is drawn there. In Windows' display settings, choose Extend these displays.
 - **`LOW RESOLUTION`.** Windows runs the Prompter XL below 1920×1080. The script is drawn, less sharp.
-- **`NOT SHOWING`.** The window does not show, or its page does not draw. The reason stands in small type under `Prompter XL` in the plate. Studio Control opens the window again by itself every few seconds; a text that scrolled is paused.
+- **`NOT SHOWING`.** The window does not show, or its page does not draw. The reason, in Windows' words, stands at the foot of the plate under `NOT SHOWING` while it lasts. Studio Control opens the window again by itself every few seconds; a text that scrolled is paused. `Prompter XL…` in the footer shows the screen as Windows reports it.
 - **When the hardware link stops,** the text on the Prompter XL stands where it was. After the restart it shows the saved place, paused.
 
-- **Scripts.** `Open file…` reads a Word document (`.docx`) or a text file (`.txt`). `Paste as a new script` takes the clipboard. `New script` opens an empty one. The app keeps its own copy and never changes the file.
+- **Scripts.** The page's `⋯`, at the top right of the state display, holds `Open file…`, which reads a Word document (`.docx`) or a text file (`.txt`), `Paste as a new script`, which takes the clipboard, and `New script`, an empty one. With no script yet and the Prompter XL `READY`, `Open file…` is the state display's own key too. The app keeps its own copy and never changes the file.
 - **An import** keeps text, paragraphs, bold, italic and underline. Headings and text in square brackets become cues: directions, never read aloud. It says what it left out.
-- **The list** is sorted by name, so number the scripts to order them. `Earlier versions` holds older texts. `Remove` moves a script to `Removed`.
+- **The list** is sorted by name, so number the scripts to order them. Each script has a `⋯` on its row, and a right-click on the row opens the same menu: `Select`, `Put on the prompter` or `Replace on the prompter…`, `Edit script`, `Rename…`, `Earlier versions…`, which opens beside the plate with `Bring back`, and `Remove`, which moves the script to Removed. The plate's title has the selected script's `⋯` too, with `Edit script`, `Rename…`, `Earlier versions…` and `Remove`; its Put on or Replace is the key under its name. The Scripts `⋯` shows Removed; a removed script's `⋯` has `Restore` and `Delete for good…`, which asks in the menu, press again, and cannot be undone.
 - **Edit.** `Edit script` opens the selected script. It saves as you type: `Saved 14:02`. `Live copy` brings the glass back.
-- **Put on.** `Put on the prompter` is one press while the prompter is blank. The script comes on paused, at its own place. `Replace on the prompter`, `Update the prompter` and `Clear the prompter` are press twice.
-- **Update.** An edit to the script on the prompter stays in the app, and the state reads `NOT UPDATED`. An update keeps the same words at the reading line.
+- **Put on.** `Put on the prompter`, under the script's name on the plate, is one press while the prompter is blank. The script comes on paused, at its own place. `Replace on the prompter`, `Update the prompter` and `Clear the prompter` are press twice: the first press turns the key dark red with "press again" and a countdown, and the state display says what the second does. A script's `Replace on the prompter…` selects it and arms the plate's key; the second press is on that key.
+- **Update.** An edit to the script on the prompter stays in the app, and the state reads `NOT UPDATED` with `Update the prompter` in its display. An update keeps the same words at the reading line.
 - **Run.** Only `PLAY` starts the scroll. `BACK` goes to the start of the paragraph at the reading line. `TOP` pauses and goes to the first line. At `END` the scroll stops.
 - **Speed** is in words a minute, 40 to 300 in steps of 5. Each script keeps its own; a new one starts at 140.
 - **Jump** by line, paragraph or cue, or press the script bar. A jump keeps the scroll as it was.
-- **The look** is one for the glass and applies at once: text size, spacing, margins, reading line, colour.
+- **Size** is in the take, beside the speed: 4 px a press, from 48 to 160 px, and `Standard` returns to 88 px. It works while nothing is on the prompter too.
+- **The look** is one for the glass and applies at once. The plate shows it; `Change…` opens the spacing, margins, reading line, colour, dimming, the line across and the paragraph numbers beside the plate. A slider sends when you let it go.
 
 ## Cameras
 

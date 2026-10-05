@@ -320,6 +320,25 @@ describe("useArm", () => {
     expect(result.current.armed).toBeNull();
   });
 
+  // The visual overhaul's Teleprompter (2026-10-05): a menu's hand-off arms
+  // the plate's key and must never be its second press, whenever it lands.
+  it("arms only with armOnly: a key armed already is left as it is, and nothing is applied", () => {
+    let clock = 0;
+    const now = () => clock;
+    const apply = vi.fn();
+    const { result } = renderHook(() => useArm({ now }));
+    act(() => result.current.armOnly("replace:4", "Replace with 04 Outro"));
+    expect(result.current.armed).toMatchObject({ key: "replace:4", armedAt: 0, timeoutMs: 4500 });
+    clock = 1000;
+    act(() => result.current.armOnly("replace:4", "Replace with 04 Outro"));
+    expect(result.current.armed).toMatchObject({ key: "replace:4", armedAt: 0 });
+    act(() => result.current.armOnly("clear", "Clear the prompter", 3000));
+    expect(result.current.armed).toMatchObject({ key: "clear", timeoutMs: 3000 });
+    clock = 2000;
+    act(() => result.current.armOrApply("clear", "Clear the prompter", apply));
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
   it("times out after the window and disarms on Escape", () => {
     const onDisarm = vi.fn();
     const { result } = renderHook(() => useArm({ now: () => 0, onDisarm }));

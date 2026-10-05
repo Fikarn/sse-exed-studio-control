@@ -1,22 +1,31 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
+import {
+  expectLaidOut,
+  openPageMenu,
+  openPlateMenu,
+  openRowMenu,
+  openTeleprompter,
+  PAST_THE_DWELL_MS,
+  pressTwice,
+  showRemoved,
+} from "./helpers/teleprompter";
 
 // New pages program, Slice 6a: the Teleprompter page against the fixture
 // double (board 1, "Live mirror"; the proposal, docs/design/
 // teleprompter.md). The double answers every prompter request as the hardware link
 // does (Slices 4 and 5a); the page's copy of the glass reports its layout, so
 // PLAY unlocks once the fonts are in.
+//
+// The visual overhaul (2026-10-05): every press twice runs on the page's
+// clock (helpers/teleprompter.ts, `pressTwice`), and checks that the first
+// press armed; the standing commands are the page's ⋯; Rename, Earlier
+// versions and Remove are a script's menu; Removed is a view of the Scripts
+// section's ⋯, and a removed script's menu holds Restore and Delete for good.
 
-async function openTeleprompter(page: Page, fixture = "teleprompter-ready") {
-  await openFixture(page, fixture);
-  await expectWorkspaceMounted(page, "teleprompter");
-}
-
-/** PLAY unlocks once the copy's layout has reached the hardware link. */
-async function expectLaidOut(page: Page) {
-  await expect(page.getByTestId("teleprompter-play")).not.toHaveAttribute("data-locked", "", { timeout: 10_000 });
-}
+const state = (page: Page) => page.getByTestId("teleprompter-state-display");
 
 test.describe("the Teleprompter page (new pages S6a)", () => {
   test("is the last tab, and shows the script on the glass with its place and time", async ({ page }) => {
@@ -117,32 +126,42 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
   });
 
   test("Replace and Clear are armed: the first press arms, the second applies", async ({ page }) => {
+    await page.clock.install();
     await openTeleprompter(page);
+    await expectLaidOut(page);
     await page.getByTestId("teleprompter-scripts").getByText("04 Outro").click();
     await expect(page.getByTestId("teleprompter-selected")).toContainText("04 Outro");
 
-    await page.getByTestId("teleprompter-replace").click();
-    await expect(page.getByTestId("teleprompter-state-display")).toContainText("Replace with 04 Outro · press again");
+    const replace = page.getByTestId("teleprompter-replace");
+    await pausePageClock(page);
+    await replace.click();
+    await expect(replace).toHaveAttribute("data-armed", "true");
+    await expect(state(page)).toContainText("Replace with 04 Outro · press again");
     await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("02 Interview intro");
-    await page.waitForTimeout(400);
-    await page.getByTestId("teleprompter-replace").click();
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await replace.click();
+    await page.clock.resume();
     await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("04 Outro");
 
-    await page.getByTestId("teleprompter-clear").click();
+    const clear = page.getByTestId("teleprompter-clear");
+    await pausePageClock(page);
+    await clear.click();
+    await expect(clear).toHaveAttribute("data-armed", "true");
+    await expect(state(page)).toContainText("Clear the prompter · press again");
     await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("04 Outro");
-    await page.waitForTimeout(400);
-    await page.getByTestId("teleprompter-clear").click();
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await clear.click();
+    await page.clock.resume();
     await expect(page.getByTestId("teleprompter-nothing-on")).toHaveText("Nothing on the prompter");
-    await expect(page.getByTestId("teleprompter-state-display")).toContainText("READY");
+    await expect(state(page)).toContainText("READY");
     await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("data-locked", "");
   });
 
   test("with nothing on the prompter, Put on is one press", async ({ page }) => {
+    await page.clock.install();
     await openTeleprompter(page);
-    await page.waitForTimeout(400);
-    await page.getByTestId("teleprompter-clear").click();
-    await page.waitForTimeout(400);
-    await page.getByTestId("teleprompter-clear").click();
+    await expectLaidOut(page);
+    await pressTwice(page, page.getByTestId("teleprompter-clear"));
     await expect(page.getByTestId("teleprompter-nothing-on")).toBeVisible();
     await page.getByTestId("teleprompter-scripts").getByText("01 Welcome").click();
     await page.getByTestId("teleprompter-put-on").click();
@@ -159,13 +178,16 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 1 of");
   });
 
+  // Flaky in a full gate on 2026-10-05 with real-time waits between the
+  // presses; on the page's clock since the visual overhaul.
   test("NOT UPDATED offers Update · press twice, and Update clears it", async ({ page }) => {
+    await page.clock.install();
     await openTeleprompter(page, "teleprompter-not-updated");
-    await expect(page.getByTestId("teleprompter-state-display")).toContainText("NOT UPDATED");
-    await page.getByTestId("teleprompter-state-update").click();
-    await page.waitForTimeout(400);
-    await page.getByTestId("teleprompter-state-update").click();
-    await expect(page.getByTestId("teleprompter-state-display")).toContainText("ON SCREEN");
+    await expect(state(page)).toContainText("NOT UPDATED");
+    await expect(page.getByTestId("teleprompter-state-update")).toHaveText("Update the prompter · press twice");
+    await expectLaidOut(page);
+    await pressTwice(page, page.getByTestId("teleprompter-state-update"));
+    await expect(state(page)).toContainText("ON SCREEN");
   });
 
   test("the first run: no scripts, a blank glass, and Open file… adds one", async ({ page }) => {
@@ -180,15 +202,20 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("teleprompter-scripts")).toContainText("Morning news");
   });
 
+  // The visual overhaul (2026-10-05): Removed is a view the Scripts section's
+  // ⋯ switches to, and Restore is a removed script's menu's item.
   test("Removed lists what was removed, and Restore brings a script back", async ({ page }) => {
     await openTeleprompter(page);
-    await page.getByTestId("teleprompter-removed").click();
+    await showRemoved(page, true);
     const removed = page.getByTestId("teleprompter-scripts");
     await expect(removed).toContainText("Removed");
-    const restore = removed.getByRole("button", { name: "Restore" }).first();
-    await restore.click();
-    await page.getByTestId("teleprompter-removed").click();
+    await expect(removed).toContainText("Draft intro");
+    const menu = await openRowMenu(page, "Draft intro");
+    await menu.getByRole("menuitem", { name: /Restore/ }).click();
+    await expect(removed).not.toContainText("Draft intro");
+    await showRemoved(page, false);
     await expect(page.getByTestId("teleprompter-scripts")).toContainText("Scripts");
+    await expect(page.getByTestId("teleprompter-scripts")).toContainText("Draft intro");
   });
 
   test("Setup / Support's Workstation names the Prompter XL as Windows reports it", async ({ page }) => {
@@ -239,6 +266,7 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
   test("an edit of the script on the prompter is saved as it is typed, marked, and reaches the glass only on Update", async ({
     page,
   }) => {
+    await page.clock.install();
     await openEditor(page);
     await expect(page.getByTestId("teleprompter-edit-note")).toContainText("the glass keeps its text");
     const line = await caretInReadingLine(page);
@@ -247,9 +275,7 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
     await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("NOT UPDATED");
     await expect(page.getByTestId("teleprompter-edited-list")).toHaveText("¶ 8");
-    await page.getByTestId("teleprompter-state-update").click();
-    await page.waitForTimeout(400);
-    await page.getByTestId("teleprompter-state-update").click();
+    await pressTwice(page, page.getByTestId("teleprompter-state-update"));
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("ON SCREEN");
     await expect(page.getByTestId("teleprompter-edited-list")).toHaveText("nothing");
   });
@@ -299,14 +325,14 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
 
   test("New script opens an empty script in the editor, and Rename names it", async ({ page }) => {
     await openTeleprompter(page, "teleprompter-empty");
-    await page.getByTestId("teleprompter-new-script").click();
+    await (await openPageMenu(page)).getByTestId("teleprompter-new-script").click();
     await expect(page.getByTestId("teleprompter-editor-text")).toHaveAttribute("contenteditable", "true");
     await expect(page.getByTestId("teleprompter-selected")).toContainText("New script");
     await page.getByTestId("teleprompter-editor-text").click();
     await page.keyboard.type("Good morning.");
     await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
     await expect(page.getByTestId("teleprompter-selected")).toContainText("2 words");
-    await page.getByTestId("teleprompter-rename").click();
+    await (await openPlateMenu(page)).getByTestId("teleprompter-rename").click();
     const field = page.getByRole("dialog").getByRole("textbox");
     await field.fill("01 Morning");
     await page.getByRole("dialog").getByRole("button", { name: "Rename" }).click();
@@ -317,7 +343,7 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
   test("Paste as a new script adds what the clipboard holds and selects it", async ({ page }) => {
     await openTeleprompter(page, "teleprompter-empty");
     await copyToClipboard(page, "<p><b>Evening news</b></p><p>Here it is.</p>", "Evening news\n\nHere it is.");
-    await page.getByTestId("teleprompter-paste-script").click();
+    await (await openPageMenu(page)).getByTestId("teleprompter-paste-script").click();
     await expect(page.getByTestId("teleprompter-selected")).toContainText("Evening news");
     await expect(page.getByTestId("teleprompter-selected")).toContainText("2 paragraphs");
   });
@@ -340,7 +366,7 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
     const count = await scripts.count();
     await scripts.filter({ hasText: "01 Welcome" }).click();
     await expect(page.getByTestId("teleprompter-selected")).toContainText("02 Interview intro");
-    await page.getByTestId("teleprompter-new-script").click();
+    await (await openPageMenu(page)).getByTestId("teleprompter-new-script").click();
     await page.getByTestId("teleprompter-bay-live").click();
     await expect(text).toContainText("MARKER");
     await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "unsaved");
@@ -356,7 +382,7 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
     const line = await caretInReadingLine(page);
     await page.keyboard.type(" Kept");
     await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
-    await page.getByTestId("teleprompter-rename").click();
+    await (await openPlateMenu(page)).getByTestId("teleprompter-rename").click();
     await page.getByRole("dialog").getByRole("textbox").fill("02 Interview opening");
     await page.getByRole("dialog").getByRole("button", { name: "Rename" }).click();
     await expect(page.getByTestId("teleprompter-selected")).toContainText("02 Interview opening");
@@ -415,5 +441,419 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
     await expect(page.getByTestId("teleprompter-scripts").locator('[data-testid^="teleprompter-script-"]')).toHaveCount(
       2
     );
+  });
+});
+
+// The visual overhaul (2026-10-05): every take-time key in one fixed home,
+// the size beside the speed; the room the page has, pinned (nothing scrolls,
+// no line is cut, an armed key keeps its height); one menu per script, whose
+// Replace hands off to the plate's key; Delete for good armed in place; the
+// look and the Prompter XL's readouts in popovers that give the focus back.
+test.describe("the Teleprompter page, the visual overhaul", () => {
+  test("the size stands beside the speed and works with nothing on the prompter; the take's keys are take-time", async ({
+    page,
+  }) => {
+    await openTeleprompter(page, "teleprompter-empty");
+    await expect(page.getByTestId("teleprompter-speed-down")).toHaveAttribute("data-locked", "");
+    await expect(page.getByTestId("teleprompter-speed-readout")).toHaveText("—");
+    const size = page.getByTestId("teleprompter-text-size");
+    await expect(size).toHaveText("88 px standard");
+    await expect(page.getByTestId("teleprompter-size-standard")).toHaveAttribute("data-locked", "");
+    await page.getByTestId("teleprompter-size-up").click();
+    await expect(size).toHaveText("92 px standard 88");
+    await page.getByTestId("teleprompter-size-standard").click();
+    await expect(size).toHaveText("88 px standard");
+    // READY with no script: the way out is Open file….
+    await expect(page.getByTestId("teleprompter-state-open-file")).toHaveText("Open file…");
+
+    await openTeleprompter(page);
+    for (const id of [
+      "teleprompter-play",
+      "teleprompter-back",
+      "teleprompter-top",
+      "teleprompter-speed-down",
+      "teleprompter-speed-up",
+      "teleprompter-size-down",
+      "teleprompter-size-up",
+      "teleprompter-size-standard",
+      "teleprompter-line-back",
+      "teleprompter-paragraph-on",
+      "teleprompter-cue-on",
+      "teleprompter-clear",
+      "teleprompter-script-bar",
+      "teleprompter-go-to-key",
+    ]) {
+      await expect(page.getByTestId(id), id).toHaveAttribute("data-take", "");
+    }
+    const rows = page.getByTestId("teleprompter-paragraphs").locator("button");
+    await expect(rows.first()).toHaveAttribute("data-take", "");
+    expect(await rows.evaluateAll((buttons) => buttons.every((button) => button.hasAttribute("data-take")))).toBe(true);
+    // − 5, + 5, − 4 and + 4 are labels: a value is never in the display face.
+    // The face of each element that draws a figure inside the key (the
+    // review of pull request 7: the key's own face says nothing of its cap).
+    for (const id of [
+      "teleprompter-speed-down",
+      "teleprompter-speed-up",
+      "teleprompter-size-down",
+      "teleprompter-size-up",
+    ]) {
+      const faces = await page
+        .getByTestId(id)
+        .evaluate((key) =>
+          [key, ...key.querySelectorAll("*")]
+            .filter((element) =>
+              [...element.childNodes].some(
+                (node) => node.nodeType === Node.TEXT_NODE && /\d/.test(node.textContent ?? "")
+              )
+            )
+            .map((element) => getComputedStyle(element).fontFamily)
+        );
+      expect(faces.length, id).toBeGreaterThan(0);
+      for (const face of faces) expect(face, id).not.toContain("Adelia");
+    }
+  });
+
+  test("nothing scrolls, no line is cut, and the paragraph list's 16 rows end above Clear", async ({ page }) => {
+    for (const fixture of [
+      "teleprompter-ready",
+      "teleprompter-not-updated",
+      "teleprompter-not-connected",
+      "teleprompter-empty",
+    ]) {
+      await openTeleprompter(page, fixture);
+      const sizes = await page.evaluate(() => {
+        const box = (selector: string) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
+        const inside = (selector: string) => {
+          const element = document.querySelector(selector)!;
+          return element.scrollHeight <= element.clientHeight + 1;
+        };
+        const cluster = document.querySelector<HTMLElement>("[data-testid=teleprompter-cluster]")!;
+        const clusterBottom =
+          cluster.getBoundingClientRect().bottom - parseFloat(getComputedStyle(cluster).paddingBottom);
+        const rows = [...document.querySelectorAll("[data-testid=teleprompter-paragraphs] li")];
+        // Every text the page cuts with an ellipsis, but a paragraph's own
+        // words in the list, which are cut by design (a paragraph is long).
+        const cut = [
+          ...document.querySelectorAll<HTMLElement>(
+            "[data-region=cluster] *, [data-region=bay] *, [data-region=plate] *, [data-region=footer] *"
+          ),
+        ]
+          .filter((element) => !element.closest("[data-paragraph-text], [data-picture]"))
+          .filter((element) => getComputedStyle(element).textOverflow === "ellipsis")
+          .filter((element) => element.scrollWidth > element.clientWidth)
+          .map((element) => element.textContent);
+        return {
+          page: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
+          copy: box("[data-testid=teleprompter-copy]"),
+          cluster: inside("[data-testid=teleprompter-cluster]"),
+          plate: inside("[data-testid=teleprompter-plate]"),
+          rows: rows.length,
+          lastRowBottom: rows.length > 0 ? rows[rows.length - 1]!.getBoundingClientRect().bottom : null,
+          clearTop: box("[data-testid=teleprompter-clear]")!.top,
+          clearBottom: box("[data-testid=teleprompter-clear]")!.bottom,
+          clusterBottom,
+          cut,
+        };
+      });
+      expect(sizes.page, fixture).toEqual([2560, 1440]);
+      expect(sizes.cluster, `${fixture}: the cluster holds everything it shows`).toBe(true);
+      expect(sizes.plate, `${fixture}: the plate holds everything it shows`).toBe(true);
+      expect(sizes.cut, `${fixture}: no line is cut`).toEqual([]);
+      expect(sizes.clearBottom, `${fixture}: Clear stands inside the cluster`).toBeLessThanOrEqual(sizes.clusterBottom);
+      if (fixture === "teleprompter-empty") continue;
+      expect([sizes.copy!.width, sizes.copy!.height], `${fixture}: the copy is 1680 × 945`).toEqual([1680, 945]);
+      expect(sizes.rows, `${fixture}: 16 of the 18 paragraphs`).toBe(16);
+      expect(sizes.lastRowBottom!, `${fixture}: the last row ends above Clear`).toBeLessThanOrEqual(
+        sizes.clearTop - 16
+      );
+    }
+  });
+
+  test("an armed Clear keeps its height, and moves nothing above it", async ({ page }) => {
+    await page.clock.install();
+    await openTeleprompter(page);
+    await expectLaidOut(page);
+    const clear = page.getByTestId("teleprompter-clear");
+    const lastRow = page.getByTestId("teleprompter-paragraphs").locator("li").last();
+    const before = await clear.boundingBox();
+    const rowBefore = await lastRow.boundingBox();
+    await pausePageClock(page);
+    await clear.click();
+    await expect(clear).toHaveAttribute("data-armed", "true");
+    await expect(clear).toContainText("press again");
+    await expect(clear).toContainText("Clear the prompter");
+    expect(await clear.boundingBox()).toEqual(before);
+    expect(await lastRow.boundingBox()).toEqual(rowBefore);
+    await page.keyboard.press("Escape");
+    await expect(clear).toHaveAttribute("data-armed", "false");
+    await expect(state(page)).not.toContainText("press again");
+    await page.clock.resume();
+  });
+
+  test("NOT UPDATED: one Update on screen, the state display's, armed in place inside the display", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await openTeleprompter(page, "teleprompter-not-updated");
+    await expectLaidOut(page);
+    // The plate says it, and leaves the key to the state display.
+    await expect(page.getByTestId("teleprompter-update")).toHaveCount(0);
+    await expect(page.getByTestId("teleprompter-on-prompter")).toContainText("Not updated");
+    const update = page.getByTestId("teleprompter-state-update");
+    const display = state(page);
+    const before = (await update.boundingBox())!;
+    await pausePageClock(page);
+    await update.click();
+    await expect(update).toHaveAttribute("data-armed", "true");
+    await expect(update).toContainText("press again");
+    await expect(update).toContainText("Update the prompter");
+    const armed = (await update.boundingBox())!;
+    const outer = (await display.boundingBox())!;
+    expect(armed.height, "the armed key keeps its height").toBe(before.height);
+    expect(armed.y, "and its place").toBe(before.y);
+    expect(armed.y + armed.height).toBeLessThanOrEqual(outer.y + outer.height);
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await update.click();
+    await page.clock.resume();
+    await expect(display).toContainText("ON SCREEN");
+    await expect(page.getByTestId("teleprompter-on-prompter")).toContainText("On prompter");
+  });
+
+  test("a script's ⋯ and a right-click on its row open the same menu, and the plate title's ⋯ the selected one's", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    const fromKey = await openRowMenu(page, "04 Outro");
+    await expect(fromKey).toHaveAccessibleName("04 Outro");
+    await expect(fromKey).toHaveAccessibleDescription("1:13 at 140 · 171 words");
+    const words = await fromKey.getByRole("menuitem").allTextContents();
+    expect(words.map((word) => word.trim())).toEqual([
+      "Select",
+      "Replace on the prompter…on the plate",
+      "Edit script",
+      "Rename…",
+      "Earlier versions…",
+      "Removeto Removed",
+    ]);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+
+    await page.locator('[data-testid^="teleprompter-script-"]', { hasText: "04 Outro" }).click({ button: "right" });
+    const fromRow = page.getByRole("menu").last();
+    await expect(fromRow).toHaveAccessibleName("04 Outro");
+    expect(await fromRow.getByRole("menuitem").allTextContents()).toEqual(words);
+    await page.keyboard.press("Escape");
+
+    // The script on the prompter: Remove is locked, and says why.
+    const onPrompter = await openPlateMenu(page);
+    await expect(onPrompter).toHaveAccessibleName("02 Interview intro");
+    await expect(onPrompter.getByTestId("teleprompter-remove")).toHaveAttribute("aria-disabled", "true");
+    await expect(onPrompter.getByTestId("teleprompter-remove")).toContainText("on the prompter · clear it first");
+    await expect(onPrompter.getByTestId("teleprompter-rename")).toBeVisible();
+  });
+
+  // The review of pull request 6 found a hand-off that waited for later reads
+  // and could arm without a press. Here the hand-off arms once, from what the
+  // page holds right after its own selection, and never presses again.
+  test("Replace from another script's menu selects it and arms the plate's key, which takes the second press", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await openTeleprompter(page);
+    await expectLaidOut(page);
+    const menu = await openRowMenu(page, "04 Outro");
+    await pausePageClock(page);
+    await menu.locator('[data-testid$="-replace"]').click();
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("04 Outro");
+    const key = page.getByTestId("teleprompter-replace");
+    await expect(key).toHaveAttribute("data-armed", "true");
+    await expect(state(page)).toContainText("Replace with 04 Outro · press again");
+    await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("02 Interview intro");
+    // The menu's Replace again, past the dwell, leaves the arm as it is: a
+    // menu never gives the second press.
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await (await openRowMenu(page, "04 Outro")).locator('[data-testid$="-replace"]').click();
+    await expect(key).toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("02 Interview intro");
+    await key.click();
+    await page.clock.resume();
+    await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("04 Outro");
+  });
+
+  test("a hand-off arms once: the script selected again by hand later arms nothing", async ({ page }) => {
+    await openTeleprompter(page);
+    const menu = await openRowMenu(page, "04 Outro");
+    await menu.locator('[data-testid$="-replace"]').click();
+    const key = page.getByTestId("teleprompter-replace");
+    await expect(key).toHaveAttribute("data-armed", "true");
+    await page.keyboard.press("Escape");
+    await expect(key).toHaveAttribute("data-armed", "false");
+    await page.getByTestId("teleprompter-scripts").getByText("01 Welcome").click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("01 Welcome");
+    await page.getByTestId("teleprompter-scripts").getByText("04 Outro").click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("04 Outro");
+    await page.waitForTimeout(1_200);
+    await expect(key).toHaveAttribute("data-armed", "false");
+    await expect(state(page)).not.toContainText("press again");
+  });
+
+  test("Delete for good is a removed script's last item: it arms in place, says it cannot be undone, and deletes at the second press", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await openTeleprompter(page);
+    await expectLaidOut(page);
+    await showRemoved(page, true);
+    const menu = await openRowMenu(page, "Draft intro");
+    await expect(menu).toHaveAccessibleDescription("Removed · a delete for good cannot be undone");
+    const remove = menu.getByRole("menuitem").and(menu.locator('[data-testid^="teleprompter-delete-"]'));
+    await expect(remove).toHaveText("Delete for good…");
+    await pausePageClock(page);
+    await remove.click();
+    await expect(remove).toHaveAttribute("data-armed", "true");
+    await expect(remove).toContainText("Press again to delete Draft intro for good");
+    await expect(menu).toBeVisible();
+    await expect(state(page)).toContainText("Delete Draft intro for good · press again");
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await remove.click();
+    await page.clock.resume();
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(page.getByTestId("teleprompter-scripts")).not.toContainText("Draft intro");
+    await expect(page.getByTestId("teleprompter-scripts")).toContainText("Old outro");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("the page's ⋯ holds Open file…, Paste as a new script and New script", async ({ page }) => {
+    await openTeleprompter(page);
+    await expect(page.getByTestId("teleprompter-open-file")).toHaveCount(0);
+    const menu = await openPageMenu(page);
+    const chooser = page.waitForEvent("filechooser");
+    await menu.getByTestId("teleprompter-open-file").click();
+    expect((await chooser).isMultiple()).toBe(false);
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect((await openPageMenu(page)).getByTestId("teleprompter-new-script")).toHaveText("New script");
+  });
+
+  test("the look opens beside its section: its choices are the selection, and Esc gives the focus back to Change…", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    const open = page.getByTestId("teleprompter-look-open");
+    await open.click();
+    const popover = page.getByTestId("teleprompter-look-popover");
+    await expect(popover).toBeVisible();
+    await expect(popover).not.toHaveAttribute("role", "dialog");
+    // Beside its section, over the bay: the plate stays in view.
+    const beside = (await popover.boundingBox())!;
+    const section = (await page.getByTestId("teleprompter-look").boundingBox())!;
+    expect(beside.x + beside.width).toBeLessThanOrEqual(section.x);
+    await expect(popover.getByTestId("teleprompter-colour-white")).toHaveAttribute("data-selected", "");
+    await expect(popover.getByTestId("teleprompter-colour-white")).not.toHaveAttribute("data-engaged", "");
+    await expect(popover.getByTestId("teleprompter-dim-read-on")).toHaveAttribute("data-selected", "");
+    await popover.getByTestId("teleprompter-line-across-on").click();
+    await expect(popover.getByTestId("teleprompter-line-across-on")).toHaveAttribute("data-selected", "");
+    await expect(page.getByTestId("teleprompter-look-values")).toContainText("A line across at the reading lineon");
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+    await expect(open).toBeFocused();
+  });
+
+  test("a look slider sends its value when let go, and the reads while the text plays never take it from the hand", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    await expectLaidOut(page);
+    await page.getByTestId("teleprompter-play").click();
+    await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("teleprompter-look-open").click();
+    const slider = page
+      .getByTestId("teleprompter-look-popover")
+      .getByTestId("teleprompter-margins")
+      .getByRole("slider");
+    const values = page.getByTestId("teleprompter-look-values");
+    await expect(values).toContainText("Margins, each side12 %");
+    const box = (await slider.boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.9, box.y + box.height / 2, { steps: 5 });
+    // Two of the page's reads pass with the hand on the slider.
+    await page.waitForTimeout(2_200);
+    await expect(values).toContainText("Margins, each side12 %");
+    await page.mouse.up();
+    await expect(values).not.toContainText("Margins, each side12 %");
+    await expect(page.getByTestId("teleprompter-look-popover")).toBeVisible();
+    await page.getByTestId("teleprompter-play").click();
+  });
+
+  test("the Prompter XL's readouts open from the footer's key, and Esc gives the focus back to it", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    const open = page.getByTestId("teleprompter-screen-open");
+    await open.click();
+    const popover = page.getByTestId("teleprompter-screen-popover");
+    await expect(popover).toBeVisible();
+    await expect(popover.getByTestId("teleprompter-screen-readouts")).toContainText("CONNECTED");
+    await expect(popover.getByTestId("teleprompter-screen-readouts")).toContainText("1920×1080");
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+    await expect(open).toBeFocused();
+  });
+
+  test("earlier versions open beside the title from the script's menu, and the focus goes back to its ⋯", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    await (await openPlateMenu(page)).getByTestId("teleprompter-versions").click();
+    const popover = page.getByTestId("teleprompter-versions-popover");
+    await expect(popover).toBeVisible();
+    await expect(popover).toContainText("Earlier versions of 02 Interview intro");
+    await expect(popover.locator('[data-testid^="teleprompter-bring-back-"]').first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+    await expect(page.getByTestId("teleprompter-plate-menu")).toBeFocused();
+  });
+
+  // The review of pull request 7: another script's versions open once that
+  // script is selected, a Bring back keeps the focus in the popover (so Esc
+  // still closes it), and a press on the ⋯ that opened it closes it.
+  test("another script's versions open once it is selected; Bring back keeps Esc in reach; its ⋯ closes them", async ({
+    page,
+  }) => {
+    await openTeleprompter(page);
+    await (await openRowMenu(page, "04 Outro")).locator('[data-testid$="-versions"]').click();
+    const popover = page.getByTestId("teleprompter-versions-popover");
+    await expect(popover).toContainText("Earlier versions of 04 Outro");
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("04 Outro");
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+
+    await page.getByTestId("teleprompter-scripts").getByText("02 Interview intro").click();
+    await (await openPlateMenu(page)).getByTestId("teleprompter-versions").click();
+    await expect(popover).toContainText("Earlier versions of 02 Interview intro");
+    const rows = popover.locator('[data-testid^="teleprompter-bring-back-"]');
+    // The oldest version: its text differs from what is on the glass.
+    await rows.last().click();
+    await expect(state(page)).toContainText("NOT UPDATED");
+    await expect(popover).toBeVisible();
+    // The list is read again; the focus stays inside the popover, never on the body.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Boolean(
+            document.querySelector("[data-testid=teleprompter-versions-popover]")?.contains(document.activeElement)
+          )
+        )
+      )
+      .toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+
+    await (await openPlateMenu(page)).getByTestId("teleprompter-versions").click();
+    await expect(popover).toBeVisible();
+    await page.getByTestId("teleprompter-plate-menu").click();
+    await expect(popover).toHaveCount(0);
+    await expect(page.getByRole("menu")).toBeVisible();
   });
 });

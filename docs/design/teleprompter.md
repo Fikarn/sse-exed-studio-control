@@ -1,6 +1,6 @@
 # The Teleprompter: what it does
 
-The approved design of the Teleprompter (decision D20 in `docs/ROADMAP.md`), with its board, `docs/design/boards/A-teleprompter-1.html`. This text says what the operator can do and see; the board shows where it sits. Where the two differ the board wins: the editor opens in the bay (Edit script, with a quarter-size copy of the glass), the time left sits over the copy, the scripts list is in the plate, and the text size keys are in the look.
+The approved design of the Teleprompter (decision D20 in `docs/ROADMAP.md`), with its board, `docs/design/boards/A-teleprompter-1.html`. This text says what the operator can do and see; the board shows where it sits. Where the two differ the board wins: the editor opens in the bay (Edit script, with a quarter-size copy of the glass), the time left sits over the copy, the scripts list is in the plate, and the text size keys are in the look. Since the visual overhaul (2026-10-05) the text size keys stand in the take beside the speed, as every take-time key has one fixed home, and the rest of the look opens beside the plate.
 
 The page, its editor, the deck's PROMPTER page (section 9) and the Prompter XL's window (section 7) are built. Where the building decided otherwise than this text, `docs/ROADMAP.md` says so under each of them. This file is folded into `docs/OPERATIONS.md` at the close-out.
 
@@ -17,16 +17,16 @@ There is no third screen. Studio Control has no fallback (D12).
 
 ## 2. The page, on the cluster rule
 
-| Region              | Teleprompter                                                                                                                                                                                                                            |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Header (56)         | the shell; a `Prompter` lamp showing the page's worst state; while the prompter scrolls, a green latch `Prompter playing · 3:12 left` on every page, which opens this page (the way the `Solo` and `Scene unsaved` latches open theirs) |
-| State display (180) | the Prompter XL's state (§8): the word, the sentence, the way out, and the armed row                                                                                                                                                    |
-| Take-time keys      | `PLAY` (lit green while scrolling), speed (readout, − / +), time left (the 44 px number), `BACK` · `TOP`, paragraph and cue steps, line steps, text size (− / +, Standard)                                                              |
-| Lists               | the scripts; the one on the prompter is marked `ON PROMPTER`                                                                                                                                                                            |
-| Standing actions    | New script · Open file… · Paste as a new script · Clear the prompter · press twice                                                                                                                                                      |
-| Bay                 | the live copy of the Prompter XL's screen across the bay's full width, 1,688 × 950 (88 % of its pixels); under it the script bar, the cue keys and Go to paragraph                                                                      |
-| Plate (416)         | the selected script (name and numbers; Put on the prompter, or Replace / Update · press twice; the editor; earlier versions; Remove), then the look                                                                                     |
-| Footer (40)         | `Prompter XL 1920×1080 · 60 Hz` · `Script Interview intro` · `Place ¶ 7 of 18 · 42 %` · `Speed 140 words/min` · `Left 3:12`                                                                                                             |
+| Region              | Teleprompter                                                                                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Header (80)         | the shell; the Teleprompter tab's lamp and word, the page's worst state; while the prompter scrolls, `playing` and the time left in that tab on every page, which opens this page (the visual overhaul, 2026-10-03)                                                      |
+| State display (180) | the Prompter XL's state (§8): the word, the sentence, the way out, and the armed row                                                                                                                                                                                     |
+| Take-time keys      | `PLAY` (lit green while scrolling), `BACK` · `TOP`; `SPEED` (readout, − 5 / + 5) and `SIZE` (readout, − 4 / + 4, Standard) side by side, as the deck's dials; the line, paragraph and cue steps (the visual overhaul, 2026-10-05: every take-time key in one fixed home) |
+| Lists               | the paragraphs, 16 rows, a window round the place; the scripts are on the plate, the one on the prompter marked `ON PROMPTER`                                                                                                                                            |
+| Standing actions    | Clear the prompter · press twice, at the foot; New script · Open file… · Paste as a new script in the page's ⋯ on the state display                                                                                                                                      |
+| Bay                 | the live copy of the Prompter XL's screen across the bay's full width, 1,680 × 945 (87.5 % of its pixels, the shell's bay since 2026-10-03); under it the script bar, the cue keys and Go to paragraph                                                                   |
+| Plate (440)         | the selected script (name and numbers, its ⋯; one key: Put on the prompter, or Replace / Update · press twice), the scripts with a ⋯ each (Removed is a view of the section's ⋯), then the look's values with Change…, a popover                                         |
+| Footer (40)         | `Prompter XL 1920×1080 · 60 Hz` · `On the glass Interview intro` · `Place ¶ 7 of 18 · 42 %` · `Speed 140 words/min` · `Left 3:12`, and `Prompter XL…`, the screen as Windows reports it                                                                                  |
 
 As on every page, nothing on it shows a key or a key hint (D6).
 
@@ -73,7 +73,7 @@ A script is named after its file, without the extension. A pasted script is name
 - **The list is sorted by name**, with numbers in their natural order (`2` before `10`). A running order is therefore a matter of naming: `01 Intro`, `02 Guest`, `03 Outro`. Each row shows the name, the length at the script's own speed, and `ON PROMPTER` on the script the prompter shows.
 - **Earlier versions.** Every import, and every time a script's text goes onto the prompter (put on, replaced, updated), keeps that text as a version. Each script keeps its last 20 versions. One press brings a version back as the script's text. If that script is on the prompter, the prompter keeps what it shows until Update (§5.5).
 - **Opening a file again.** When a file with the same name was opened before, a dialog offers two choices: update that script from the file (its old text becomes a version), or add the file as a new script.
-- **Removing.** Remove moves a script to Removed, a section under the list that shows its count. Restore brings a script back. Only "Delete for good…" in Removed ends a script, and it asks first. The script on the prompter cannot be removed: its Remove key is locked and says why ("clear the prompter first").
+- **Removing.** Remove moves a script to Removed, a view of the list (the Scripts section's ⋯ switches to it) that shows its count. Restore brings a script back. Only "Delete for good…" in Removed ends a script, and it asks first: it arms in its menu, press again (D38). The script on the prompter cannot be removed: its menu's Remove is locked and says why ("on the prompter · clear it first").
 - **Backups.** The database backups (daily, shutdown, pre-migration and pre-restore) carry the scripts with everything else. The backup archive (format 6) carries the scripts, their versions, the removed ones, the look, and each script's place and speed, and Verify counts them ("12 scripts"). Restoring an archive adds the scripts it holds and never removes or overwrites one: a script whose text differs comes back as an earlier version of it. A database restore replaces the saved data, as it does today, after writing its pre-restore copy.
 
 ## 4. What the prompter shows
@@ -95,7 +95,7 @@ The prompter has one look, not one per script: there is one presenter and one gl
 | Text already read | dimmed to 45 % above the reading line                        | on / off                                                  | after looking away, the presenter finds the place at a glance                                                                                                                                                                                     |
 | Paragraph numbers | off on the prompter (always shown on the operator's side)    | on / off                                                  | when they are on, "from paragraph 7" means the same thing to both people                                                                                                                                                                          |
 
-The **standard size** is set in the look. During a take, − / + and the deck's size dial move the size away from it. That size is saved too, so a restart keeps it. Standard, or a push of the size dial, returns to the standard size. The readout shows both, for example `96 px · standard 88`.
+The **standard size** is 88 px, fixed (D20; the owner kept it fixed on 2026-10-05, D38: nothing on screen sets it). During a take, − / + and the deck's size dial move the size away from it. That size is saved too, so a restart keeps it. Standard, or a push of the size dial, returns to the standard size. The readout shows both, for example `96 px standard 88`.
 
 ### 4.2 Paragraphs, cues and the end
 
@@ -159,7 +159,7 @@ Each of these is a row in Setup / Support › Recent actions, with Screen as who
 
 ### 6.1 The live copy
 
-The bay shows the Prompter XL's screen as the glass gets it, unmirrored, at 1,688 × 950. That is 88 % of its pixels, so the standard 88 px text shows at 77 px on the studio display.
+The bay shows the Prompter XL's screen as the glass gets it, unmirrored, at 1,680 × 945. That is 87.5 % of its pixels, so the standard 88 px text shows at 77 px on the studio display.
 
 - It is the same layout scaled down, never a second layout: the lines break in the same places, the reading arrow sits at the same height, and the dimming is the same.
 - Nothing is drawn on it that the presenter does not see. The operator's own marks (numbers, the place, the time) sit around it.
@@ -236,7 +236,7 @@ The Stream Deck + has four dials, a touch strip over them, and eight keys.
 
 ## 10. What is armed (D11)
 
-Only three things are armed, because each changes what the presenter reads: **Replace on the prompter**, **Update the prompter** and **Clear the prompter**. They use the design system's arm: the key gets an amber keyline and counts down 4.5 s, and a second press between 0.35 s and 4.5 s applies it. Esc still cancels and is never shown (D6).
+Only three things are armed, because each changes what the presenter reads: **Replace on the prompter**, **Update the prompter** and **Clear the prompter**. They use the design system's one armed form: the key turns Burgundy with "press again" and a countdown bar of 4.5 s, keeping its place and its height, the state display says what the second press does, and a second press between 0.35 s and 4.5 s applies it. Esc still cancels and is never shown (D6). Update and Clear are held only on the page (the hardware link acts on one request), so no menu offers them; a script's menu hands Replace off to the plate's key and never gives the second press.
 
 Not armed:
 
@@ -246,7 +246,7 @@ Not armed:
 - edits, which change Studio Control's copy (§6.3).
 - Remove, which moves a script to Removed.
 
-Delete for good… asks in a dialog, like Delete fixture… on Lighting.
+Delete for good… is the last item of a removed script's ⋯ and arms in place, as Lighting's deletes do: its menu says a delete for good cannot be undone, and the second press deletes the script and its earlier versions (D38).
 
 ## 11. What must never happen (D12), and how the design prevents it
 

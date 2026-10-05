@@ -8,6 +8,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Teleprompter page is drawn anew: the text size stands beside the speed with `− 4`, `+ 4` and `Standard`, and works with nothing on the prompter; Open file…, Paste as a new script and New script are the page's `⋯`; the look's settings open beside the plate with `Change…`, the Prompter XL's from the footer; state words are in capitals and a current choice has a beige outline (#307).
+- Every script has a `⋯` (or a right-click) with Select, Put on or Replace, Edit, Rename, Earlier versions and Remove; Removed is the Scripts `⋯`'s view. `Delete for good…` asks in its menu, press again, not in a dialog. Replace, Update and Clear turn dark red with a countdown and keep their size (#307).
 - The Cameras page is drawn anew: each camera has a `⋯` beside its key, in its small picture's label and in the plate's title (or a right-click), with Select, Read again or Connect, Camera setup and Release; the state words are in capitals; a current choice has a beige outline instead of a yellow fill; the helper sentences are tooltips (#306).
 - A value's list, the white balance and tint field, and the format's and look's keys open beside the plate, and the pictures stay drawn while they are open; the list and the field hid every picture until now. Closing the format's or the look's keys drops a key armed in them (#306).
 - `CUT ALL`, `LIGHTING` off and the deck's `ALL OFF` take a highlighted, soloed or flashing light off too, and end the Highlight, the Solo and a Find; a highlighted light used to stay at full after a cut. In Preview they still cut the preview only (#305).

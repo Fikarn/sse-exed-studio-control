@@ -26,16 +26,16 @@
 }
 
 .label {
-  color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0.08em;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: var(--font-tracking-cap);
   text-transform: uppercase;
 }
 
 .detail {
   overflow: hidden;
   color: var(--text-text);
-  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -44,7 +44,6 @@
   flex: none;
   width: 480px;
   height: 270px;
-  border-radius: var(--radius-key);
   overflow: hidden;
 }
 
@@ -53,42 +52,29 @@
 }
 
 .readouts {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px 16px;
   margin: 0;
-  padding: 14px 16px;
-  border-radius: var(--radius-key);
-  background: var(--material-well);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
 }
 
-.readouts dt {
-  color: var(--display-text2);
+/* What the glass does not show as it is: doubt's yellow. */
+.edited[data-edited] {
+  color: var(--role-yellow-text);
 }
 
-.readouts dd {
-  margin: 0;
-  overflow: hidden;
-  color: var(--display-text);
-  font-weight: 700;
-  text-align: right;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+/* The reading line's state, a word in capitals: UNCHANGED, EDITED, REMOVED. */
+.lineState {
+  text-transform: uppercase;
 }
 
-.readouts dd[data-edited] {
+.lineState[data-edited] {
   color: var(--role-yellow-text);
 }
 
 .nothing {
   margin: 0;
-  color: var(--text-text);
-  font: 700 var(--font-size-body) / 1.3 var(--font-family-ui);
 }
 
 .note {
   margin: 0;
   color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1.45 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }

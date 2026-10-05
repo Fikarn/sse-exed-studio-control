@@ -1,6 +1,7 @@
-/* The Teleprompter's plate (new pages program, Slice 6a): board 1's right
-   column. The selected script, the scripts and Removed, the look, the
-   Prompter XL. Nothing scrolls: a long list is paged. */
+/* The Teleprompter's plate (new pages program, Slice 6a; the visual
+   overhaul, 2026-10-05): the selected script's title plate and its one key,
+   the scripts as rows with a ⋯ each, the look. Nothing scrolls: a long list is
+   paged, and the versions and the look's settings open beside the plate. */
 
 .plate {
   display: flex;
@@ -12,70 +13,41 @@
   overflow: hidden;
 }
 
-.selectedKeys {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: none;
+.plateKey {
+  display: inline-flex;
 }
 
-.pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+/* The one key under the title, at one height whatever it is. */
+.status {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: none;
+  min-height: 36px;
+}
+
+/* An armed key that keeps its height: the tag and the words side by side. */
+.armRow[data-armed="true"] {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 14px;
 }
 
 .onPrompter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--role-green-text);
-  border-radius: var(--radius-key);
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
-}
-
-.versions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   margin: 0;
-  padding: 4px;
-  border-radius: var(--radius-key);
-  background: var(--material-well);
-  list-style: none;
-}
-
-.version {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 4px 0 8px;
-  color: var(--display-text);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
-}
-
-/* One line a version, so the list's height is known and the scripts under it keep their pager. */
-.version > span {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .none {
-  padding: 8px;
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
+  padding: 8px 0;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .scripts {
-  flex: 0 1 auto;
+  flex: none;
   min-height: 0;
-  overflow: hidden;
 }
 
 .scriptList {
@@ -87,25 +59,38 @@
   list-style: none;
 }
 
+/* A script's row: the row selects, its ⋯ stands inside its edge. */
+.row {
+  position: relative;
+}
+
+.rowMenu {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: inline-flex;
+  transform: translateY(-50%);
+}
+
 .scriptRow {
   appearance: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
-  min-height: 44px;
-  padding: 4px 12px;
+  min-height: 48px;
+  padding: 4px 48px 4px 12px;
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  color: var(--display-text);
+  color: var(--text-text);
   text-align: left;
   cursor: pointer;
 }
 
 .scriptRow:hover {
-  border-color: var(--display-text2);
+  border-color: var(--text-text4);
 }
 
 .scriptRow:focus-visible {
@@ -113,8 +98,11 @@
   outline-offset: 2px;
 }
 
+/* The selected script: the Beige keyline, 2 px. */
 .scriptRow[data-selected] {
-  border-color: var(--display-text);
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .scriptText {
@@ -126,27 +114,28 @@
 
 .scriptText b {
   overflow: hidden;
-  font: 700 var(--font-size-body) / 1.2 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .scriptText span {
-  color: var(--display-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .removedRow {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 4px 4px 4px 12px;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 8px 4px 12px;
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  color: var(--display-text);
+  color: var(--text-text);
 }
 
 .pager {
@@ -156,50 +145,19 @@
   gap: 8px;
   margin-top: 8px;
   color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
   text-align: center;
 }
 
-.sizeRow {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.sizeReadout {
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-}
-
-.sizeReadout b {
-  color: var(--text-text);
-  font: 700 var(--font-size-value) / 1 var(--font-family-mono);
-}
-
-.toggleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 32px;
-}
-
-.toggleLabel {
-  color: var(--text-text);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
-}
-
-/* On the versions' well, the display's own muted ink. */
-.versions .none {
-  color: var(--display-text2);
-}
-
 /* Why the Prompter XL's window did not open, as Windows said it (up to 300
-   characters): it wraps under the readouts rather than squeezing them. */
+   characters): it wraps at the plate's foot rather than being cut. */
+.windowSection {
+  flex: none;
+}
+
 .windowError {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--role-coral-text);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
   overflow-wrap: anywhere;
 }

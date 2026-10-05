@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ShellRegion, useArm } from "@sse/design-system";
+import { ShellRegion } from "@sse/design-system";
 import type {
   JsonObject,
   JsonValue,
   PrompterGlassSnapshot,
   PrompterHealthCheck,
+  PrompterScriptSummary,
   PrompterSnapshot,
   ShellStore,
 } from "@sse/engine-client";
@@ -30,6 +31,15 @@ import {
   prompterStateView,
   type ReportedLines,
 } from "./teleprompterModel";
+import {
+  armName,
+  armStillStands,
+  CLEAR_ARM_KEY,
+  teleprompterArmedWords,
+  teleprompterArmKey,
+  UPDATE_ARM_KEY,
+  useTeleprompterArming,
+} from "./useTeleprompterArming";
 import styles from "./TeleprompterWorkspace.module.css";
 
 // The Teleprompter page (new pages program, Slice 6a; board 1, "Live mirror",
@@ -45,6 +55,13 @@ import styles from "./TeleprompterWorkspace.module.css";
 // a notice. Slice 6b brings Edit script (the bay's second view), Rename, New
 // script and Paste as a new script; the editor saves what was typed before
 // any request, so an Update or a Put on takes the text as the operator sees it.
+//
+// The visual overhaul (2026-10-05): one arm for the page
+// (`useTeleprompterArming`), shared by Replace, Update, Clear and a removed
+// script's Delete for good, and dropped once its key would no longer do what
+// it said (`armStillStands`). Each script has one menu; Replace from it
+// selects the script and arms the plate's fixed key, only from what the page
+// holds right after its own selection, and never gives the second press.
 
 export interface TeleprompterWorkspaceProps {
   healthSnapshot: JsonObject | null;
@@ -59,14 +76,6 @@ function sentenceOf(result: JsonValue): string | null {
     ? result.sentence
     : null;
 }
-
-/** A script's name in the armed row, cut so `· press again` stays in view. */
-function armName(name: string): string {
-  return name.length > ARM_NAME_ROOM ? `${name.slice(0, ARM_NAME_ROOM - 1)}…` : name;
-}
-
-/** The characters of a name the state display's armed row has room for beside its words. */
-const ARM_NAME_ROOM = 20;
 
 /** `checks.prompter` from the health snapshot; `null` while it is absent or could not be read. */
 function prompterCheckOf(healthSnapshot: JsonObject | null): PrompterHealthCheck | null {
@@ -83,7 +92,7 @@ export function TeleprompterWorkspace({
   store,
 }: TeleprompterWorkspaceProps) {
   const toast = useToast();
-  const arm = useArm();
+  const arm = useTeleprompterArming();
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [bayView, setBayView] = useState<BayView>("live");
   const editor = useRef<ScriptEditorHandle>(null);
@@ -117,6 +126,18 @@ export function TeleprompterWorkspace({
     [check, prompterSnapshot, scripts.length]
   );
   const timeLeft = usePrompterTimeLeft(glass);
+
+  // An armed key whose key has gone, or would now do something else, is
+  // dropped: Update once NOT UPDATED has cleared, Clear on a blank prompter,
+  // Replace once its script is not the selected one or is on the prompter, and
+  // Delete for good once its script is not among the removed.
+  const armedKey = arm.armed?.key ?? null;
+  const armStands = armedKey === null || armStillStands(armedKey, prompterSnapshot, selected?.id ?? null);
+  const clearArm = arm.clear;
+  useEffect(() => {
+    if (!armStands) clearArm();
+  }, [armStands, clearArm]);
+  const armedWords = arm.armed ? teleprompterArmedWords(arm.armed, prompterSnapshot) : null;
   // The layout the page's copy last reported: where its lines break, which
   // `BACK`'s hint reads (the hardware link works from the same layout).
   const [reported, setReported] = useState<ReportedLines | null>(null);
@@ -177,41 +198,74 @@ export function TeleprompterWorkspace({
     }
   });
 
+  /** The plate's Replace key for `script`: the first press arms, the second puts it on. */
+  const armReplace = (script: PrompterScriptSummary) =>
+    arm.armOrApply(
+      teleprompterArmKey.replace(script.id),
+      `Replace with ${armName(script.name)}`,
+      () => void perform(() => store.putOnPrompter(script.id, true), true)
+    );
   const putOn = useLiveCallback(() => {
     if (!selected) return;
     if (!glass) {
       void perform(() => store.putOnPrompter(selected.id), true);
       return;
     }
-    arm.armOrApply(
-      `replace:${selected.id}`,
-      `Replace with ${armName(selected.name)}`,
-      () => void perform(() => store.putOnPrompter(selected.id, true), true)
-    );
+    armReplace(selected);
   });
   // Choosing another script drops an armed Replace: it named the script chosen
   // before. The editor closes on another script, so what was typed is saved
   // first, and a text that could not be saved keeps the editor open on it.
   const choose = useLiveCallback((scriptId: string) => {
     setChosenId(scriptId);
-    if (arm.armed?.key.startsWith("replace:")) arm.clear();
+    if (scriptId !== selected?.id && arm.armed?.key.startsWith("replace:")) arm.clear();
   });
   const select = useLiveCallback(async (scriptId: string) => {
-    if (scriptId !== selected?.id && !(await flushEditor())) return;
+    if (scriptId !== selected?.id && !(await flushEditor())) return false;
     choose(scriptId);
+    return true;
+  });
+  // A menu's Put on: one press, while the prompter is blank.
+  const putOnScript = useLiveCallback(async (scriptId: string) => {
+    if (!(await select(scriptId))) return;
+    if (store.getSnapshot().prompterSnapshot?.glass) return;
+    void perform(() => store.putOnPrompter(scriptId), true);
+  });
+  // Replace from a script's menu: select it, then arm the plate's Replace key,
+  // and only from what the page holds right after that selection: that script
+  // there, another one on the prompter. Nothing waits for a later read, so a
+  // later selection of the script never arms anything; and the hand-off only
+  // arms (`armOnly`): a key already armed for it is left as it is, never
+  // pressed again, however late the selection lands after the press.
+  const replaceElsewhere = useLiveCallback(async (scriptId: string) => {
+    if (!(await select(scriptId))) return;
+    const now = store.getSnapshot().prompterSnapshot;
+    const target = now?.scripts.find((script) => script.id === scriptId) ?? null;
+    if (!now?.glass || !target || now.glass.scriptId === scriptId) return;
+    arm.armOnly(teleprompterArmKey.replace(target.id), `Replace with ${armName(target.name)}`);
+  });
+  // Edit script from a menu: that script in the bay's editor.
+  const editScript = useLiveCallback(async (scriptId: string) => {
+    if (!(await select(scriptId))) return;
+    setBayView("edit");
   });
   // Live copy closes the editor: the same.
   const showView = useLiveCallback(async (view: BayView) => {
     if (view !== bayView && view === "live" && !(await flushEditor())) return;
     setBayView(view);
   });
+  // Update and Clear are the page's own keys only: the hardware link acts on one request.
   const update = useLiveCallback(() => {
     if (!glass) return;
-    arm.armOrApply("update", `Update ${armName(glass.name)}`, () => void perform(() => store.updatePrompter(), true));
+    arm.armOrApply(
+      UPDATE_ARM_KEY,
+      `Update ${armName(glass.name)}`,
+      () => void perform(() => store.updatePrompter(), true)
+    );
   });
   const clear = useLiveCallback(() => {
     if (!glass) return;
-    arm.armOrApply("clear", "Clear the prompter", () => void perform(() => store.clearPrompter(), true, TAKE));
+    arm.armOrApply(CLEAR_ARM_KEY, "Clear the prompter", () => void perform(() => store.clearPrompter(), true, TAKE));
   });
   const notice = useLiveCallback((tone: "ok" | "attention", message: string) => toast.push({ tone, message }));
   /** Selects the script a request answered with (a new one, a pasted one, an import). */
@@ -253,12 +307,12 @@ export function TeleprompterWorkspace({
       <ShellRegion region="cluster">
         <TeleprompterCluster
           armed={arm.armed}
+          armedWords={armedWords}
+          arm={arm}
           cut={cut}
           onClear={clear}
           onUpdate={update}
-          onPutOn={putOn}
           perform={perform}
-          selected={selected}
           backTo={glass ? backParagraph(glass, reported) : 0}
           onNewScript={() => void newScript()}
           onPasteScript={() => void pasteScript()}
@@ -299,9 +353,14 @@ export function TeleprompterWorkspace({
       <ShellRegion region="plate">
         <TeleprompterPlate
           armed={arm.armed}
+          arm={arm}
+          updateInDisplay={state.wayOut === "update"}
           onPutOn={putOn}
           onSelect={select}
           onUpdate={update}
+          onPutOnScript={(scriptId) => void putOnScript(scriptId)}
+          onReplaceElsewhere={(scriptId) => void replaceElsewhere(scriptId)}
+          onEdit={(scriptId) => void editScript(scriptId)}
           perform={perform}
           removed={removed}
           scripts={scripts}

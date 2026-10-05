@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
-import { Key, Lamp, Segmented } from "@sse/design-system";
+import { Field, Key, LampWord, Segmented, Tooltip } from "@sse/design-system";
 import type { PrompterJumpRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
 import type { GlassParagraph } from "./glass/glassText";
@@ -17,6 +17,11 @@ import styles from "./TeleprompterBay.module.css";
 // nothing is drawn on it that the presenter does not see, and the mouse wheel
 // never moves it. It reports its layout to the hardware link, which runs the
 // clock on it (Slice 4).
+//
+// The visual overhaul (2026-10-05): the view shown is the Beige selection, the
+// run state and Not on the glass are state words in capitals, the bar's
+// sentence is a tooltip on its word, and the bar and Go are marked take-time.
+// The copy itself, the glass's props and its layout report are as they were.
 
 /** The copy across the bay, 1,680 × 945: 87.5 % of the Prompter XL's pixels (the proposal §6.1;
  *  the shell, overhaul 3, made the bay 1,680 wide). */
@@ -133,12 +138,19 @@ export function TeleprompterBay({
     <section className={styles.bay} data-testid="teleprompter-bay" aria-label="The prompter's glass">
       <div className={styles.bayHead}>
         <Segmented label="The bay shows" className={styles.views} testId="teleprompter-bay-view">
-          <Key mode="segmented" engaged={view === "live"} testId="teleprompter-bay-live" onClick={() => onView("live")}>
+          <Key
+            mode="segmented"
+            selected={view === "live"}
+            aria-pressed={view === "live"}
+            testId="teleprompter-bay-live"
+            onClick={() => onView("live")}
+          >
             Live copy
           </Key>
           <Key
             mode="segmented"
-            engaged={view === "edit"}
+            selected={view === "edit"}
+            aria-pressed={view === "edit"}
             locked={editLock !== null}
             reason={editLock ?? undefined}
             testId="teleprompter-bay-edit"
@@ -156,7 +168,7 @@ export function TeleprompterBay({
           </span>
           <span className={styles.stripItem}>
             <span className={styles.stripLabel}>Place</span>
-            <b className={styles.stripMono} data-testid="teleprompter-place">
+            <b className={styles.stripValue} data-testid="teleprompter-place">
               {place ? place.text : "—"}
             </b>
           </span>
@@ -174,10 +186,9 @@ export function TeleprompterBay({
             ) : null}
           </span>
           {glass ? (
-            <span className={styles.runState} data-testid="teleprompter-run-state">
-              <Lamp tone={glass.playing ? "ok" : "off"} />
+            <LampWord tone={glass.playing ? "ok" : "off"} className={styles.runState} testId="teleprompter-run-state">
               {glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused"}
-            </span>
+            </LampWord>
           ) : null}
         </header>
       </div>
@@ -196,8 +207,10 @@ export function TeleprompterBay({
               testId="teleprompter-copy"
             />
             {!draws && glass ? (
-              <span className={styles.notOnGlass} data-testid="teleprompter-not-on-glass">
-                Not on the glass
+              <span className={styles.notOnGlass}>
+                <LampWord tone="error" testId="teleprompter-not-on-glass">
+                  Not on the glass
+                </LampWord>
               </span>
             ) : null}
           </div>
@@ -205,7 +218,12 @@ export function TeleprompterBay({
           {glass ? (
             <>
               <div className={styles.barHead}>
-                <span>The whole script · press anywhere on it to go to the start of that paragraph</span>
+                <Tooltip
+                  content="Press anywhere on it to go to the start of that paragraph. The scroll stays as it was."
+                  placement="top"
+                >
+                  <span className={styles.barWord}>The whole script</span>
+                </Tooltip>
                 <span>
                   {readWords}
                   {place ? ` · ${Math.floor(place.share * 100)} % read` : ""}
@@ -215,6 +233,7 @@ export function TeleprompterBay({
                 type="button"
                 className={styles.bar}
                 data-well=""
+                data-take=""
                 aria-label="The whole script: press to go to the start of a paragraph"
                 data-testid="teleprompter-script-bar"
                 onClick={pressBar}
@@ -278,22 +297,24 @@ export function TeleprompterBay({
                   ))}
                 </div>
                 <div className={styles.goTo} role="group" data-testid="teleprompter-go-to">
-                  <label className={styles.goToLabel} htmlFor="teleprompter-go-to-paragraph">
-                    Go to paragraph
-                  </label>
-                  <input
-                    id="teleprompter-go-to-paragraph"
-                    className={styles.goToField}
-                    data-well=""
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder={`1–${glass.paragraphCount}`}
-                    value={goTo}
-                    onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
-                    data-testid="teleprompter-go-to-field"
+                  <Field
+                    className={styles.goToWell}
+                    label={<label htmlFor="teleprompter-go-to-paragraph">Go to paragraph</label>}
+                    value={
+                      <input
+                        id="teleprompter-go-to-paragraph"
+                        className={styles.goToField}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder={`1–${glass.paragraphCount}`}
+                        value={goTo}
+                        onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
+                        data-testid="teleprompter-go-to-field"
+                      />
+                    }
                   />
                   <Key
-                    size="small"
+                    take
                     locked={goToProblem !== null}
                     reason={goToProblem ?? undefined}
                     testId="teleprompter-go-to-key"
@@ -306,7 +327,7 @@ export function TeleprompterBay({
             </>
           ) : (
             <p className={styles.nothing} data-testid="teleprompter-nothing-on">
-              Nothing on the prompter
+              <LampWord tone="off">Nothing on the prompter</LampWord>
             </p>
           )}
         </>

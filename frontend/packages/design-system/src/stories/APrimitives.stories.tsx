@@ -739,6 +739,7 @@ const PHANTOM = {
 const HELD_ARM: UseArmResult = {
   armed: { key: "menu:phantom", label: "Turn 48 V off", armedAt: 0, timeoutMs: 4500 },
   armOrApply: () => undefined,
+  armOnly: () => undefined,
   cancel: () => false,
   clear: () => undefined,
   remainingMs: () => 2700,

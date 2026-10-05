@@ -1,17 +1,19 @@
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 
 import {
   ArmKey,
   ARM_TIMEOUT_MS,
-  Button,
   Dialog,
   Key,
   LatchSlot,
   MenuButton,
+  Readout,
   Section,
   StateDisplay,
+  Tooltip,
   type ArmedKey,
   type MenuEntry,
+  type UseArmResult,
 } from "@sse/design-system";
 import type {
   JsonValue,
@@ -27,34 +29,47 @@ import {
   paragraphWindow,
   playLockReason,
   runLockReason,
+  SIZE_RANGE,
   SPEED_RANGE,
   stepLocks,
   type PrompterStateView,
 } from "./teleprompterModel";
 import { TAKE, type PerformAction } from "./perform";
+import { CLEAR_ARM_KEY, UPDATE_ARM_KEY } from "./useTeleprompterArming";
 import styles from "./TeleprompterCluster.module.css";
 
 // The Teleprompter's cluster (new pages program, Slice 6a; board 1's left
 // column, the proposal §2 and §5): the state display with its armed row, the
-// take — PLAY, BACK, TOP, the speed, the line, paragraph and cue steps — the
-// paragraph list, and the standing actions. Every take key is one press and
+// take — PLAY, BACK, TOP, the speed and the text size, the line, paragraph and
+// cue steps — the paragraph list, and Clear. Every take key is one press and
 // none but PLAY starts the scroll; Clear is armed (D11).
+//
+// The visual overhaul (2026-10-05): every take key has one fixed home here.
+// The text size moved in from the plate's look, beside the speed, as the
+// deck's SPEED and SIZE dials stand side by side; the size works while
+// nothing is on the prompter, as the hardware link allows. Open file…, Paste
+// as a new script and New script are the page's ⋯ only (the state display's
+// top right), which leaves the paragraph list its 16 rows. The helper
+// sentences are tooltips on the words; press twice, the countdowns and the
+// lock reasons stay on screen.
 
-/** The paragraph list's rows: as many as the cluster holds under the latch slot (the shell,
- *  overhaul 3; board 1 drew 18); a longer script shows a window around the place. */
+/** The paragraph list's rows: as many as the cluster holds under the steps and over Clear
+ *  (`teleprompter.spec.ts` holds that the last one ends inside the cluster); a longer
+ *  script shows a window around the place. */
 const PARAGRAPH_ROOM = 16;
 
 export interface TeleprompterClusterProps {
   snapshot: PrompterSnapshot;
   state: PrompterStateView;
   cut: readonly GlassParagraph[];
-  selected: PrompterScriptSummary | null;
   /** Where `BACK` goes from the place (`backParagraph`), from 0. */
   backTo: number;
   armed: ArmedKey | null;
+  /** What the state display's armed row says, before "· press again". */
+  armedWords: string | null;
+  arm: UseArmResult;
   store: ShellStore;
   perform: PerformAction;
-  onPutOn: () => void;
   onUpdate: () => void;
   onClear: () => void;
   /** The scripts kept, for a file opened before (§3.3). */
@@ -85,16 +100,28 @@ async function fileAsBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
+/** A dial's word (the deck's, SSE Adelia) over its value, the helper sentence on hover. */
+function DialCell({ word, tip, children }: { word: string; tip: string; children: ReactNode }) {
+  return (
+    <div className={styles.cell} data-well="">
+      <Tooltip content={tip} placement="right">
+        <span className={styles.cellWord}>{word}</span>
+      </Tooltip>
+      {children}
+    </div>
+  );
+}
+
 export function TeleprompterCluster({
   snapshot,
   state,
   cut,
-  selected,
   backTo,
   armed,
+  armedWords,
+  arm,
   store,
   perform,
-  onPutOn,
   onUpdate,
   onClear,
   scripts,
@@ -121,6 +148,15 @@ export function TeleprompterCluster({
     glass && glass.speedWpm >= SPEED_RANGE.max
       ? `The pace is at its fastest, ${SPEED_RANGE.max} words a minute.`
       : null;
+  // The size is the glass's, not the script's: it is set while nothing is on
+  // the prompter too (the screen's look sets it at any time; only the deck's
+  // dial waits for a script), so only its ends lock it.
+  const { sizePx, look } = snapshot;
+  const atStandard = sizePx === look.standardSizePx;
+  const smallest = sizePx <= SIZE_RANGE.min ? `The text is at its smallest, ${SIZE_RANGE.min} px.` : null;
+  const largest = sizePx >= SIZE_RANGE.max ? `The text is at its largest, ${SIZE_RANGE.max} px.` : null;
+  const size = (request: { step: 1 | -1 } | { standard: true }) =>
+    void perform(() => store.setPrompterTextSize(request), false, TAKE);
   const shown = paragraphWindow(rows.length, placeParagraph, PARAGRAPH_ROOM);
 
   /** Sends a file the page read, as a new script or as `updateScriptId`'s new text. */
@@ -157,32 +193,50 @@ export function TeleprompterCluster({
     if (script) setReopened({ file, script });
     else void sendFile(file);
   };
+  const openFile = () => fileInput.current?.click();
 
+  // The way out (§8): Update while NOT UPDATED, which the display holds in its
+  // own foot, armed in place; or Open file… while no script is kept. Put on
+  // the prompter is the plate's key, under the script it puts on.
+  const updateArmed = armed?.key === UPDATE_ARM_KEY;
   const wayOut =
     state.wayOut === "update" ? (
       <ArmKey
-        armed={armed?.key === "update"}
-        timeoutMs={ARM_TIMEOUT_MS}
+        armed={updateArmed}
+        timeoutMs={armed?.timeoutMs ?? ARM_TIMEOUT_MS}
         countdownTestId="teleprompter-update-countdown"
         size="small"
+        take
+        className={styles.armRow}
         testId="teleprompter-state-update"
         onClick={onUpdate}
       >
-        {armed?.key === "update" ? "Update the prompter" : "Update the prompter · press twice"}
+        {updateArmed ? "Update the prompter" : "Update the prompter · press twice"}
       </ArmKey>
-    ) : state.wayOut === "put-on" && selected ? (
-      <Key size="small" testId="teleprompter-state-put-on" onClick={onPutOn}>
-        Put {selected.name} on the prompter
+    ) : state.wayOut === "open-file" ? (
+      <Key size="small" mode="primary" testId="teleprompter-state-open-file" onClick={openFile}>
+        Open file…
       </Key>
     ) : undefined;
 
-  // The shell (overhaul 3): the page's ⋯ on the state display. Until the
-  // Teleprompter's own pull request it holds the standing commands that do
-  // not arm, with the same handlers; Clear stays the key that arms.
+  // The shell (overhaul 3): the page's ⋯ on the state display. The visual
+  // overhaul (2026-10-05): it is the one home of the standing commands, none
+  // of which arms; they keep the standing keys' test ids.
   const pageMenu: MenuEntry[] = [
-    { id: "open-file", label: "Open file…", onSelect: () => fileInput.current?.click() },
-    { id: "paste-script", label: "Paste as a new script", onSelect: onPasteScript },
-    { id: "new-script", label: "New script", onSelect: onNewScript },
+    {
+      id: "open-file",
+      label: "Open file…",
+      value: ".docx or .txt",
+      onSelect: openFile,
+      testId: "teleprompter-open-file",
+    },
+    {
+      id: "paste-script",
+      label: "Paste as a new script",
+      onSelect: onPasteScript,
+      testId: "teleprompter-paste-script",
+    },
+    { id: "new-script", label: "New script", onSelect: onNewScript, testId: "teleprompter-new-script" },
   ];
 
   return (
@@ -191,12 +245,15 @@ export function TeleprompterCluster({
         tone={state.tone}
         word={state.word}
         sentence={state.sentence}
-        meta={state.meta ?? undefined}
+        // Beside the Update key the screen's mode would be cut: NOT UPDATED
+        // says what matters, and the footer keeps the mode.
+        meta={state.wayOut === "update" ? undefined : (state.meta ?? undefined)}
         actions={wayOut}
-        // The way out's own key says it is armed; the armed row is for the others.
+        // The way out's own key says it is armed, in the display's foot; the
+        // armed row says what the second press of any other key does.
         armed={
-          armed && !(armed.key === "update" && state.wayOut === "update")
-            ? { text: `${armed.label} · press again`, timeoutMs: armed.timeoutMs }
+          armed && !(updateArmed && state.wayOut === "update")
+            ? { text: `${armedWords ?? armed.label} · press again`, timeoutMs: armed.timeoutMs }
             : null
         }
         testId="teleprompter-state-display"
@@ -204,7 +261,7 @@ export function TeleprompterCluster({
           <MenuButton
             buttonLabel="Teleprompter menu"
             buttonTestId="teleprompter-page-menu"
-            menu={{ head: { title: "Teleprompter" }, items: pageMenu }}
+            menu={{ head: { title: "Teleprompter", detail: "Scripts" }, items: pageMenu, arm }}
           />
         }
       />
@@ -215,13 +272,9 @@ export function TeleprompterCluster({
       <div className={styles.take}>
         <Key
           cap="Play"
-          hint={
-            glass?.playing
-              ? "playing · press to pause"
-              : glass && !glass.atEnd
-                ? `paused at ¶ ${placeParagraph + 1} · press to play`
-                : "press to play"
-          }
+          // What a press does; a locked PLAY says nothing here, the state
+          // display says why.
+          hint={playLock !== null ? undefined : glass?.playing ? "press to pause" : `from ¶ ${placeParagraph + 1}`}
           layout="stack"
           size="tall"
           live={glass?.playing ?? false}
@@ -257,31 +310,83 @@ export function TeleprompterCluster({
         />
       </div>
 
-      <Section title="Speed" detail="this script's own · 5 words/min a press · 40–300" testId="teleprompter-speed">
-        <div className={styles.speed}>
-          <Key
-            cap="− 5"
-            locked={(runLock ?? slowest) !== null}
-            reason={runLock ?? slowest ?? undefined}
-            take
-            testId="teleprompter-speed-down"
-            aria-label="Slower by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }), false, TAKE)}
-          />
-          <output className={styles.speedReadout} data-well="" data-testid="teleprompter-speed-readout">
-            <b>{glass ? glass.speedWpm : "—"}</b> words/min
-          </output>
-          <Key
-            cap="+ 5"
-            locked={(runLock ?? fastest) !== null}
-            reason={runLock ?? fastest ?? undefined}
-            take
-            testId="teleprompter-speed-up"
-            aria-label="Faster by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }), false, TAKE)}
-          />
+      <div className={styles.dials}>
+        <div className={styles.dial} data-testid="teleprompter-speed">
+          <DialCell word="Speed" tip="This script's own pace: 5 words a minute a press, from 40 to 300.">
+            <Readout
+              className={styles.cellValue}
+              value={glass ? glass.speedWpm : undefined}
+              unit="words/min"
+              empty={!glass}
+              testId="teleprompter-speed-readout"
+            />
+          </DialCell>
+          <div className={styles.dialKeys}>
+            <Key
+              locked={(runLock ?? slowest) !== null}
+              reason={runLock ?? slowest ?? undefined}
+              take
+              testId="teleprompter-speed-down"
+              aria-label="Slower by 5 words a minute"
+              onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }), false, TAKE)}
+            >
+              − 5
+            </Key>
+            <Key
+              locked={(runLock ?? fastest) !== null}
+              reason={runLock ?? fastest ?? undefined}
+              take
+              testId="teleprompter-speed-up"
+              aria-label="Faster by 5 words a minute"
+              onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }), false, TAKE)}
+            >
+              + 5
+            </Key>
+          </div>
         </div>
-      </Section>
+        <div className={styles.dial} data-testid="teleprompter-size">
+          <DialCell
+            word="Size"
+            tip={`The glass's text size: 4 px a press, from ${SIZE_RANGE.min} to ${SIZE_RANGE.max} px. Standard returns to ${look.standardSizePx} px.`}
+          >
+            <span className={styles.cellValue} data-testid="teleprompter-text-size">
+              <b>{sizePx}</b> <span className={styles.cellUnit}>px</span>{" "}
+              <span>{atStandard ? "standard" : `standard ${look.standardSizePx}`}</span>
+            </span>
+          </DialCell>
+          <div className={styles.sizeKeys}>
+            <Key
+              take
+              testId="teleprompter-size-down"
+              locked={smallest !== null}
+              reason={smallest ?? undefined}
+              aria-label="Smaller by 4 px"
+              onClick={() => size({ step: -1 })}
+            >
+              − 4
+            </Key>
+            <Key
+              take
+              testId="teleprompter-size-up"
+              locked={largest !== null}
+              reason={largest ?? undefined}
+              aria-label="Larger by 4 px"
+              onClick={() => size({ step: 1 })}
+            >
+              + 4
+            </Key>
+            <Key
+              take
+              testId="teleprompter-size-standard"
+              locked={atStandard}
+              reason="The text is at the standard size."
+              onClick={() => size({ standard: true })}
+            >
+              Standard
+            </Key>
+          </div>
+        </div>
+      </div>
 
       <div className={styles.steps}>
         <Key
@@ -341,118 +446,116 @@ export function TeleprompterCluster({
       </div>
 
       <Section
-        title="Paragraphs"
+        title={
+          <Tooltip content="Press a paragraph to go to its start. The scroll stays as it was." placement="right">
+            <span>Paragraphs</span>
+          </Tooltip>
+        }
         detail={
           glass
             ? shown.from === 0 && shown.to === rows.length
-              ? `${rows.length} · all shown`
+              ? `${rows.length}`
               : `¶ ${shown.from + 1}–${shown.to} of ${rows.length}`
-            : "nothing on the prompter"
+            : undefined
         }
         className={styles.paragraphs}
         testId="teleprompter-paragraphs"
       >
         {glass ? (
           <ol className={styles.paragraphList} data-well="">
-            {rows.slice(shown.from, shown.to).map((row) => (
-              <li key={row.index}>
-                <button
-                  type="button"
-                  className={styles.paragraphRow}
-                  data-current={row.index === placeParagraph && !glass.atEnd ? "" : undefined}
-                  aria-current={row.index === placeParagraph && !glass.atEnd ? "true" : undefined}
-                  data-testid={`teleprompter-paragraph-${row.index + 1}`}
-                  onClick={() => jump({ to: "paragraph", paragraph: row.index })}
-                >
-                  <span className={styles.paragraphNumber}>{row.index + 1}</span>
-                  <span className={styles.paragraphText}>
-                    {row.cue ? <i className={styles.paragraphCue}>{row.cue}</i> : null}
-                    {row.cue && row.text ? " " : null}
-                    {row.text}
-                  </span>
-                  <span className={styles.paragraphLength}>{row.length}</span>
-                </button>
-              </li>
-            ))}
+            {rows.slice(shown.from, shown.to).map((row) => {
+              const current = row.index === placeParagraph && !glass.atEnd;
+              return (
+                <li key={row.index}>
+                  <button
+                    type="button"
+                    className={styles.paragraphRow}
+                    data-take=""
+                    data-current={current ? "" : undefined}
+                    aria-current={current ? "true" : undefined}
+                    data-testid={`teleprompter-paragraph-${row.index + 1}`}
+                    onClick={() => jump({ to: "paragraph", paragraph: row.index })}
+                  >
+                    <span className={styles.paragraphNumber}>{row.index + 1}</span>
+                    <span className={styles.paragraphText} data-paragraph-text="">
+                      {row.cue ? <i className={styles.paragraphCue}>{row.cue}</i> : null}
+                      {row.cue && row.text ? " " : null}
+                      {row.text}
+                    </span>
+                    <span className={styles.paragraphLength}>{row.length}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
-        ) : null}
+        ) : (
+          <p className={styles.none}>Nothing on the prompter</p>
+        )}
       </Section>
 
-      <div className={styles.standing}>
-        <input
-          ref={fileInput}
-          className={styles.fileInput}
-          type="file"
-          accept=".docx,.txt"
-          tabIndex={-1}
-          aria-hidden="true"
-          data-testid="teleprompter-file-input"
-          onChange={importFile}
-        />
-        <div className={styles.standingRow}>
-          <Key size="small" testId="teleprompter-open-file" onClick={() => fileInput.current?.click()}>
-            Open file…
-          </Key>
-          <Key size="small" testId="teleprompter-paste-script" onClick={onPasteScript}>
-            Paste as a new script
-          </Key>
-          <Key size="small" testId="teleprompter-new-script" onClick={onNewScript}>
-            New script
-          </Key>
-        </div>
-        <ArmKey
-          armed={armed?.key === "clear"}
-          timeoutMs={ARM_TIMEOUT_MS}
-          countdownTestId="teleprompter-clear-countdown"
-          size="small"
-          locked={runLock !== null}
-          reason={runLock ?? undefined}
-          testId="teleprompter-clear"
-          onClick={onClear}
+      <ArmKey
+        armed={armed?.key === CLEAR_ARM_KEY}
+        timeoutMs={armed?.timeoutMs ?? ARM_TIMEOUT_MS}
+        countdownTestId="teleprompter-clear-countdown"
+        locked={runLock !== null}
+        reason={runLock ?? undefined}
+        take
+        className={[styles.clear, styles.armRow].join(" ")}
+        testId="teleprompter-clear"
+        onClick={onClear}
+      >
+        {armed?.key === CLEAR_ARM_KEY ? "Clear the prompter" : "Clear the prompter · press twice"}
+      </ArmKey>
+
+      <input
+        ref={fileInput}
+        className={styles.fileInput}
+        type="file"
+        accept=".docx,.txt"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-testid="teleprompter-file-input"
+        onChange={importFile}
+      />
+      {reopened ? (
+        <Dialog
+          title={`${reopened.file.name} was opened before`}
+          onClose={() => setReopened(null)}
+          actions={
+            <>
+              <Key size="small" onClick={() => setReopened(null)}>
+                Cancel
+              </Key>
+              <Key
+                size="small"
+                testId="teleprompter-reopen-add"
+                onClick={() => {
+                  setReopened(null);
+                  void sendFile(reopened.file);
+                }}
+              >
+                Add as a new script
+              </Key>
+              <Key
+                size="small"
+                mode="primary"
+                testId="teleprompter-reopen-update"
+                onClick={() => {
+                  setReopened(null);
+                  void sendFile(reopened.file, reopened.script.id);
+                }}
+              >
+                Update {reopened.script.name}
+              </Key>
+            </>
+          }
         >
-          Clear the prompter · press twice
-        </ArmKey>
-        {reopened ? (
-          <Dialog
-            title={`${reopened.file.name} was opened before`}
-            onClose={() => setReopened(null)}
-            actions={
-              <>
-                <Button variant="ghost" size="compact" onClick={() => setReopened(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="compact"
-                  data-testid="teleprompter-reopen-add"
-                  onClick={() => {
-                    setReopened(null);
-                    void sendFile(reopened.file);
-                  }}
-                >
-                  Add as a new script
-                </Button>
-                <Button
-                  variant="primary"
-                  size="compact"
-                  data-testid="teleprompter-reopen-update"
-                  onClick={() => {
-                    setReopened(null);
-                    void sendFile(reopened.file, reopened.script.id);
-                  }}
-                >
-                  Update {reopened.script.name}
-                </Button>
-              </>
-            }
-          >
-            <p className={styles.reopened} data-testid="teleprompter-reopen">
-              {reopened.script.name} came from this file. Update it from the file — its text now is kept as an earlier
-              version — or add the file as a new script.
-            </p>
-          </Dialog>
-        ) : null}
-      </div>
+          <p className={styles.reopened} data-testid="teleprompter-reopen">
+            {reopened.script.name} came from this file. Update it from the file — its text now is kept as an earlier
+            version — or add the file as a new script.
+          </p>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
