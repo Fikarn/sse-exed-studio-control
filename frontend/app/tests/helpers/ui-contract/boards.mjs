@@ -44,7 +44,7 @@ export const BOARD_STEPS = {
     ready: "[data-testid=teleprompter-editor-text][contenteditable=true]",
   },
   "teleprompter-new-script": {
-    presses: ["teleprompter-new-script"],
+    presses: ["teleprompter-page-menu", "teleprompter-new-script"],
     ready: "[data-testid=teleprompter-editor-text][contenteditable=true]",
   },
 };
