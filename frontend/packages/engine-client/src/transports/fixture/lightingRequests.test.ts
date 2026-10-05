@@ -281,23 +281,85 @@ describe("the fixture double's rig actions", () => {
     expect((await snapshot()).sceneState).toBe("preview");
   });
 
-  // The review of the Lighting page's redraw (2026-10-04): the hardware link
-  // takes a fixture's control map whole (`fixtures.rs`, `preview.rs`), a
-  // control left out going to its default. The double merged it, and hid that
-  // the plate sent one control at a time: on the INFINIBAR, Green reset Red.
-  it("lighting.fixture.update takes the control map whole, as the hardware link does", async () => {
+  // The hardware link lays a fixture's control map over the one it holds
+  // (`fixtures.rs`, and the buffer's in Preview, `preview.rs`, since
+  // 2026-10-05): a control the request does not name keeps its value. Until
+  // then it took the map whole, and on the INFINIBAR a plate that sent one
+  // control reset the others (the review of the Lighting page's redraw,
+  // 2026-10-04).
+  it("lighting.fixture.update keeps the controls a map does not name, as the hardware link does", async () => {
     const { request, fixture } = openDouble();
     await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { red: 200, green: 0 } });
     expect((await fixture("fixture-back"))?.controlValues).toMatchObject({ red: 200, green: 0, blue: 0 });
     await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { green: 100 } });
-    expect((await fixture("fixture-back"))?.controlValues).toMatchObject({ red: 0, green: 100 });
+    expect((await fixture("fixture-back"))?.controlValues).toMatchObject({ red: 200, green: 100, blue: 0 });
 
     await request("lighting.editor.previewMode", { enabled: true });
     await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { blue: 50 } });
+    await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { red: 10 } });
     const preview = ((await request("lighting.snapshot")).previewFixtures as JsonObject[]).find(
       (entry) => entry.id === "fixture-back"
     );
-    expect(preview?.controlValues).toMatchObject({ red: 0, green: 0, blue: 50 });
+    expect(preview?.controlValues, "the first staged edit is kept").toMatchObject({ red: 10, green: 100, blue: 50 });
+    expect((await fixture("fixture-back"))?.controlValues, "the live map does not move").toMatchObject({
+      red: 200,
+      green: 100,
+      blue: 0,
+    });
+  });
+
+  // 2026-10-05: `lighting.power.all` off ends the identify flashes (a Find's
+  // waiting ones too), the highlight and the solo in the same write, outside
+  // Preview, as `fixtures.rs` does. All on leaves them, and so does a cut in
+  // Preview, which edits the preview only.
+  it("lighting.power.all off ends the overlays outside Preview, and leaves them in it", async () => {
+    const { request, snapshot, fixture } = openDouble();
+    await request("lighting.fixture.highlight", { fixtureIds: ["fixture-key"], mode: "highlight" });
+    await request("lighting.fixture.identifySequence", {
+      fixtureIds: ["fixture-back", "fixture-fill"],
+      stepMs: 500,
+      durationMs: 400,
+    });
+    await request("lighting.power.all", { on: true });
+    expect((await snapshot()).highlightFixtureIds).toEqual(["fixture-key"]);
+    expect(await fixture("fixture-back")).toMatchObject({ on: true, intensity: 100 });
+
+    await request("lighting.power.all", { on: false });
+    const cut = await snapshot();
+    expect(cut.highlightFixtureIds).toEqual([]);
+    expect(cut.soloFixtureIds).toEqual([]);
+    expect((cut.fixtures as JsonObject[]).every((entry) => entry.on === false)).toBe(true);
+    vi.setSystemTime(START + 500);
+    expect(await fixture("fixture-fill"), "the Find's waiting flash is gone").toMatchObject({ on: false });
+
+    await request("lighting.fixture.highlight", { fixtureIds: ["fixture-key"], mode: "solo" });
+    await request("lighting.power.all", { on: false });
+    await request("lighting.power.all", { on: true });
+    const relit = await snapshot();
+    expect(relit.soloFixtureIds).toEqual([]);
+    expect((relit.fixtures as JsonObject[]).every((entry) => entry.on === true)).toBe(true);
+
+    await request("lighting.fixture.highlight", { fixtureIds: ["fixture-key"], mode: "highlight" });
+    await request("lighting.editor.previewMode", { enabled: true });
+    await request("lighting.power.all", { on: false });
+    expect((await snapshot()).highlightFixtureIds).toEqual(["fixture-key"]);
+  });
+
+  // The hardware link refuses only a scene recall outside Preview while the
+  // rig is not reachable (`scenes.rs`); a fixture's edit and a group's power
+  // go through. Until 2026-10-05 the double refused those two as well, so the
+  // page tests on an unreachable rig saw what the studio never does.
+  it("takes a fixture's edit and a group's power on an unreachable rig, and refuses a recall", async () => {
+    const transport = createFixtureTransport(getFixtureScenario("lighting-dmx-unreachable"));
+    const request = (method: RequestMethod, params: JsonObject = {}) =>
+      transport.request(method, params) as Promise<JsonObject>;
+    await request("lighting.fixture.update", { fixtureId: "fixture-key", intensity: 30 });
+    await request("lighting.group.power", { groupId: "group-front", on: false });
+    const fixtures = (await request("lighting.snapshot")).fixtures as JsonObject[];
+    expect(fixtures.find((entry) => entry.id === "fixture-key")).toMatchObject({ on: false, intensity: 30 });
+    await expect(request("lighting.scene.recall", { sceneId: "scene-warm-wash" })).rejects.toThrow(
+      "Lighting scene recall requires a reachable lighting transport."
+    );
   });
 
   // 2026-09-23: the double refused `grandMaster` until then, so the Lighting

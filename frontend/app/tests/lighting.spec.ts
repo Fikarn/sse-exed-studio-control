@@ -811,8 +811,10 @@ test("opens typed numeric entry on a lighting intensity slider via Enter and com
 });
 
 // The review of the Lighting page's redraw (2026-10-04): the hardware link
-// takes a fixture's control map whole, so the plate sends every control with
-// the one changed. It sent the one alone, and on the INFINIBAR Green reset Red.
+// took a fixture's control map whole, and the plate sent the one control
+// changed, so on the INFINIBAR Green reset Red. The plate sends every control
+// with the one changed; since 2026-10-05 the hardware link also lays a map over
+// the one it holds, so a control left out keeps its value either way.
 test("a catalog control's commit keeps the fixture's other controls", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   await page.getByRole("button", { name: /^Fixture Back,/ }).click();
@@ -1084,6 +1086,31 @@ test("shows lighting DMX-unreachable posture and blackout hold", async ({ page }
   // Reason: the master card is the cluster's key and hero now.
   await expect(page.getByTestId("lighting-power-toggle")).toContainText("nothing lit");
   await expect(page.getByRole("button", { name: /^Fixture Key, off,/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+// 2026-10-05: a cut outside Preview ends the identify flashes on the hardware
+// link, a Find's waiting ones too, and the page's Find ends with it: the key
+// reads Find again at once. Before, it read Stop over a dark rig until the
+// sequence's planned end (the page's clock is paused here, so that end never
+// comes).
+test("CUT ALL during a Find ends it: the Find key reads Find again", async ({ page }) => {
+  await page.clock.install();
+  await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+  await pausePageClock(page);
+  // All four lights, so the Find runs 1.9 s, longer than the cut's dwell.
+  await page.getByTestId("lighting-add-to-selection").click();
+  for (const name of ["Fill", "Back", "Warm wash"]) {
+    await page.getByRole("button", { name: new RegExp(`^Fixture ${name},`) }).focus();
+    await page.keyboard.press("Enter");
+  }
+  await expect(page.getByLabel("Selected fixtures", { exact: true }).getByText("4 fixtures selected")).toBeVisible();
+  const find = page.getByTestId("lighting-identify-find");
+  await find.click();
+  await expect(find).toHaveText("Stop");
+  await pressTwice(page, page.getByRole("button", { name: "Cut all fixtures to 0 %" }));
+  await expect(page.getByTestId("lighting-power-toggle")).toContainText("nothing lit");
+  await expect(find).toHaveText("Find");
 });
 
 test("frames the populated rig via the stage-plot Frame mode (DENSITY-04)", async ({ page }) => {

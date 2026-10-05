@@ -1022,12 +1022,11 @@ export function handleFixtureLightingRequest(
         const previewTarget = editableFixtures.find((fixture) => asString(fixture.id) === fixtureId) ?? targetFixture;
         const cctRange = lightingFixtureCctRange(targetFixture);
         const defaultCct = defaultLightingFixtureCct(targetFixture);
-        // The map is taken whole, as the hardware link takes it
-        // (`preview.rs`): a control it leaves out goes to its default. Until
-        // 2026-10-04 the double merged it, and hid that the plate sent one
-        // control at a time.
+        // Laid over the buffer's map, as the hardware link does
+        // (`preview.rs`, since 2026-10-05): a control the request does not
+        // name keeps its staged value.
         const controlValues = hasControlValues
-          ? asNumberRecord(params.controlValues)
+          ? { ...asNumberRecord(previewTarget.controlValues), ...asNumberRecord(params.controlValues) }
           : asNumberRecord(previewTarget.controlValues);
         const updatedFixture: JsonObject = {
           ...previewTarget,
@@ -1072,10 +1071,6 @@ export function handleFixtureLightingRequest(
           source: "preview",
           summary,
         };
-      }
-
-      if (!asBoolean(lightingSnapshot.reachable, false)) {
-        throw new Error("Lighting fixture update requires a reachable lighting transport.");
       }
 
       const definition = fixtureDefinitionByIdentity(
@@ -1206,9 +1201,16 @@ export function handleFixtureLightingRequest(
                     ),
             }
           : {}),
-        // Whole, as `fixtures.rs` takes it: a control left out goes to its
-        // default (see the preview's above).
-        ...(hasControlValues ? { controlValues: asNumberRecord(params.controlValues) } : {}),
+        // Laid over the stored map, as `fixtures.rs` does: a control the
+        // request does not name keeps its value (see the preview's above).
+        ...(hasControlValues
+          ? {
+              controlValues: {
+                ...asNumberRecord(targetFixture.controlValues),
+                ...asNumberRecord(params.controlValues),
+              },
+            }
+          : {}),
         ...(hasIntensity
           ? {
               intensity: Math.max(
@@ -1399,10 +1401,6 @@ export function handleFixtureLightingRequest(
       const affectedFixtures = fixtures.filter((fixture) => asString(fixture.groupId) === groupId).length;
       if (affectedFixtures === 0) {
         throw new Error(`Lighting group '${asString(targetGroup.name, groupId)}' does not currently contain fixtures.`);
-      }
-
-      if (!previewActive && !asBoolean(lightingSnapshot.reachable, false)) {
-        throw new Error("Lighting group power requires a reachable lighting transport.");
       }
 
       const nextFixtures = fixtures.map((fixture) =>
@@ -1599,6 +1597,14 @@ export function handleFixtureLightingRequest(
         lightingSnapshot.previewDirty = true;
       } else {
         lightingSnapshot.fixtures = nextFixtures;
+        if (!on) {
+          // As `fixtures.rs` does since 2026-10-05: all off ends the
+          // identify flashes (a Find's waiting ones too), the highlight and
+          // the solo in the same write, outside Preview only.
+          state.lightingIdentifyBursts = {};
+          lightingSnapshot.highlightFixtureIds = [];
+          lightingSnapshot.soloFixtureIds = [];
+        }
       }
 
       const summary = `All native lighting fixtures set ${on ? "on" : "off"} across ${fixtures.length} fixtures${previewActive ? " in preview" : ""}.`;

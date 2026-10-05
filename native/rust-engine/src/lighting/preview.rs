@@ -106,12 +106,16 @@ pub fn read_lighting_snapshot_with_preview(
 /// while previewing, otherwise the stored state with a running fade sampled
 /// now — never the identify, highlight or solo overlays, which exist only
 /// at render time. The Stream Deck's relative keys start from these values
-/// and its LCD shows them (Slice 10 — F12).
+/// and its LCD shows them (Slice 10 — F12). `cct_min` and `cct_max` are the
+/// fixture's own colour temperature range, from its definition and mode, so
+/// the deck's `CCT` dial moves inside it, as the plate's slider does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LightingFixtureLevels {
     pub on: bool,
     pub intensity: i64,
     pub cct: i64,
+    pub cct_min: i64,
+    pub cct_max: i64,
     pub previewing: bool,
 }
 
@@ -130,17 +134,22 @@ pub fn read_lighting_fixture_levels(
         .enabled
         .then(|| preview.fixture_states.get(fixture_id))
         .flatten();
+    let (cct_min, cct_max) = fixture_cct_range_from_profile(&fixture_profile_for_state(fixture));
     Some(match staged {
         Some(staged) => LightingFixtureLevels {
             on: staged.on,
             intensity: clamp_i64(staged.intensity, 0, 100),
             cct: staged.cct,
+            cct_min,
+            cct_max,
             previewing: true,
         },
         None => LightingFixtureLevels {
             on: fixture.on,
             intensity: clamp_i64(fixture.intensity, 0, 100),
             cct: fixture.cct,
+            cct_min,
+            cct_max,
             previewing: preview.enabled,
         },
     })
@@ -241,8 +250,16 @@ pub fn update_lighting_fixture_with_preview(
         preview_state.cct = clamp_cct_for_type(cct, &fixture.fixture_type, default_cct);
     }
     if let Some(control_values) = &request.control_values {
+        // Laid over the buffer's map, never the stored one, so a second
+        // staged edit keeps the first.
         let profile = fixture_profile_for_state(&fixture);
-        preview_state.control_values = normalize_fixture_control_values(&profile, control_values);
+        let mut merged = preview_state.control_values.clone();
+        merged.extend(
+            control_values
+                .iter()
+                .map(|(id, value)| (id.clone(), *value)),
+        );
+        preview_state.control_values = normalize_fixture_control_values(&profile, &merged);
     }
     preview.dirty = true;
 

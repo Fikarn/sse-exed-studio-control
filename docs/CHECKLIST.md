@@ -28,6 +28,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The bridge's network cable pulled for 15 s: Lighting reads `NOT ANSWERING`, amber, nothing is locked, and there is no `Open Setup` key. Plugged back: it clears by itself within about 10 s.
 - [ ] `CUT ALL` arms at the first press ("press again", a 3 s bar) and takes every light off at the second, as the deck's `ALL OFF`; let the bar run out once and nothing changes.
 - [ ] A `Highlight` on a fixture: the rig shows it at full, the scene's row still reads `ON RIG` and the state display does not read `UNSAVED`; `Off` in the latch slot ends it.
+- [ ] A `Highlight` on a fixture, then `CUT ALL`: the whole rig goes dark, the highlighted fixture too, and the latch slot reads `Nothing latched`. Then select every light and press `Find`; as soon as the first light has flashed, press `CUT ALL` twice: no light flashes after the cut (until 2026-10-05 the Find went on over the dark rig), and the Find key reads `Find` at once.
 - [ ] The INFINIMAT (Backline Wash) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
 - [ ] Two scenes saved with `Save as a new scene` (press twice) come back after a restart, named `Scene N`; a scene deleted from its `⋯` (press twice) can be undone.
 - [ ] The plot draws each fixture where it hangs in the room: Key, Fill, Back and the wash read their real places on the rulers.
@@ -61,6 +62,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The deck draws `◂ Cue`, `Cue ▸` and the page keys' arrows, and on the strips `·` and `°`, as they are written here.
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen within a second.
 - [ ] `RECALL` reads `ON RIG` in green after a recall; `UNSAVED` in yellow after a light is changed; `scene` once the `SCENE` dial chose another scene; with the Lighting page's `Fade` at 2 s, a recall from the deck fades as one from the screen does.
+- [ ] On the INFINIMAT (Backline Wash) at 8000 K, a turn of the deck's `CCT` up reads `8200 K` and the light goes cooler (until 2026-10-05 it fell to 6500 K); a push reads `6000 K`, as the plate's Reset. On an Astra a push reads `4400 K`.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, `RECALL` reads `PREVIEW` in blue, the INTENSITY and CCT values are blue, and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
 - [ ] `ALL OFF` on the deck, in coral, reads `OFF?` and "press again" in dark red at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `ALL OFF` again within about a second. `REC` or `PLAY` pressed meanwhile does not end the question.

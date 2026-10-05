@@ -236,8 +236,16 @@ pub fn update_lighting_fixture(
             fixture.cct = clamp_i64(if cct == 0 { default_cct } else { cct }, min_cct, max_cct);
         }
         if let Some(control_values) = &request.control_values {
+            // The request is laid over the stored map: a control it does not
+            // name keeps its value instead of going back to its default.
             let profile = fixture_profile_for_state(fixture);
-            fixture.control_values = normalize_fixture_control_values(&profile, control_values);
+            let mut merged = fixture.control_values.clone();
+            merged.extend(
+                control_values
+                    .iter()
+                    .map(|(id, value)| (id.clone(), *value)),
+            );
+            fixture.control_values = normalize_fixture_control_values(&profile, &merged);
         }
         if let Some(group_id) = &request.group_id {
             fixture.group_id = group_id.clone();
@@ -310,6 +318,22 @@ pub fn set_lighting_all_power(
         affected_fixtures
     );
     let mut updates = lighting_editor_state_updates(&editor_state)?;
+    if !request.on {
+        // The overlays are drawn over the stored rig when it is read, so a
+        // flashing or highlighted fixture would still go out at 100 % after
+        // a cut, and a solo would light only its fixtures at the next all
+        // on. All off ends them in the same write as the fixtures: the
+        // identify bursts (a Find's waiting flashes too), the highlight and
+        // the solo.
+        updates.extend_from_slice(&[
+            (
+                String::from(LIGHTING_IDENTIFY_BURSTS_KEY),
+                String::from("{}"),
+            ),
+            (String::from(LIGHTING_HIGHLIGHT_IDS_KEY), String::from("[]")),
+            (String::from(LIGHTING_SOLO_IDS_KEY), String::from("[]")),
+        ]);
+    }
     updates.extend_from_slice(&[
         (
             String::from(LIGHTING_LAST_ACTION_STATUS_KEY),

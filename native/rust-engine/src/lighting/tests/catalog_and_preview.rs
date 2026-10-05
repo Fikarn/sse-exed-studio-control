@@ -1313,3 +1313,137 @@ fn lighting_palette_parsers_validate_shapes() {
     }))
     .expect_err("invalid cct value should reject");
 }
+
+// The owner's answer (2026-10-05): CUT ALL in Preview cuts the preview only.
+// The live rig keeps its look, its overlays included, and the wire does not
+// move.
+#[test]
+fn all_off_in_preview_leaves_the_live_overlays_and_the_wire() {
+    let test_dir = initialize_ready_lighting("preview-all-off-overlays");
+    set_lighting_fixture_highlight(
+        test_dir.db_path().as_path(),
+        &LightingFixtureHighlightRequest {
+            fixture_ids: vec![String::from("fixture-key-left")],
+            mode: FixtureHighlightMode::Highlight,
+        },
+    )
+    .expect("highlight should succeed");
+    let wire_before = wire_dimmers(&test_dir);
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    set_lighting_all_power_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingAllPowerRequest { on: false },
+        &mut preview,
+    )
+    .expect("preview all power should succeed");
+
+    let settings = load_test_app_settings(&test_dir);
+    assert_eq!(
+        settings.get(LIGHTING_HIGHLIGHT_IDS_KEY).map(String::as_str),
+        Some("[\"fixture-key-left\"]")
+    );
+    assert_eq!(wire_dimmers(&test_dir), wire_before);
+    let snapshot = read_lighting_snapshot_with_preview(&settings, &preview);
+    assert!(snapshot.preview_fixtures.iter().all(|fixture| !fixture.on));
+}
+
+// A control map that names some controls keeps the others (2026-10-05).
+// Before, `lighting.fixture.update` stored the map whole, so a control left
+// out went back to its default: on the INFINIBAR, Green reset Red.
+#[test]
+fn a_partial_control_map_keeps_the_controls_it_does_not_name() {
+    let test_dir = initialize_ready_lighting("partial-control-map");
+    update_fixture_json(
+        &test_dir,
+        serde_json::json!({
+            "fixtureId": "fixture-house-practicals",
+            "on": true,
+            "intensity": 100,
+            "controlValues": { "red": 255 },
+        }),
+    );
+
+    let updated = update_fixture_json(
+        &test_dir,
+        serde_json::json!({
+            "fixtureId": "fixture-house-practicals",
+            "controlValues": { "green": 12 },
+        }),
+    );
+
+    assert_eq!(updated.fixture.control_values.get("red"), Some(&255));
+    assert_eq!(updated.fixture.control_values.get("green"), Some(&12));
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    let stored = fixture_snapshot(&snapshot, "fixture-house-practicals");
+    assert_eq!(stored.control_values.get("red"), Some(&255));
+    assert_eq!(wire_slot(&test_dir, "House Practicals", "Red"), 255);
+    assert_eq!(wire_slot(&test_dir, "House Practicals", "Green"), 12);
+}
+
+// In Preview the request is laid over the buffer's map, never the stored
+// one, so a second staged edit keeps the first, and the wire keeps the live
+// values.
+#[test]
+fn a_partial_control_map_in_preview_keeps_the_staged_controls() {
+    let test_dir = initialize_ready_lighting("partial-control-map-preview");
+    update_fixture_json(
+        &test_dir,
+        serde_json::json!({
+            "fixtureId": "fixture-house-practicals",
+            "on": true,
+            "intensity": 100,
+            "controlValues": { "red": 255 },
+        }),
+    );
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+    for request in [
+        serde_json::json!({
+            "fixtureId": "fixture-house-practicals",
+            "controlValues": { "red": 40 },
+        }),
+        serde_json::json!({
+            "fixtureId": "fixture-house-practicals",
+            "controlValues": { "green": 30 },
+        }),
+    ] {
+        update_lighting_fixture_with_preview(
+            test_dir.db_path().as_path(),
+            &parse_lighting_fixture_update_request(&request).expect("the update should parse"),
+            &mut preview,
+        )
+        .expect("the preview should take the value");
+    }
+
+    let staged = &preview.fixture_states["fixture-house-practicals"].control_values;
+    assert_eq!(
+        staged.get("red"),
+        Some(&40),
+        "the first staged edit is kept"
+    );
+    assert_eq!(staged.get("green"), Some(&30));
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    let stored = fixture_snapshot(&snapshot, "fixture-house-practicals");
+    assert_eq!(stored.control_values.get("red"), Some(&255));
+    assert_eq!(stored.control_values.get("green"), Some(&0));
+    assert_eq!(wire_slot(&test_dir, "House Practicals", "Red"), 255);
+    assert_eq!(wire_slot(&test_dir, "House Practicals", "Green"), 0);
+}

@@ -929,14 +929,17 @@ fn locked_light_action(
                         "Selected lighting fixture was not found.",
                     ))
                 })?;
+            // `CCT` moves inside the fixture's own range, and a push goes to
+            // the middle of it rounded to 100 K, as the plate's Reset does.
+            let (cct_min, cct_max) = (levels.cct_min, levels.cct_max);
             let (field, change) = match action {
                 "toggleLight" => ("on", json!(!levels.on)),
                 "intensityUp" => ("intensity", json!(clamp_i64(levels.intensity + 5, 0, 100))),
                 "intensityDown" => ("intensity", json!(clamp_i64(levels.intensity - 5, 0, 100))),
-                "cctUp" => ("cct", json!(clamp_i64(levels.cct + 200, 2700, 6500))),
-                "cctDown" => ("cct", json!(clamp_i64(levels.cct - 200, 2700, 6500))),
+                "cctUp" => ("cct", json!(clamp_i64(levels.cct + 200, cct_min, cct_max))),
+                "cctDown" => ("cct", json!(clamp_i64(levels.cct - 200, cct_min, cct_max))),
                 "resetIntensity" => ("intensity", json!(100)),
-                _ => ("cct", json!(4500)),
+                _ => ("cct", json!(middle_of_cct_range(cct_min, cct_max))),
             };
             let mut params = json!({ "fixtureId": fixture_id });
             params[field] = change;
@@ -947,8 +950,7 @@ fn locked_light_action(
                 preview,
             )
             .map_err(map_lighting_error)?;
-            // The reply carries what was stored — the fixture's own CCT range
-            // may be narrower than the deck's 2700–6500 K.
+            // The reply carries what was stored.
             let stored = match field {
                 "on" => json!(result.fixture.on),
                 "intensity" => json!(result.fixture.intensity),
@@ -1141,6 +1143,13 @@ fn selected_lighting_fixture_id(
 
 pub(crate) fn clamp_i64(value: i64, min: i64, max: i64) -> i64 {
     value.max(min).min(max)
+}
+
+/// The middle of a colour temperature range rounded to 100 K, as the
+/// Lighting plate's Reset sets it: 4400 K on the Astra (3200–5600 K), 6000 K
+/// on the INFINIMAT and the INFINIBAR (2000–10000 K).
+pub(crate) fn middle_of_cct_range(min: i64, max: i64) -> i64 {
+    ((min + max) as f64 / 200.0).round() as i64 * 100
 }
 
 pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
