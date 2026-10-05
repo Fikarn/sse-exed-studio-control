@@ -237,15 +237,18 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
   // selection says that camera is selected and held. That read is the one
   // chance: nothing waits for a later read, so a later selection of the camera,
   // by hand or from the deck, never arms anything. It never arms the camera
-  // that was selected before, and it only arms: it never gives the second press.
+  // that was selected before, and it only arms (`armOnly`): it never gives the
+  // second press, however late the selection's answer lands. (Until the
+  // Teleprompter's review it checked the arm as it stood before the await,
+  // and two hand-offs in quick succession could have been the two presses.)
   const releaseElsewhere = useLiveCallback(async (camera: CameraNumber) => {
     if (camera === selectedNumber) return;
     const answer = await perform(() => store.selectCamera(camera));
     if (answer === null) return;
     const now = store.getSnapshot().camerasSnapshot;
     const target = now?.selected === camera ? cameraOf(now, camera) : null;
-    if (target?.state !== "held" || arm.armed?.key === camerasArmKey.release(camera)) return;
-    armRelease(target);
+    if (target?.state !== "held") return;
+    arm.armOnly(camerasArmKey.release(camera), `Release ${target.tag} to ${releasedTo(target)}`);
   });
   const format = useLiveCallback((setting: "resolution" | "frameRate", value: string) => {
     if (!selected) return;
