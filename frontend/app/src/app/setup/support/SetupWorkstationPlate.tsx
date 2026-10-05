@@ -1,7 +1,7 @@
 import { SupportPlate } from "../components/SupportPlate";
 import { describeBackupKind, formatBackupTimestamp } from "../../shellData";
 import { enterStudioFullscreen, resetWindowLayout } from "../../shellCommands";
-import { APP_VERSION } from "../setupPilotModel";
+import { APP_VERSION, hardwareProfileWord } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
 /** The Prompter XL as `health.snapshot`'s `checks.prompter` carries it (new pages
@@ -40,7 +40,7 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       busy={busyAction !== null}
       canOpenEngineLog={engineLogPath.trim().length > 0}
       engineVersion={String(runtime?.engineVersion ?? "—")}
-      hardwareProfile={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
+      hardwareProfile={hardwareProfileWord(commissioningSnapshot?.hardwareProfile, "Unavailable")}
       lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "none yet"}
       lightOutputsArmed={lightOutputsArmed}
       prompterXl={prompterXlRow(healthSnapshot)}

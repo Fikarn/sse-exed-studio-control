@@ -20,6 +20,10 @@ import styles from "./SetupCamerasScreen.module.css";
 // right-click. `Forget CAM n…` is the menu's last item and arms in place: it
 // drops a pairing that takes the camera beside you to make again.
 //
+// The visual overhaul's polish (2026-10-05): the hardware link's sentence
+// about a camera is its state word's tooltip, the pairing a word with its
+// lamp, and the blocks reach the well's padding, as the other screens do.
+//
 // In a build with no link to a camera (`setup.noLink`) its pairing and its
 // address are locked, with the hardware link's sentence on screen.
 
@@ -62,9 +66,14 @@ function CameraBlock({
       <header className={styles.head}>
         <span className={styles.tag}>{camera.tag}</span>
         <span className={styles.model}>{camera.model}</span>
-        <LampWord tone={camera.tone} testId={`setup-camera-${camera.camera}-state`}>
-          {camera.word}
-        </LampWord>
+        {/* The record's test id stays on what holds the sentence. */}
+        <span data-testid={`setup-camera-record-${camera.camera}`}>
+          <Tooltip content={camera.sentence} placement="bottom">
+            <LampWord tone={camera.tone} testId={`setup-camera-${camera.camera}-state`}>
+              {camera.word}
+            </LampWord>
+          </Tooltip>
+        </span>
         <MenuButton
           buttonLabel={`${camera.tag} menu`}
           buttonTestId={`setup-camera-menu-${camera.camera}`}
@@ -86,17 +95,17 @@ function CameraBlock({
           }}
         />
       </header>
-      {/* The hardware link's sentence about the camera, as the Cameras page prints it. */}
-      <p className={styles.sentence} data-testid={`setup-camera-record-${camera.camera}`}>
-        {camera.sentence}
-      </p>
 
       {camera.link === "bluetooth" ? (
         <div className={styles.row}>
           <span className={styles.label}>Pairing</span>
-          <span className={styles.value} data-testid={`setup-camera-${camera.camera}-paired`}>
+          <LampWord
+            tone={camera.setup.paired ? "ok" : "attention"}
+            className={styles.pairing}
+            testId={`setup-camera-${camera.camera}-paired`}
+          >
             {camera.setup.paired ? "paired" : "not paired"}
-          </span>
+          </LampWord>
           <Tooltip content={`Pair with ${camera.tag} beside you: it shows a 6-digit PIN.`} placement="left">
             <span className={styles.keyCell}>
               <Key
@@ -167,7 +176,6 @@ function CameraBlock({
 
 export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScreenProps) {
   const { store } = editor.props;
-  const { bayHead } = editor.chrome;
   const { busyAction, arm } = editor.state;
   const { performAction } = editor.actions;
   // What was typed and not saved yet; a field without an entry shows what Setup holds.
@@ -216,8 +224,6 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
 
   return (
     <SetupStepScreen
-      head={bayHead}
-      eyebrow="Cameras"
       title="Camera setup"
       lead="What Studio Control needs to hold each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. Studio Control connects only to a camera whose address is entered here. Each picture comes from its own vMix output; saving sends nothing to a camera."
       wide

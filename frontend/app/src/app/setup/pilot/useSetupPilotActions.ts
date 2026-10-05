@@ -282,8 +282,11 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
   };
 
   const primaryActionLabel = useMemo(() => {
+    // The visual overhaul's polish (2026-10-05): the key says the step's verb
+    // (it writes the export to a folder, as Export only does) and that it moves
+    // on, as Continue to verify does. It read "Download profile".
     if (activeStepId === "import") {
-      return "Download profile";
+      return "Export and continue";
     }
     if (activeStepId === "probe") {
       return "Run all probes";

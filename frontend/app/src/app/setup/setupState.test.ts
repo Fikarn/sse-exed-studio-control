@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CommissioningCheck } from "../shellData";
+import { UNPUBLISH_ARMED_SENTENCE } from "./setupPilotModel";
 import { deriveSetupState } from "./setupState";
 
 // 2026-09 production readiness, Slice 8 (finding F14): the hardware link's
@@ -111,5 +112,25 @@ describe("deriveSetupState with the hardware link's health", () => {
     for (const checks of [[], deckNotGreen, green]) {
       expect(deriveSetupState({ ...unpublished, checks }).meta).toBeNull();
     }
+  });
+
+  // The visual overhaul's polish (2026-10-05; the owner's rule): the state
+  // display's sentence keeps at most two lines, about 75 characters, so every
+  // sentence the page builds for it is at most 70; a meta beside a way-out
+  // key has about 30. The hardware link's own sentences are its to keep short.
+  it("the page's own sentences fit two lines, and a meta beside a way-out key fits its room", () => {
+    const own = { ...base, commissioningSummary: null, healthSummary: null, healthTone: "ok" as const };
+    for (const state of [
+      deriveSetupState({ ...own, checks: [], published: false }),
+      deriveSetupState({ ...own, checks: deckNotGreen }),
+      deriveSetupState({ ...own, checks: [] }),
+      deriveSetupState({ ...own, checks: green }),
+    ]) {
+      expect(state.sentence.length, state.sentence).toBeLessThanOrEqual(70);
+      if (state.wayOut !== null && state.meta !== null) {
+        expect(state.meta.length, state.meta).toBeLessThanOrEqual(30);
+      }
+    }
+    expect(UNPUBLISH_ARMED_SENTENCE.length, UNPUBLISH_ARMED_SENTENCE).toBeLessThanOrEqual(70);
   });
 });

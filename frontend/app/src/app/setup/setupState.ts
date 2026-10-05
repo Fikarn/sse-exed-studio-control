@@ -103,7 +103,10 @@ export function deriveSetupState({
       meta: probes,
       passedProbeCount: passed,
       probeCount: total,
-      sentence: healthSummary ?? "Operator mode is available, but one of the commissioning probes needs attention.",
+      // The page's own sentence keeps the display's two lines, at most 70
+      // characters (the owner's rule, 2026-10-05); Run all probes, beside it,
+      // says what to do.
+      sentence: healthSummary ?? "Operator mode is available, but a probe needs attention.",
       tone: healthTone === "error" ? "error" : "attention",
       wayOut: "run-probes",
       word: "DEGRADED",

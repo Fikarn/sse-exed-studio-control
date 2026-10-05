@@ -168,7 +168,9 @@ export function SupportPlate({
                 testId={`support-scale-${scale}`}
                 onClick={() => onSelectUiScale(scale)}
               >
-                {String(scale)}
+                {/* The visual overhaul's polish (2026-10-05): the number with
+                    its unit, at half size in the quiet ink. */}
+                {scale} <span className={styles.unit}>%</span>
               </Key>
             ))}
           </Segmented>

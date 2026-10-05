@@ -10,13 +10,7 @@ import { SetupSupportScreen } from "./support/SetupSupportScreen";
 import { SetupWorkstationPlate } from "./support/SetupWorkstationPlate";
 import { SetupFooter } from "./components/SetupFooter";
 import { SetupPilotDialogs } from "./support/SetupPilotDialogs";
-import {
-  probeChecks,
-  type RunnerStepId,
-  APP_VERSION,
-  runnerStepOrder,
-  type SetupSupportPilotProps,
-} from "./setupPilotModel";
+import { probeChecks, type RunnerStepId, runnerStepOrder, type SetupSupportPilotProps } from "./setupPilotModel";
 import { useSetupPilot } from "./useSetupPilot";
 
 /** Setup / Support. It assembles; it owns nothing. State and handlers live in
@@ -102,14 +96,6 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
 
       <ShellRegion region="footer">
         <SetupFooter
-          appVersion={APP_VERSION}
-          commissioningWord={
-            setupState.word === "READY"
-              ? "published"
-              : setupState.word === "DEGRADED"
-                ? "needs re-verification"
-                : "setup required"
-          }
           passedProbeCount={setupState.passedProbeCount}
           probeCount={setupState.probeCount}
           stepLabel={runnerSteps[stepIndex]?.label ?? ""}

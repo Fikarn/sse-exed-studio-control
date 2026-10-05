@@ -35,15 +35,11 @@
   white-space: nowrap;
 }
 
-.sentence {
-  margin: 0;
-  color: var(--text-text2);
-  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
-}
-
+/* The label, a value sized for an address, and the key at the block's right
+   edge (the visual overhaul's polish, 2026-10-05: the field ran 900 px). */
 .row {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 160px;
+  grid-template-columns: 120px minmax(0, 320px) 1fr;
   align-items: center;
   gap: 12px;
   min-height: 40px;
@@ -59,10 +55,9 @@
   font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
-/* `paired` and `not paired` are state words: capitals. */
-.value[data-testid$="-paired"] {
-  letter-spacing: var(--font-tracking-cap);
-  text-transform: uppercase;
+/* `paired` and `not paired` are state words: capitals, with their lamp. */
+.pairing {
+  justify-self: start;
 }
 
 .keyCell {

@@ -1,7 +1,7 @@
-import { SetupField, SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
+import { SetupField, SetupStepScreen, SetupRecordSection, SetupRecordRow } from "../components/SetupStepScreen";
 import { Key } from "@sse/design-system";
 import { healthCheckTone } from "../../shellData";
-import { runnerStepOrder } from "../setupPilotModel";
+import { hardwareProfileWord } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
 /** Runner step 1: the deck's profile for Companion. */
@@ -9,14 +9,15 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot } = editor.props;
   const { activeStepId, setExportBaseUrl, exportBaseUrl, runtimePaths, controlSurface, pages, totalControlCount } =
     editor.state;
-  const { bayHead, primaryKey } = editor.chrome;
+  const { stepEyebrow, primaryKey } = editor.chrome;
   const { performAction, saveImportProfile } = editor.actions;
+  // The bridge's standing colours its sentence only when it is not ok.
+  const bridge = healthCheckTone(controlSurface?.status);
   return (
     <>
       {activeStepId === "import" ? (
         <SetupStepScreen
-          head={bayHead}
-          eyebrow={`Step 1 of ${runnerStepOrder.length}`}
+          eyebrow={stepEyebrow}
           title="Import the Companion profile"
           lead="Export the deck's profile for Companion: its pages, keys and dials, made from what Studio Control holds. It lands in the exports folder."
           // What to do in Companion stays on screen: the import replaces what
@@ -29,22 +30,13 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
             },
           ]}
           facts={
-            <>
-              <SetupField
-                label="Server base URL"
-                wide
-                placeholder="http://127.0.0.1:38201"
-                value={exportBaseUrl}
-                onChange={(event) => setExportBaseUrl(event.target.value)}
-              />
-              <SetupField
-                label="Export target"
-                wide
-                disabled
-                readOnly
-                value={String(runtimePaths?.appDataDir ?? "not reported")}
-              />
-            </>
+            <SetupField
+              label="Server base URL"
+              wide
+              placeholder="http://127.0.0.1:38201"
+              value={exportBaseUrl}
+              onChange={(event) => setExportBaseUrl(event.target.value)}
+            />
           }
           actions={
             <>
@@ -59,12 +51,11 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
             </>
           }
           record={
-            <>
-              <SetupRecordHeading>Before you start</SetupRecordHeading>
+            <SetupRecordSection title="Before you start">
               <SetupRecordRow
                 label="Companion link"
                 value={String(controlSurface?.summary ?? "Pending")}
-                tone={healthCheckTone(controlSurface?.status) === "ok" ? "ok" : "attention"}
+                tone={bridge === "ok" || bridge === "error" ? bridge : "attention"}
               />
               <SetupRecordRow label="Deck pages" value={String(pages.length)} tone={pages.length > 0 ? "ok" : "off"} />
               <SetupRecordRow
@@ -74,9 +65,16 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
               />
               <SetupRecordRow
                 label="Hardware profile"
-                value={String(commissioningSnapshot?.hardwareProfile ?? "not reported")}
+                value={hardwareProfileWord(commissioningSnapshot?.hardwareProfile, "not reported")}
               />
-            </>
+              {/* The visual overhaul's polish (2026-10-05): where the profile
+                  lands, a fact and not a locked field; it named the app-data
+                  folder, one above it. */}
+              <SetupRecordRow
+                label="Exports folder"
+                value={String(runtimePaths?.exportsDir ?? runtimePaths?.appDataDir ?? "not reported")}
+              />
+            </SetupRecordSection>
           }
           testId="setup-screen-import"
         />

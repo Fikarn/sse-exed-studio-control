@@ -1,9 +1,11 @@
 /* A screen of Setup's bay (the visual overhaul, 2026-10-05): two columns on
-   the bay's well, drawn by type and hairlines. The screen is the height it
-   needs and never more than the bay, so nothing scrolls to be reached. */
+   the bay's well, drawn by type and hairlines. The visual overhaul's polish
+   (2026-10-05): the well fills the bay, from the frame's top line (level with
+   the state display and the title plate) to its foot; its content stands at
+   the top, and nothing scrolls. */
 
 .frame {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -20,9 +22,18 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* The wide screen's blocks reach the well's padding, the right edge the
+   runner's record column and Support's share. */
 .step[data-wide] .facts {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 1200px;
+  max-width: none;
+}
+
+/* The eyebrow and the title, across both columns: the left column and the
+   record start on the one line under them. */
+.head {
+  grid-column: 1 / -1;
+  margin-bottom: 24px;
 }
 
 .column {
@@ -31,18 +42,29 @@
   min-width: 0;
 }
 
+/* The first thing under the head starts on the record's line. */
+.column > :first-child {
+  margin-top: 0;
+}
+
 .eyebrow {
   color: var(--text-text3);
   font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
+/* The plate title's size: the state word is the one thing at the display size. */
 .title {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--text-text);
-  font: var(--font-weight-bold) var(--font-size-display) / var(--font-line-height-tight) var(--font-family-ui);
+  font: var(--font-weight-bold) var(--font-size-readout) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
-/* The lines that stay on screen: a lamp and what must be read before a press. */
+.title:first-child {
+  margin-top: 0;
+}
+
+/* The lines that stay on screen: what must be read before a press, with a lamp
+   where the line says how something stands. */
 .rules {
   display: flex;
   flex-direction: column;
@@ -58,9 +80,10 @@
   margin: 0;
   color: var(--text-text2);
   font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  text-wrap: pretty;
 }
 
-.rule > span:first-child {
+.ruleLamp {
   flex: none;
   margin-top: 7px;
 }
@@ -103,7 +126,7 @@
   color: var(--text-text3);
 }
 
-/* A fact: its label, its value, how it stands. No box: the well is the box. */
+/* A fact: its label and its value. No box: the well is the box. */
 .card {
   display: flex;
   flex-direction: column;
@@ -125,14 +148,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.cardStanding {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-text2);
-  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
-}
-
 .go {
   display: flex;
   flex-wrap: wrap;
@@ -146,48 +161,42 @@
   margin: 16px 0 0;
   color: var(--text-text2);
   font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  text-wrap: pretty;
 }
 
 /* ---- the right column: what the screen records -------------------------- */
 
+/* The design system's sections, one under another. */
 .record {
   display: flex;
   flex-direction: column;
+  gap: 28px;
   min-width: 0;
-  padding-top: 22px;
 }
 
-.recordHeading {
-  margin-top: 28px;
-  padding-bottom: 6px;
-  border-bottom: 2px solid var(--material-line2);
-  color: var(--text-text);
-  font: var(--font-weight-bold) var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
-  letter-spacing: var(--font-tracking-display);
-  text-transform: uppercase;
+.rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.recordHeading:first-child {
-  margin-top: 0;
-}
-
+/* A row as the plate's Readouts draw one: the label in the quiet ink, the
+   value in the ink at the right, both PT Sans 16, on a hairline. A name keeps
+   its whole width; a long value gives way. */
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
   align-items: center;
   column-gap: 16px;
-  min-height: 36px;
+  padding: 5px 0;
   border-bottom: 1px solid var(--material-line);
-  color: var(--text-text2);
-  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .rowLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
   overflow: hidden;
+  color: var(--text-text3);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -196,9 +205,22 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-text);
-  font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A value that stands in doubt or in fault says so in its own words' colour. */
+.row[data-tone="attention"] .rowValue {
+  color: var(--role-yellow-text);
+}
+
+.row[data-tone="error"] .rowValue {
+  color: var(--role-coral-text);
+}
+
+/* A state word with its lamp, as the cluster's probes draw one. */
+.rowWord {
+  justify-self: end;
 }

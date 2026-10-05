@@ -1,8 +1,8 @@
-import { SetupField, SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
+import { SetupField, SetupStepScreen, SetupRecordSection, SetupRecordRow } from "../components/SetupStepScreen";
 import styles from "../SetupSupportPilot.module.css";
 import { formatBackupTimestamp } from "../../shellData";
 import { Key } from "@sse/design-system";
-import { runnerStepOrder, probeChecks } from "../setupPilotModel";
+import { probeChecks } from "../setupPilotModel";
 import { probeTone, probeWord } from "../setupState";
 import type { SetupPilot } from "../useSetupPilot";
 
@@ -24,14 +24,13 @@ export function SetupProbeStep({ editor }: { editor: SetupPilot }) {
     checks,
     busyAction,
   } = editor.state;
-  const { bayHead, setupState, primaryKey, backKey } = editor.chrome;
+  const { stepEyebrow, setupState, primaryKey, backKey } = editor.chrome;
   const { performAction, runSingleProbe } = editor.actions;
   return (
     <>
       {activeStepId === "probe" ? (
         <SetupStepScreen
-          head={bayHead}
-          eyebrow={`Step 2 of ${runnerStepOrder.length}`}
+          eyebrow={stepEyebrow}
           title="Probe hardware"
           lead="Run the deck, bridge and desk probes in one pass. What each one answers shows under Probes too. A probe that fails never moves the runner on."
           rules={[
@@ -86,14 +85,15 @@ export function SetupProbeStep({ editor }: { editor: SetupPilot }) {
             </>
           }
           record={
-            <>
-              <SetupRecordHeading>What each probe answered</SetupRecordHeading>
+            <SetupRecordSection title="What each probe answered">
               {probeChecks(checks).map((check) => (
                 <div key={check.id} className={styles.probeRecord}>
+                  {/* The probe's word with its lamp, as the cluster prints it. */}
                   <SetupRecordRow
                     label={check.label}
-                    value={probeWord(check.status).toUpperCase()}
+                    value={probeWord(check.status)}
                     tone={probeTone(check.status)}
+                    word
                     testId={`setup-probe-record-${check.id}`}
                   />
                   <p className={styles.checkDetail}>{check.detail}</p>
@@ -116,7 +116,7 @@ export function SetupProbeStep({ editor }: { editor: SetupPilot }) {
                   </div>
                 </div>
               ))}
-            </>
+            </SetupRecordSection>
           }
           testId="setup-screen-probe"
         />

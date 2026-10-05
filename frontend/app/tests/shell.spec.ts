@@ -59,7 +59,7 @@ test("Setup's modes, steps and the Map's pages and deck keys answer clicks", asy
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 
   // Import, then Probe, then Map, the way the operator walks them.
-  await page.getByRole("button", { name: "Download profile" }).click();
+  await page.getByRole("button", { name: "Export and continue" }).click();
   await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
@@ -332,7 +332,7 @@ for (const { fixture, tab, label, band, tone, word } of [
 // once commissioning is published the operator can leave it from the tabs.
 test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
   await openFixture(page, "setup-ready");
-  await expect(page.getByText("Commissioning runner")).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Commissioning runner" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
   await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
     "aria-current",
@@ -425,7 +425,7 @@ test("the crash hook is absent unless the fixture URL asks for it", async ({ pag
 // again its marker moves into the entry script and this fails. (New pages
 // program, Slice 1: Planning and its chunk are gone.)
 const WORKSPACE_CHUNKS = {
-  LightingWorkspace: "lighting-stage-lock-note",
+  LightingWorkspace: "lighting-scenes-section",
   AudioWorkspace: "audio-monitor-bar",
   SetupSupportPilot: "setup-screen-support",
 } as const;

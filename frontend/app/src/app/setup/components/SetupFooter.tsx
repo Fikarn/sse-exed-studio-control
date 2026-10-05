@@ -1,14 +1,13 @@
 import { Footer } from "@sse/design-system";
 
-// Visual overhaul A, Slice 7 (system §2): Setup's footer is the shell's. It
-// says where commissioning stands without the operator leaving the step they
-// are on: which step, how the probes came back, what commissioning is, and what
-// version of the app is running. New pages program, Slice 3 (D6): it prints no
-// key hints — Studio Control binds no key of its own.
+// Visual overhaul A, Slice 7 (system §2): Setup's footer is the shell's: which
+// step the runner is on and how the probes came back. New pages program,
+// Slice 3 (D6): it prints no key hints — Studio Control binds no key of its
+// own. The visual overhaul's polish (2026-10-05): the counts read as the
+// cluster reads them (`5 of 5`, `3 of 3 passed`), and Commissioning and App
+// went: the state word and the plate's About say them.
 
 export interface SetupFooterProps {
-  appVersion: string;
-  commissioningWord: string;
   passedProbeCount: number;
   probeCount: number;
   stepLabel: string;
@@ -16,26 +15,16 @@ export interface SetupFooterProps {
   stepTotal: number;
 }
 
-export function SetupFooter({
-  appVersion,
-  commissioningWord,
-  passedProbeCount,
-  probeCount,
-  stepLabel,
-  stepNumber,
-  stepTotal,
-}: SetupFooterProps) {
+export function SetupFooter({ passedProbeCount, probeCount, stepLabel, stepNumber, stepTotal }: SetupFooterProps) {
   return (
     <Footer
       items={[
-        { id: "step", label: "Step", value: `${stepNumber} / ${stepTotal} · ${stepLabel}` },
+        { id: "step", label: "Step", value: `${stepNumber} of ${stepTotal} · ${stepLabel}` },
         {
           id: "probes",
           label: "Probes",
-          value: probeCount > 0 ? `${passedProbeCount} / ${probeCount} ok` : "none run",
+          value: probeCount > 0 ? `${passedProbeCount} of ${probeCount} passed` : "none run",
         },
-        { id: "commissioning", label: "Commissioning", value: commissioningWord },
-        { id: "app", label: "App", value: appVersion },
       ]}
       testId="setup-health-bar"
       itemsTestId="setup-footer-telemetry"
