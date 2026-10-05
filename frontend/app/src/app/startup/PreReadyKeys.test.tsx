@@ -48,16 +48,21 @@ afterEach(() => {
 });
 
 describe("the startup screen has no key", () => {
-  it("carries the state and no key, and names the page that opens", () => {
-    const { rerender } = render(<StartupSurface lifecycle="waiting-for-ready-event" />);
-    const display = () => screen.getByTestId("startup-surface-state-display");
-    expect(display().textContent).toContain("STARTING UP…");
-    expect(display().textContent).toContain("The Console opens once Studio Control is ready.");
+  // The visual overhaul (2026-10-05): which page opens is not known until the
+  // start is done (D1, the page last used); the line said "Setup opens" on
+  // every start, since the store begins on Setup.
+  it("carries the state and no key, and says the page last used opens", () => {
+    render(<StartupSurface lifecycle="waiting-for-ready-event" />);
+    const display = screen.getByTestId("startup-surface-state-display");
+    expect(display.textContent).toContain("STARTING UP…");
+    expect(display.textContent).toContain("The page last used opens once Studio Control is ready.");
     expect(keysOn("startup-surface-state-display")).toEqual([]);
+  });
 
-    rerender(<StartupSurface lifecycle="waiting-for-ready-event" opensSetup />);
-    expect(display().textContent).toContain("Setup opens once Studio Control is ready.");
-    expect(keysOn("startup-surface-state-display")).toEqual([]);
+  // A stage is the wait for its step: a step reads done once the next stage began.
+  it("reads a step done only once the stage after it has begun", () => {
+    render(<StartupSurface lifecycle="waiting-for-ready-event" />);
+    expect(screen.getByTestId("startup-steps-section").textContent).toContain("1 of 4 done");
   });
 });
 
@@ -80,11 +85,12 @@ describe("the recovery screen: Reset the window layout beside Retry startup", ()
 
   // The shell (overhaul 3): the state display stands in the 440 px cluster,
   // where three keys do not fit; its one way out stays on it, and the window's
-  // keys stand right under it.
+  // key stands right under it. The visual overhaul (2026-10-05, the owner's
+  // answer): Back to Console went, since it could never leave this screen.
   it("offers the key under Retry startup; a reset that works says nothing", async () => {
     renderSetupRecovery();
     expect(keysOn("setup-recovery-surface-state-display")).toEqual(["Retry startup"]);
-    expect(keysOn("setup-recovery-keys")).toEqual(["Reset the window layout", "Back to Console"]);
+    expect(keysOn("setup-recovery-keys")).toEqual(["Reset the window layout"]);
 
     fireEvent.click(screen.getByTestId("setup-recovery-window-reset"));
     await waitFor(() => expect(resetWindowLayout).toHaveBeenCalledTimes(1));

@@ -1,9 +1,10 @@
-/* Visual overhaul A, Slice 7: the commissioning step as a screen, in two
-   columns; the screen is the height its step needs, so the bay's floor stays
-   visible under it and nothing scrolls to be reached. */
+/* A screen of Setup's bay (the visual overhaul, 2026-10-05): two columns on
+   the bay's well, drawn by type and hairlines. The screen is the height it
+   needs and never more than the bay, so nothing scrolls to be reached. */
 
 .frame {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .step {
@@ -15,6 +16,15 @@
   padding: 32px 40px 36px;
 }
 
+.step[data-wide] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.step[data-wide] .facts {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1200px;
+}
+
 .column {
   display: flex;
   flex-direction: column;
@@ -22,132 +32,139 @@
 }
 
 .eyebrow {
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
-  color: var(--display-text2);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .title {
-  margin: 10px 0 0;
-  font: 700 var(--font-size-hero) / 1.05 var(--font-family-ui);
-  letter-spacing: -0.02em;
-  color: var(--display-text);
+  margin: 8px 0 0;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-display) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
-.lead {
-  max-width: 760px;
-  margin-top: 16px;
-  font: 400 var(--font-size-value) / 1.4 var(--font-family-ui);
-  color: var(--display-text);
-}
-
+/* The lines that stay on screen: a lamp and what must be read before a press. */
 .rules {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   max-width: 760px;
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .rule {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr);
-  column-gap: 12px;
-  align-items: start;
-  font: 400 var(--font-size-body) / 1.45 var(--font-family-ui);
-  color: var(--display-text2);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .rule > span:first-child {
+  flex: none;
   margin-top: 7px;
 }
 
 .facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   max-width: 760px;
   margin-top: 28px;
 }
 
+/* A field: the design system's well, its label over the input. */
+.field {
+  min-width: 0;
+  padding: 6px 12px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.input {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-text4);
+}
+
+.input:disabled {
+  color: var(--text-text3);
+}
+
+/* A fact: its label, its value, how it stands. No box: the well is the box. */
 .card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--display-text) 20%, transparent);
-  border-radius: var(--radius-key);
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--material-line);
 }
 
 .cardLabel {
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
-  color: var(--display-text2);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .cardValue {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font: 700 var(--font-size-name) / 1.25 var(--font-family-mono);
-  color: var(--display-text);
+  min-width: 0;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
 .cardStanding {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--role-green-text);
-}
-
-.card[data-tone="attention"] .cardStanding {
-  color: var(--role-yellow-text);
-}
-
-.card[data-tone="error"] .cardStanding {
-  color: var(--role-coral-text);
-}
-
-.card[data-tone="off"] .cardStanding {
-  color: var(--display-text2);
+  gap: 8px;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .go {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
   align-items: center;
-  margin-top: 30px;
-}
-
-.go > button {
-  min-height: 48px;
-  padding: 0 20px;
+  gap: 12px;
+  margin-top: 28px;
 }
 
 .note {
-  max-width: 340px;
-  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
-  color: var(--display-text2);
+  max-width: 760px;
+  margin: 16px 0 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
-/* ---- the right column: what the step records ---------------------------- */
+/* ---- the right column: what the screen records -------------------------- */
 
 .record {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   min-width: 0;
-  padding-top: 72px;
+  padding-top: 22px;
 }
 
 .recordHeading {
-  margin-top: 6px;
-  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--display-text);
+  margin-top: 28px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--material-line2);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
 }
 
 .recordHeading:first-child {
@@ -158,13 +175,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 12px;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--display-text) 16%, transparent);
-  border-radius: var(--radius-key);
-  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
-  color: var(--display-text2);
+  column-gap: 16px;
+  min-height: 36px;
+  border-bottom: 1px solid var(--material-line);
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .rowLabel {
@@ -178,9 +193,12 @@
 }
 
 .rowValue {
+  min-width: 0;
   overflow: hidden;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
-  color: var(--display-text);
 }

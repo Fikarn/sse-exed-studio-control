@@ -370,7 +370,8 @@ test("workspace crash keeps shell alive", async ({ page }) => {
 
   await nav.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(boundary).toContainText("LIGHTING STOPPED");
-  await expect(boundary).toContainText("The rest of Studio Control keeps working");
+  // The visual overhaul (2026-10-05): the whole sentence stands in the bay.
+  await expect(page.getByTestId("workspace-boundary-bay")).toContainText("The rest of Studio Control keeps working");
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
   // The area failed, not the screen: the shell's own chrome is all still here.
   await expect(page.getByTestId("shell-boundary")).toHaveCount(0);

@@ -1,11 +1,10 @@
-/* 2026-09 production readiness, Slice 11: the Recent actions list on the
-   Support plate. The sentence and, under it, when; at the row's end, who.
-   Only sizes the plate already prints (body, label), the text roles, and the
-   design system's badge — so no measure of system §10 moves. */
+/* Recent actions on the Support plate (the visual overhaul, 2026-10-05): rows
+   under hairlines, the sentence over when, who at the row's end. Sizes the
+   plate already prints (body, label), the text roles, nothing else. */
 
 .list {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -21,33 +20,49 @@
   column-gap: 12px;
   row-gap: 2px;
   min-width: 0;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--material-line);
+}
+
+/* The sentence's tooltip wrapper takes the cell, so a long one gives way. */
+.row > span:first-child {
+  grid-area: detail;
+  display: flex;
+  min-width: 0;
+}
+
+.row > span:first-child > span:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .detail {
-  grid-area: detail;
+  display: block;
   min-width: 0;
   overflow: hidden;
   color: var(--text-text);
-  font: 400 var(--font-size-body) / 1.15 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .time {
   grid-area: time;
-  color: var(--text-text2);
-  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .source {
   grid-area: source;
-  display: inline-flex;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  white-space: nowrap;
 }
 
 .empty {
   margin: 0;
-  color: var(--text-text2);
-  font: 400 var(--font-size-body) / 1.35 var(--font-family-ui);
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }

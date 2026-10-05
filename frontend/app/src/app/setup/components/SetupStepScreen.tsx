@@ -1,32 +1,36 @@
-import type { ReactNode } from "react";
+import { useId, type InputHTMLAttributes, type ReactNode } from "react";
 
-import { Lamp, Screen, type LampTone } from "@sse/design-system";
+import { Field, Lamp, Screen, Tooltip, type LampTone } from "@sse/design-system";
 
 import styles from "./SetupStepScreen.module.css";
 
-// Visual overhaul A, Slice 7 (A-setup.html's screen): a commissioning step is a
-// backlit screen at the height the step needs — never a scrolling panel. On the
-// left what the step is, the rules that govern it, the facts it works from and
-// the key that does it; on the right what the step records and what it depends
-// on, so the operator can see the consequence before pressing anything.
+// A screen of Setup's bay (the visual overhaul, 2026-10-05): a step of the
+// runner, Support or the cameras' setup, on the bay's well. On the left what
+// the screen is (its sentence is the title's tooltip), the lines that must be
+// read before a press, the fields and facts it works from, and the keys that
+// do it; on the right what it records, as rows under hairlines. Nothing on it
+// is a card, and it is never taller than the bay.
 
 export interface SetupStepScreenProps {
   /** `Step 5 of 5`. */
   eyebrow: string;
   title: string;
-  /** One or two sentences on what the step does. */
-  lead: ReactNode;
-  /** The rules that govern the step, each with a lamp. */
-  rules?: readonly { id: string; text: ReactNode; tone?: LampTone }[];
-  /** The fact cards or fields the step works from. */
+  /** What the screen does, in a sentence or two: the title's tooltip. */
+  lead: string;
+  /** Lines that stay on screen (a state, a lock, what a press changes), each with a lamp. */
+  rules?: readonly { id: string; text: ReactNode; tone?: LampTone; testId?: string }[];
+  /** The fields and facts the screen works from. */
   facts?: ReactNode;
-  /** The key that does the step, the way back, and the note under them. */
+  /** The key that does the step, the way back. */
   actions?: ReactNode;
+  /** A line under the keys that stays on screen: what the press changes. */
   note?: ReactNode;
-  /** The right column: what the step records. */
+  /** The right column: what the screen records. */
   record?: ReactNode;
-  /** The screen's own header: what the runner is and where it is. */
+  /** The screen's own header: what the bay shows. */
   head?: ReactNode;
+  /** One wide column and no record (the cameras' setup). */
+  wide?: boolean;
   testId?: string;
 }
 
@@ -40,36 +44,55 @@ export function SetupStepScreen({
   note,
   record,
   head,
+  wide = false,
   testId,
 }: SetupStepScreenProps) {
   return (
     <Screen head={head} className={styles.frame} testId={testId}>
-      <div className={styles.step}>
+      <div className={styles.step} data-wide={wide ? "" : undefined}>
         <div className={styles.column}>
           <div className={styles.eyebrow}>{eyebrow}</div>
-          <h1 className={styles.title}>{title}</h1>
-          <div className={styles.lead}>{lead}</div>
+          <h1 className={styles.title}>
+            <Tooltip content={lead} placement="bottom">
+              <span>{title}</span>
+            </Tooltip>
+          </h1>
           {rules.length > 0 ? (
             <div className={styles.rules}>
               {rules.map((rule) => (
-                <div key={rule.id} className={styles.rule}>
-                  <Lamp tone={rule.tone ?? "ok"} />
+                <p key={rule.id} className={styles.rule} data-testid={rule.testId}>
+                  <Lamp tone={rule.tone ?? "off"} />
                   <span>{rule.text}</span>
-                </div>
+                </p>
               ))}
             </div>
           ) : null}
           {facts ? <div className={styles.facts}>{facts}</div> : null}
-          {actions || note ? (
-            <div className={styles.go}>
-              {actions}
-              {note ? <span className={styles.note}>{note}</span> : null}
-            </div>
-          ) : null}
+          {actions ? <div className={styles.go}>{actions}</div> : null}
+          {note ? <p className={styles.note}>{note}</p> : null}
         </div>
         {record ? <div className={styles.record}>{record}</div> : null}
       </div>
     </Screen>
+  );
+}
+
+export interface SetupFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "className"> {
+  label: string;
+  /** Across the facts' two columns. */
+  wide?: boolean;
+  testId?: string;
+}
+
+/** A field of the screen: the design system's field, its label over the input. */
+export function SetupField({ label, wide = false, testId, ...input }: SetupFieldProps) {
+  const id = useId();
+  return (
+    <Field
+      className={[styles.field, wide ? styles.wide : ""].filter(Boolean).join(" ")}
+      label={<label htmlFor={id}>{label}</label>}
+      value={<input id={id} className={styles.input} autoComplete="off" data-testid={testId} {...input} />}
+    />
   );
 }
 
@@ -81,7 +104,7 @@ export interface SetupFactCardProps {
   testId?: string;
 }
 
-/** A fact the step works from: what it is, what it says, and how it stands. */
+/** A fact the screen works from: what it is, what it says, and how it stands. */
 export function SetupFactCard({ label, value, standing, tone = "ok", testId }: SetupFactCardProps) {
   return (
     <div className={styles.card} data-tone={tone} data-testid={testId}>
@@ -104,8 +127,8 @@ export interface SetupRecordRowProps {
   testId?: string;
 }
 
-/** One line of what the step records: a lamp, what it is, and its value. */
-export function SetupRecordRow({ label, value, tone = "ok", testId }: SetupRecordRowProps) {
+/** One line of what the screen records: a lamp, what it is, and its value. */
+export function SetupRecordRow({ label, value, tone = "off", testId }: SetupRecordRowProps) {
   return (
     <div className={styles.row} data-testid={testId}>
       <span className={styles.rowLabel}>

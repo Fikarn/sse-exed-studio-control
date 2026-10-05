@@ -2894,5 +2894,244 @@
       "recentBackups": [],
       "recentEvents": []
     }
+  },
+  "setup-support": {
+    "appSnapshot": {
+      "runtime": {
+        "protocol": "2",
+        "engineVersion": "0.1.0",
+        "controlSurface": {
+          "available": true,
+          "status": "ready",
+          "summary": "Companion bridge ready."
+        }
+      },
+      "shell": {
+        "workspace": "setup",
+        "window": {
+          "mode": "fullscreen"
+        },
+        "summary": "Operator surface ready.",
+        "setup": {
+          "activeSection": "support"
+        }
+      },
+      "commissioning": {
+        "hasCompletedSetup": true,
+        "runnerStage": "publish",
+        "stage": "ready",
+        "hardwareProfile": "Studio workstation",
+        "summary": "Commissioning complete."
+      },
+      "startup": {
+        "targetSurface": "setup",
+        "operatorUiAllowed": true
+      },
+      "summary": "Setup / Support on Support, with more backups than one page shows."
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "startupPhase": "ready",
+      "summary": "System healthy and ready.",
+      "checks": {
+        "lighting": {
+          "status": "ready",
+          "summary": "DMX bridge online."
+        },
+        "audio": {
+          "status": "ready",
+          "summary": "OSC connection synchronized."
+        },
+        "controlSurface": {
+          "status": "ready",
+          "summary": "Companion bridge responding."
+        }
+      }
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "runnerStage": "publish",
+      "stage": "ready",
+      "summary": "Setup is published: Lighting, Audio, Cameras and Teleprompter are open.",
+      "checks": [
+        {
+          "id": "lighting",
+          "label": "Lighting bridge",
+          "status": "ok",
+          "detail": "Universe 1 responding."
+        },
+        {
+          "id": "audio",
+          "label": "Audio console",
+          "status": "ok",
+          "detail": "OSC sync healthy."
+        },
+        {
+          "id": "control-surface",
+          "label": "Control surface",
+          "status": "ok",
+          "detail": "Profile export current."
+        }
+      ]
+    },
+    "supportSnapshot": {
+      "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
+      "backupCount": 11,
+      "latestBackupPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-22T07-12-00.000Z.json",
+      "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
+      "backups": [
+        {
+          "name": "native-backup-2026-04-22T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-22T07-12-00.000Z.json",
+          "sizeBytes": 4096,
+          "modifiedAt": 1776841920000
+        },
+        {
+          "name": "db-2026-04-22T03-00-00-000Z-daily.sqlite3",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\db-2026-04-22T03-00-00-000Z-daily.sqlite3",
+          "sizeBytes": 82944,
+          "modifiedAt": 1776826800000
+        },
+        {
+          "name": "native-backup-2026-04-21T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-21T07-12-00.000Z.json",
+          "sizeBytes": 4352,
+          "modifiedAt": 1776755520000
+        },
+        {
+          "name": "db-2026-04-21T03-00-00-000Z-daily.sqlite3",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\db-2026-04-21T03-00-00-000Z-daily.sqlite3",
+          "sizeBytes": 84992,
+          "modifiedAt": 1776740400000
+        },
+        {
+          "name": "native-backup-2026-04-20T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-20T07-12-00.000Z.json",
+          "sizeBytes": 4608,
+          "modifiedAt": 1776669120000
+        },
+        {
+          "name": "db-2026-04-20T03-00-00-000Z-daily.sqlite3",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\db-2026-04-20T03-00-00-000Z-daily.sqlite3",
+          "sizeBytes": 87040,
+          "modifiedAt": 1776654000000
+        },
+        {
+          "name": "native-backup-2026-04-19T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-19T07-12-00.000Z.json",
+          "sizeBytes": 4864,
+          "modifiedAt": 1776582720000
+        },
+        {
+          "name": "db-2026-04-19T03-00-00-000Z-daily.sqlite3",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\db-2026-04-19T03-00-00-000Z-daily.sqlite3",
+          "sizeBytes": 89088,
+          "modifiedAt": 1776567600000
+        },
+        {
+          "name": "native-backup-2026-04-18T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-18T07-12-00.000Z.json",
+          "sizeBytes": 5120,
+          "modifiedAt": 1776496320000
+        },
+        {
+          "name": "db-2026-04-18T03-00-00-000Z-daily.sqlite3",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\db-2026-04-18T03-00-00-000Z-daily.sqlite3",
+          "sizeBytes": 91136,
+          "modifiedAt": 1776481200000
+        },
+        {
+          "name": "native-backup-2026-04-17T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-17T07-12-00.000Z.json",
+          "sizeBytes": 5376,
+          "modifiedAt": 1776409920000
+        }
+      ],
+      "summary": "Latest backup exported this morning.",
+      "recentBackups": ["2026-04-22T07:12:00.000Z"],
+      "recentEvents": [
+        {
+          "id": 9,
+          "at": "2026-04-22T07:41:12.412Z",
+          "source": "ui",
+          "domain": "lighting",
+          "action": "outputs-armed",
+          "target": "Light outputs",
+          "detail": "Light outputs armed"
+        },
+        {
+          "id": 8,
+          "at": "2026-04-22T07:40:03.118Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "scene-recalled",
+          "target": "Interview wide",
+          "detail": "Scene recalled: Interview wide"
+        },
+        {
+          "id": 7,
+          "at": "2026-04-22T07:39:48.905Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "all-off",
+          "target": "All lights",
+          "detail": "All lights off"
+        },
+        {
+          "id": 6,
+          "at": "2026-04-22T07:36:20.377Z",
+          "source": "console",
+          "domain": "audio",
+          "action": "mute",
+          "target": "Host",
+          "detail": "Mute on at TotalMix: Host"
+        },
+        {
+          "id": 5,
+          "at": "2026-04-22T07:31:09.640Z",
+          "source": "deck",
+          "domain": "audio",
+          "action": "dim",
+          "target": "Main Out",
+          "detail": "Dim on: Main Out"
+        },
+        {
+          "id": 4,
+          "at": "2026-04-22T07:31:07.122Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "mono",
+          "target": "Main Out",
+          "detail": "Mono on: Main Out"
+        },
+        {
+          "id": 3,
+          "at": "2026-04-22T07:24:51.003Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "phantom",
+          "target": "Host",
+          "detail": "48 V on: Host"
+        },
+        {
+          "id": 2,
+          "at": "2026-04-22T07:22:30.871Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "console-snapshot-recalled",
+          "target": "Panel",
+          "detail": "Console mix recalled: Panel"
+        },
+        {
+          "id": 1,
+          "at": "2026-04-22T07:12:44.250Z",
+          "source": "launch",
+          "domain": "lighting",
+          "action": "outputs-held",
+          "target": "Light outputs",
+          "detail": "Light outputs held at start (safe start)"
+        }
+      ]
+    }
   }
 }

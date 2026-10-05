@@ -1,8 +1,9 @@
-/* The recovery screen (the shell, overhaul 3): drawn by type and hairlines like
-   every page. The bay holds what to do — what went wrong and the restore, the
-   backups, where things are; the plate holds what the hardware reported.
-   Sections are Adelia heads over the heavy rule (the design system's
-   `Section`), lists are rows under hairlines, and nothing is a card. */
+/* The recovery screen (the shell, overhaul 3; the visual overhaul,
+   2026-10-05): drawn by type and hairlines like every page. The bay holds what
+   to do: what went wrong, the restore, the backups, where things are; the
+   plate holds what the hardware reported. Sections are Adelia heads over the
+   heavy rule (the design system's `Section`), lists are rows under hairlines,
+   every key is the design system's `Key`, and nothing is a card or scrolls. */
 
 .column {
   display: flex;
@@ -16,76 +17,74 @@
 .feedback {
   display: flex;
   align-items: center;
-  gap: 12px;
   min-height: 56px;
   padding: 12px 16px;
   border: 1px solid var(--material-line);
   border-radius: var(--radius-base);
-  font: 400 var(--font-size-body) / 1.35 var(--font-family-ui);
-  color: var(--text-text2);
 }
 
 .feedback[data-tone="error"] {
   border-color: var(--role-coral-text);
 }
 
-/* The hardware link's voice, as in the state display. */
+.feedbackWords {
+  min-width: 0;
+  color: var(--text-text);
+  white-space: normal;
+}
+
+/* The hardware link's voice, as in the state display, whole. */
 .sentence {
   margin: 0;
   max-width: 1200px;
-  font: italic 400 var(--font-size-word) / 1.3 var(--font-family-serif);
   color: var(--text-text);
+  font: italic var(--font-weight-regular) var(--font-size-word) / 1.3 var(--font-family-serif);
+}
+
+/* Its raw code: small, never the first thing read. */
+.code {
+  margin: 0;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
 .facts {
-  display: flex;
-  gap: 40px;
-  margin: 0;
-}
-
-.facts dt {
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
-  color: var(--text-text3);
-}
-
-.facts dd {
-  margin: 4px 0 0;
-  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
-  color: var(--text-text);
+  max-width: 480px;
 }
 
 .restore {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 24px;
 }
 
-.latest,
-.field {
+.latest {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
-.latest strong {
-  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
-  color: var(--text-text);
+/* The path: the design system's field, its label over the input. */
+.field {
+  min-width: 0;
+  padding: 6px 12px;
 }
 
 .input {
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--material-line);
-  border-radius: var(--radius-base);
-  background: var(--material-well);
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text-text);
-  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  outline: none;
 }
 
-.input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.input::placeholder {
+  color: var(--text-text4);
 }
 
 .keys {
@@ -94,9 +93,18 @@
   gap: 8px;
 }
 
+.reason {
+  margin: 0;
+  color: var(--role-yellow-text);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
 .backups {
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* A backup: one row under a hairline; pressing it puts its path in the field. */
@@ -106,10 +114,12 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  min-height: 48px;
+  width: 100%;
+  min-height: 44px;
   padding: 6px 8px;
-  border: 0;
-  border-bottom: 1px solid var(--material-line);
+  border: 1px solid transparent;
+  border-bottom-color: var(--material-line);
+  border-radius: 0;
   background: transparent;
   color: var(--text-text);
   text-align: left;
@@ -117,97 +127,81 @@
 }
 
 .backupRow:hover {
-  background: var(--material-hover);
+  border-color: var(--material-line2);
 }
 
 .backupRow:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+
+/* The backup whose path is in the field: the Beige selection. */
+.backupRow[data-selected] {
+  border-color: var(--accent);
+  border-radius: var(--radius-base);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .backupName {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   min-width: 0;
-}
-
-.backupName strong {
-  font: 700 var(--font-size-body) / 1.2 var(--font-family-ui);
-}
-
-.backupName small {
   overflow: hidden;
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
+}
+
+.backupMeta {
   color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* A folder to open: a key face, its name in PT Sans. */
-.pathKey {
-  appearance: none;
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--material-line2);
-  border-radius: var(--radius-base);
-  background: var(--material-key);
-  color: var(--text-text);
-  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
-  cursor: pointer;
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.pathKey:hover:not(:disabled) {
-  border-color: var(--text-text3);
+.pagerPlace {
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
 }
 
-.pathKey:disabled {
-  color: var(--text-text4);
-  cursor: not-allowed;
-}
-
-.pathKey:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
+/* ---- the plate ----------------------------------------------------------- */
 
 .checks {
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
+/* A check: the hardware's name and its word, what it said under them. */
 .check {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
   padding: 10px 0;
   border-bottom: 1px solid var(--material-line);
 }
 
-.checkHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .checkTitle {
-  font: 700 var(--font-size-body) / 1.2 var(--font-family-ui);
   color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
 }
 
-.subsection {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
+.checkWord {
+  justify-self: end;
 }
 
-.subhead {
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--material-line2);
-  font: 700 var(--font-size-label) / 1.2 var(--font-family-ui);
-  color: var(--text-text2);
+.check .hint {
+  grid-column: 1 / -1;
 }
 
 .list {
@@ -227,26 +221,28 @@
 }
 
 .listLabel {
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
   color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .hint {
   min-width: 0;
+  margin: 0;
   overflow-wrap: anywhere;
-  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
   color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
+/* The log's last lines, on a well: as many as the plate has room for, never
+   a scroll. */
 .log {
-  max-height: 220px;
   margin: 0;
   padding: 10px 12px;
+  overflow: hidden;
   border: 1px solid var(--material-line);
   border-radius: var(--radius-base);
   background: var(--material-well);
   color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1.5 var(--font-family-ui);
-  overflow: auto;
+  font: var(--font-weight-regular) var(--font-size-tick) / 1.5 var(--font-family-ui);
   white-space: pre-wrap;
 }

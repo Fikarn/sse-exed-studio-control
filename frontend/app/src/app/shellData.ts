@@ -235,12 +235,31 @@ export function formatBackupTimestamp(value: string | number) {
     return String(value);
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  // One form wherever a backup's time is printed: 24 h, as the clock (the
+  // visual overhaul, 2026-10-05). It followed the browser's locale, AM/PM.
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     hour: "2-digit",
+    hour12: false,
     minute: "2-digit",
     month: "short",
     year: "numeric",
+  }).format(parsed);
+}
+
+/** A time of this year, short: `22 Apr, 09:12` (the state display's meta line). */
+export function formatShortTimestamp(value: string | number) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "short",
   }).format(parsed);
 }
 

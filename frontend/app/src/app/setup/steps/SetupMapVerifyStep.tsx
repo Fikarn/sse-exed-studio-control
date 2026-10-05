@@ -2,8 +2,11 @@ import { Key, Segmented } from "@sse/design-system";
 
 import { SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
 import styles from "../SetupSupportPilot.module.css";
-import { deckKeySlots, runnerStepOrder } from "../setupPilotModel";
+import { controlKindWord, type ControlSurfaceControl, deckKeySlots, runnerStepOrder } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
+
+/** The keys of a Stream Deck +, above its strip: places 1 to 8. */
+const KEY_PLACES = 8;
 
 /** Runner steps 3 and 4: the Stream Deck's pages and controls, mapped and verified. */
 export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
@@ -19,26 +22,54 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
     totalControlCount,
   } = editor.state;
   const { bayHead, primaryKey, backKey } = editor.chrome;
+  const verifying = activeStepId === "verify";
+
+  // One control of the deck as the screen draws it: its word, the Beige
+  // selection, and a lit fill for the moment the deck reports a press of it.
+  const cell = (control: ControlSurfaceControl, className: string) => (
+    <button
+      key={control.id}
+      type="button"
+      className={className}
+      aria-label={`${control.label} ${controlKindWord(control.type)}`}
+      data-echo={verifying && control.id === echoControlId}
+      data-selected={control.id === selectedControl?.id}
+      data-page-key={control.pageNav ? "" : undefined}
+      onClick={() => setSelectedControlId(control.id)}
+    >
+      <span>{control.label}</span>
+    </button>
+  );
+
+  const keys = selectedPage?.buttons.filter((control) => control.position <= KEY_PLACES) ?? [];
+  const strip = [...(selectedPage?.buttons.filter((control) => control.position > KEY_PLACES) ?? [])].sort(
+    (a, b) => a.position - b.position
+  );
+  // The dials a column each, under their cell of the strip: the push, then the turns.
+  const dialColumns = [1, 2, 3, 4].map((place) =>
+    (selectedPage?.dials ?? []).filter((dial) => dial.position === place)
+  );
+
   return (
     <>
-      {activeStepId === "map" || activeStepId === "verify" ? (
+      {activeStepId === "map" || verifying ? (
         <SetupStepScreen
           head={bayHead}
-          eyebrow={`Step ${activeStepId === "map" ? 3 : 4} of ${runnerStepOrder.length}`}
-          title={activeStepId === "map" ? "Map bindings" : "Verify live echo"}
+          eyebrow={`Step ${verifying ? 4 : 3} of ${runnerStepOrder.length}`}
+          title={verifying ? "Verify live echo" : "Map bindings"}
           lead={
-            activeStepId === "map"
-              ? "Review the deck page map Studio Control holds, then confirm each slot label against the hardware before live verification."
-              : "Press a button or dial on the deck. The matching cell pulses when the deck reports the press back."
+            verifying
+              ? "Press a key or turn a dial on the deck: its cell lights when the deck reports the press."
+              : "The deck's four pages as Studio Control holds them, the keys, the strip and the dials, as the profile draws them on the deck."
           }
           rules={
-            activeStepId === "verify"
+            verifying
               ? [
                   {
                     id: "echo",
                     text: echoControlId
-                      ? "The pulse is driven by what the deck reports, not by this screen."
-                      : "Nothing has been pressed yet. The cell pulses as soon as the deck answers.",
+                      ? "The deck reported a press: the cell lights from what it reports, not from this screen."
+                      : "Nothing has been pressed yet.",
                     tone: echoControlId ? "ok" : "off",
                   },
                   {
@@ -46,81 +77,60 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
                     text: liveTransportRequested
                       ? "This workstation is wired to the hardware, so a press is real."
                       : "This workstation is running on sample data; presses are simulated.",
-                    tone: liveTransportRequested ? "ok" : "off",
+                    tone: liveTransportRequested ? "attention" : "off",
                   },
                 ]
-              : [
-                  {
-                    id: "pages",
-                    text: "Bindings are edited here, not in Companion: the profile is regenerated from what Studio Control holds.",
-                    tone: "off",
-                  },
-                ]
+              : []
           }
           facts={
             selectedPage ? (
-              <div className={styles.deckPreview}>
-                {/* New pages program, Slice 3 (D6): a page is chosen by its
-                    tab; the tab no longer prints the number key that chose it.
-                    The tabs are the system's segmented keys: the lit one is
-                    the page shown. */}
+              <div className={styles.deck}>
+                {/* A page is chosen by its tab, which prints its name and
+                    nothing else; the page shown is the Beige selection. */}
                 <Segmented label="The deck's pages" className={styles.pageTabs} testId="setup-deck-pages">
                   {pages.map((page) => (
                     <Key
                       key={page.id}
                       mode="segmented"
                       size="small"
-                      cap={page.label}
-                      engaged={page.id === selectedPage?.id}
-                      aria-pressed={page.id === selectedPage?.id}
-                      data-active={page.id === selectedPage?.id}
+                      selected={page.id === selectedPage.id}
+                      aria-pressed={page.id === selectedPage.id}
+                      data-active={page.id === selectedPage.id}
                       testId={`setup-deck-page-${page.id}`}
                       onClick={() => {
                         setSelectedPageId(page.id);
                         setSelectedControlId(page.buttons[0]?.id ?? page.dials[0]?.id ?? null);
                       }}
-                    />
+                    >
+                      {page.label}
+                    </Key>
                   ))}
                 </Segmented>
-                <div className={styles.buttonMatrix} data-testid="setup-deck-keys">
-                  {deckKeySlots(selectedPage.buttons).map((control, index) =>
+                <div className={styles.deckKeys} data-testid="setup-deck-keys">
+                  {deckKeySlots(keys).map((control, index) =>
                     control ? (
-                      <button
-                        key={control.id}
-                        className={styles.deckButton}
-                        data-echo={activeStepId === "verify" && control.id === echoControlId}
-                        data-selected={control.id === selectedControl?.id}
-                        onClick={() => setSelectedControlId(control.id)}
-                        type="button"
-                      >
-                        <span>{control.label}</span>
-                        <small>{control.type}</small>
-                      </button>
+                      cell(control, styles.deckKey)
                     ) : (
-                      // A key the page leaves blank, where the deck has it.
-                      <span key={`blank-${index + 1}`} aria-hidden="true" className={styles.deckSlot} data-blank-key />
+                      // A dark key: black glass, where the deck has it.
+                      <span key={`blank-${index + 1}`} aria-hidden="true" className={styles.deckDark} data-blank-key />
                     )
                   )}
                 </div>
-                <div className={styles.dialRow}>
-                  {selectedPage.dials.map((control) => (
-                    <button
-                      key={control.id}
-                      className={styles.dialChip}
-                      data-echo={activeStepId === "verify" && control.id === echoControlId}
-                      data-selected={control.id === selectedControl?.id}
-                      onClick={() => setSelectedControlId(control.id)}
-                      type="button"
-                    >
-                      {control.label}
-                    </button>
+                {strip.length > 0 ? (
+                  <div className={styles.deckStrip} data-testid="setup-deck-strip">
+                    {strip.map((control) => cell(control, styles.stripCell))}
+                  </div>
+                ) : null}
+                <div className={styles.deckDials} data-testid="setup-deck-dials">
+                  {dialColumns.map((column, index) => (
+                    <div key={index + 1} className={styles.dialColumn}>
+                      {column.map((control) => cell(control, styles.dialChip))}
+                    </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className={styles.emptyState}>
-                The deck has not reported its pages yet. Run all probes to check the deck.
-              </div>
+              <p className={styles.emptyState}>The deck has not reported its pages yet. Run all probes to check it.</p>
             )
           }
           actions={
@@ -129,29 +139,15 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
               {backKey}
             </>
           }
-          note={
-            activeStepId === "verify" && !echoControlId
-              ? "Waiting for a press. Continue when every control you rely on has echoed."
-              : undefined
-          }
           record={
             <>
-              <SetupRecordHeading>{activeStepId === "map" ? "Binding detail" : "Echo detail"}</SetupRecordHeading>
+              <SetupRecordHeading>{verifying ? "The control pressed" : "The control chosen"}</SetupRecordHeading>
               <SetupRecordRow
                 label={selectedControl?.label ?? "Choose a control"}
-                value={selectedControl?.type ?? "—"}
-                tone={
-                  activeStepId === "verify" && selectedControl?.id === echoControlId
-                    ? "ok"
-                    : selectedControl
-                      ? "off"
-                      : "attention"
-                }
+                value={selectedControl ? controlKindWord(selectedControl.type) : "—"}
+                tone={verifying && selectedControl?.id === echoControlId ? "ok" : "off"}
               />
-              <div className={styles.checkDetail}>
-                {selectedControl?.description ??
-                  "Review the current page and make sure the binding description matches the hardware label."}
-              </div>
+              {selectedControl ? <p className={styles.checkDetail}>{selectedControl.description}</p> : null}
               <SetupRecordHeading>The deck as Studio Control holds it</SetupRecordHeading>
               <SetupRecordRow label="Pages" value={String(pages.length)} tone={pages.length > 0 ? "ok" : "attention"} />
               <SetupRecordRow
@@ -161,7 +157,7 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
               />
               <SetupRecordRow
                 label="Hardware link"
-                value={liveTransportRequested ? "live" : "sample data"}
+                value={liveTransportRequested ? "LIVE" : "SAMPLE DATA"}
                 tone={liveTransportRequested ? "ok" : "off"}
               />
             </>

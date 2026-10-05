@@ -16,6 +16,7 @@ import {
   UNPUBLISH_ARM_LABEL,
   UNPUBLISH_WINDOW_MS,
 } from "../setupPilotModel";
+import { BACK_ARM_KEY, RUN_PROBES_ARM_KEY, setupArmKey } from "../setupArming";
 import type { SetupPilotState } from "./useSetupPilotState";
 
 /** What the operator can run from Setup / Support: save the import profile,
@@ -344,7 +345,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
 
   const moveStepSelection = useLiveCallback((direction: -1 | 1) => {
     const nextIndex = Math.min(Math.max(stepIndex + direction, 0), runnerStepOrder.length - 1);
-    askBeforeUnpublishing("back", () => void activateStep(runnerStepOrder[nextIndex]!));
+    askBeforeUnpublishing(BACK_ARM_KEY, () => void activateStep(runnerStepOrder[nextIndex]!));
   });
 
   const requestStepSelection = useLiveCallback((stepId: RunnerStepId) => {
@@ -360,13 +361,13 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
       return;
     }
 
-    askBeforeUnpublishing(`step:${stepId}`, () => void activateStep(stepId));
+    askBeforeUnpublishing(setupArmKey.step(stepId), () => void activateStep(stepId));
   });
 
   // Both `Run all probes` keys of the cluster: the runner goes to Probe
   // hardware, and on to Map bindings when all three pass.
   const runAllProbesFromCluster = useLiveCallback(() => {
-    askBeforeUnpublishing("run-all-probes", () => {
+    askBeforeUnpublishing(RUN_PROBES_ARM_KEY, () => {
       persistMode("runner");
       void activateStep("probe");
       void performAction("run-all-probes", () => runAllProbes(true));

@@ -569,8 +569,9 @@ export function useLightingSceneEditor({
     return ids;
   }, [busyActions, scenes]);
 
+  // 24 h, as the clock (the visual overhaul, 2026-10-05).
   const lastSavedLabel = lastSavedAt
-    ? lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(lastSavedAt)
     : undefined;
   return {
     recallFadeMs,

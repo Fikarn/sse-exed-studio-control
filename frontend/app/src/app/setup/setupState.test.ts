@@ -95,7 +95,10 @@ describe("deriveSetupState with the hardware link's health", () => {
     expect(state.wayOut).toBe("start-runner");
   });
 
-  it("an unpublished runtime says what is left to verify, and the count once nothing is", () => {
+  // The visual overhaul (2026-10-05): no meta line while the way-out key names
+  // the step: the line beside it was cut, and the steps and the probes' count
+  // stand in the cluster under the display.
+  it("an unpublished runtime has no meta line", () => {
     const unpublished = {
       ...base,
       healthSummary: null,
@@ -105,14 +108,8 @@ describe("deriveSetupState with the hardware link's health", () => {
       stepNumber: 3,
       stepTotal: 5,
     };
-    expect(deriveSetupState({ ...unpublished, checks: [] }).meta).toBe(
-      "Step 3 of 5 · Map bindings · no probes run yet"
-    );
-    expect(deriveSetupState({ ...unpublished, checks: deckNotGreen }).meta).toBe(
-      "Step 3 of 5 · Map bindings · control surface not yet verified"
-    );
-    expect(deriveSetupState({ ...unpublished, checks: green }).meta).toBe(
-      "Step 3 of 5 · Map bindings · 3 of 3 probes passed"
-    );
+    for (const checks of [[], deckNotGreen, green]) {
+      expect(deriveSetupState({ ...unpublished, checks }).meta).toBeNull();
+    }
   });
 });

@@ -130,13 +130,15 @@ describe("the recovery screen reads the health checks in the hardware link's wor
         />
       </OperatorLayoutProvider>
     );
-    const badgeOf = (label: string) => {
-      const card = screen.getByText(label).parentElement?.parentElement;
-      if (!card) throw new Error(`no diagnostics card for ${label}`);
-      return within(card).getByText(/^(Ready|Needs attention|Failed|Pending)$/).textContent;
+    // The visual overhaul (2026-10-05): each check is a row, its name and its
+    // word with a lamp (the word set in capitals).
+    const wordOf = (label: string) => {
+      const row = screen.getByText(label).parentElement;
+      if (!row) throw new Error(`no diagnostics row for ${label}`);
+      return within(row).getByText(/^(ready|needs attention|failed|pending|not read)$/).textContent;
     };
-    expect(badgeOf("The deck")).toBe("Ready");
-    expect(badgeOf("The desk")).toBe("Ready");
-    expect(badgeOf("The bridge")).toBe("Needs attention");
+    expect(wordOf("The deck")).toBe("ready");
+    expect(wordOf("The desk")).toBe("ready");
+    expect(wordOf("The bridge")).toBe("needs attention");
   });
 });

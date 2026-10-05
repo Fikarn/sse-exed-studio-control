@@ -119,7 +119,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 - **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track, and a ▲ under the track for a value kept elsewhere, a scene's saved level, yellow while the value has left it), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
-- **Setup**: `StepKey`, `ProbeRow`, the Support sections.
+- **Setup**: its step keys (an `ArmKey` with the step's number, name and word; on a published setup it reads `press twice` and arms in its own height) and its probe rows (the name, a `LampWord`, the answer under it) are the page's own, built from these, and so are the deck's map and the Support sections.
 
 ## 8. State words
 
@@ -132,6 +132,7 @@ Every state word is the hardware link's, in capitals with its lamp. Its sentence
 | Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                                                      |
 | Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`                                       |
 | Cameras      | `HELD` · `RELEASED`, `NOT SET UP`, `PICTURE MISSING`, `NO PICTURES` · `UNREACHABLE`                                                         |
+| Before ready | `STARTING UP…`, `OPENING…` · `STARTUP FAILED`, `PROTOCOL MISMATCH`, `SAVED DATA DAMAGED`, `LINK STOPPED`, `ALREADY OPEN`, `<AREA> STOPPED`  |
 
 ## 9. Copy and controls
 
@@ -145,7 +146,7 @@ Every state word is the hardware link's, in capitals with its lamp. Its sentence
 
 ### Menus, popovers and tooltips
 
-- **The menu** (`Menu`). A head row naming its object in PT Sans Bold (a name keeps its case), with a quiet sub-line. Rows 36 px high in PT Sans 16. An item's current value stands at the right in the quiet ink; a toggle says its value in words (`on`, `off`). Choices stand in a group under a quiet label, the chosen one marked. Dividers are one hairline. A disabled item is in the quiet ink with its reason at the right, and the arrows pass over it. The destructive item is last, after a divider, in coral, and ends in "…": its first press turns it into the armed form in place (Burgundy, "Press again to …", the countdown bar) while the menu stays open, the second press does it, and moving to another item, the window running out or Esc disarms it. No icons, no submenus, no key hints.
+- **The menu** (`Menu`). A head row naming its object in PT Sans Bold (a name keeps its case), with a quiet sub-line. Rows 36 px high in PT Sans 16. An item's current value stands at the right in the quiet ink; a toggle says its value in words (`on`, `off`). Choices stand in a group under a quiet label, the chosen one marked. Dividers are one hairline. A disabled item is in the quiet ink with its reason at the right, and the arrows pass over it. The destructive item is last, after a divider, in coral, and ends in "…": its first press turns it into the armed form in place (Burgundy, "Press again to …", the countdown bar) while the menu stays open, the second press does it, and moving to another item, the window running out or Esc disarms it. A restore is never the destructive item: it replaces the saved data and asks in its own dialog, which says what it replaces, and a menu's `Restore…` opens that dialog. No icons, no submenus, no key hints.
 - **The ⋯** (`MenuButton`). A square key at its object's right; the menu hangs under it, towards the object, and the focus comes back to the ⋯ when it closes. A right-click on the object opens the same menu at the pointer. A menu opened from the keyboard puts the focus on its first item.
 - **Where a layer goes.** Beside what opened it: it flips to the other side when its side has no room, and slides along its side to stay 8 px inside the screen. At the pointer a menu opens down and to the right, and to the left at the screen's right edge.
 - **The popover** (`Popover`). Values edited beside their key, the key staying visible. A title in PT Sans Bold over a hairline. It is never a dialog: nothing behind it is blocked, a press outside or Esc closes it, and the focus goes back to its key. A list of values in it is a `listbox`.

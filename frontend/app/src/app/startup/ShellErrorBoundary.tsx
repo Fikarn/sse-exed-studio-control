@@ -100,9 +100,10 @@ export class ShellErrorBoundary extends Component<ShellErrorBoundaryProps, Shell
         <PreReadyState
           tone="error"
           word="THIS SCREEN STOPPED"
-          sentence="Studio Control hit a problem it could not draw past. The hardware link keeps running, so the desk, the rig and the deck hold their current state. Reload to start the screen again."
-          code={error.message}
-          meta="Export diagnostics before you reload if this keeps happening"
+          // The display's sentence is one line; the whole sentence and the
+          // error's own words are in the bay, where nothing cuts them (the
+          // visual overhaul, 2026-10-05).
+          sentence="The screen could not draw."
           actions={
             <>
               <Key size="small" mode="primary" testId="shell-boundary-reload" onClick={this.reload}>
@@ -120,6 +121,14 @@ export class ShellErrorBoundary extends Component<ShellErrorBoundaryProps, Shell
           }
           testId="shell-boundary"
         >
+          <p className={recoveryStyles.sentence}>
+            Studio Control hit a problem it could not draw past. The hardware link keeps running, so the desk, the rig
+            and the deck hold their current state. Reload to start the screen again.
+          </p>
+          <p className={recoveryStyles.code} data-state-code="">
+            {error.message}
+          </p>
+          <p className={recoveryStyles.nextStep}>Export diagnostics before you reload if this keeps happening.</p>
           {exportMessage ? (
             <p className={recoveryStyles.nextStep} data-testid="shell-boundary-export-result">
               {exportMessage}

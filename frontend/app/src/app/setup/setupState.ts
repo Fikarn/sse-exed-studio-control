@@ -1,6 +1,6 @@
-import type { StateDisplayTone } from "@sse/design-system";
+import type { LampTone, StateDisplayTone } from "@sse/design-system";
 
-import type { CommissioningCheck } from "../shellData";
+import type { CommissioningCheck, StatusToneLike } from "../shellData";
 
 // Visual overhaul A, Slice 7 (plan D1, D12; A-setup.html): what commissioning
 // is, in one word, the engine's own sentence, and one line of facts. Nothing
@@ -35,8 +35,9 @@ export interface SetupState {
   tone: StateDisplayTone;
   /** The engine's sentence, verbatim. */
   sentence: string;
-  /** Step · probes · backup. */
-  meta: string;
+  /** The probes' count, and the backup's time once published; none while the
+   *  way-out key names the step (the Probes section under it has the count). */
+  meta: string | null;
   /** The one key that gets the operator out of this state. */
   wayOut: SetupWayOut;
   passedProbeCount: number;
@@ -48,6 +49,22 @@ export function setupProbeCounts(checks: readonly CommissioningCheck[]) {
     passed: checks.filter((check) => check.status === "ok").length,
     total: checks.length,
   };
+}
+
+/** A probe's result, one word wherever it is printed (the cluster and the Probe step). */
+export function probeWord(status: StatusToneLike): string {
+  if (status === "ok") return "passed";
+  if (status === "error") return "failed";
+  if (status === "attention") return "attention";
+  return "not run";
+}
+
+/** The lamp beside a probe's word. */
+export function probeTone(status: StatusToneLike): LampTone {
+  if (status === "ok") return "ok";
+  if (status === "error") return "error";
+  if (status === "attention") return "attention";
+  return "off";
 }
 
 /** The probes that are not green, named — for the meta line and the dialog. */
@@ -62,22 +79,16 @@ export function deriveSetupState({
   healthSummary,
   healthTone,
   published,
-  stepNumber,
-  stepLabel,
-  stepTotal,
 }: SetupStateInput): SetupState {
   const { passed, total } = setupProbeCounts(checks);
   const allGreen = total > 0 && passed === total;
-  const step = `Step ${stepNumber} of ${stepTotal} · ${stepLabel}`;
+  // The meta line is short facts beside the way-out key: the steps stand in
+  // the cluster under the display, so the line no longer repeats the step.
   const probes = total > 0 ? `${passed} of ${total} probes passed` : "no probes run yet";
 
   if (!published) {
-    // What is left to verify, by name; the count once every probe has passed.
-    // (Until 2026-09-28 three probes out of three read "nothing verified yet".)
-    const unverified = setupUnverifiedProbeNames(checks);
-    const tail = unverified.length > 0 ? `${unverified.join(" and ")} not yet verified` : probes;
     return {
-      meta: `${step} · ${tail}`,
+      meta: null,
       passedProbeCount: passed,
       probeCount: total,
       sentence: commissioningSummary ?? "Complete commissioning to unlock operator mode.",
@@ -89,7 +100,7 @@ export function deriveSetupState({
 
   if (!allGreen) {
     return {
-      meta: `${step} · ${probes} · re-verify before publishing`,
+      meta: probes,
       passedProbeCount: passed,
       probeCount: total,
       sentence: healthSummary ?? "Operator mode is available, but one of the commissioning probes needs attention.",
@@ -100,7 +111,7 @@ export function deriveSetupState({
   }
 
   return {
-    meta: `${step} · ${probes}${lastBackupLabel ? ` · Backup ${lastBackupLabel}` : " · no backup exported yet"}`,
+    meta: `${probes} · ${lastBackupLabel ? `backup ${lastBackupLabel}` : "no backup yet"}`,
     passedProbeCount: passed,
     probeCount: total,
     sentence: commissioningSummary ?? "Commissioning complete and operator mode unlocked.",

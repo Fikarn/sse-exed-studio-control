@@ -1,29 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
-import { Button, Key, Section, StatusBadge } from "@sse/design-system";
+import { Field, Key, LampWord, Readouts, Section, type LampTone } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
 
 import {
   asRecord,
-  asStatusTone,
   describeBackupKind,
   formatBackupTimestamp,
   getSupportBackups,
   healthCheckTone,
-  statusToneLabel,
   RESTORE_HOLD_SENTENCE,
   type SnapshotRecord,
   withRestoreDetail,
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath, resetWindowLayout } from "../shellCommands";
-import { RestoreConfirmDialog, type RestorePrompt } from "./components/RestoreConfirmDialog";
+import { RestoreConfirmDialog, restoreKindOf, type RestorePrompt } from "./components/RestoreConfirmDialog";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { PreReadyState } from "../startup/PreReadyState";
 import styles from "./SetupRecoverySurface.module.css";
 import {
   type ActionFeedback,
-  feedbackBadgeTone,
   formatFailureCode,
+  formatFailureStage,
   formatFileSize,
   formatPathLabel,
   getFailureTitle,
@@ -35,6 +33,23 @@ import {
 // state.
 function toJsonValue(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as JsonValue;
+}
+
+/** The backups a page of the list shows: the bay never scrolls, so the list pages. */
+const BACKUPS_A_PAGE = 8;
+/** The log's last lines the plate has room for. */
+const LOG_LINES = 12;
+
+/** A check of the hardware, as the recovery plate prints it: one word with its lamp. */
+function checkWord(status: unknown, failed: boolean): { word: string; tone: LampTone } {
+  // Nothing was read: a start that failed reads no health at all (the
+  // handshake fails before it), so the three say so, not doubt.
+  if (status === undefined) return failed ? { word: "not read", tone: "off" } : { word: "pending", tone: "off" };
+  const tone = healthCheckTone(status);
+  if (tone === "ok") return { word: "ready", tone: "ok" };
+  if (tone === "error") return { word: "failed", tone: "error" };
+  if (tone === "attention") return { word: "needs attention", tone: "attention" };
+  return { word: "pending", tone: "off" };
 }
 
 export function SetupRecoverySurface({
@@ -65,12 +80,12 @@ export function SetupRecoverySurface({
       Object.entries(failure?.paths ?? {}).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : []))
     ),
   };
-  const startup = asRecord(appSnapshot?.startup);
-  const canReturnToConsole = String(startup?.targetSurface ?? "commissioning") === "dashboard";
   const backups = useMemo(() => getSupportBackups(supportSnapshot), [supportSnapshot]);
   const [restorePath, setRestorePath] = useState("");
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const pathFieldId = useId();
   // A restore asks first, and says what it replaces (2026-09-28).
   const [restorePrompt, setRestorePrompt] = useState<RestorePrompt | null>(null);
   const cancelRestore = useCallback(() => setRestorePrompt(null), []);
@@ -88,13 +103,18 @@ export function SetupRecoverySurface({
     );
   const detailEntries = Object.entries(asRecord(healthSnapshot?.details) ?? {});
   const pathEntries = Object.entries(runtimePaths);
-  const recentLogExcerpt = readLogExcerpt(healthSnapshot?.recentLogExcerpt);
+  const recentLogExcerpt = readLogExcerpt(healthSnapshot?.recentLogExcerpt).slice(-LOG_LINES);
   // The hardware link answers the backup requests here only in recovery
   // mode — after a storage failure it stays up for exactly that (2026-09
   // production readiness, Slice 7 — F20); after any other failure it is gone.
   const engineRequestsAvailable = failure === null || storageFailed;
-  // Slice 8 (system §9): name the hardware. "Control surface", "DMX" and "OSC"
-  // are the wires; the operator knows the deck, the bridge and the desk.
+  const busy = busyAction !== null;
+  const chosenPath = restorePath.trim();
+  // While the saved data does not open only a database backup restores: an
+  // archive in the field is locked here, with the reason on screen, rather
+  // than refused by the hardware link after the question.
+  const archiveRefused = storageFailed && chosenPath !== "" && restoreKindOf(chosenPath, backups) === "archive";
+  // Slice 8 (system §9): name the hardware. The deck, the bridge and the desk.
   const diagnosticsChecks = [
     { key: "controlSurface", label: "The deck" },
     { key: "lighting", label: "The bridge" },
@@ -104,12 +124,26 @@ export function SetupRecoverySurface({
     return {
       detail: String(check?.summary ?? `${label} reported nothing at startup.`),
       label,
-      // The hardware link reports each check in its own words (`ready`,
-      // `not-verified`, `unavailable`, …); `healthCheckTone` reads them as the
-      // header does. A check that said nothing keeps the fallback.
-      tone: check?.status === undefined ? (failure ? "attention" : "info") : healthCheckTone(check.status),
+      ...checkWord(check?.status, failure !== null),
     };
   });
+  // What the restore can do here, said before the keys, so a locked key never
+  // reads as one that would work.
+  const restoreHint = storageFailed
+    ? "While the saved data does not open, only a database backup can be restored. The hardware link restarts into it."
+    : !engineRequestsAvailable
+      ? failure?.code === "PROTOCOL_MISMATCH"
+        ? "Nothing can be restored until the app and the hardware link are the same version."
+        : "Nothing can be restored from here: retry the start, or restore from Setup / Support once Studio Control is back."
+      : String(
+          supportSnapshot?.restoreSummary ?? "Restore a backup archive or a database backup from the backups folder."
+        );
+
+  const pages = Math.max(1, Math.ceil(backups.length / BACKUPS_A_PAGE));
+  useEffect(() => {
+    if (page > pages - 1) setPage(pages - 1);
+  }, [page, pages]);
+  const shown = backups.slice(page * BACKUPS_A_PAGE, page * BACKUPS_A_PAGE + BACKUPS_A_PAGE);
 
   useEffect(() => {
     if (!lastBackup?.path) {
@@ -177,22 +211,31 @@ export function SetupRecoverySurface({
     };
   };
 
+  const folder = (label: string, path: string, actionId: string, testId: string) => (
+    <Key
+      size="small"
+      disabled={!path.trim() || busy}
+      testId={testId}
+      onClick={() => void performAction(actionId, () => openReferencePath(label, path))}
+    >
+      {label}
+    </Key>
+  );
+
   return (
-    // The one recovery screen, whichever page was open (2026-09-28: a stop
-    // during a session showed a smaller one, without Export diagnostics and
-    // without the restore keys). The word, the hardware link's sentence, its
-    // code in the display's own slot.
-    // The shell (overhaul 3): the display, its one way out (Retry startup), the
-    // window's keys under it and the message line in the cluster; what to do
-    // in the bay (the restore and where things are); what the hardware
-    // reported on the plate. Reset the window layout says nothing when the
-    // window moves, and a refusal lands in the message line.
+    // The one recovery screen, whichever page was open (2026-09-28). The
+    // shell (overhaul 3): the display, its one way out (Retry startup), the
+    // window's key under it and the message line in the cluster; what to do in
+    // the bay (the sentence whole, the restore, the backups, where things
+    // are); what the hardware reported on the plate. The visual overhaul
+    // (2026-10-05): one key family, the design system's `Key`; no tooltips, so
+    // everything is read without hovering.
     <PreReadyState
       tone="error"
       word={getFailureTitle(failure).toUpperCase()}
       sentence={summary}
       code={failure?.code ?? undefined}
-      meta={`${formatFailureCode(failure)} · failed at ${failure?.stage ?? "runtime"} · recover from Setup / Support`}
+      meta={`${formatFailureCode(failure)} · ${failure ? `at ${formatFailureStage(failure.stage)}` : "while running"}`}
       actions={
         <Key size="small" mode="primary" testId="setup-recovery-retry" onClick={onRequestRestart}>
           Retry startup
@@ -204,19 +247,11 @@ export function SetupRecoverySurface({
           <div className={styles.keys} data-testid="setup-recovery-keys">
             <Key
               size="small"
-              disabled={busyAction !== null}
+              disabled={busy}
               testId="setup-recovery-window-reset"
               onClick={() => void performAction("reset-window-layout", resetWindowLayout)}
             >
               Reset the window layout
-            </Key>
-            <Key
-              size="small"
-              disabled={!canReturnToConsole}
-              testId="setup-recovery-console"
-              onClick={() => void store.setWorkspace("audio")}
-            >
-              Back to Console
             </Key>
           </div>
           {feedback ? (
@@ -227,11 +262,13 @@ export function SetupRecoverySurface({
               data-tone={feedback.tone}
               role="status"
             >
-              <StatusBadge
-                label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
-                tone={feedbackBadgeTone(feedback.tone)}
-              />
-              <span>{feedback.message}</span>
+              <LampWord
+                tone={feedback.tone === "ok" ? "ok" : feedback.tone === "error" ? "error" : "info"}
+                cap={false}
+                className={styles.feedbackWords}
+              >
+                {feedback.message}
+              </LampWord>
             </div>
           ) : null}
         </>
@@ -239,23 +276,44 @@ export function SetupRecoverySurface({
       plate={
         <div className={styles.column} data-testid="setup-recovery-diagnostics">
           <Section title="Diagnostics">
-            <div className={styles.checks}>
+            <ul className={styles.checks}>
               {diagnosticsChecks.map((check) => (
-                <div key={check.label} className={styles.check}>
-                  <div className={styles.checkHead}>
-                    <div className={styles.checkTitle}>{check.label}</div>
-                    <StatusBadge label={statusToneLabel(check.tone)} tone={asStatusTone(check.tone)} />
-                  </div>
-                  <div className={styles.hint}>{check.detail}</div>
-                </div>
+                <li key={check.label} className={styles.check}>
+                  <span className={styles.checkTitle}>{check.label}</span>
+                  <LampWord tone={check.tone} className={styles.checkWord}>
+                    {check.word}
+                  </LampWord>
+                  <span className={styles.hint}>{check.detail}</span>
+                </li>
               ))}
+            </ul>
+            <div className={styles.keys}>
+              <Key
+                size="small"
+                disabled={busy}
+                testId="setup-recovery-export-diagnostics"
+                onClick={() => void performAction("export-diagnostics-card", exportDiagnostics)}
+              >
+                {busyAction === "export-diagnostics-card" ? "Working…" : "Export diagnostics"}
+              </Key>
+              <Key
+                size="small"
+                disabled={!String(runtimePaths.logFilePath ?? "").trim() || busy}
+                testId="setup-recovery-open-log"
+                onClick={() =>
+                  void performAction("open-engine-log-card", () =>
+                    openReferencePath("The log", String(runtimePaths.logFilePath ?? ""))
+                  )
+                }
+              >
+                Open the log
+              </Key>
             </div>
           </Section>
 
-          <div className={styles.subsection}>
-            <div className={styles.subhead}>Recovery evidence</div>
+          <Section title="Recovery evidence">
             {detailEntries.length > 0 ? (
-              <ul className={styles.list}>
+              <ul className={styles.list} data-testid="setup-recovery-evidence">
                 {detailEntries.map(([key, value]) => (
                   <li key={key}>
                     <span className={styles.listLabel}>{formatPathLabel(key)}</span>
@@ -264,38 +322,14 @@ export function SetupRecoverySurface({
                 ))}
               </ul>
             ) : (
-              <div className={styles.hint}>
+              <p className={styles.hint}>
                 Startup failed before Studio Control could write detailed incident evidence.
-              </div>
+              </p>
             )}
-          </div>
+          </Section>
 
-          <div className={styles.keys}>
-            <Button
-              disabled={busyAction !== null}
-              onClick={() => {
-                void performAction("export-diagnostics-card", exportDiagnostics);
-              }}
-              variant="secondary"
-            >
-              {busyAction === "export-diagnostics-card" ? "Working…" : "Export diagnostics"}
-            </Button>
-            <Button
-              disabled={!String(runtimePaths.logFilePath ?? "").trim() || busyAction !== null}
-              onClick={() => {
-                void performAction("open-engine-log-card", () =>
-                  openReferencePath("The log", String(runtimePaths.logFilePath ?? ""))
-                );
-              }}
-              variant="ghost"
-            >
-              Open the log
-            </Button>
-          </div>
-
-          <div className={styles.subsection}>
-            <div className={styles.subhead}>File paths</div>
-            <ul className={styles.list}>
+          <Section title="File paths">
+            <ul className={styles.list} data-testid="setup-recovery-paths">
               {pathEntries.length > 0 ? (
                 pathEntries.map(([key, value]) => (
                   <li key={key}>
@@ -309,179 +343,175 @@ export function SetupRecoverySurface({
                 </li>
               )}
             </ul>
-          </div>
+          </Section>
 
           {recentLogExcerpt.length > 0 ? (
-            <div className={styles.subsection} data-testid="setup-recovery-log">
-              <div className={styles.subhead}>The log's last lines</div>
+            <Section title="The log's last lines" testId="setup-recovery-log">
               <pre className={styles.log}>{recentLogExcerpt.join("\n")}</pre>
-            </div>
+            </Section>
           ) : null}
         </div>
       }
     >
       <div className={styles.column} data-testid="setup-recovery-cards">
-        <Section title="What went wrong?" detail="restore what was saved, or retry the start">
-          {/* The hardware link's sentence whole: the state display keeps two
-              lines of it in the cluster. */}
+        <Section title="What went wrong?">
+          {/* The hardware link's sentence whole, and its code: the state
+              display keeps two lines of the sentence and gives the code's
+              slot away when the sentence takes both. */}
           <p className={styles.sentence} data-testid="setup-recovery-sentence">
             {summary}
           </p>
-          {failure?.code === "PROTOCOL_MISMATCH" ? (
-            <dl className={styles.facts}>
-              <div>
-                <dt>Requested protocol</dt>
-                <dd>{failure.requestedProtocol ?? "unknown"}</dd>
-              </div>
-              <div>
-                <dt>Reported protocol</dt>
-                <dd>{failure.supportedProtocol ?? "unknown"}</dd>
-              </div>
-            </dl>
+          {failure?.code ? (
+            <p className={styles.code} data-testid="setup-recovery-code">
+              {failure.code}
+            </p>
           ) : null}
+          {failure?.code === "PROTOCOL_MISMATCH" ? (
+            <Readouts
+              className={styles.facts}
+              rows={[
+                { id: "requested", label: "Requested protocol", value: failure.requestedProtocol ?? "unknown" },
+                { id: "reported", label: "Reported protocol", value: failure.supportedProtocol ?? "unknown" },
+              ]}
+            />
+          ) : null}
+        </Section>
 
+        <Section title="Restore">
           <div className={styles.restore}>
             <div className={styles.latest}>
-              <span className={styles.listLabel}>Latest database backup</span>
-              <strong>{lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No database backup yet"}</strong>
-              <span className={styles.hint}>
-                {storageFailed
-                  ? "While the saved data does not open, only a database backup can be restored. The hardware link restarts into it."
-                  : String(
-                      supportSnapshot?.restoreSummary ??
-                        (engineRequestsAvailable
-                          ? "Restore a backup archive or a database backup from the backups folder."
-                          : failure?.code === "PROTOCOL_MISMATCH"
-                            ? "Nothing can be restored until the app and the hardware link are the same version."
-                            : "Nothing can be restored from here; use Retry startup, or Setup / Support once Studio Control is back.")
-                    )}
-              </span>
-            </div>
-            <label className={styles.field}>
-              <span className={styles.listLabel}>Restore from path</span>
-              <input
-                className={styles.input}
-                onChange={(event) => setRestorePath(event.target.value)}
-                placeholder={String(runtimePaths.backupDir ?? "a file inside the backups folder")}
-                value={restorePath}
+              <Readouts
+                rows={[
+                  {
+                    id: "latest",
+                    label: "Latest database backup",
+                    value: lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No database backup yet",
+                  },
+                ]}
               />
-            </label>
+              {/* What a restore can do here stays on screen, with a lock's reason. */}
+              <p className={styles.hint} data-testid="setup-recovery-restore-hint">
+                {restoreHint}
+              </p>
+            </div>
+            <Field
+              className={styles.field}
+              label={<label htmlFor={pathFieldId}>Restore from path</label>}
+              value={
+                <input
+                  id={pathFieldId}
+                  className={styles.input}
+                  autoComplete="off"
+                  placeholder={String(runtimePaths.backupDir ?? "a file inside the backups folder")}
+                  value={restorePath}
+                  data-testid="setup-recovery-path-field"
+                  onChange={(event) => setRestorePath(event.target.value)}
+                />
+              }
+            />
           </div>
-
           <div className={styles.keys}>
-            <Button onClick={onRequestRestart} variant="primary">
-              Retry startup
-            </Button>
-            <Button
-              disabled={busyAction !== null}
-              onClick={() => {
-                void performAction("export-diagnostics", exportDiagnostics);
-              }}
-              variant="secondary"
-            >
-              {busyAction === "export-diagnostics" ? "Working…" : "Export diagnostics"}
-            </Button>
-            <Button
-              disabled={!engineRequestsAvailable || !lastBackup || busyAction !== null}
+            <Key
+              disabled={!engineRequestsAvailable || !lastBackup || busy}
+              testId="setup-recovery-restore-latest"
               onClick={() => {
                 if (!lastBackup) {
                   return;
                 }
                 setRestorePrompt({ actionId: "restore-latest", path: lastBackup.path });
               }}
-              variant="secondary"
             >
-              Restore latest
-            </Button>
-            <Button
-              disabled={!engineRequestsAvailable || !restorePath.trim() || busyAction !== null}
-              onClick={() => {
-                setRestorePrompt({ actionId: "restore-path", path: restorePath.trim() });
-              }}
-              variant="ghost"
+              Restore latest…
+            </Key>
+            <Key
+              disabled={!engineRequestsAvailable || !chosenPath || archiveRefused || busy}
+              testId="setup-recovery-restore-path"
+              onClick={() => setRestorePrompt({ actionId: "restore-path", path: chosenPath })}
             >
-              Restore path
-            </Button>
+              Restore path…
+            </Key>
           </div>
+          {archiveRefused ? (
+            <p className={styles.reason} data-testid="setup-recovery-archive-refused">
+              The path is a backup archive. While the saved data does not open, choose a database backup.
+            </p>
+          ) : null}
         </Section>
 
-        <Section title="Backups">
+        <Section
+          title="Backups"
+          detail={backups.length > 0 ? (backups.length === 1 ? "1 backup" : `${backups.length} backups`) : undefined}
+        >
           {backups.length > 0 ? (
-            <div className={styles.backups}>
-              {backups.map((backup) => (
-                <button
-                  key={backup.path}
-                  className={styles.backupRow}
-                  onClick={() => setRestorePath(backup.path)}
-                  type="button"
-                >
-                  <span className={styles.backupName}>
-                    <strong>{backup.name}</strong>
-                    <small>{backup.path}</small>
-                  </span>
-                  <span className={styles.hint}>
-                    {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
-                    {describeBackupKind(backup.kind)}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <ol className={styles.backups}>
+              {shown.map((backup, offset) => {
+                const index = page * BACKUPS_A_PAGE + offset;
+                const chosen = backup.path === chosenPath;
+                return (
+                  <li key={backup.path}>
+                    {/* A press puts the backup's path in the field; nothing is restored. */}
+                    <button
+                      className={styles.backupRow}
+                      aria-pressed={chosen}
+                      data-selected={chosen ? "" : undefined}
+                      data-testid={`setup-recovery-backup-${index}`}
+                      onClick={() => setRestorePath(backup.path)}
+                      type="button"
+                    >
+                      <span className={styles.backupName}>{backup.name}</span>
+                      <span className={styles.backupMeta}>
+                        {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
+                        {describeBackupKind(backup.kind)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
           ) : (
-            <div className={styles.hint}>
+            <p className={styles.hint}>
               No backup list was published before startup failed. Name a file inside the backups folder above and
               restore it directly.
-            </div>
+            </p>
           )}
+          {pages > 1 ? (
+            <div className={styles.pager}>
+              <Key
+                size="small"
+                aria-label="Newer backups"
+                disabled={page === 0}
+                testId="setup-recovery-backups-newer"
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+              >
+                ‹
+              </Key>
+              <span className={styles.pagerPlace}>
+                {page + 1} / {pages}
+              </span>
+              <Key
+                size="small"
+                aria-label="Older backups"
+                disabled={page >= pages - 1}
+                testId="setup-recovery-backups-older"
+                onClick={() => setPage((current) => Math.min(pages - 1, current + 1))}
+              >
+                ›
+              </Key>
+            </div>
+          ) : null}
         </Section>
 
-        <Section title="Reference paths">
+        <Section title="Where things are">
           <div className={styles.keys}>
-            <button
-              className={styles.pathKey}
-              disabled={!String(runtimePaths.backupDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-archive", () =>
-                  openReferencePath("Archive", String(runtimePaths.backupDir ?? ""))
-                );
-              }}
-              type="button"
-            >
-              Archive
-            </button>
-            <button
-              className={styles.pathKey}
-              disabled={!String(runtimePaths.appDataDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-app-data", () =>
-                  openReferencePath("App data", String(runtimePaths.appDataDir ?? ""))
-                );
-              }}
-              type="button"
-            >
-              App data
-            </button>
-            <button
-              className={styles.pathKey}
-              disabled={!String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-diagnostics", () =>
-                  openReferencePath("Diagnostics", String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""))
-                );
-              }}
-              type="button"
-            >
-              Diagnostics
-            </button>
-            <button
-              className={styles.pathKey}
-              disabled={!String(runtimePaths.logsDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths.logsDir ?? "")));
-              }}
-              type="button"
-            >
-              Logs
-            </button>
+            {folder("Backups", String(runtimePaths.backupDir ?? ""), "open-archive", "setup-recovery-open-backups")}
+            {folder("App data", String(runtimePaths.appDataDir ?? ""), "open-app-data", "setup-recovery-open-app-data")}
+            {folder(
+              "Diagnostics",
+              String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""),
+              "open-diagnostics",
+              "setup-recovery-open-diagnostics"
+            )}
+            {folder("Logs", String(runtimePaths.logsDir ?? ""), "open-logs", "setup-recovery-open-logs")}
           </div>
         </Section>
       </div>
@@ -489,7 +519,7 @@ export function SetupRecoverySurface({
       {restorePrompt ? (
         <RestoreConfirmDialog
           backups={backups}
-          busy={busyAction !== null}
+          busy={busy}
           prompt={restorePrompt}
           onCancel={cancelRestore}
           onConfirm={() => {

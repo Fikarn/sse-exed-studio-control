@@ -5,7 +5,8 @@ import { APP_VERSION } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
 /** The Prompter XL as `health.snapshot`'s `checks.prompter` carries it (new pages
- *  program, Slice 6a): its word, its mode, its tone; `null` before it is known. */
+ *  program, Slice 6a): its word, in the hardware link's capitals, its mode,
+ *  its tone; `null` before it is known. */
 export function prompterXlRow(
   healthSnapshot: Record<string, unknown> | null
 ): { value: string; tone: "ok" | "attention" | "error" } | null {
@@ -15,7 +16,7 @@ export function prompterXlRow(
   if (!screen || typeof screen !== "object") return null;
   const { word, tone, width, height, refreshHz } = screen as Record<string, unknown>;
   if (typeof word !== "string") return null;
-  const parts = [word.toLowerCase()];
+  const parts = [word];
   if (typeof width === "number" && typeof height === "number") parts.push(`${width}×${height}`);
   if (typeof refreshHz === "number") parts.push(`${refreshHz} Hz`);
   return { value: parts.join(" · "), tone: tone === "error" ? "error" : tone === "attention" ? "attention" : "ok" };
@@ -26,12 +27,13 @@ export function prompterXlRow(
  *  keys. */
 export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot, healthSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
-  const { backups, lastBackup, busyAction, runtime, recentActions, uiScale, setUiScale, setRestorePrompt } =
+  const { backups, lastBackup, busyAction, runtime, recentActions, uiScale, setUiScale, setRestorePrompt, arm } =
     editor.state;
   const { engineLogPath, openEngineLog } = editor.chrome;
   const { performAction, exportSupportBackup, exportDiagnostics, setLightOutputsArmed, verifyBackup } = editor.actions;
   return (
     <SupportPlate
+      arm={arm}
       appVersion={APP_VERSION}
       archiveCount={backups.length}
       backupKind={lastBackup ? describeBackupKind(lastBackup.kind) : "none yet"}
@@ -39,7 +41,7 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       canOpenEngineLog={engineLogPath.trim().length > 0}
       engineVersion={String(runtime?.engineVersion ?? "—")}
       hardwareProfile={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
-      lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "no backup exported yet"}
+      lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "none yet"}
       lightOutputsArmed={lightOutputsArmed}
       prompterXl={prompterXlRow(healthSnapshot)}
       protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "2")}

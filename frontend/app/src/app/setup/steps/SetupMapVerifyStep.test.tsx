@@ -10,14 +10,15 @@ import { SetupMapVerifyStep } from "./SetupMapVerifyStep";
 // every key after a gap a place early. Since 2026-10-03 (the approved layout)
 // LIGHTS has a dark key at place 7, Del Scene's place, and RECALL after it.
 
-function key(pageId: string, position: number, label: string): ControlSurfaceControl {
+function key(pageId: string, position: number, label: string, type = "button"): ControlSurfaceControl {
   return {
     body: null,
     description: `${label} is mapped.`,
     id: `${pageId}-btn-${position}`,
     label,
+    pageNav: label.endsWith("›"),
     position,
-    type: "button",
+    type,
     url: null,
   };
 }
@@ -74,21 +75,30 @@ describe("SetupMapVerifyStep's deck keys", () => {
     expect(within(cells[3]).getByText("AUDIO \u203a").tagName).toBe("SPAN");
     expect(within(cells[5]).getByText("ALL OFF").tagName).toBe("SPAN");
     expect(within(cells[7]).getByText("RECALL").tagName).toBe("SPAN");
-    expect(screen.getAllByRole("button", { name: /button$/ })).toHaveLength(7);
+    // Each control is named with its kind in the operator's words.
+    expect(screen.getAllByRole("button", { name: / key$/ })).toHaveLength(7);
+    // The page key is drawn as the deck draws it (Dark Green, the next page's word).
+    expect(cells[3].hasAttribute("data-page-key")).toBe(true);
+    expect(cells[0].hasAttribute("data-page-key")).toBe(false);
   });
 
-  it("draws a page that fills every place without a blank", () => {
+  it("draws the keys above the strip, and the strip's cells as one strip", () => {
     const audio: ControlSurfacePage = {
-      buttons: Array.from({ length: 12 }, (_, index) => key("audio", index + 1, `Channel ${index + 1}`)),
+      buttons: [
+        ...Array.from({ length: 8 }, (_, index) => key("audio", index + 1, `Key ${index + 1}`)),
+        ...Array.from({ length: 4 }, (_, index) => key("audio", index + 9, `Strip ${index + 1}`, "display")),
+      ],
       dials: [],
       id: "audio",
       label: "AUDIO",
     };
     const cells = renderMap(audio);
 
-    expect(cells).toHaveLength(12);
+    expect(cells).toHaveLength(8);
     expect(cells.filter((cell) => cell.hasAttribute("data-blank-key"))).toHaveLength(0);
-    expect(within(cells[11]).getByText("Channel 12").tagName).toBe("SPAN");
+    const strip = [...screen.getByTestId("setup-deck-strip").children];
+    expect(strip.map((cell) => cell.textContent)).toEqual(["Strip 1", "Strip 2", "Strip 3", "Strip 4"]);
+    expect(screen.getByRole("button", { name: "Strip 4 strip cell" })).toBeTruthy();
   });
 });
 

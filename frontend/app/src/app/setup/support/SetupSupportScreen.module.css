@@ -1,0 +1,101 @@
+/* Support's screen in the bay (the visual overhaul, 2026-10-05): the backups
+   as rows under hairlines, a page of eight at a time, each with its ⋯ inside
+   its edge; the chosen one carries the Beige selection. */
+
+.backupList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.backupRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.backupPick {
+  appearance: none;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 48px 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: var(--text-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.backupPick:hover {
+  border-color: var(--material-line2);
+}
+
+.backupPick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The backup whose path is in the field: the Beige selection. */
+.backupRow[data-selected] .backupPick {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.backupName {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backupMeta {
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The row's ⋯, drawn inside its edge. */
+.rowMenu {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  translate: 0 -50%;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pagerPlace {
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 10px 0 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+.folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

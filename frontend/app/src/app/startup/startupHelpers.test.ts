@@ -15,7 +15,7 @@ describe("startupHelpers failure copy", () => {
       stage: "bootstrap",
     };
 
-    expect(getFailureTitle(failure)).toBe("Saved data needs attention");
+    expect(getFailureTitle(failure)).toBe("Saved data damaged");
     expect(formatFailureCode(failure)).toBe("Saved data check failed");
   });
 
@@ -26,7 +26,7 @@ describe("startupHelpers failure copy", () => {
       stage: "bootstrap",
     };
 
-    expect(getFailureTitle(failure)).toBe("Saved data needs attention");
+    expect(getFailureTitle(failure)).toBe("Saved data damaged");
     expect(formatFailureCode(failure)).toBe("Saved data upgrade failed");
   });
 
@@ -49,7 +49,7 @@ describe("startupHelpers failure copy", () => {
       stage: "runtime",
     };
 
-    expect(getFailureTitle(failure)).toBe("The hardware link stopped");
+    expect(getFailureTitle(failure)).toBe("Link stopped");
     expect(formatFailureCode(failure)).toBe("Hardware link stopped");
     expect(formatFailureStage(failure.stage)).toBe("running");
   });
@@ -61,7 +61,7 @@ describe("startupHelpers failure copy", () => {
       stage: "bootstrap",
     };
 
-    expect(getFailureTitle(failure)).toBe("Studio Control is already open");
+    expect(getFailureTitle(failure)).toBe("Already open");
     expect(formatFailureCode(failure)).toBe("Already open");
   });
 });

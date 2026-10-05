@@ -85,7 +85,7 @@ describe("the recovery screen is one screen", () => {
     // The shell (overhaul 3): the screen fills the cluster, the bay and the
     // plate, so its keys are the whole window's.
     const keys = screen.getAllByRole("button").map((key) => key.textContent);
-    for (const key of ["Retry startup", "Reset the window layout", "Export diagnostics", "Restore latest"]) {
+    for (const key of ["Retry startup", "Reset the window layout", "Export diagnostics", "Restore latest…"]) {
       expect(keys, key).toContain(key);
     }
     expect(screen.queryByTestId("recovery-surface")).toBeNull();

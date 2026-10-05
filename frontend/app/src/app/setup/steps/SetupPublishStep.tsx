@@ -4,7 +4,7 @@ import { Key } from "@sse/design-system";
 import { runnerStepOrder } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
-/** Runner step 5: publish the setup and export the Stream Deck profile. */
+/** Runner step 5: publish the setup, which unlocks the pages and exports a backup. */
 export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot } = editor.props;
   const {
@@ -26,6 +26,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
   } = editor.state;
   const { bayHead, notPassedProbes, backKey, setupState, publishOverrideRecorded, clusterSteps } = editor.chrome;
   const { invokePrimaryAction } = editor.actions;
+  const overriding = notPassedProbes.length > 0;
   return (
     <>
       {activeStepId === "publish" ? (
@@ -33,60 +34,42 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
           head={bayHead}
           eyebrow={`Step ${runnerStepOrder.length} of ${runnerStepOrder.length}`}
           title="Publish"
-          lead="Publishing unlocks the operator workspaces, exports a fresh support backup, and returns you to the console."
+          lead="Publishing unlocks Lighting, Audio, Cameras and Teleprompter, exports a backup and opens the Console. Once published, the deck's pages, the bridge and the desk are live for the next session."
           rules={[
             {
               id: "probes",
-              text: "The deck, bridge and desk probes must all be green before publish; publishing with a probe that is not green asks for an explicit override and records it.",
-              tone: notPassedProbes.length > 0 ? "attention" : "ok",
-            },
-            {
-              id: "backup",
-              text: "The support backup export is part of publish, not a chore for afterwards.",
-              tone: "ok",
-            },
-            {
-              id: "live",
-              text: "Once published, the deck's pages, the bridge and the desk are live for the next session.",
-              tone: "ok",
+              text: overriding
+                ? `${notPassedProbes.length} of ${setupState.probeCount} probes have not passed: publishing asks first, and records the override with the time.`
+                : "Every probe passed.",
+              tone: overriding ? "attention" : "ok",
             },
           ]}
           facts={
             <>
               <SetupFactCard
                 label="Latest backup"
-                value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "None"}
-                standing={lastBackup ? "healthy" : "none yet"}
+                value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "None yet"}
                 tone={lastBackup ? "ok" : "attention"}
               />
               <SetupFactCard
-                label="Startup target"
-                value={
-                  String(startup?.targetSurface ?? "commissioning") === "dashboard" ? "Console" : "Setup / Support"
-                }
-                standing={isReady ? "healthy" : "pending publish"}
+                label="Opens at start"
+                value={String(startup?.targetSurface ?? "commissioning") === "dashboard" ? "Console" : "Setup"}
                 tone={isReady ? "ok" : "attention"}
-              />
-              <SetupFactCard
-                label="Support archives"
-                value={`${backups.length} · native`}
-                standing={backups.length > 0 ? "ready" : "none yet"}
-                tone={backups.length > 0 ? "ok" : "attention"}
               />
             </>
           }
           actions={
             <>
               <Key
-                mode={notPassedProbes.length > 0 ? "danger" : "primary"}
-                take
+                mode={overriding ? "danger" : "primary"}
+                size="large"
                 disabled={busyAction !== null}
                 testId="setup-step-primary"
                 onClick={() => invokePrimaryAction()}
               >
                 {busyAction
                   ? "Working…"
-                  : notPassedProbes.length > 0
+                  : overriding
                     ? "Publish with override…"
                     : isReady
                       ? "Open the Console"
@@ -95,20 +78,17 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
               {backKey}
             </>
           }
-          note={
-            notPassedProbes.length > 0
-              ? `${notPassedProbes.length} of ${setupState.probeCount} probes are not green. Publishing now asks for an explicit override and records it with a timestamp.`
-              : "Writes the gate, exports a backup, then opens the console."
-          }
+          // What the press changes, while it changes something.
+          note={!isReady && !overriding ? "Publish exports a backup, then opens the Console." : undefined}
           record={
             <>
-              {/* What publish commits, as the engine holds it: the
-                          addresses and the counts, not a repeat of the probe
-                          sentences the cluster already prints. */}
+              {/* What publish commits, as the hardware link holds it: the
+                  addresses and the counts, not a repeat of the probe
+                  sentences the cluster already prints. */}
               <SetupRecordHeading>What publish records</SetupRecordHeading>
               <SetupRecordRow
                 label="Hardware profile"
-                value={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
+                value={String(commissioningSnapshot?.hardwareProfile ?? "not reported")}
               />
               <SetupRecordRow
                 label="Lighting bridge"
@@ -132,7 +112,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
               <SetupRecordRow
                 label="Override"
                 value={publishOverrideRecorded ?? "none recorded"}
-                tone={publishOverrideRecorded ? "attention" : "ok"}
+                tone={publishOverrideRecorded ? "attention" : "off"}
                 testId={publishOverrideRecorded ? "setup-publish-override-note" : undefined}
               />
               <SetupRecordHeading>The steps above, as done</SetupRecordHeading>
@@ -154,7 +134,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
                   tone={step.standing === "done" ? "ok" : step.standing === "failed" ? "error" : "attention"}
                 />
               ))}
-              <SetupRecordHeading>Support archives</SetupRecordHeading>
+              <SetupRecordHeading>Backups</SetupRecordHeading>
               {backups.length > 0 ? (
                 backups
                   .slice(0, 3)
@@ -166,7 +146,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
                     />
                   ))
               ) : (
-                <SetupRecordRow label="No archives yet" value="export one with publish" tone="attention" />
+                <SetupRecordRow label="None yet" value="Publish exports one" tone="attention" />
               )}
             </>
           }

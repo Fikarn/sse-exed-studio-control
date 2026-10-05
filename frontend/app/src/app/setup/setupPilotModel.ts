@@ -30,6 +30,8 @@ export interface ControlSurfaceControl {
   description: string;
   id: string;
   label: string;
+  /** The page key that turns the deck to another page (`AUDIO ›`). */
+  pageNav: boolean;
   position: number;
   type: string;
   /** The bridge's route the control posts to; `null` for one that sends nothing. */
@@ -76,9 +78,27 @@ export const runnerStepOrder: RunnerStepId[] = ["import", "probe", "map", "verif
  *  stop's window (owner's decision, 2026-09-28). */
 export const UNPUBLISH_WINDOW_MS = 3000;
 export const UNPUBLISH_ARM_LABEL = "Unpublish the setup";
-/** What the state display says while that press is armed: what gets locked. */
-export const UNPUBLISH_ARMED_SENTENCE =
-  "A second press unpublishes the setup: Lighting, Audio, Cameras and Teleprompter lock until it is published again.";
+/** What the state display says while that press is armed: what gets locked
+ *  (two lines of the display; the armed row says what the press does). */
+export const UNPUBLISH_ARMED_SENTENCE = "A second press unpublishes: Lighting, Audio, Cameras and Teleprompter lock.";
+
+/** A control's kind on the deck, in the operator's words. */
+export function controlKindWord(type: string): string {
+  switch (type) {
+    case "button":
+      return "key";
+    case "display":
+      return "strip cell";
+    case "dial-press":
+      return "dial push";
+    case "dial-turn-left":
+      return "dial turn left";
+    case "dial-turn-right":
+      return "dial turn right";
+    default:
+      return type.replace(/-/g, " ");
+  }
+}
 
 export function parseControlSurfacePages(snapshot: SnapshotRecord | null): ControlSurfacePage[] {
   const pages = snapshot?.pages;
@@ -111,6 +131,7 @@ export function parseControlSurfacePages(snapshot: SnapshotRecord | null): Contr
             description: String(controlRecord.description ?? "Control mapped on the deck."),
             id: String(controlRecord.id ?? controlRecord.label ?? "control"),
             label: String(controlRecord.label ?? "Control"),
+            pageNav: controlRecord.isPageNav === true,
             position: typeof controlRecord.position === "number" ? controlRecord.position : 0,
             type: String(controlRecord.type ?? "button"),
             url: typeof controlRecord.url === "string" ? controlRecord.url : null,

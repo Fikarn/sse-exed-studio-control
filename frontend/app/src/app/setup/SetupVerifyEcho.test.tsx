@@ -94,7 +94,7 @@ describe("Setup's Verify step and the deck's four pages", () => {
     press("/api/deck/camera-action", "select", "2");
     await waitFor(() => expect(tab("CAMERAS").getAttribute("data-active")).toBe("true"));
     expect(pulsing()).toEqual(["CAM 2"]);
-    expect(within(step()).getByRole("button", { name: "CAM 2 button" }).getAttribute("data-selected")).toBe("true");
+    expect(within(step()).getByRole("button", { name: "CAM 2 key" }).getAttribute("data-selected")).toBe("true");
     expect(within(step()).getByText("Select CAM 2: the dials, the plate and the big picture follow.")).toBeTruthy();
     // The pulse is short.
     await waitFor(() => expect(pulsing()).toEqual([]));
@@ -122,12 +122,12 @@ describe("Setup's Verify step and the deck's four pages", () => {
     const user = userEvent.setup();
     press("/api/deck/light-action", "allOn");
     await user.click(tab("AUDIO"));
-    await user.click(within(step()).getByRole("button", { name: "DIM button" }));
+    await user.click(within(step()).getByRole("button", { name: "DIM key" }));
 
     press("/api/deck/audio-action", "dialPress", "3");
     await waitFor(() => expect(pulsing()).toEqual(["DIAL 3"]));
     expect(tab("AUDIO").getAttribute("data-active")).toBe("true");
-    expect(within(step()).getByRole("button", { name: "DIM button" }).getAttribute("data-selected")).toBe("true");
+    expect(within(step()).getByRole("button", { name: "DIM key" }).getAttribute("data-selected")).toBe("true");
     await store.dispose();
   });
 

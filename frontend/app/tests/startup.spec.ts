@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNoDocumentScroll } from "./helpers/geometry";
 import { openFixture } from "./helpers/openFixture";
+import { measureRoom } from "./helpers/setup";
 
 // plan PR 4 / workstream D4: startup + recovery surface specs split out
 // of operator-shell.spec.ts. Covers the startup-loading, protocol-mismatch,
@@ -26,7 +27,7 @@ test("renders startup and recovery fixture states", async ({ page }) => {
   await expect(mismatchDisplay).toContainText("PROTOCOL MISMATCH", { timeout: 10000 });
   await expect(mismatchDisplay).toContainText("PROTOCOL_MISMATCH");
   await expect(page.getByText("What went wrong?")).toBeVisible();
-  await expect(page.getByText("Reference paths")).toBeVisible();
+  await expect(page.getByText("Where things are", { exact: true })).toBeVisible();
   await expect(page.getByText("Requested protocol")).toBeVisible();
   await page.getByRole("button", { name: "App data" }).click();
   await expect(page.getByText(/App data opened at/)).toBeVisible();
@@ -37,8 +38,8 @@ test("renders startup and recovery fixture states", async ({ page }) => {
     timeout: 10000,
   });
   await expect(page.getByText("What went wrong?")).toBeVisible();
-  await expect(page.getByText("File paths")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+  await expect(page.getByText("File paths", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
 });
 
 // plan PR 6 / workstream D6: deeper assertions on the recovery surfaces
@@ -55,7 +56,7 @@ test("protocol-mismatch fixture exposes the documented diagnostic fields", async
   // Every protocol-mismatch instance must expose the documented diagnostic
   // strings; the operator hands these to the maintainer for triage.
   await expect(page.getByText("What went wrong?")).toBeVisible();
-  await expect(page.getByText("Reference paths")).toBeVisible();
+  await expect(page.getByText("Where things are", { exact: true })).toBeVisible();
   await expect(page.getByText("Requested protocol")).toBeVisible();
 
   // Logs is the click-through that the operator uses to capture the
@@ -72,8 +73,8 @@ test("bootstrap-failed fixture surfaces archive + recovery affordances", async (
   // The bootstrap-failed posture is the worst-case startup failure; the
   // operator needs an archive button to capture the runtime state for
   // hand-off + the runtime paths block to know where to look.
-  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
-  await expect(page.getByText("File paths")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
+  await expect(page.getByText("File paths", { exact: true })).toBeVisible();
 });
 
 test("startup-loading fixture hides every operator workspace surface", async ({ page }) => {
@@ -123,7 +124,7 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
   expect(cards, "the sections should have a box").not.toBeNull();
   expect(cards!.y).toBeGreaterThanOrEqual(0);
   expect(cards!.y + cards!.height).toBeLessThanOrEqual(1440);
-  const lastPath = page.getByText("File paths").locator("xpath=following-sibling::ul/li[last()]");
+  const lastPath = page.getByTestId("setup-recovery-paths").locator("li").last();
   const box = await lastPath.boundingBox();
   expect(box, "the last file path should have a box").not.toBeNull();
   expect(box!.y + box!.height).toBeLessThanOrEqual(1440);
@@ -132,20 +133,62 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
   await expectNoDocumentScroll(page);
 });
 
+// The visual overhaul (2026-10-05): an area that stopped drawing says so in a
+// word that fits the display, its short name (`PROMPTER STOPPED`).
+test("an area that stopped: its word fits, nothing scrolls, no line is cut", async ({ page }) => {
+  for (const [crash, tab, word] of [
+    ["setup", "Setup / Support", "SETUP STOPPED"],
+    ["lighting", "Lighting", "LIGHTING STOPPED"],
+    ["cameras", "Cameras", "CAMERAS STOPPED"],
+    ["teleprompter", "Teleprompter", "PROMPTER STOPPED"],
+  ] as const) {
+    await openFixture(page, "audio-populated", { crash });
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: tab, exact: true })
+      .click();
+    await expect(page.getByTestId("workspace-boundary-state-display")).toContainText(word);
+    await expect(page.getByTestId("workspace-boundary-bay")).toContainText("The rest of Studio Control keeps working");
+    const room = await measureRoom(page);
+    expect(room.scrolls, `${crash}: every column holds what it shows`).toEqual([]);
+    expect(room.cut, `${crash}: no line is cut`).toEqual([]);
+  }
+});
+
+// The visual overhaul (2026-10-05): on every screen before ready nothing
+// scrolls and no line is cut, the display's word included (the owner chose
+// shorter words where the 440 px display cut them).
+test("the screens before ready: nothing scrolls, no line is cut", async ({ page }) => {
+  for (const [fixture, word] of [
+    ["protocol-mismatch", "PROTOCOL MISMATCH"],
+    ["bootstrap-failed", "STARTUP FAILED"],
+    ["startup-loading", "STARTING UP…"],
+  ] as const) {
+    await openFixture(page, fixture);
+    await expect(page.getByTestId(/state-display$/).first()).toContainText(word, { timeout: 10000 });
+    const room = await measureRoom(page);
+    expect(room.page, fixture).toEqual([2560, 1440]);
+    expect(room.scrolls, `${fixture}: every column holds what it shows`).toEqual([]);
+    expect(room.cut, `${fixture}: no line is cut`).toEqual([]);
+  }
+});
+
 // Visual overhaul A, Slice 7 (plan Slice 7): a recovery surface is not a dead
 // end — every band on it says what the operator does next.
 test("every recovery band names a next step", async ({ page }) => {
   await openFixture(page, "bootstrap-failed");
 
   const display = page.getByTestId("setup-recovery-surface-state-display");
-  await expect(display).toContainText("STARTUP FAILED");
+  // The fixture's failure comes after the page and the double load: the wait
+  // every other case here gives it (this one flaked at the default 5 s).
+  await expect(display).toContainText("STARTUP FAILED", { timeout: 10000 });
   // The way out is a key on the display itself.
   await expect(page.getByTestId("setup-recovery-retry")).toBeVisible();
 
   // Each band the surface shows carries an action or a named next step.
-  await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Backups", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
-  await expect(page.getByText("File paths")).toBeVisible();
+  await expect(page.getByText("File paths", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Export diagnostics/ }).first()).toBeVisible();
 });
 
@@ -168,12 +211,11 @@ test("the recovery screen offers Reset the window layout beside Retry startup (S
   const display = page.getByTestId("setup-recovery-surface-state-display");
   await expect(display).toContainText("STARTUP FAILED", { timeout: 10000 });
   // The shell (overhaul 3): the display stands in the 440 px cluster; its one
-  // way out stays on it, and the window's keys stand right under it.
+  // way out stays on it, and the window's key stands right under it. The
+  // visual overhaul (2026-10-05, the owner's answer): Back to Console went,
+  // since it could never leave this screen.
   await expect(display.getByRole("button")).toHaveText(["Retry startup"]);
-  await expect(page.getByTestId("setup-recovery-keys").getByRole("button")).toHaveText([
-    "Reset the window layout",
-    "Back to Console",
-  ]);
+  await expect(page.getByTestId("setup-recovery-keys").getByRole("button")).toHaveText(["Reset the window layout"]);
 
   const reset = page.getByTestId("setup-recovery-window-reset");
   await reset.click();

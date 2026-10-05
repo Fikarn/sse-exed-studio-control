@@ -1,6 +1,6 @@
 import { AUDIO_FADER_UNITY, faderDbToLin, faderLinToDb, type AudioSnapshot } from "@sse/engine-client";
 
-import { formatBackupTimestamp, type StatusToneLike } from "../shellData";
+import { formatBackupTimestamp, formatShortTimestamp, type StatusToneLike } from "../shellData";
 
 /**
  * Audio-page level vocabulary — three labels, three meanings, one home each:
@@ -184,15 +184,9 @@ export function meterFill(value: number) {
 // The day and the time, in the Console's date style without the year
 // (`formatAudioTimestamp`'s): when TotalMix last saved its snapshot names
 // (2026-10-01). The text as sent when it is not a time.
+/** `22 Apr, 09:12`: 24 h, as the clock, wherever a time is printed (the visual overhaul, 2026-10-05). */
 export function formatAudioDayTime(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-  }).format(parsed);
+  return formatShortTimestamp(value);
 }
 
 // Visual overhaul A, Slice 4b: what a locked bay says on each tier header —

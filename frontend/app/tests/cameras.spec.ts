@@ -1377,10 +1377,12 @@ test.describe("Setup / Support's camera section", () => {
   });
 
   test("takes an address and a pairing, names each camera's vMix output, and forgets a camera", async ({ page }) => {
+    await page.clock.install();
     await openFixture(page, "setup-cameras");
     await expectWorkspaceMounted(page, "setup");
     await expect(page.getByTestId("setup-camera-3-state")).toHaveText("NOT SET UP");
-    await expect(page.getByTestId("setup-camera-record-3")).toContainText("not set up");
+    // The visual overhaul (2026-10-05): the hardware link's sentence under the camera's head.
+    await expect(page.getByTestId("setup-camera-record-3")).toContainText("has no address");
     await expect(page.getByTestId("setup-camera-3-save-address")).toHaveAttribute("aria-disabled", "true");
 
     await page.getByTestId("setup-camera-3-address").fill("172.16.16.30");
@@ -1409,7 +1411,10 @@ test.describe("Setup / Support's camera section", () => {
     }
     await expect(page.getByTestId("setup-screen-cameras")).not.toContainText("vMix input");
 
-    await page.getByTestId("setup-camera-1-forget").click();
+    // The visual overhaul (2026-10-05): Forget is the camera menu's last item,
+    // and it arms in place: the second press forgets.
+    await page.getByTestId("setup-camera-menu-1").click();
+    await pressTwice(page, "setup-camera-1-forget");
     await expect(page.getByTestId("setup-feedback")).toContainText("CAM 1's pairing is forgotten.");
     await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
     await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("not paired");
