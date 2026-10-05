@@ -19,7 +19,7 @@ export interface SetupStateInput {
   commissioningSummary: string | null;
   /** `22 Apr 2026 · 09:12`, or null when nothing has been exported. */
   lastBackupLabel: string | null;
-  /** The engine's health sentence, which is what a degraded desk has to say. */
+  /** The engine's health summary: a report, no longer DEGRADED's sentence. */
   healthSummary: string | null;
   healthTone: StateDisplayTone;
   /** True once the engine reports commissioning published. */
@@ -67,6 +67,20 @@ export function probeTone(status: StatusToneLike): LampTone {
   return "off";
 }
 
+/**
+ * DEGRADED's sentence, the page's own (the polish, 2026-10-05): the probes
+ * that did not pass, by their hardware, in the display's two lines. The
+ * hardware link's health summary ("Health 'attention'. Storage … Lighting …")
+ * is a report, not a sentence, and runs far past them; Run all probes, beside
+ * it, says what to do.
+ */
+export function degradedSentence(checks: readonly CommissioningCheck[]): string {
+  const names = checks.filter((check) => check.status !== "ok").map((check) => check.label);
+  if (names.length === 0) return "Published, but a probe needs attention.";
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `Published, but ${list} ${names.length === 1 ? "needs" : "need"} attention.`;
+}
+
 /** The probes that are not green, named — for the meta line and the dialog. */
 export function setupUnverifiedProbeNames(checks: readonly CommissioningCheck[]) {
   return checks.filter((check) => check.status !== "ok").map((check) => check.label.toLowerCase());
@@ -76,7 +90,6 @@ export function deriveSetupState({
   checks,
   commissioningSummary,
   lastBackupLabel,
-  healthSummary,
   healthTone,
   published,
 }: SetupStateInput): SetupState {
@@ -103,10 +116,7 @@ export function deriveSetupState({
       meta: probes,
       passedProbeCount: passed,
       probeCount: total,
-      // The page's own sentence keeps the display's two lines, at most 70
-      // characters (the owner's rule, 2026-10-05); Run all probes, beside it,
-      // says what to do.
-      sentence: healthSummary ?? "Operator mode is available, but a probe needs attention.",
+      sentence: degradedSentence(checks),
       tone: healthTone === "error" ? "error" : "attention",
       wayOut: "run-probes",
       word: "DEGRADED",
