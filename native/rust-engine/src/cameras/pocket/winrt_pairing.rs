@@ -383,6 +383,9 @@ fn answer(
                     }
                 });
             }
+            // Failed or cancelled: while the PIN was awaited, its time ran
+            // out (however Windows reports it); otherwise Windows' words.
+            Ok(_) if held.is_some() => break Err(failed(NO_PIN)),
             Ok(_) => {
                 break Err(operation
                     .GetResults()

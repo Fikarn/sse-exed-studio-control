@@ -496,14 +496,16 @@ impl Cameras {
             return Ok(None);
         }
         // `Pairing`, or why the PIN could not be handed over (its thread
-        // gone): the pairing's own word.
-        let step = self
-            .links
-            .pairing_step()
-            .unwrap_or_else(|| PairingStep::Failed(String::from(STOPPED)));
-        if !step.running() {
-            self.links.end_pairing();
-        }
+        // gone). A pairing that is already `Paired` is left to its own
+        // notice, which `follow_pairing` saves from `Pairing`.
+        let step = match self.links.pairing_step() {
+            Some(failed @ PairingStep::Failed(_)) => {
+                self.links.end_pairing();
+                failed
+            }
+            None => PairingStep::Failed(String::from(STOPPED)),
+            Some(_) => PairingStep::Pairing,
+        };
         self.camera_mut(RECORDING_CAMERA).pairing = Some(step);
         Ok(Some("pairing"))
     }
