@@ -212,11 +212,12 @@ fn session(shared: &Arc<Shared>, inbox: &Inbox, events: &Events) -> Result<(), S
             // Subscribed at the loop's top, when not already.
             Ok(Order::Event(Event::Connected(true))) => {}
             Ok(Order::Event(event)) => shared.take(&event),
-            Err(RecvTimeoutError::Timeout) => {
-                if PocketLink::abandoned(shared) {
-                    break Ok(());
-                }
-            }
+            Err(RecvTimeoutError::Timeout) => {}
+        }
+        // On every pass, not only a quiet one: a running camera's timecode
+        // keeps the inbox busy, and an abandoned link must still end.
+        if PocketLink::abandoned(shared) {
+            break Ok(());
         }
     };
 
