@@ -4,6 +4,12 @@
 //! Setup's part is saved (`store.rs`); releasing and the selection are kept
 //! in memory, so a start holds every set-up camera again.
 //!
+//! The cameras are read through one of two links: the simulated cameras
+//! (`bodies`, every test and development run) or the real links
+//! (`real_link::RealLinks`, the studio's build), which the runtime tells
+//! what to hold and to let go (`tell_links`) whenever who holds a camera
+//! changes, and which answer a read at once from what they last heard.
+//!
 //! One set of cameras per saved data (`db_path`), so the tests, each with a
 //! database of its own, never share one. Every `cameras.*` request runs under
 //! the cameras' own lock (`with_cameras`), which first reads every held
@@ -14,7 +20,7 @@
 //! health check changed — whoever noticed first.
 
 use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
-use crate::cameras::real_link::{self, LinkFailure};
+use crate::cameras::real_link::{self, LinkFailure, RealLinks};
 use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras};
 use crate::cameras::snapshot::{CameraDialBank, CameraSetupSummary, CameraState};
 use crate::cameras::store::{read_setup, StoredSetup};
@@ -187,6 +193,10 @@ pub(crate) struct Cameras {
     pub db_path: PathBuf,
     /// The simulated link (`SSE_CAMERAS_SIMULATED=1`), or the real ones.
     pub simulated: bool,
+    /// The real links (`real_link.rs`): told what to hold and to let go,
+    /// read without waiting, sent the presses. Spoken to only without the
+    /// simulated cameras, so no test or development run reaches one.
+    pub links: RealLinks,
     /// The camera the big picture, the plate and the deck's dials set (D19).
     pub selected: u8,
     /// What the deck's dials set on it (D14); exposure after a start. Kept
@@ -226,6 +236,7 @@ impl Cameras {
         let mut cameras = Self {
             db_path: db_path.to_path_buf(),
             simulated,
+            links: RealLinks::new(),
             selected: RECORDING_CAMERA,
             bank: CameraDialBank::default(),
             stop_arm: None,
@@ -235,9 +246,26 @@ impl Cameras {
             cameras: setup.map(|setup| CameraRuntime::new(setup, simulated)),
         };
         for camera in CAMERA_NUMBERS {
+            cameras.tell_links(camera);
             cameras.read(camera, bodies, now);
         }
         Ok(cameras)
+    }
+
+    /// Tells the real links to hold `camera` as its setup now stands (set
+    /// up and not released) or to let it go; nothing with the simulated
+    /// cameras.
+    fn tell_links(&mut self, camera: u8) {
+        if self.simulated {
+            return;
+        }
+        let runtime = self.camera(camera);
+        if runtime.setup.set_up() && !runtime.released {
+            let setup = runtime.setup.clone();
+            self.links.hold(&setup);
+        } else {
+            self.links.let_go(camera);
+        }
     }
 
     pub(crate) fn camera(&self, camera: u8) -> &CameraRuntime {
@@ -276,10 +304,7 @@ impl Cameras {
         if self.simulated {
             bodies.read(camera).ok_or(LinkFailure::NoAnswer)
         } else {
-            Err(real_link::read(
-                camera,
-                self.camera(camera).setup.address.as_deref(),
-            ))
+            self.links.read(&self.camera(camera).setup)
         }
     }
 
@@ -359,10 +384,8 @@ impl Cameras {
         commands: &[CameraCommand],
     ) -> Result<(), CameraError> {
         let failure = if !self.simulated {
-            Some(real_link::read(
-                camera,
-                self.camera(camera).setup.address.as_deref(),
-            ))
+            let setup = self.camera(camera).setup.clone();
+            self.links.send(&setup, commands).err()
         } else if bodies.send(camera, commands) {
             None
         } else {
@@ -403,6 +426,7 @@ impl Cameras {
         let runtime = self.camera_mut(camera);
         runtime.released = true;
         runtime.forget_reading();
+        self.tell_links(camera);
     }
 
     /// Takes a camera back and reads it again.
@@ -415,6 +439,7 @@ impl Cameras {
         } else {
             runtime.forget_reading();
         }
+        self.tell_links(camera);
         self.read(camera, bodies, now);
     }
 
@@ -439,6 +464,7 @@ impl Cameras {
         if hold || !same_camera {
             runtime.released = false;
             runtime.forget_reading();
+            self.tell_links(camera);
             self.read(camera, bodies, now);
         }
     }
@@ -549,6 +575,17 @@ thread_local! {
 #[cfg(test)]
 pub(crate) fn forget(db_path: &Path) {
     lock(&entry(db_path)).cameras = None;
+}
+
+/// What the runtime told the real links of this saved data since the start
+/// (`hold 2`, `let go 2`), for the tests of the seam.
+#[cfg(test)]
+pub(crate) fn links_told(db_path: &Path) -> Vec<String> {
+    lock(&entry(db_path))
+        .cameras
+        .as_ref()
+        .map(|cameras| cameras.links.told())
+        .unwrap_or_default()
 }
 
 /// Does something to the simulated cameras themselves (a test hook: the

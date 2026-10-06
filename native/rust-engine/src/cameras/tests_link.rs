@@ -8,12 +8,15 @@
 
 use crate::cameras::model::Setting;
 use crate::cameras::real_link::guard_camera_address;
+use crate::cameras::runtime;
 use crate::cameras::simulated::{CameraCommand, CameraValue};
 use crate::cameras::snapshot::{CameraState, CameraTone};
+use crate::cameras::store::{write_setup, StoredSetup};
 use crate::cameras::test_support::{
     announced_changes, assert_operator_words, refusal, take_announced, TestCameras, CAM2_ADDRESS,
     CAM3_ADDRESS,
 };
+use crate::storage::open_connection;
 use serde_json::{json, Value};
 
 fn change(reason: &str, camera: Value) -> (String, Value) {
@@ -470,6 +473,58 @@ fn without_a_link_a_camera_the_saved_data_holds_does_not_answer() {
     assert_eq!(cameras.camera(2)["state"], "not-set-up");
     assert_eq!(cameras.health().whole_status_sentence(), None);
     assert!(cameras.nothing_sent());
+}
+
+// The seam to the real links (2026-10-06): the runtime tells them to hold a
+// camera at a start and at Connect, and to let it go at Release and when its
+// setup is taken away; with the simulated cameras it tells them nothing.
+// Until the Pocket's parts are built the links read no link yet, CAM 1's
+// pairing from saved data included.
+#[test]
+fn the_real_links_are_told_what_to_hold_and_to_let_go() {
+    let cameras = TestCameras::without_simulation("told");
+    cameras.starts_with_address(2, "127.0.0.1");
+    let connection = open_connection(cameras.path()).expect("connection should open");
+    write_setup(
+        &connection,
+        &StoredSetup {
+            paired: true,
+            ..StoredSetup::new(1)
+        },
+    )
+    .expect("the row writes");
+    cameras.restart();
+    cameras.snapshot();
+    assert_eq!(
+        runtime::links_told(cameras.path()),
+        vec!["hold 1", "hold 2", "let go 3"],
+        "a start holds every set-up camera"
+    );
+    let no_link = "Studio Control has no link to CAM 1 yet: it comes with a later version.";
+    assert_eq!(cameras.camera(1)["state"], "unreachable");
+    assert_eq!(cameras.camera(1)["sentence"], no_link);
+
+    cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
+    cameras.call("cameras.connect", json!({ "camera": 2 }));
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 2, "address": null }),
+    );
+    cameras.call("cameras.setup.forget", json!({ "camera": 1 }));
+    assert_eq!(
+        runtime::links_told(cameras.path())[3..],
+        ["let go 2", "hold 2", "let go 2", "let go 1"]
+    );
+    assert!(cameras.nothing_sent());
+
+    let simulated = TestCameras::set_up("told-simulated");
+    simulated.call("cameras.release", json!({ "camera": 1, "confirm": true }));
+    simulated.call("cameras.connect", json!({ "camera": 1 }));
+    assert_eq!(
+        runtime::links_told(simulated.path()),
+        Vec::<String>::new(),
+        "the simulated cameras speak to no real link"
+    );
 }
 
 // D15 rule 1: in a test build the network link refuses every address that is
