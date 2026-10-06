@@ -236,7 +236,7 @@ impl Cameras {
         let mut cameras = Self {
             db_path: db_path.to_path_buf(),
             simulated,
-            links: RealLinks::new(),
+            links: RealLinks::new(db_path),
             selected: RECORDING_CAMERA,
             bank: CameraDialBank::default(),
             stop_arm: None,
@@ -384,8 +384,18 @@ impl Cameras {
         commands: &[CameraCommand],
     ) -> Result<(), CameraError> {
         let failure = if !self.simulated {
-            let setup = self.camera(camera).setup.clone();
-            self.links.send(&setup, commands).err()
+            let runtime = self.camera(camera);
+            let setup = runtime.setup.clone();
+            let current = runtime.reading.clone().unwrap_or_default();
+            match self.links.send(&setup, commands, &current) {
+                Ok(()) => None,
+                // The protocol cannot carry the press: nothing was sent,
+                // and the camera is as reachable as before.
+                Err(LinkFailure::NotCarried(sentence)) => {
+                    return Err(CameraError::Refused("CAMERA_VALUE_NOT_ALLOWED", sentence));
+                }
+                Err(failure) => Some(failure),
+            }
         } else if bodies.send(camera, commands) {
             None
         } else {
@@ -534,6 +544,14 @@ pub(crate) fn with_cameras<T>(
         pictures_helper::want(db_path, now_wanted);
     }
     result
+}
+
+/// A real link heard something the page shows (a value the camera changed,
+/// a connection that came or went): the cameras are read again and what
+/// changed is announced, as before any request. Called from the link's
+/// thread, never under the cameras' lock.
+pub(crate) fn notice(db_path: &Path) {
+    let _ = with_cameras(db_path, false, |_, _, _| Ok(()));
 }
 
 /// `cameras.changed { reason, camera }` from outside a request's own reply.

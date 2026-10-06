@@ -3361,6 +3361,7 @@ dependencies = [
  "serde_json",
  "studio-control-protocol",
  "ts-rs",
+ "windows",
 ]
 
 [[package]]

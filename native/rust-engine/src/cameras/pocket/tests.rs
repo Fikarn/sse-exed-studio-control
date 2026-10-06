@@ -257,19 +257,21 @@ fn white_balance_and_tint_go_together() {
         [255, 8, 0, 0, 1, 2, 2, 0, 0xE0, 0x15, 0xFB, 0xFF],
         "a tint of −5 with the board's 5600 K"
     );
+    // Neither half is ever guessed (D12): until the camera has reported the
+    // other half, the press is refused.
     let unread = CameraReading::default();
-    assert!(
+    assert_eq!(
         encode_commands(&[set(Setting::Tint, CameraValue::Number(1.0))], &unread)
-            .expect_err("no white balance to send the tint with")
-            .contains("white balance")
+            .expect_err("no white balance to send the tint with"),
+        "CAM 1 has not reported its white balance yet, so a tint cannot be sent with it."
     );
     assert_eq!(
-        one(
-            set(Setting::WhiteBalance, CameraValue::Number(3200.0)),
+        encode_commands(
+            &[set(Setting::WhiteBalance, CameraValue::Number(3200.0))],
             &unread
-        )[10..],
-        [0, 0],
-        "a tint not read goes as 0"
+        )
+        .expect_err("no tint to send the white balance with"),
+        "CAM 1 has not reported its tint yet, so a white balance cannot be sent with it."
     );
     let mut reading = CameraReading::default();
     apply(
@@ -594,6 +596,60 @@ fn what_the_pocket_does_not_take_is_refused() {
         .is_err(),
         "one refused command refuses the press"
     );
+}
+
+// A press that sets half a parameter carries the other half as the camera
+// reported it, never a guess (D12): right after a connection, before the
+// camera has sent its settings, such a press is refused and nothing is sent.
+#[test]
+fn a_press_before_the_camera_reported_the_other_half_is_refused() {
+    let unread = CameraReading::default();
+    for (command, sentence) in [
+        (
+            set(Setting::Resolution, text("UHD")),
+            "CAM 1 has not reported its recording format yet, so a resolution cannot be sent with it.",
+        ),
+        (
+            set(Setting::FrameRate, text("25")),
+            "CAM 1 has not reported its recording format yet, so a frame rate cannot be sent with it.",
+        ),
+        (
+            set(Setting::DisplayLut, text("None")),
+            "CAM 1 has not reported whether its display LUT is on yet, so a display LUT cannot be sent with it.",
+        ),
+        (
+            set(Setting::DisplayLutOn, CameraValue::Switch(true)),
+            "CAM 1 has not reported its display LUT yet, so the switch cannot be sent with it.",
+        ),
+    ] {
+        assert_eq!(
+            encode_commands(std::slice::from_ref(&command), &unread).expect_err("refused"),
+            sentence,
+            "{command:?}"
+        );
+    }
+    // Half a format is not enough either.
+    let half = CameraReading {
+        resolution: Some(String::from("6K")),
+        ..CameraReading::default()
+    };
+    assert!(encode_commands(&[set(Setting::FrameRate, text("25"))], &half).is_err());
+    // What needs no other half goes through unread.
+    for command in [
+        set(Setting::Iso, text("400")),
+        set(Setting::Shutter, text("180°")),
+        set(Setting::Iris, text("f/4.0")),
+        set(Setting::Nd, text("Clear")),
+        set(Setting::Focus, CameraValue::Number(0.5)),
+        set(Setting::DynamicRange, text("Film")),
+        CameraCommand::RecordStart,
+        CameraCommand::Auto(AutoKind::Focus),
+    ] {
+        assert!(
+            encode_commands(std::slice::from_ref(&command), &unread).is_ok(),
+            "{command:?}"
+        );
+    }
 }
 
 proptest! {

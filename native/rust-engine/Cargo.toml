@@ -31,6 +31,22 @@ miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-a
 quick-xml = "0.42"
 base64 = "0.22.1"
 
+# CAM 1 over Bluetooth (the Pocket's link, 2026-10-06): Windows' own pairing
+# and GATT through the `windows` crate, the one the shell and the pictures
+# helper already lock (0.61); these are new features of it, and nothing new is
+# fetched. WinRT's calls are safe code, so the workspace's `forbid(unsafe_code)`
+# stands. The Linux CI builds do not see it: `cameras/pocket/stub.rs` stands
+# in for `winrt.rs` there.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Devices_Bluetooth",
+    "Devices_Bluetooth_GenericAttributeProfile",
+    "Devices_Enumeration",
+    "Foundation",
+    "Foundation_Collections",
+    "Storage_Streams",
+] }
+
 [dev-dependencies]
 # Property tests for the two parsers that read bytes from outside the process:
 # the control-surface bridge's HTTP reader and the TotalMix OSC ingest (2026-09
