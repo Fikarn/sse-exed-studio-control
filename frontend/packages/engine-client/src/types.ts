@@ -666,7 +666,11 @@ export interface ShellStore {
   releaseCamera(camera: CameraNumber, confirm: boolean): Promise<JsonValue>;
   connectCamera(camera: CameraNumber): Promise<JsonValue>;
   updateCameraSetup(request: CameraSetupUpdateRequest): Promise<JsonValue>;
-  pairCamera(camera: CameraNumber): Promise<JsonValue>;
+  /**
+   * CAM 1's pairing (2026-10-06): without `pin` it begins (the camera then shows a 6-digit
+   * PIN); with `pin` it hands that PIN over.
+   */
+  pairCamera(camera: CameraNumber, pin?: string): Promise<JsonValue>;
   forgetCamera(camera: CameraNumber): Promise<JsonValue>;
   /**
    * Reads the cameras again (`cameras.snapshot`), which leaves no event and no

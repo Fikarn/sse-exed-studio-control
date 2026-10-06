@@ -94,7 +94,8 @@ describe("the fixture double's cameras seed", () => {
         { camera: 3, address: CAM3_ADDRESS },
       ],
     });
-    expect((await camera(1)).sentence).toBe("Studio Control has no link to CAM 1 yet: it comes with a later version.");
+    // CAM 1's link is the studio build's own, and the double has no Pocket for it to reach.
+    expect((await camera(1)).sentence).toBe("CAM 1 does not answer over Bluetooth. Check it is on and within reach.");
     expect((await camera(3)).sentence).toBe("Studio Control has no link to CAM 3 yet: it comes with a later version.");
     expect((await camera(2)).state).toBe("not-set-up");
   });

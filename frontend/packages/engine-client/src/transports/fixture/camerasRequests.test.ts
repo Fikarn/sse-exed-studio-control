@@ -522,7 +522,15 @@ describe("the fixture double's cameras: Setup", () => {
     const before = (await rows()).length;
     expect(await call("cameras.setup.update", { camera: 2, address: " 010.000.000.002 " })).toEqual({
       camera: 2,
-      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 2, vmixOutput: 3, noLink: null },
+      setup: {
+        setUp: true,
+        address: "10.0.0.2",
+        paired: false,
+        vmixInput: 2,
+        vmixOutput: 3,
+        noLink: null,
+        pairing: null,
+      },
     });
     expect(seen()).toEqual([
       ["cameras.changed", "setup", 2],
@@ -532,14 +540,22 @@ describe("the fixture double's cameras: Setup", () => {
     expect((await camera(2)).values.iso.value).toBe("800");
     expect(await call("cameras.setup.update", { camera: 2, vmixInput: 7 })).toEqual({
       camera: 2,
-      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 7, vmixOutput: 3, noLink: null },
+      setup: {
+        setUp: true,
+        address: "10.0.0.2",
+        paired: false,
+        vmixInput: 7,
+        vmixOutput: 3,
+        noLink: null,
+        pairing: null,
+      },
     });
     expect(await call("cameras.setup.update", { camera: 1, vmixInput: 1000 })).toMatchObject({
       setup: { setUp: false, vmixInput: 1000 },
     });
     expect(await call("cameras.setup.update", { camera: 2, address: null })).toEqual({
       camera: 2,
-      setup: { setUp: false, address: null, paired: false, vmixInput: 7, vmixOutput: 3, noLink: null },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 7, vmixOutput: 3, noLink: null, pairing: null },
     });
     expect((await camera(2)).state).toBe("not-set-up");
     expect(cameras.sent(2)).toBe(0);
@@ -597,11 +613,18 @@ describe("the fixture double's cameras: Setup", () => {
     expect(await camera(3)).toMatchObject({ state: "held", setup: { address: "127.0.0.9", vmixInput: 9 } });
   });
 
-  it("pairs CAM 1 with the simulated link at once, and forgets a camera's address or pairing", async () => {
+  it("pairs CAM 1 at the PIN it shows, and forgets a camera's address or pairing", async () => {
     const { call, refused, seen, camera, cameras } = openCamerasDouble();
+    const wanted = { state: "pin", sentence: "CAM 1 shows a 6-digit PIN. Enter it here." };
     expect(await call("cameras.setup.pair", { camera: 1 })).toEqual({
       camera: 1,
-      setup: { setUp: true, address: null, paired: true, vmixInput: 1, vmixOutput: 2, noLink: null },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 1, vmixOutput: 2, noLink: null, pairing: wanted },
+    });
+    expect(seen()).toEqual([["cameras.changed", "pairing", 1]]);
+    expect((await camera(1)).state, "nothing is saved yet").toBe("not-set-up");
+    expect(await call("cameras.setup.pair", { camera: 1, pin: " 123456 " })).toEqual({
+      camera: 1,
+      setup: { setUp: true, address: null, paired: true, vmixInput: 1, vmixOutput: 2, noLink: null, pairing: null },
     });
     expect(seen()).toEqual([
       ["cameras.changed", "setup", 1],
@@ -615,20 +638,48 @@ describe("the fixture double's cameras: Setup", () => {
     await call("cameras.setup.update", { camera: 1, vmixInput: 4 });
     expect(await call("cameras.setup.forget", { camera: 1 })).toEqual({
       camera: 1,
-      setup: { setUp: false, address: null, paired: false, vmixInput: 4, vmixOutput: 2, noLink: null },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 4, vmixOutput: 2, noLink: null, pairing: null },
     });
     expect((await camera(1)).state).toBe("not-set-up");
     expect(cameras.sent(1)).toBe(0);
   });
 
-  it("takes no pairing and no address without a link: every camera NOT SET UP, and why", async () => {
-    const { call, refused, seen, snapshot, health, cameras } = openCamerasDouble({ simulated: false });
-    const cannotPair = "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
-    const cannotTake = "Studio Control cannot take CAM 2's address yet: its network link comes with a later version.";
-    expect(await refused("cameras.setup.pair", { camera: 1 })).toEqual({
-      code: "CAMERA_NO_LINK",
-      sentence: cannotPair,
+  it("fails a PIN that is not the camera's, saves nothing, and takes a PIN only while one is wanted", async () => {
+    const { call, refused, seen, camera, cameras } = openCamerasDouble();
+    const notWanted = {
+      code: "CAMERA_PAIRING_NOT_WANTED",
+      sentence: "CAM 1's pairing does not wait for a PIN now. Press Pair CAM 1 first.",
+    };
+    expect(await refused("cameras.setup.pair", { camera: 1, pin: "123456" })).toEqual(notWanted);
+    await call("cameras.setup.pair", { camera: 1 });
+    seen();
+    for (const pin of ["12345", "1234567", "12a456", "12 456", "", 123456, true]) {
+      expect(await refused("cameras.setup.pair", { camera: 1, pin }), String(pin)).toEqual({
+        code: "INVALID_PARAMS",
+        sentence: "pin must be the 6 digits CAM 1 shows.",
+      });
+    }
+    expect(seen(), "a refused request raises nothing").toEqual([]);
+    expect(await call("cameras.setup.pair", { camera: 1, pin: "654321" })).toMatchObject({
+      setup: {
+        paired: false,
+        pairing: { state: "failed", sentence: "CAM 1 did not accept the PIN. Press Pair CAM 1 to try again." },
+      },
     });
+    expect(seen()).toEqual([["cameras.changed", "pairing", 1]]);
+    expect(await refused("cameras.setup.pair", { camera: 1, pin: "123456" })).toEqual(notWanted);
+    expect((await camera(1)).state).toBe("not-set-up");
+    // A new pairing starts over; Forget stops one that runs.
+    expect(await call("cameras.setup.pair", { camera: 1 })).toMatchObject({ setup: { pairing: { state: "pin" } } });
+    expect(await call("cameras.setup.forget", { camera: 1 })).toMatchObject({ setup: { pairing: null } });
+    expect(await refused("cameras.setup.pair", { camera: 1, pin: "123456" })).toEqual(notWanted);
+    expect(cameras.sent(1)).toBe(0);
+  });
+
+  it("takes no address without a link to CAM 2 and CAM 3, and CAM 1's pairing in the studio's build", async () => {
+    const { call, refused, seen, snapshot, health, cameras } = openCamerasDouble({ simulated: false });
+    const notPaired = "CAM 1 is not paired. Pair it in Setup, with the camera beside you.";
+    const cannotTake = "Studio Control cannot take CAM 2's address yet: its network link comes with a later version.";
     expect(await refused("cameras.setup.update", { camera: 2, address: "127.0.0.1" })).toEqual({
       code: "CAMERA_NO_LINK",
       sentence: cannotTake,
@@ -649,13 +700,13 @@ describe("the fixture double's cameras: Setup", () => {
     expect(shown.cameras.map((camera) => [camera.state, camera.sentence, camera.setup])).toEqual([
       [
         "not-set-up",
-        "Studio Control has no link to CAM 1 yet: it comes with a later version.",
-        { setUp: false, address: null, paired: false, vmixInput: 1, vmixOutput: 2, noLink: cannotPair },
+        notPaired,
+        { setUp: false, address: null, paired: false, vmixInput: 1, vmixOutput: 2, noLink: null, pairing: null },
       ],
       [
         "not-set-up",
         "Studio Control has no link to CAM 2 yet: it comes with a later version.",
-        { setUp: false, address: null, paired: false, vmixInput: 2, vmixOutput: 3, noLink: cannotTake },
+        { setUp: false, address: null, paired: false, vmixInput: 2, vmixOutput: 3, noLink: cannotTake, pairing: null },
       ],
       [
         "not-set-up",
@@ -667,14 +718,12 @@ describe("the fixture double's cameras: Setup", () => {
           vmixInput: 3,
           vmixOutput: 4,
           noLink: "Studio Control cannot take CAM 3's address yet: its network link comes with a later version.",
+          pairing: null,
         },
       ],
     ]);
     const { summary, check } = await health();
-    expect(check).toMatchObject({
-      word: "NOT SET UP",
-      summary: "Studio Control has no link to CAM 1 yet: it comes with a later version.",
-    });
+    expect(check).toMatchObject({ word: "NOT SET UP", summary: notPaired });
     expect(summary, "the Cameras lamp only").not.toContain("Cameras:");
     expect(await refused("cameras.set", { camera: 2, setting: "iso", value: "800" })).toEqual({
       code: "CAMERA_NOT_SET_UP",
@@ -688,7 +737,19 @@ describe("the fixture double's cameras: Setup", () => {
     expect(await call("cameras.setup.update", { camera: 2, address: null })).toMatchObject({
       setup: { setUp: false },
     });
-    expect(await call("cameras.setup.forget", { camera: 1 })).toMatchObject({ setup: { noLink: cannotPair } });
+    // CAM 1's link is the studio build's own; the double has no Pocket, so its pairing looks
+    // for one and finds none, and takes no PIN.
+    expect(await call("cameras.setup.pair", { camera: 1 })).toMatchObject({
+      setup: {
+        noLink: null,
+        pairing: {
+          state: "finding",
+          sentence: "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.",
+        },
+      },
+    });
+    expect((await refused("cameras.setup.pair", { camera: 1, pin: "123456" })).code).toBe("CAMERA_PAIRING_NOT_WANTED");
+    expect(await call("cameras.setup.forget", { camera: 1 })).toMatchObject({ setup: { noLink: null, pairing: null } });
     expect([cameras.sent(1), cameras.sent(2), cameras.sent(3)]).toEqual([0, 0, 0]);
   });
 

@@ -115,11 +115,18 @@ describe("the fixture double's Cameras lamp: the whole status", () => {
     expect(summary).not.toMatch(/Cameras:/);
   });
 
-  it("counts a set-up camera with no link yet, as the live app has until Slices 11 and 13", async () => {
+  it("counts a set-up camera with no link yet, as the studio's build has until Slice 13", async () => {
+    const { health } = openCamerasDouble({ simulated: false, cameras: [{ camera: 2, address: CAM2_ADDRESS }] });
+    const { status, summary } = await health();
+    expect(status).toBe("attention");
+    expect(summary).toMatch(/ Cameras: Studio Control has no link to CAM 2 yet: it comes with a later version\.$/);
+  });
+
+  it("counts a paired CAM 1 the studio's build cannot reach (the double has no Pocket)", async () => {
     const { health } = openCamerasDouble({ simulated: false, cameras: [{ camera: 1, paired: true }] });
     const { status, summary } = await health();
     expect(status).toBe("attention");
-    expect(summary).toMatch(/ Cameras: Studio Control has no link to CAM 1 yet: it comes with a later version\.$/);
+    expect(summary).toMatch(/ Cameras: CAM 1 does not answer over Bluetooth\. Check it is on and within reach\.$/);
   });
 
   it("ends the summary with the Prompter XL's sentence, then the cameras'", async () => {
@@ -245,6 +252,7 @@ describe("the fixture double's cameras: the backup (format 7)", () => {
       vmixInput: 1,
       vmixOutput: 2,
       noLink: null,
+      pairing: null,
     });
     expect(await camera(2)).toMatchObject({ state: "held", setup: { address: CAM2_ADDRESS, vmixInput: 12 } });
     expect(await camera(3)).toMatchObject({ state: "held", setup: { address: CAM3_ADDRESS, vmixInput: 3 } });

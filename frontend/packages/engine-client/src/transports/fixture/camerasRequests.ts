@@ -64,8 +64,13 @@ import {
   notConfirmedRefusal,
   notRecordingRefusal,
   notSetUpRefusal,
+  PAIRING_SENTENCES,
+  pairingNotWantedRefusal,
+  PIN_INVALID_MESSAGE,
+  PIN_REFUSED_SENTENCE,
   releasedRefusal,
   releasedToSentence,
+  SIMULATED_PIN,
   startedRecordingSentence,
   stoppedRecordingSentence,
   unreachableRefusal,
@@ -100,6 +105,8 @@ export type CamerasChangedReason =
   | "release"
   | "connect"
   | "setup"
+  /** A step of CAM 1's pairing (2026-10-06). */
+  | "pairing"
   | "reported"
   | "unreachable"
   | "reachable"
@@ -500,22 +507,55 @@ function setupUpdateRequest(cameras: FixtureCameras, params: JsonObject, now: nu
   return answer({ camera, setup: setupSummary(cameras, camera) }, "setup", camera);
 }
 
-/** `cameras.setup.pair { camera: 1 }`: the simulated link pairs at once; without it, no link yet. */
+/** The PIN's form: six digits, the spaces around them taken away (`parse_pin`). */
+function pinParam(params: JsonObject): string | null {
+  const value = params.pin;
+  if (value === undefined || value === null) return null;
+  const pin = typeof value === "string" ? value.trim() : "";
+  if (!/^[0-9]{6}$/.test(pin)) throw invalidParams(PIN_INVALID_MESSAGE);
+  return pin;
+}
+
+/**
+ * `cameras.setup.pair { camera: 1, pin? }`, in two steps (2026-10-06): without `pin` a pairing
+ * begins, and one that runs starts over — the simulated CAM 1 shows its PIN at once; in the
+ * studio's build the double has no Pocket, so the pairing looks for one. With `pin` it hands
+ * the PIN over: the simulated camera's own (`123456`) pairs it, saved and held (`setup`); any
+ * other fails and saves nothing. Each step is `cameras.changed { reason: "pairing" }`.
+ */
 function setupPairRequest(cameras: FixtureCameras, params: JsonObject, now: number): Answer {
   const camera = cameraParam(params);
   if (camera !== 1) throw invalidParams("Only CAM 1 is paired; CAM 2 and CAM 3 take an address.");
+  const pin = pinParam(params);
   if (!hasLink(cameras, camera)) throw noLinkRefusal(cameraModel(camera));
-  cameras.held[1].paired = true;
+  const held = cameras.held[1];
+  if (pin === null) {
+    const state = cameras.simulated ? "pin" : "finding";
+    held.pairing = { state, sentence: PAIRING_SENTENCES[state] };
+    return answer({ camera, setup: setupSummary(cameras, camera) }, "pairing", camera);
+  }
+  if (held.pairing?.state !== "pin") throw pairingNotWantedRefusal();
+  if (pin !== SIMULATED_PIN) {
+    held.pairing = { state: "failed", sentence: PIN_REFUSED_SENTENCE };
+    return answer({ camera, setup: setupSummary(cameras, camera) }, "pairing", camera);
+  }
+  held.pairing = null;
+  held.paired = true;
   holdAfresh(cameras, 1, now);
   return answer({ camera, setup: setupSummary(cameras, camera) }, "setup", camera);
 }
 
-/** `cameras.setup.forget { camera }`: the address or the pairing goes (the vMix input stays); not set up again. */
+/**
+ * `cameras.setup.forget { camera }`: the address or the pairing goes (the vMix input stays),
+ * and CAM 1's pairing stops if one runs; not set up again.
+ */
 function setupForgetRequest(cameras: FixtureCameras, params: JsonObject): Answer {
   const camera = cameraParam(params);
   const held = cameras.held[camera];
-  if (camera === 1) held.paired = false;
-  else held.address = null;
+  if (camera === 1) {
+    held.paired = false;
+    held.pairing = null;
+  } else held.address = null;
   held.released = false;
   forgetRead(cameras, camera);
   return answer({ camera, setup: setupSummary(cameras, camera) }, "setup", camera);

@@ -100,6 +100,18 @@
   font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
 }
 
+/* CAM 1's pairing while it runs (2026-10-06): what to do now, in the
+   text's own colour; a pairing that failed says why as a lock does. */
+.step {
+  margin: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+.step[data-state="failed"] {
+  color: var(--role-yellow-text);
+}
+
 .waiting {
   margin: 0;
   color: var(--text-text2);

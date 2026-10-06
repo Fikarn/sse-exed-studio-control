@@ -60,7 +60,7 @@ export function unreachableSentence(model: CameraModel, address: string | null):
     : `${model.tag} does not answer at ${address ?? "its address"}. Check that it is on and on the network.`;
 }
 
-/** A camera in a build with no link to it, before Slices 11 and 13 bring the real one. */
+/** A camera in a build with no link to it: CAM 2 and CAM 3 before Slice 13 brings theirs. */
 export function noLinkSentence(model: CameraModel): string {
   return `Studio Control has no link to ${model.tag} yet: it comes with a later version.`;
 }
@@ -101,6 +101,32 @@ export function noLinkRefusalSentence(model: CameraModel): string {
 
 export function noLinkRefusal(model: CameraModel): EngineRequestError {
   return new EngineRequestError("CAMERA_NO_LINK", noLinkRefusalSentence(model));
+}
+
+// CAM 1's pairing (the Pocket's link, part 5, 2026-10-06; `pocket/pairing.rs`): `Pair CAM 1`
+// begins it, the camera shows a 6-digit PIN, and the PIN it shows pairs it.
+
+/** The PIN the simulated CAM 1 shows (`SIMULATED_PIN`). */
+export const SIMULATED_PIN = "123456";
+
+/** Each running step's sentence, as Setup shows it. */
+export const PAIRING_SENTENCES = {
+  finding: "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.",
+  pin: "CAM 1 shows a 6-digit PIN. Enter it here.",
+  pairing: "Pairing with CAM 1…",
+} as const;
+
+/** A PIN that is not the camera's: the pairing fails, and nothing is saved. */
+export const PIN_REFUSED_SENTENCE = "CAM 1 did not accept the PIN. Press Pair CAM 1 to try again.";
+
+export const PIN_INVALID_MESSAGE = "pin must be the 6 digits CAM 1 shows.";
+
+/** `CAMERA_PAIRING_NOT_WANTED`: a PIN with no pairing waiting for one. */
+export function pairingNotWantedRefusal(): EngineRequestError {
+  return new EngineRequestError(
+    "CAMERA_PAIRING_NOT_WANTED",
+    "CAM 1's pairing does not wait for a PIN now. Press Pair CAM 1 first."
+  );
 }
 
 /** A setting the camera does not report: its not-reported sentence. */

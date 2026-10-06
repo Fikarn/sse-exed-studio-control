@@ -1703,8 +1703,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     updateCameraSetup(request: CameraSetupUpdateRequest) {
       return performRequest("cameras.setup.update", { ...request });
     },
-    pairCamera(camera: CameraNumber) {
-      return performRequest("cameras.setup.pair", { camera });
+    pairCamera(camera: CameraNumber, pin?: string) {
+      return performRequest("cameras.setup.pair", pin === undefined ? { camera } : { camera, pin });
     },
     forgetCamera(camera: CameraNumber) {
       return performRequest("cameras.setup.forget", { camera });

@@ -722,6 +722,7 @@ describe("createShellStore scoped refresh", () => {
     await store.connectCamera(1);
     await store.updateCameraSetup({ camera: 3, vmixInput: 7 });
     await store.pairCamera(1);
+    await store.pairCamera(1, "123456");
     await store.forgetCamera(2);
     expect(sent).toEqual([
       ["cameras.select", { camera: 3 }],
@@ -737,6 +738,7 @@ describe("createShellStore scoped refresh", () => {
       ["cameras.connect", { camera: 1 }],
       ["cameras.setup.update", { camera: 3, vmixInput: 7 }],
       ["cameras.setup.pair", { camera: 1 }],
+      ["cameras.setup.pair", { camera: 1, pin: "123456" }],
       ["cameras.setup.forget", { camera: 2 }],
     ]);
     await store.dispose();
