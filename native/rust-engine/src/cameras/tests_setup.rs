@@ -248,6 +248,44 @@ fn cam_1_is_paired_and_held() {
     assert!(cameras.nothing_sent());
 }
 
+// CAM 1's row may carry its Bluetooth address beside its pairing (the
+// Pocket's link, 2026-10-06): the snapshot hides it, as the address is
+// Windows' pairing's and not Setup's to show, the archive leaves it out
+// with the pairing, and Forget takes both away.
+#[test]
+fn cam_1_s_row_may_carry_its_bluetooth_address_which_stays_on_this_pc() {
+    let cameras = TestCameras::new("bluetooth-address");
+    let connection = open_connection(cameras.path()).expect("connection should open");
+    write_setup(
+        &connection,
+        &StoredSetup {
+            camera: 1,
+            address: Some(String::from("D4:3A:2C:11:22:33")),
+            paired: true,
+            vmix_input: 1,
+        },
+    )
+    .expect("the row writes");
+    cameras.restart();
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "held");
+    assert_eq!(cam1["setup"]["paired"], true);
+    assert_eq!(cam1["setup"]["address"], Value::Null, "hidden for CAM 1");
+    assert_eq!(
+        saved(&cameras)[0].address.as_deref(),
+        Some("D4:3A:2C:11:22:33"),
+        "and kept in the row"
+    );
+    let archived =
+        crate::cameras::archive::build_cameras_archive(&connection).expect("the archive builds");
+    assert_eq!(archived[0].address, None, "the archive leaves it out");
+    assert_eq!(archived[0].camera, 1);
+
+    cameras.call("cameras.setup.forget", json!({ "camera": 1 }));
+    assert_eq!(saved(&cameras)[0], StoredSetup::new(1));
+    assert!(cameras.nothing_sent());
+}
+
 // D13, D19: Setup is saved; who holds a camera and the selection are not —
 // after a start every set-up camera is held again and CAM 1 is selected.
 #[test]

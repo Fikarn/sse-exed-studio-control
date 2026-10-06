@@ -1,7 +1,8 @@
 //! Setup's part of the cameras in the saved data (schema 10): `camera_setup`,
-//! one row a camera — CAM 2's and CAM 3's address, whether CAM 1 is paired,
-//! and the vMix input that carries each camera's picture. Nothing else about
-//! a camera is saved: who holds it and what it reports are the camera's own
+//! one row a camera — CAM 2's and CAM 3's address, whether CAM 1 is paired
+//! (and, beside it, the Pocket's Bluetooth address, in the same column), and
+//! the vMix input that carries each camera's picture. Nothing else about a
+//! camera is saved: who holds it and what it reports are the camera's own
 //! (D12, D13), and the selection is kept in memory (D19).
 
 use crate::cameras::model::{CAMERA_NUMBERS, VMIX_INPUT_MAX, VMIX_INPUT_MIN};
@@ -13,7 +14,10 @@ use studio_control_protocol::pictures::vmix_output;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StoredSetup {
     pub camera: u8,
-    /// CAM 2's or CAM 3's address; always `None` for CAM 1.
+    /// CAM 2's or CAM 3's network address, as Setup took it. For CAM 1 the
+    /// Pocket's Bluetooth address, which its pairing writes (2026-10-06):
+    /// never shown as an address (`summary`), never taken from Setup, left
+    /// out of the archive with the pairing, and `None` until it is paired.
     pub address: Option<String>,
     /// CAM 1 is paired; always `false` for CAM 2 and CAM 3.
     pub paired: bool,
