@@ -85,8 +85,12 @@ impl LinkState {
         Noticed::Changed
     }
 
-    /// The link cannot go on: the sentence says why.
+    /// The link cannot go on for now: the sentence says why. The same
+    /// sentence again (a retry that failed the same way) changes nothing.
     pub(crate) fn failed(&mut self, sentence: String) -> Noticed {
+        if self.connection == Connection::Stopped && self.failure.as_deref() == Some(&*sentence) {
+            return Noticed::Nothing;
+        }
         self.connection = Connection::Stopped;
         self.failure = Some(sentence);
         Noticed::Changed

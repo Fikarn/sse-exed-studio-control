@@ -10,7 +10,7 @@ use crate::cameras::pocket::protocol::{Message, Parameter, TYPE_INT32, VIDEO_ISO
 use crate::cameras::pocket::state::{
     Connection, LinkState, Noticed, STATUS_CAMERA_READY, STATUS_INITIAL_PAYLOAD_RECEIVED,
 };
-use crate::cameras::real_link::{parse_bluetooth_address, LinkFailure};
+use crate::cameras::real_link::{parse_bluetooth_address, BluetoothAddress, LinkFailure};
 use crate::cameras::runtime;
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue};
 use crate::cameras::store::{write_setup, StoredSetup};
@@ -21,6 +21,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 const POCKET_ADDRESS: &str = "D4:3A:2C:11:22:33";
+
+fn pocket_address() -> BluetoothAddress {
+    BluetoothAddress {
+        address: 0xD43A_2C11_2233,
+        random: false,
+    }
+}
 
 fn iso(value: i32) -> Vec<u8> {
     Message {
@@ -36,7 +43,8 @@ fn iso(value: i32) -> Vec<u8> {
 // The link's state: starting reads as no answer; connected, the camera's
 // messages fill the reading and a changed value is noticed, a timecode or a
 // status flag is not; lost keeps the reading and reads as no answer; a
-// failure reads as the link's own sentence.
+// failure reads as the link's own sentence, and the same failure again says
+// nothing.
 #[test]
 fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
     let mut state = LinkState::new();
@@ -105,16 +113,21 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
     );
     assert!(!state.initial_payload_received());
 
-    assert_eq!(
-        state.failed(String::from("Bluetooth is off on this PC.")),
-        Noticed::Changed
-    );
+    let off = String::from("Bluetooth is off on this PC.");
+    assert_eq!(state.failed(off.clone()), Noticed::Changed);
     assert_eq!(state.connection, Connection::Stopped);
+    assert_eq!(state.read(), Err(LinkFailure::Bluetooth(off.clone())));
     assert_eq!(
-        state.read(),
-        Err(LinkFailure::Bluetooth(String::from(
-            "Bluetooth is off on this PC."
-        )))
+        state.failed(off.clone()),
+        Noticed::Nothing,
+        "the same failure again, a retry that failed the same way"
+    );
+    assert_eq!(
+        state.failed(String::from(
+            "Windows did not find CAM 1 at its Bluetooth address."
+        )),
+        Noticed::Changed,
+        "another failure is a change"
     );
     state.let_go();
     assert_eq!(state.read(), Err(LinkFailure::NoAnswer));
@@ -136,10 +149,11 @@ fn the_guard_keeps_every_test_off_bluetooth() {
 
     let looked = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&looked);
-    let link = PocketLink::start(0xD43A_2C11_2233, move || {
+    let link = PocketLink::start(pocket_address(), move || {
         counted.fetch_add(1, Ordering::SeqCst);
     });
     assert!(link.stopped());
+    assert_eq!(link.address(), pocket_address());
     assert_eq!(link.read(), Err(LinkFailure::Bluetooth(refused.clone())));
     assert_eq!(
         link.send(&[CameraCommand::RecordStart], &CameraReading::default()),
@@ -173,7 +187,8 @@ fn the_guard_keeps_every_test_off_bluetooth() {
 // Through the runtime: CAM 1 paired, with its Bluetooth address in its row,
 // in a build without the simulated cameras. The links are told to hold it,
 // the guard's sentence is CAM 1's UNREACHABLE sentence, a press is refused
-// as unreachable with it, and nothing is sent.
+// as unreachable with it, and nothing is sent. A row whose address goes
+// lets the link go.
 #[test]
 fn a_test_build_reads_the_guard_s_sentence_as_cam_1_s_unreachable_sentence() {
     let cameras = TestCameras::without_simulation("guarded");
@@ -213,18 +228,44 @@ fn a_test_build_reads_the_guard_s_sentence_as_cam_1_s_unreachable_sentence() {
         runtime::links_told(cameras.path()),
         vec!["hold 1", "let go 2", "let go 3", "let go 1", "hold 1"]
     );
+    // The pairing stays and the address goes (a backup from before the
+    // link, restored whole): no link to start, and the old one let go.
+    write_setup(
+        &connection,
+        &StoredSetup {
+            camera: 1,
+            address: None,
+            paired: true,
+            vmix_input: 1,
+        },
+    )
+    .expect("the row writes");
+    crate::cameras::after_archive_restore(cameras.path(), false).expect("the restore settles");
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "unreachable");
+    assert_eq!(
+        cam1["sentence"],
+        "Studio Control has no link to CAM 1 yet: it comes with a later version."
+    );
     assert!(cameras.nothing_sent());
 }
 
 #[test]
-fn a_bluetooth_address_is_six_pairs_of_hexadecimal_digits() {
+fn a_bluetooth_address_is_six_pairs_of_hexadecimal_digits_and_its_kind() {
     assert_eq!(
         parse_bluetooth_address(POCKET_ADDRESS),
-        Some(0xD43A_2C11_2233)
+        Some(pocket_address())
     );
     assert_eq!(
         parse_bluetooth_address(" d4-3a-2c-11-22-33 "),
-        Some(0xD43A_2C11_2233)
+        Some(pocket_address())
+    );
+    assert_eq!(
+        parse_bluetooth_address("D4:3A:2C:11:22:33 random"),
+        Some(BluetoothAddress {
+            random: true,
+            ..pocket_address()
+        })
     );
     for other in [
         "172.16.16.85",
@@ -233,8 +274,26 @@ fn a_bluetooth_address_is_six_pairs_of_hexadecimal_digits() {
         "D4:3A:2C:11:22:3G",
         "",
         "D43A2C112233",
+        "D4:3A:2C:11:22:33 public",
+        "D4:3A:2C:11:22:33 random more",
     ] {
         assert_eq!(parse_bluetooth_address(other), None, "{other}");
+    }
+    assert_eq!(pocket_address().text(), POCKET_ADDRESS);
+    assert_eq!(
+        BluetoothAddress {
+            random: true,
+            ..pocket_address()
+        }
+        .text(),
+        "D4:3A:2C:11:22:33 random"
+    );
+    for text in [POCKET_ADDRESS, "D4:3A:2C:11:22:33 random"] {
+        assert_eq!(
+            parse_bluetooth_address(text).map(BluetoothAddress::text),
+            Some(String::from(text)),
+            "written and read back"
+        );
     }
 }
 

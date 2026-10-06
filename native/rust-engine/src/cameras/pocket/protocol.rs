@@ -489,6 +489,13 @@ fn cannot_carry(setting: Setting, value: &CameraValue) -> String {
     )
 }
 
+/// A press that sets half a parameter needs the other half as the camera
+/// reported it, never a guess (D12): until the camera has reported it, the
+/// press is refused with this sentence.
+fn not_yet(what: &str, press: &str) -> String {
+    format!("CAM 1 has not reported {what} yet, so {press} cannot be sent with it.")
+}
+
 fn set_message(
     setting: Setting,
     value: &CameraValue,
@@ -526,7 +533,9 @@ fn set_message(
             Ok(Message::fixed16(VIDEO_ND_FILTER, &[stops]))
         }
         (Setting::WhiteBalance, CameraValue::Number(kelvin)) => {
-            let tint = current.tint.unwrap_or(0.0);
+            let tint = current
+                .tint
+                .ok_or_else(|| not_yet("its tint", "a white balance"))?;
             Ok(Message::int16(
                 VIDEO_WHITE_BALANCE,
                 &[
@@ -536,11 +545,9 @@ fn set_message(
             ))
         }
         (Setting::Tint, CameraValue::Number(tint)) => {
-            let kelvin = current.white_balance.ok_or_else(|| {
-                String::from(
-                    "CAM 1 has not reported its white balance yet, so a tint cannot be sent with it.",
-                )
-            })?;
+            let kelvin = current
+                .white_balance
+                .ok_or_else(|| not_yet("its white balance", "a tint"))?;
             Ok(Message::int16(
                 VIDEO_WHITE_BALANCE,
                 &[
@@ -557,12 +564,14 @@ fn set_message(
         }
         (Setting::Resolution, CameraValue::Text(word)) => {
             let format = current_format(current)
+                .ok_or_else(|| not_yet("its recording format", "a resolution"))?
                 .with_resolution(word)
                 .ok_or_else(refused)?;
             Ok(Message::int16(VIDEO_RECORDING_FORMAT, &format.to_values()))
         }
         (Setting::FrameRate, CameraValue::Text(word)) => {
             let format = current_format(current)
+                .ok_or_else(|| not_yet("its recording format", "a frame rate"))?
                 .with_frame_rate(word)
                 .ok_or_else(refused)?;
             Ok(Message::int16(VIDEO_RECORDING_FORMAT, &format.to_values()))
@@ -573,15 +582,17 @@ fn set_message(
         }
         (Setting::DisplayLut, CameraValue::Text(word)) => {
             let code = display_lut_of(word).ok_or_else(refused)?;
-            let enabled = i8::from(current.display_lut_on.unwrap_or(false));
-            Ok(Message::int8(VIDEO_DISPLAY_LUT, &[code, enabled]))
+            let enabled = current
+                .display_lut_on
+                .ok_or_else(|| not_yet("whether its display LUT is on", "a display LUT"))?;
+            Ok(Message::int8(VIDEO_DISPLAY_LUT, &[code, i8::from(enabled)]))
         }
         (Setting::DisplayLutOn, CameraValue::Switch(on)) => {
             let code = current
                 .display_lut
                 .as_deref()
                 .and_then(display_lut_of)
-                .unwrap_or(0);
+                .ok_or_else(|| not_yet("its display LUT", "the switch"))?;
             Ok(Message::int8(VIDEO_DISPLAY_LUT, &[code, i8::from(*on)]))
         }
         _ => Err(refused()),
@@ -596,28 +607,11 @@ fn int16_of(value: f64) -> Option<i16> {
 }
 
 /// The recording format as the camera last reported it, from the reading's
-/// words; a camera that has reported none is taken at HD 25.
-fn current_format(current: &CameraReading) -> RecordingFormat {
-    let mut format = RecordingFormat {
-        file_frame_rate: 25,
-        sensor_frame_rate: 0,
-        width: 1920,
-        height: 1080,
-        flags: 0,
-    };
-    if let Some(with) = current
-        .resolution
-        .as_deref()
-        .and_then(|word| format.with_resolution(word))
-    {
-        format = with;
-    }
-    if let Some(with) = current
-        .frame_rate
-        .as_deref()
-        .and_then(|word| format.with_frame_rate(word))
-    {
-        format = with;
-    }
-    format
+/// words; `None` until the camera has reported both its resolution and its
+/// frame rate (never a guess, D12).
+fn current_format(current: &CameraReading) -> Option<RecordingFormat> {
+    let format = RecordingFormat::default()
+        .with_resolution(current.resolution.as_deref()?)?
+        .with_frame_rate(current.frame_rate.as_deref()?)?;
+    Some(format)
 }

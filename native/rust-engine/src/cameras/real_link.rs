@@ -80,11 +80,50 @@ pub(crate) fn guard_camera_address(address: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A Bluetooth LE address with its kind: public, or random (a static random
+/// address, which many devices use; Windows must be told which it is to find
+/// the device).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BluetoothAddress {
+    pub address: u64,
+    pub random: bool,
+}
+
+impl BluetoothAddress {
+    /// The address as CAM 1's row holds it: `D4:3A:2C:11:22:33`, with
+    /// ` random` after it for a random address. The pairing part writes it.
+    #[allow(dead_code)]
+    pub(crate) fn text(self) -> String {
+        let bytes = self.address.to_be_bytes();
+        let pairs: Vec<String> = bytes[2..]
+            .iter()
+            .map(|byte| format!("{byte:02X}"))
+            .collect();
+        let joined = pairs.join(":");
+        if self.random {
+            format!("{joined} random")
+        } else {
+            joined
+        }
+    }
+}
+
 /// A Bluetooth address as CAM 1's row holds it, `D4:3A:2C:11:22:33` (six
-/// pairs of hexadecimal digits, with `:` or `-` between), as the number
-/// Windows takes; `None` for anything else, an IPv4 address included.
-pub(crate) fn parse_bluetooth_address(text: &str) -> Option<u64> {
-    let parts: Vec<&str> = text.trim().split([':', '-']).collect();
+/// pairs of hexadecimal digits, with `:` or `-` between), with ` random`
+/// after it for a random address; `None` for anything else, an IPv4
+/// address included.
+pub(crate) fn parse_bluetooth_address(text: &str) -> Option<BluetoothAddress> {
+    let mut words = text.split_whitespace();
+    let digits = words.next()?;
+    let random = match words.next() {
+        None => false,
+        Some("random") => true,
+        Some(_) => return None,
+    };
+    if words.next().is_some() {
+        return None;
+    }
+    let parts: Vec<&str> = digits.split([':', '-']).collect();
     if parts.len() != 6 {
         return None;
     }
@@ -95,7 +134,7 @@ pub(crate) fn parse_bluetooth_address(text: &str) -> Option<u64> {
         }
         address = (address << 8) | u64::from(u8::from_str_radix(part, 16).ok()?);
     }
-    Some(address)
+    Some(BluetoothAddress { address, random })
 }
 
 /// The real links as the runtime holds them, one seam for the three
@@ -131,13 +170,15 @@ impl RealLinks {
 
     /// Holds a set-up camera: its link connects and keeps reading it. CAM 1
     /// without a Bluetooth address in its row (a pairing from before the
-    /// link, restored whole) has no link to start.
+    /// link, restored whole) has no link to start, and a link that was
+    /// running for another row is let go.
     pub(crate) fn hold(&mut self, setup: &StoredSetup) {
         self.note("hold", setup.camera);
         if setup.camera != RECORDING_CAMERA {
             return;
         }
         let Some(address) = setup.address.as_deref().and_then(parse_bluetooth_address) else {
+            self.let_go_pocket();
             return;
         };
         if self
@@ -147,9 +188,7 @@ impl RealLinks {
         {
             return;
         }
-        if let Some(old) = self.pocket.take() {
-            old.let_go();
-        }
+        self.let_go_pocket();
         let db_path = self.db_path.clone();
         self.pocket = Some(PocketLink::start(address, move || notice(&db_path)));
     }
@@ -158,9 +197,13 @@ impl RealLinks {
     pub(crate) fn let_go(&mut self, camera: u8) {
         self.note("let go", camera);
         if camera == RECORDING_CAMERA {
-            if let Some(pocket) = self.pocket.take() {
-                pocket.let_go();
-            }
+            self.let_go_pocket();
+        }
+    }
+
+    fn let_go_pocket(&mut self) {
+        if let Some(pocket) = self.pocket.take() {
+            pocket.let_go();
         }
     }
 
