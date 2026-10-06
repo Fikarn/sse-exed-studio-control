@@ -222,6 +222,121 @@ fn step_decimals(step: f64) -> i32 {
     decimals
 }
 
+/// Why a step has nothing to start from (the step rule, 2026-10-06).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum StepFrom {
+    /// The camera has not reported the setting.
+    NotRead,
+    /// It reports a value with no number in it, which cannot be placed
+    /// against the list.
+    NoNumber(String),
+}
+
+/// The number in one of a choice's values, so that a value the camera
+/// reports that is not on its list can be placed against the list: `400` →
+/// 400, `172.8°` → 172.8, `f/2.8` → 2.8, `1/50` → 0.02, `2 stops` → 2,
+/// `Clear` → 0. `None` for a value with no number in it (`Auto`).
+pub(crate) fn option_number(value: &str) -> Option<f64> {
+    let text = value.trim().to_lowercase();
+    if text == "clear" {
+        return Some(0.0);
+    }
+    let text = text.strip_prefix("f/").unwrap_or(&text);
+    let is_number = |character: char| character.is_ascii_digit() || character == '.';
+    let start = text.find(|character: char| character.is_ascii_digit())?;
+    let rest = &text[start..];
+    let end = rest
+        .find(|character| !is_number(character))
+        .unwrap_or(rest.len());
+    let first: f64 = rest[..end].parse().ok()?;
+    if let Some(denominator) = rest[end..].strip_prefix('/') {
+        let end = denominator
+            .find(|character| !is_number(character))
+            .unwrap_or(denominator.len());
+        let denominator: f64 = denominator[..end].parse().ok()?;
+        if denominator == 0.0 {
+            return None;
+        }
+        return Some(first / denominator);
+    }
+    Some(first)
+}
+
+/// Where a step from `current` lands among `options` (D11; the step rule,
+/// 2026-10-06): from a listed value, `step` places along the list; from a
+/// value that is not on the list, from the nearest listed option in the
+/// step's direction, the list being in the order of its numbers, rising or
+/// falling; stopping at the ends. `Err` when there is nothing to step
+/// from: no value, or one with no number in it.
+pub(crate) fn step_choice(
+    options: &[&str],
+    current: Option<&str>,
+    step: i64,
+) -> Result<usize, StepFrom> {
+    let last = options.len().saturating_sub(1) as i64;
+    let current = current.ok_or(StepFrom::NotRead)?;
+    let place = |index: i64| usize::try_from(index.clamp(0, last)).unwrap_or(0);
+    if let Some(index) = options.iter().position(|option| *option == current) {
+        return Ok(place(index as i64 + step));
+    }
+    let no_number = || StepFrom::NoNumber(current.to_string());
+    let value = option_number(current).ok_or_else(no_number)?;
+    let numbers: Vec<f64> = options
+        .iter()
+        .map(|option| option_number(option))
+        .collect::<Option<_>>()
+        .ok_or_else(no_number)?;
+    if let Some(index) = numbers
+        .iter()
+        .position(|number| (number - value).abs() < 1e-9)
+    {
+        // The same value in other words (`f/2.80`): it is the listed one.
+        return Ok(place(index as i64 + step));
+    }
+    let rising = numbers.first() <= numbers.last();
+    // The first listed option past the value in the list's direction; the
+    // list's length when the value is past them all.
+    let later = numbers
+        .iter()
+        .position(|number| {
+            if rising {
+                *number > value
+            } else {
+                *number < value
+            }
+        })
+        .unwrap_or(options.len()) as i64;
+    Ok(place(if step > 0 {
+        later + step - 1
+    } else {
+        later + step
+    }))
+}
+
+/// Where a step from `current` lands on a level's scale (the step rule,
+/// 2026-10-06): from a value on a step, `step` steps along; from one
+/// between two steps, from the next step in the step's direction; stopping
+/// at the ends. `Err` when the value has not been read.
+pub(crate) fn step_level(
+    scale: &LevelScale,
+    current: Option<f64>,
+    step: i64,
+) -> Result<f64, StepFrom> {
+    let current = current
+        .filter(|value| value.is_finite())
+        .ok_or(StepFrom::NotRead)?;
+    let exact = (current - scale.min) / scale.step;
+    let rounded = exact.round();
+    let from = if (exact - rounded).abs() < 1e-6 {
+        rounded as i64 + step
+    } else if step > 0 {
+        exact.ceil() as i64 + step - 1
+    } else {
+        exact.floor() as i64 + step + 1
+    };
+    Ok(scale.at(from.clamp(0, scale.last_step())))
+}
+
 const CAM1_ISO: &[&str] = &[
     "100", "125", "160", "200", "250", "320", "400", "500", "640", "800", "1000", "1250", "1600",
     "2000", "2500", "3200", "4000", "5000", "6400", "8000", "10000", "12800", "16000", "20000",
@@ -517,6 +632,22 @@ impl CameraModel {
     /// `CAMERA_VALUE_NOT_ALLOWED`: the value as it was sent.
     pub(crate) fn value_refusal(&self, setting: Setting, value: &str) -> String {
         format!("{} does not allow {} {value}.", self.tag, setting.label())
+    }
+
+    /// `CAMERA_VALUE_NOT_ALLOWED` for a step with nothing to start from
+    /// (the step rule, 2026-10-06).
+    pub(crate) fn step_refusal(&self, setting: Setting, from: &StepFrom) -> String {
+        let (tag, label) = (self.tag, setting.label());
+        match from {
+            StepFrom::NotRead => {
+                format!(
+                    "{tag} has not reported its {label} yet, so a step has nothing to start from."
+                )
+            }
+            StepFrom::NoNumber(value) => {
+                format!("{tag} reports {label} {value}, which Studio Control cannot step from.")
+            }
+        }
     }
 
     /// `CAMERA_FORMAT_NOT_ALLOWED`.
