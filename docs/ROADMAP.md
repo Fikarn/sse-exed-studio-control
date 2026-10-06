@@ -249,7 +249,7 @@ Heard on 2026-10-06 (the owner's decision 2, D40): a passive listen of 150 s and
 
 Asked and answered on 2026-10-06 (D41): a start takes a released camera back without a press, and that would disturb the iPad, since a connected Pocket advertises to nobody else and takes one controller at a time. So a release is kept across a start, as a saved setting. The controller's name is written to the camera at each connection, and the attended part runs as `npm run app -- --bluetooth`.
 
-Built, in parts, on 2026-10-06: the step rule (#312); the seam to the real links (#313); the protocol, pure (#314); the link over Windows' Bluetooth with the watch off the request loop and the guards (#315, one review and a second look). Left, in order: the attended run's switch (D41), the kept release, pairing (with the PIN typed in Setup, `setup.pairing` in the snapshot, the simulated link's PIN `123456`, Setup's PIN field), and the close-out. The plan in detail is `camera-links-plan-2026-10-06.md` in the owner's plans folder.
+Built, in parts, on 2026-10-06: the step rule (#312); the seam to the real links (#313); the protocol, pure (#314); the link over Windows' Bluetooth with the watch off the request loop and the guards (#315, one review and a second look). Then the attended run's switch (D41, #317) and the kept release (D41: saved as `cameras.released.<camera>`, ended by `Connect`, `Forget`, a new pairing or address). Left, in order: pairing (with the PIN typed in Setup, `setup.pairing` in the snapshot, the simulated link's PIN `123456`, Setup's PIN field, the controller's name written at each connection), and the close-out. The plan in detail is `camera-links-plan-2026-10-06.md` in the owner's plans folder.
 
 ### The BGH1s over the network (was Slice 13)
 

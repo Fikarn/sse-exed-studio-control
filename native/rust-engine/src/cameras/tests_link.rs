@@ -226,18 +226,56 @@ fn a_take_started_elsewhere_is_seen_starting_or_not() {
     assert!(cameras.nothing_sent());
 }
 
-// D13: releasing is kept in memory; a start holds every set-up camera again.
+// D13 and D41 (2026-10-06): a release is kept across a start, so a camera
+// handed to the iPad or LUMIX Tether stays with it until Connect; Forget and
+// a new pairing or address end it too. Until D41 a start held every set-up
+// camera again, which would have taken the Pocket from the iPad the moment
+// the iPad let go. A start still announces nothing and sends nothing.
 #[test]
-fn a_start_holds_every_set_up_camera_again() {
-    let cameras = TestCameras::set_up("start-holds");
+fn a_release_is_kept_across_a_start_until_connect() {
+    let cameras = TestCameras::set_up("release-kept");
     cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
     cameras.call("cameras.release", json!({ "camera": 1, "confirm": true }));
     cameras.restart();
     let snapshot = cameras.snapshot();
-    for camera in snapshot["cameras"].as_array().expect("three cameras") {
-        assert_eq!(camera["state"], "held", "{camera}");
-    }
+    assert_eq!(snapshot["cameras"][0]["state"], "released");
+    assert_eq!(snapshot["cameras"][1]["state"], "released");
+    assert_eq!(snapshot["cameras"][2]["state"], "held");
+    assert_eq!(
+        snapshot["cameras"][0]["sentence"],
+        "CAM 1 is released to the iPad. Connect it to control it here."
+    );
     assert_eq!(take_announced(), Vec::new(), "a start announces nothing");
+
+    // Connect ends it, and a start keeps that too.
+    cameras.call("cameras.connect", json!({ "camera": 2 }));
+    cameras.restart();
+    let snapshot = cameras.snapshot();
+    assert_eq!(snapshot["cameras"][1]["state"], "held");
+    assert_eq!(
+        snapshot["cameras"][0]["state"], "released",
+        "CAM 1 stays released"
+    );
+
+    // Forget ends it: the camera is not set up, and a new pairing holds it.
+    cameras.call("cameras.setup.forget", json!({ "camera": 1 }));
+    assert_eq!(cameras.camera(1)["state"], "not-set-up");
+    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    assert_eq!(cameras.camera(1)["state"], "held");
+    cameras.restart();
+    assert_eq!(cameras.camera(1)["state"], "held");
+
+    // A new address ends a BGH1's release the same way.
+    cameras.call("cameras.release", json!({ "camera": 3, "confirm": true }));
+    cameras.restart();
+    assert_eq!(cameras.camera(3)["state"], "released");
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 3, "address": "172.16.16.87" }),
+    );
+    assert_eq!(cameras.camera(3)["state"], "held");
+    cameras.restart();
+    assert_eq!(cameras.camera(3)["state"], "held");
     assert!(cameras.nothing_sent());
 }
 

@@ -1,8 +1,11 @@
 //! The cameras while Studio Control runs: who holds each, what each last
 //! reported and when, and the selection — loaded by the first request, with
-//! every set-up camera held and read (D13) and CAM 1 selected (D19). Only
-//! Setup's part is saved (`store.rs`); releasing and the selection are kept
-//! in memory, so a start holds every set-up camera again.
+//! every set-up camera that is not released held and read (D13) and CAM 1
+//! selected (D19). Setup's part is saved (`store.rs`), and so is a release
+//! (D41, 2026-10-06; a setting of its own, `cameras.released.<camera>`): a
+//! camera handed to the iPad or LUMIX Tether stays released across a start
+//! until `Connect`, `Forget`, a new pairing or a new address. The selection
+//! and the dials' bank are kept in memory.
 //!
 //! The cameras are read through one of two links: the simulated cameras
 //! (`bodies`, every test and development run) or the real links
@@ -25,10 +28,11 @@ use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras};
 use crate::cameras::snapshot::{CameraDialBank, CameraSetupSummary, CameraState};
 use crate::cameras::store::{read_setup, StoredSetup};
 use crate::cameras::CameraError;
+use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
 use crate::health::APP_CHANGED_REASON_HEALTH;
 use crate::pictures_helper::{self, Wanted};
-use crate::storage::open_connection;
+use crate::storage::{apply_settings, list_settings_by_prefix, open_connection, set_settings};
 use crate::storage_backups::civil_from_days;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -52,13 +56,25 @@ pub(crate) fn utc_text(time: SystemTime) -> String {
     )
 }
 
+/// The setting that keeps a camera's release across a start (D41):
+/// `cameras.released.<camera>`, `1` while released, absent otherwise. Under
+/// a prefix of its own, outside `app.`, so no archive carries it and no
+/// other reader of the settings meets it; a database backup restored whole
+/// brings it back.
+const RELEASED_PREFIX: &str = "cameras.released.";
+
+fn released_key(camera: u8) -> String {
+    format!("{RELEASED_PREFIX}{camera}")
+}
+
 /// One camera as the hardware link holds it.
 #[derive(Debug, Clone)]
 pub(crate) struct CameraRuntime {
     pub setup: StoredSetup,
     /// This build has a link to it (`real_link::has_link`).
     pub has_link: bool,
-    /// Handed back to the iPad or LUMIX Tether (D13); kept in memory only.
+    /// Handed back to the iPad or LUMIX Tether (D13); saved, so a start
+    /// keeps it (D41).
     pub released: bool,
     /// What it last reported; `None` when it was never read since the start
     /// or it is released.
@@ -224,8 +240,9 @@ pub(crate) struct Cameras {
 }
 
 impl Cameras {
-    /// A start: Setup's rows, every set-up camera held and read (a read
-    /// sends nothing), CAM 1 selected. Nothing is announced.
+    /// A start: Setup's rows, every set-up camera that was not released
+    /// held and read (a read sends nothing), a released one left released
+    /// (D41), CAM 1 selected. Nothing is announced.
     fn load(
         db_path: &Path,
         simulated: bool,
@@ -233,6 +250,8 @@ impl Cameras {
         now: SystemTime,
     ) -> Result<Self, CameraError> {
         let setup = read_setup(&open_connection(db_path)?)?;
+        let released = list_settings_by_prefix(db_path, RELEASED_PREFIX)
+            .map_err(|error| CameraError::Storage(error.to_string()))?;
         let mut cameras = Self {
             db_path: db_path.to_path_buf(),
             simulated,
@@ -243,13 +262,41 @@ impl Cameras {
             deck_rec_at: None,
             take_changes: 0,
             recent_unread: false,
-            cameras: setup.map(|setup| CameraRuntime::new(setup, simulated)),
+            cameras: setup.map(|setup| {
+                let mut runtime = CameraRuntime::new(setup, simulated);
+                runtime.released = runtime.setup.set_up()
+                    && released
+                        .get(&released_key(runtime.camera()))
+                        .is_some_and(|value| value.trim() == "1");
+                runtime
+            }),
         };
         for camera in CAMERA_NUMBERS {
             cameras.tell_links(camera);
             cameras.read(camera, bodies, now);
         }
         Ok(cameras)
+    }
+
+    /// Saves whether `camera` is released (D41): the setting written while
+    /// it is, taken away when it is held again. A write that fails is a
+    /// line in the log, and the release stands for this run.
+    fn save_release(&self, camera: u8, released: bool) {
+        let key = released_key(camera);
+        let written = if released {
+            set_settings(&self.db_path, &[(&key, String::from("1"))])
+        } else {
+            apply_settings(&self.db_path, &[], &[&key])
+        };
+        if let Err(error) = written {
+            log_event(
+                LogLevel::Warn,
+                &format!(
+                    "{}'s release could not be saved; the next start holds it again: {error}",
+                    model(camera).tag
+                ),
+            );
+        }
     }
 
     /// Tells the real links to hold `camera` as its setup now stands (set
@@ -431,23 +478,29 @@ impl Cameras {
     }
 
     /// Hands a camera back (D13): the link stops reading it and sends it
-    /// nothing; a take it is recording goes on.
+    /// nothing; a take it is recording goes on. The release is saved, so a
+    /// start keeps it (D41).
     pub(crate) fn release(&mut self, camera: u8) {
         let runtime = self.camera_mut(camera);
         runtime.released = true;
         runtime.forget_reading();
+        self.save_release(camera, true);
         self.tell_links(camera);
     }
 
-    /// Takes a camera back and reads it again.
+    /// Takes a camera back and reads it again; the saved release goes.
     pub(crate) fn connect(&mut self, camera: u8, bodies: &SimulatedCameras, now: SystemTime) {
         let runtime = self.camera_mut(camera);
+        let was_released = runtime.released;
         runtime.released = false;
         if runtime.failure.is_some() {
             // Tried again below; what it last reported stays until it
             // answers.
         } else {
             runtime.forget_reading();
+        }
+        if was_released {
+            self.save_release(camera, false);
         }
         self.tell_links(camera);
         self.read(camera, bodies, now);
@@ -456,9 +509,9 @@ impl Cameras {
     /// Setup holds something else for a camera. With `hold` (an address
     /// saved, CAM 1 paired, a camera forgotten) the camera starts again from
     /// its new setup: held and read at once when it is set up, nothing to
-    /// show when it is not. Without it (a restore) only a camera whose
-    /// address or pairing changed starts again; a new vMix input changes
-    /// nothing else.
+    /// show when it is not, and a saved release goes (D41). Without it (a
+    /// restore) only a camera whose address or pairing changed starts again;
+    /// a new vMix input changes nothing else.
     pub(crate) fn take_setup(
         &mut self,
         setup: StoredSetup,
@@ -472,8 +525,12 @@ impl Cameras {
             runtime.setup.address == setup.address && runtime.setup.paired == setup.paired;
         runtime.setup = setup;
         if hold || !same_camera {
+            let was_released = runtime.released;
             runtime.released = false;
             runtime.forget_reading();
+            if was_released {
+                self.save_release(camera, false);
+            }
             self.tell_links(camera);
             self.read(camera, bodies, now);
         }

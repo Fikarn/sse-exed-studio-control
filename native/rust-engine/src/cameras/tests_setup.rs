@@ -286,19 +286,21 @@ fn cam_1_s_row_may_carry_its_bluetooth_address_which_stays_on_this_pc() {
     assert!(cameras.nothing_sent());
 }
 
-// D13, D19: Setup is saved; who holds a camera and the selection are not —
-// after a start every set-up camera is held again and CAM 1 is selected.
+// D13, D19, D41: Setup is saved, and so is a release (2026-10-06); the
+// selection is not — after a start CAM 1 is selected, and a released camera
+// is still released.
 #[test]
-fn setup_is_saved_and_the_rest_is_kept_in_memory() {
+fn setup_and_a_release_are_saved_and_the_selection_is_not() {
     let cameras = TestCameras::set_up("saved");
     cameras.call("cameras.release", json!({ "camera": 3, "confirm": true }));
     cameras.call("cameras.select", json!({ "camera": 2 }));
     cameras.restart();
     let snapshot = cameras.snapshot();
     assert_eq!(snapshot["selected"], 1);
-    assert_eq!(snapshot["cameras"][2]["state"], "held");
+    assert_eq!(snapshot["cameras"][2]["state"], "released");
     assert_eq!(snapshot["cameras"][2]["setup"]["address"], CAM3_ADDRESS);
     assert_eq!(snapshot["cameras"][0]["setup"]["paired"], true);
+    assert_eq!(snapshot["cameras"][0]["state"], "held");
 }
 
 // A restore writes Setup's rows and sends nothing: the hardware link takes
