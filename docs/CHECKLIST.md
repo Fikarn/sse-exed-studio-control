@@ -139,6 +139,7 @@ Once the links are built, with the cameras on vMix's outputs:
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.
 - [ ] After `Release` the iPad reaches CAM 1 and LUMIX Tether reaches a BGH1; `Connect` takes the camera back.
 - [ ] Closing the app while CAM 1 records leaves it recording, and a restart changes no camera setting.
+- [ ] A camera released before the app is closed is still released after the start, and `Connect` takes it back.
 - [ ] A camera switched off reads `UNREACHABLE`, and nothing else changes.
 
 ## Saved data and recovery

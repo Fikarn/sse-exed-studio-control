@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- A camera released to the iPad or LUMIX Tether stays released when Studio Control starts again, until `Connect`; `Forget` and a new pairing or address end it too. Before, every start took the camera back (#318).
 - A camera's step keys and the deck's dials step from the value the camera reports, also when it is not on the list: to the nearest listed value in the step's direction. A setting the camera has not reported, or reports as `Auto`, cannot be stepped, and the refusal says so (#312).
 
 - The header's tabs stay where they are when the page changes: the open tab keeps the room of its word. Lighting's tab says `unreachable`, as its page does; on Lighting the Console's latch reads `AUDIO SOLO`. Before the app is ready the lamps are hollow and read `pending`, or `not read` after a failed start (#311).
