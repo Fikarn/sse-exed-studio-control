@@ -214,13 +214,20 @@ function simulatedLightsRequested(value) {
 export const VMIX_PICTURES_ENV = "SSE_VMIX_PICTURES";
 /** NDI's library for that run, by its full path (`NDI_LIBRARY_ENV`). */
 export const NDI_LIBRARY_ENV = "SSE_NDI_LIBRARY";
+/**
+ * Bluetooth's switch (D41): `1` lets a development run's CAM 1 be the real
+ * Pocket over Windows' Bluetooth. Only `npm run app -- --bluetooth` sets it,
+ * for a hardware test the owner attends (`studio_control_protocol::
+ * development::CAMERA_BLUETOOTH_ENV`, which the engine's guard reads).
+ */
+export const CAMERA_BLUETOOTH_ENV = "SSE_CAMERA_BLUETOOTH";
 
-// Whether `env` holds vMix's switch at all, under the name in any case, as
+// Whether `env` holds a switch at all, under the name in any case, as
 // Windows reads it: anything but absent, empty or 0. Wider than the engine's
 // reading (only `1`, trimmed), so that no way of trimming a value differs.
-function vmixSwitchSet(env) {
+function switchSet(env, switchName) {
   return Object.entries(env).some(
-    ([name, value]) => name.toUpperCase() === VMIX_PICTURES_ENV && !["", "0"].includes(String(value ?? "").trim())
+    ([name, value]) => name.toUpperCase() === switchName && !["", "0"].includes(String(value ?? "").trim())
   );
 }
 
@@ -232,8 +239,14 @@ function vmixSwitchSet(env) {
  * module's own tests pass it (`laneProcessEnv` refuses it). `vmixPictures`
  * lets vMix's switch pass: only `npm run app -- --vmix-pictures` passes it
  * (`scripts/dev-app.mjs`), and `laneProcessEnv` refuses it from a lane.
+ * `bluetooth` lets Bluetooth's switch pass, and the real cameras with it:
+ * only `npm run app -- --bluetooth` passes it (D41), and `laneProcessEnv`
+ * refuses it from a lane.
  */
-export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSOLE, vmixPictures = false } = {}) {
+export function laneEnvRefusal(
+  env,
+  { safeStart = true, liveConsole = LIVE_CONSOLE, vmixPictures = false, bluetooth = false } = {}
+) {
   for (const name of ["SSE_APP_DATA_DIR", "SSE_LOG_DIR"]) {
     const refusal = scratchFolderRefusal(env, name);
     if (refusal) {
@@ -259,13 +272,18 @@ export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSO
     return "SSE_AUDIO_SIMULATED_INPUT_MODE must be 1 outside the live console lane.";
   }
   // Every lane, the live console lane too, uses the simulated cameras: no lane
-  // may reach a camera (new pages program, Slice 8 — D15 rules 1–2).
-  if (!simulatedCamerasRequested(env.SSE_CAMERAS_SIMULATED)) {
+  // may reach a camera (new pages program, Slice 8 — D15 rules 1–2). The one
+  // run with the real cameras is `npm run app -- --bluetooth` (D41).
+  if (!bluetooth && !simulatedCamerasRequested(env.SSE_CAMERAS_SIMULATED)) {
     return "SSE_CAMERAS_SIMULATED must be 1: a lane uses the simulated cameras.";
   }
   // No lane opens vMix's pictures: that is a hardware test the owner attends (D33).
-  if (!vmixPictures && vmixSwitchSet(env)) {
+  if (!vmixPictures && switchSet(env, VMIX_PICTURES_ENV)) {
     return `${VMIX_PICTURES_ENV} is set: only \`npm run app -- --vmix-pictures\` takes vMix's pictures, a hardware test the owner attends, and no lane may.`;
+  }
+  // No lane opens Bluetooth: that is a hardware test the owner attends (D41).
+  if (!bluetooth && switchSet(env, CAMERA_BLUETOOTH_ENV)) {
+    return `${CAMERA_BLUETOOTH_ENV} is set: only \`npm run app -- --bluetooth\` opens Bluetooth to CAM 1, a hardware test the owner attends, and no lane may.`;
   }
   return null;
 }
@@ -295,6 +313,11 @@ export function laneProcessEnv(base, overrides = {}, { label = "A lane process",
   if (Object.hasOwn(options, "vmixPictures")) {
     throw new Error(
       `${label} was not started: a lane cannot take vMix's pictures; only \`npm run app -- --vmix-pictures\` does, a hardware test the owner attends (D33).`
+    );
+  }
+  if (Object.hasOwn(options, "bluetooth")) {
+    throw new Error(
+      `${label} was not started: a lane cannot open Bluetooth; only \`npm run app -- --bluetooth\` does, a hardware test the owner attends (D41).`
     );
   }
   const env = { ...process.env, ...base, ...overrides };

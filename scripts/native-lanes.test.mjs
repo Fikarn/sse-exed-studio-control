@@ -1229,6 +1229,63 @@ test("no lane takes vMix's pictures, and only npm run app lets the switch pass",
   }
 });
 
+// D41: CAM 1 over Bluetooth is a hardware test the owner attends, under
+// `npm run app -- --bluetooth` and nothing else. No lane names the switch or
+// lets it pass; a lane environment that holds it, under its name in any
+// case, is refused before anything is spawned; and of every script only
+// `npm run app` passes the option that lets it through.
+test("no lane opens Bluetooth, and only npm run app lets the switch pass", async () => {
+  const namers = ALL_LANES.filter((lane) =>
+    /\bSSE_CAMERA_BLUETOOTH\b|\bCAMERA_BLUETOOTH_ENV\b|\bbluetooth\b/.test(withoutComments(read(lane)))
+  );
+  assert.deepEqual(namers, [HARNESS], "a lane that names Bluetooth's switch");
+  const scriptsDir = path.join(repoRoot, "scripts");
+  const passers = readdirSync(scriptsDir)
+    .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+    .filter((name) => /\bbluetooth\b/.test(withoutComments(readFileSync(path.join(scriptsDir, name), "utf8"))));
+  assert.deepEqual(passers.sort(), ["dev-app.mjs", "native-runtime-harness.mjs"]);
+
+  const env = { ...(await hardenedLaneEnv()), ...scratchFolders() };
+  assert.equal(laneEnvRefusal({ ...env, SSE_CAMERA_BLUETOOTH: "0" }, { liveConsole: false }), null);
+  assert.equal(laneEnvRefusal({ ...env, SSE_CAMERA_BLUETOOTH: " " }, { liveConsole: false }), null);
+  for (const asked of [
+    { SSE_CAMERA_BLUETOOTH: "1" },
+    { SSE_CAMERA_BLUETOOTH: " 1 " },
+    { sse_camera_bluetooth: "1" },
+    { SSE_CAMERA_BLUETOOTH: "yes" },
+  ]) {
+    assert.match(
+      laneEnvRefusal({ ...env, ...asked }, { liveConsole: false }) ?? "",
+      /SSE_CAMERA_BLUETOOTH is set: only `npm run app -- --bluetooth`/,
+      JSON.stringify(asked)
+    );
+    assert.equal(laneEnvRefusal({ ...env, ...asked }, { liveConsole: false, bluetooth: true }), null);
+    assert.throws(
+      () => laneProcessEnv(env, asked, { label: "A planted lane" }),
+      /A planted lane was not started: SSE_CAMERA_BLUETOOTH is set/,
+      JSON.stringify(asked)
+    );
+  }
+  // The real cameras pass only with the switch's option, and only there.
+  assert.match(
+    laneEnvRefusal({ ...env, SSE_CAMERAS_SIMULATED: "0" }, { liveConsole: false }) ?? "",
+    /SSE_CAMERAS_SIMULATED must be 1/
+  );
+  assert.equal(
+    laneEnvRefusal(
+      { ...env, SSE_CAMERAS_SIMULATED: "0", SSE_CAMERA_BLUETOOTH: "1" },
+      { liveConsole: false, bluetooth: true }
+    ),
+    null
+  );
+  for (const bluetooth of [true, false]) {
+    assert.throws(
+      () => laneProcessEnv(env, {}, { label: "A planted lane", bluetooth }),
+      /A planted lane was not started: a lane cannot open Bluetooth/
+    );
+  }
+});
+
 test("the scripts that do work do nothing when imported", () => {
   // The scan's own cases: what only reads passes, and a call to anything
   // else is work, however deep in a constant's value it sits.

@@ -33,6 +33,15 @@
 // environment holds; the lanes refuse the switch (`laneEnvRefusal`), the
 // tests remove it, and the helper reads it again in its own environment.
 //
+// `npm run app -- --bluetooth` is the other hardware test the owner asks for
+// and attends (D41): CAM 1 is the real Pocket over Windows' own Bluetooth,
+// paired in Setup, held and read, and takes the operator's presses, as the
+// studio build will; CAM 2 and CAM 3 have no link, and the pictures come only
+// with `--vmix-pictures` beside it. It sets `SSE_CAMERA_BLUETOOTH=1` and
+// `SSE_CAMERAS_SIMULATED=0`. Every other run sets the switch to 0, whatever
+// the caller's environment holds; the lanes refuse it, and a test build never
+// passes the engine's guard whatever it holds.
+//
 // No other argument is taken: `--config` can change the app's identity, and
 // what `tauri dev` hands on to the app is the app's to refuse.
 
@@ -43,7 +52,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { ndiLibraryRefusal, readNdiPin, sdkLibraryPath } from "./ndi-library.mjs";
-import { laneEnvRefusal, NDI_LIBRARY_ENV, VMIX_PICTURES_ENV } from "./native-runtime-harness.mjs";
+import { CAMERA_BLUETOOTH_ENV, laneEnvRefusal, NDI_LIBRARY_ENV, VMIX_PICTURES_ENV } from "./native-runtime-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -68,13 +77,15 @@ const STUDIO_BUILD_ENV = "SSE_STUDIO_BUILD";
 
 /**
  * What the arguments ask for: the data folder they name (null for the run's
- * own), whether the run is built in the release profile, and whether it
- * takes vMix's pictures. Any other argument is refused with a sentence.
+ * own), whether the run is built in the release profile, whether it takes
+ * vMix's pictures, and whether its CAM 1 is the real Pocket over Bluetooth.
+ * Any other argument is refused with a sentence.
  */
 export function runOptionsFrom(args) {
   let dataFolder = null;
   let release = false;
   let vmixPictures = false;
+  let bluetooth = false;
   for (const arg of args) {
     if (arg === "--release") {
       release = true;
@@ -84,30 +95,42 @@ export function runOptionsFrom(args) {
       vmixPictures = true;
       continue;
     }
+    if (arg === "--bluetooth") {
+      bluetooth = true;
+      continue;
+    }
     const named = /^--data=(.+)$/.exec(arg);
     if (!named) {
       throw new Error(
-        `'${arg}' is not an argument of \`npm run app\`. It takes --data=<folder>, the saved data to open in place of its own; --release, to build the run in the release profile; and --vmix-pictures, for vMix's Outputs 2 to 4 over NDI, a hardware test the owner attends.`
+        `'${arg}' is not an argument of \`npm run app\`. It takes --data=<folder>, the saved data to open in place of its own; --release, to build the run in the release profile; --vmix-pictures, for vMix's Outputs 2 to 4 over NDI, a hardware test the owner attends; and --bluetooth, for CAM 1 as the real Pocket over Windows' Bluetooth, a hardware test the owner attends.`
       );
     }
     dataFolder = path.resolve(named[1]);
   }
-  return { dataFolder, release, vmixPictures };
+  return { dataFolder, release, vmixPictures, bluetooth };
 }
 
 /**
  * The environment of a development run: `env` with the run's own folders and
- * port, the switches that keep it off the devices, its profile and vMix's
- * switch; with `release`, the build folder of its own as well, and with
- * `vmixPictures`, NDI's library (`ndiLibrary`, checked by the caller). Every
- * one of them is set here, whatever `env` holds: a variable of the same name
- * in `env`, in any case (Windows reads the names without regard to it), is
- * left out, and so are `SSE_STUDIO_BUILD` and, without the switch,
- * `SSE_NDI_LIBRARY`.
+ * port, the switches that keep it off the devices, its profile, vMix's
+ * switch and Bluetooth's; with `release`, the build folder of its own as
+ * well, and with `vmixPictures`, NDI's library (`ndiLibrary`, checked by the
+ * caller). With `bluetooth` the cameras are not simulated: CAM 1 is the real
+ * Pocket (D41). Every one of them is set here, whatever `env` holds: a
+ * variable of the same name in `env`, in any case (Windows reads the names
+ * without regard to it), is left out, and so are `SSE_STUDIO_BUILD` and,
+ * without the switch, `SSE_NDI_LIBRARY`.
  */
 export function developmentEnv(
   env,
-  { dataFolder = null, release = false, vmixPictures = false, ndiLibrary = null, repositoryRoot = root } = {}
+  {
+    dataFolder = null,
+    release = false,
+    vmixPictures = false,
+    bluetooth = false,
+    ndiLibrary = null,
+    repositoryRoot = root,
+  } = {}
 ) {
   if (vmixPictures && !ndiLibrary) {
     throw new Error("vMix's pictures need NDI's library, checked against its pin.");
@@ -120,9 +143,10 @@ export function developmentEnv(
     SSE_SAFE_START: "1",
     SSE_LIGHTS_SIMULATED: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
-    SSE_CAMERAS_SIMULATED: "1",
+    SSE_CAMERAS_SIMULATED: bluetooth ? "0" : "1",
     [DEV_RUN_RELEASE_ENV]: release ? "1" : "0",
     [VMIX_PICTURES_ENV]: vmixPictures ? "1" : "0",
+    [CAMERA_BLUETOOTH_ENV]: bluetooth ? "1" : "0",
     ...(vmixPictures ? { [NDI_LIBRARY_ENV]: ndiLibrary } : {}),
     ...(release ? { CARGO_TARGET_DIR: path.join(repositoryRoot, RELEASE_TARGET_DIR) } : {}),
   };
@@ -137,11 +161,13 @@ function main() {
   let env;
   let release;
   let vmixPictures;
+  let bluetooth;
   let pin = null;
   try {
     const options = runOptionsFrom(process.argv.slice(2));
     release = options.release;
     vmixPictures = options.vmixPictures;
+    bluetooth = options.bluetooth;
     let ndiLibrary = null;
     if (vmixPictures) {
       // NDI's library: the SDK's own file, and only the pinned one.
@@ -155,8 +181,8 @@ function main() {
     env = developmentEnv(process.env, { ...options, ndiLibrary });
     // The lanes' own check of a hardened environment. Of its rules only the
     // data folder is the caller's to get wrong: the studio's own is refused.
-    // vMix's switch passes here, and only here (D33).
-    const refusal = laneEnvRefusal(env, { liveConsole: false, vmixPictures });
+    // vMix's switch and Bluetooth's pass here, and only here (D33, D41).
+    const refusal = laneEnvRefusal(env, { liveConsole: false, vmixPictures, bluetooth });
     if (refusal) {
       throw new Error(refusal);
     }
@@ -171,13 +197,20 @@ function main() {
       "Development run",
       `  Saved data   ${env.SSE_APP_DATA_DIR}`,
       `  Bridge port  ${env.SSE_CONTROL_SURFACE_PORT} (the studio's is ${STUDIO_BRIDGE_PORT})`,
-      "  Lights held and simulated, console and cameras simulated.",
+      ...(bluetooth
+        ? [
+            "  Lights held and simulated, console simulated.",
+            "  Cameras      CAM 1 is the real Pocket over Windows' Bluetooth (--bluetooth): a hardware test the owner attends. CAM 2 and CAM 3 have no link.",
+          ]
+        : ["  Lights held and simulated, console and cameras simulated."]),
       ...(vmixPictures
         ? [
             "  Pictures     vMix's Outputs 2, 3 and 4 over NDI on this PC (--vmix-pictures): a hardware test the owner attends.",
             `  NDI library  ${env[NDI_LIBRARY_ENV]}, ${pin.version}, its hash the pinned one.`,
           ]
-        : ["  Pictures     the helper's test card."]),
+        : bluetooth
+          ? ["  Pictures     none: with the real cameras the helper starts only under --vmix-pictures."]
+          : ["  Pictures     the helper's test card."]),
       "  Setup's probes still ask the address they are given.",
       ...(release ? [`  Release profile, built in ${env.CARGO_TARGET_DIR}: the first build takes some minutes.`] : []),
       "",

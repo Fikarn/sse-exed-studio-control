@@ -31,6 +31,7 @@ test("a development run has its own data and port and reaches no device", () => 
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(env[DEV_RUN_RELEASE_ENV], "0");
   assert.equal(env.SSE_VMIX_PICTURES, "0", "no run takes vMix's pictures unasked");
+  assert.equal(env.SSE_CAMERA_BLUETOOTH, "0", "no run opens Bluetooth unasked");
   assert.ok(!Object.keys(env).some((name) => name.toUpperCase() === "SSE_NDI_LIBRARY"));
 });
 
@@ -58,6 +59,9 @@ test("a development run keeps its folders and switches whatever the caller's env
       sse_vmix_pictures: "1",
       SSE_NDI_LIBRARY: "C:/elsewhere/Processing.NDI.Lib.x64.dll",
       Sse_Ndi_Library: "C:/elsewhere/Processing.NDI.Lib.x64.dll",
+      // Bluetooth's switch too (D41).
+      SSE_CAMERA_BLUETOOTH: "1",
+      sse_camera_bluetooth: "1",
     },
     { repositoryRoot }
   );
@@ -96,12 +100,18 @@ test("`--data=<folder>` names the saved data, and `--release` and `--vmix-pictur
 
 test("`--release` builds the run in the release profile, in a folder of its own, and changes nothing else", () => {
   const copy = path.resolve("/work/a copy of the studio data");
-  assert.deepEqual(runOptionsFrom([]), { dataFolder: null, release: false, vmixPictures: false });
-  assert.deepEqual(runOptionsFrom(["--release"]), { dataFolder: null, release: true, vmixPictures: false });
+  assert.deepEqual(runOptionsFrom([]), { dataFolder: null, release: false, vmixPictures: false, bluetooth: false });
+  assert.deepEqual(runOptionsFrom(["--release"]), {
+    dataFolder: null,
+    release: true,
+    vmixPictures: false,
+    bluetooth: false,
+  });
   assert.deepEqual(runOptionsFrom(["--release", `--data=${copy}`]), {
     dataFolder: copy,
     release: true,
     vmixPictures: false,
+    bluetooth: false,
   });
 
   // The build folder is the run's own, whatever the caller's environment
@@ -134,11 +144,17 @@ test("`--release` builds the run in the release profile, in a folder of its own,
 });
 
 test("`--vmix-pictures` alone takes vMix's pictures, with NDI's library, and the lanes' check lets it pass only when asked", () => {
-  assert.deepEqual(runOptionsFrom(["--vmix-pictures"]), { dataFolder: null, release: false, vmixPictures: true });
+  assert.deepEqual(runOptionsFrom(["--vmix-pictures"]), {
+    dataFolder: null,
+    release: false,
+    vmixPictures: true,
+    bluetooth: false,
+  });
   assert.deepEqual(runOptionsFrom(["--release", "--vmix-pictures"]), {
     dataFolder: null,
     release: true,
     vmixPictures: true,
+    bluetooth: false,
   });
   for (const refused of ["--vmix-pictures=1", "--vmix", "--pictures=vmix", "--ndi-library=x"]) {
     assert.throws(() => runOptionsFrom([refused]), /is not an argument of `npm run app`/, refused);
@@ -162,6 +178,58 @@ test("`--vmix-pictures` alone takes vMix's pictures, with NDI's library, and the
   const plain = developmentEnv({}, { ndiLibrary: library, repositoryRoot });
   assert.equal(plain.SSE_VMIX_PICTURES, "0");
   assert.ok(!Object.hasOwn(plain, "SSE_NDI_LIBRARY"));
+});
+
+test("`--bluetooth` makes CAM 1 the real Pocket over Windows' Bluetooth, and the lanes' check lets it pass only when asked", () => {
+  assert.deepEqual(runOptionsFrom(["--bluetooth"]), {
+    dataFolder: null,
+    release: false,
+    vmixPictures: false,
+    bluetooth: true,
+  });
+  for (const refused of ["--bluetooth=1", "--ble", "--cameras=real", "--pocket"]) {
+    assert.throws(() => runOptionsFrom([refused]), /is not an argument of `npm run app`/, refused);
+  }
+
+  // The switch is set, the cameras are not simulated, and everything else is
+  // a development run's (D41).
+  const env = developmentEnv(
+    { SSE_CAMERA_BLUETOOTH: "0", sse_camera_bluetooth: "0", SSE_CAMERAS_SIMULATED: "1" },
+    { bluetooth: true, repositoryRoot }
+  );
+  assert.equal(env.SSE_CAMERA_BLUETOOTH, "1");
+  assert.equal(env.SSE_CAMERAS_SIMULATED, "0", "CAM 1 is the real camera; CAM 2 and CAM 3 have no link");
+  assert.equal(env.SSE_SAFE_START, "1");
+  assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
+  assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
+  assert.equal(env.SSE_VMIX_PICTURES, "0");
+  const rest = { ...env, SSE_CAMERA_BLUETOOTH: "0", SSE_CAMERAS_SIMULATED: "1" };
+  assert.deepEqual(rest, developmentEnv({}, { repositoryRoot }));
+
+  // The lanes' check lets the run pass only when asked: a lane with the same
+  // environment is refused, at the cameras first, then at the switch.
+  assert.equal(laneEnvRefusal(env, { liveConsole: false, bluetooth: true }), null);
+  assert.match(laneEnvRefusal(env, { liveConsole: false }) ?? "", /SSE_CAMERAS_SIMULATED must be 1/);
+  const simulatedWithSwitch = { ...env, SSE_CAMERAS_SIMULATED: "1" };
+  assert.match(laneEnvRefusal(simulatedWithSwitch, { liveConsole: false }) ?? "", /SSE_CAMERA_BLUETOOTH is set/);
+  assert.match(
+    laneEnvRefusal({ ...developmentEnv({}, { repositoryRoot }), sse_camera_bluetooth: "1" }, { liveConsole: false }) ??
+      "",
+    /SSE_CAMERA_BLUETOOTH is set/,
+    "under the name in any case"
+  );
+
+  // Without the argument the switch is off, whatever the caller's environment holds.
+  assert.equal(developmentEnv({ SSE_CAMERA_BLUETOOTH: "1" }, { repositoryRoot }).SSE_CAMERA_BLUETOOTH, "0");
+
+  // Both hardware tests at once: CAM 1 over Bluetooth, the pictures from vMix.
+  const library = "C:\\Program Files\\NDI\\NDI 6 SDK\\Bin\\x64\\Processing.NDI.Lib.x64.dll";
+  const both = developmentEnv({}, { bluetooth: true, vmixPictures: true, ndiLibrary: library, repositoryRoot });
+  assert.equal(both.SSE_CAMERA_BLUETOOTH, "1");
+  assert.equal(both.SSE_VMIX_PICTURES, "1");
+  assert.equal(both.SSE_CAMERAS_SIMULATED, "0");
+  assert.equal(laneEnvRefusal(both, { liveConsole: false, vmixPictures: true, bluetooth: true }), null);
+  assert.match(laneEnvRefusal(both, { liveConsole: false, bluetooth: true }) ?? "", /SSE_VMIX_PICTURES is set/);
 });
 
 test("a development run is hardened the way a lane is, and the studio's folder is refused", () => {
