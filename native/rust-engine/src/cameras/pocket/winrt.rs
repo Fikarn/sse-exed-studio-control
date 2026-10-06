@@ -9,13 +9,20 @@
 //! reached by a test or a development run: `guard_bluetooth` stands before
 //! this thread.
 //!
+//! Once each connection is made it writes the controller's name to the
+//! camera's Device Name characteristic (D41), so the camera's Bluetooth menu
+//! names Studio Control, as the iPad's app does; a camera that does not take
+//! it is a line in the log, and the link goes on.
+//!
 //! What it never does: write the Camera Status characteristic (a `0x00`
-//! there switches the camera off), pair (that is Setup's, in the next part),
+//! there switches the camera off), pair (that is Setup's, `winrt_pairing.rs`),
 //! or scan. `Writable` names the characteristics it may write, and the one
 //! function that writes takes one of them.
 
 use crate::cameras::pocket::characteristics::{Notified, Writable, SERVICE};
 use crate::cameras::pocket::link::{Event, Events, Inbox, Order, PocketLink, Shared};
+use crate::cameras::real_link::LinkFailure;
+use crate::diagnostics::{log_event, LogLevel};
 use std::sync::mpsc::RecvTimeoutError;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -34,12 +41,15 @@ use windows::Storage::Streams::{DataReader, DataWriter, IBuffer};
 /// how long it waits before a session that failed is tried again.
 const RETRY: Duration = Duration::from_secs(5);
 
+/// The controller's name the camera shows (D41; up to 32 characters).
+const CONTROLLER_NAME: &str = "Studio Control";
+
 /// How a session ended.
 enum Ended {
     /// Let go, or nobody holds the link any more: the thread ends.
     LetGo,
     /// It cannot go on for now; tried again after `RETRY`.
-    Failed(String),
+    Failed(LinkFailure),
 }
 
 /// The link's thread: a session with the camera, tried again after a
@@ -48,15 +58,15 @@ pub(crate) fn run(shared: Arc<Shared>, inbox: Inbox, events: Events) {
     loop {
         let ended = match session(&shared, &inbox, &events) {
             Ok(()) => Ended::LetGo,
-            Err(sentence) => Ended::Failed(sentence),
+            Err(failure) => Ended::Failed(failure),
         };
         match ended {
             Ended::LetGo => {
                 shared.stopped();
                 return;
             }
-            Ended::Failed(sentence) => {
-                shared.fail(sentence);
+            Ended::Failed(failure) => {
+                shared.fail(failure);
                 if !wait_to_retry(&shared, &inbox) {
                     shared.stopped();
                     return;
@@ -118,8 +128,9 @@ impl Subscribed {
 
 /// One session: the device, its pairing, the GATT session, then the loop
 /// over the inbox until the link is let go (`Ok`) or something fails
-/// (`Err`, with the sentence the operator reads).
-fn session(shared: &Arc<Shared>, inbox: &Inbox, events: &Events) -> Result<(), String> {
+/// (`Err`, with the sentence the operator reads). A device Windows no
+/// longer holds paired is `NotPaired`: CAM 1 reads `NOT SET UP`.
+fn session(shared: &Arc<Shared>, inbox: &Inbox, events: &Events) -> Result<(), LinkFailure> {
     let address = shared.address;
     let address_type = if address.random {
         BluetoothAddressType::Random
@@ -131,22 +142,39 @@ fn session(shared: &Arc<Shared>, inbox: &Inbox, events: &Events) -> Result<(), S
         address_type,
     )
     .and_then(|pending| pending.get())
-    .map_err(|_| String::from("Windows did not find CAM 1 at its Bluetooth address."))?;
+    .map_err(|_| {
+        LinkFailure::Bluetooth(String::from(
+            "Windows did not find CAM 1 at its Bluetooth address.",
+        ))
+    })?;
     let paired = device
         .DeviceInformation()
         .and_then(|information| information.Pairing())
         .and_then(|pairing| pairing.IsPaired())
         .map_err(|error| {
-            format!(
+            LinkFailure::Bluetooth(format!(
                 "Windows could not say whether CAM 1 is paired: {}",
                 text(error)
-            )
+            ))
         })?;
     if !paired {
-        return Err(String::from(
+        let _ = device.Close();
+        return Err(LinkFailure::NotPaired(String::from(
             "Windows no longer holds CAM 1's pairing. Pair it again in Setup.",
-        ));
+        )));
     }
+    let outcome = serve(shared, inbox, events, &device).map_err(LinkFailure::Bluetooth);
+    let _ = device.Close();
+    outcome
+}
+
+/// The GATT session with a paired camera, and the loop over the inbox.
+fn serve(
+    shared: &Arc<Shared>,
+    inbox: &Inbox,
+    events: &Events,
+    device: &BluetoothLEDevice,
+) -> Result<(), String> {
     let gatt = device
         .BluetoothDeviceId()
         .and_then(|id| GattSession::FromDeviceIdAsync(&id))
@@ -174,7 +202,7 @@ fn session(shared: &Arc<Shared>, inbox: &Inbox, events: &Events) -> Result<(), S
             // Asks Windows for the camera's service, which connects when
             // the camera is free; while it is not, this is tried again
             // every `RETRY`, and Windows connects by itself meanwhile.
-            if let Ok(fresh) = subscribe(&device, events) {
+            if let Ok(fresh) = subscribe(device, events) {
                 subscribed = Some(fresh);
                 shared.take(&Event::Connected(true));
             }
@@ -226,7 +254,6 @@ fn session(shared: &Arc<Shared>, inbox: &Inbox, events: &Events) -> Result<(), S
     }
     let _ = device.RemoveConnectionStatusChanged(connection_token);
     let _ = gatt.Close();
-    let _ = device.Close();
     outcome
 }
 
@@ -311,6 +338,24 @@ fn fill(
             .map_err(text)?;
         if status != GattCommunicationStatus::Success {
             return Err(format!("CAM 1 refused the notifications of {notified:?}."));
+        }
+    }
+    // The controller's name, once each connection, after the subscriptions
+    // (D41). A camera that does not take it is a line in the log, and the
+    // link goes on without it.
+    match characteristic(Writable::DeviceName.uuid()) {
+        Ok(name) => subscribed.writable.push((Writable::DeviceName, name)),
+        Err(sentence) => log_event(
+            LogLevel::Warn,
+            &format!("CAM 1 offers no place for Studio Control's name: {sentence}"),
+        ),
+    }
+    if let Some(name) = subscribed.characteristic(Writable::DeviceName) {
+        if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes()) {
+            log_event(
+                LogLevel::Warn,
+                &format!("CAM 1 did not take Studio Control's name: {sentence}"),
+            );
         }
     }
     Ok(())

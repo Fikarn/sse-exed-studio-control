@@ -56,6 +56,7 @@ impl StoredSetup {
             vmix_input: self.vmix_input,
             vmix_output: vmix_output(self.camera).unwrap_or_default(),
             no_link: None,
+            pairing: None,
         }
     }
 }

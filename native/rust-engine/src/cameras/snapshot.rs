@@ -69,6 +69,35 @@ pub struct CameraSetupSummary {
     /// CAM 3): this build has no link to it yet. `null` when it can.
     #[serde(rename = "noLink")]
     pub no_link: Option<String>,
+    /// CAM 1's pairing while it runs, or why the last one failed; `null`
+    /// when none runs (always for CAM 2 and CAM 3).
+    pub pairing: Option<CameraPairing>,
+}
+
+/// Where a pairing of CAM 1 stands (Setup's two steps, 2026-10-06).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "lowercase")]
+pub enum CameraPairingState {
+    /// Looking for the camera.
+    Finding,
+    /// The camera shows a 6-digit PIN; Setup waits for it.
+    Pin,
+    /// The PIN is handed over and Windows pairs.
+    Pairing,
+    /// It did not pair; nothing was saved.
+    Failed,
+}
+
+/// CAM 1's pairing as Setup shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct CameraPairing {
+    pub state: CameraPairingState,
+    /// What the operator reads beside it: what to do, or why it failed.
+    pub sentence: String,
 }
 
 /// A value a choice cannot take now, and why (a frame rate not at this

@@ -57,6 +57,11 @@ fn set_up(app: &EngineApp) {
     result(app, "cameras.setup.pair", json!({ "camera": 1 }));
     result(
         app,
+        "cameras.setup.pair",
+        json!({ "camera": 1, "pin": crate::cameras::simulated::SIMULATED_PIN }),
+    );
+    result(
+        app,
         "cameras.setup.update",
         json!({ "camera": 2, "address": "172.16.16.85" }),
     );

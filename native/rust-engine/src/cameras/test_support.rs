@@ -4,7 +4,7 @@
 
 use crate::cameras::model::Setting;
 use crate::cameras::runtime::{self, ANNOUNCED};
-use crate::cameras::simulated::{CameraCommand, CameraValue};
+use crate::cameras::simulated::{CameraCommand, CameraValue, SIMULATED_PIN};
 use crate::cameras::store::{write_setup, StoredSetup};
 use crate::cameras::{handle_cameras_request, CameraError, CamerasReply};
 use crate::storage::{initialize_test_database, open_connection};
@@ -62,7 +62,7 @@ impl TestCameras {
     /// CAM 2 and CAM 3 at their addresses.
     pub(crate) fn set_up(label: &str) -> Self {
         let cameras = Self::new(label);
-        cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+        cameras.pair_cam_1();
         cameras.call(
             "cameras.setup.update",
             json!({ "camera": 2, "address": CAM2_ADDRESS }),
@@ -77,6 +77,16 @@ impl TestCameras {
 
     pub(crate) fn path(&self) -> &Path {
         &self.db_path
+    }
+
+    /// Pairs the simulated CAM 1 as Setup does: `Pair CAM 1`, then the PIN
+    /// the camera shows.
+    pub(crate) fn pair_cam_1(&self) {
+        self.call("cameras.setup.pair", json!({ "camera": 1 }));
+        self.call(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": SIMULATED_PIN }),
+        );
     }
 
     /// A request as the screen sends it; the whole reply.

@@ -53,7 +53,7 @@ pub(crate) struct LinkState {
     pub status: Option<u8>,
     /// Why the link stopped, in the operator's words; `None` while it runs
     /// or was let go.
-    pub failure: Option<String>,
+    pub failure: Option<LinkFailure>,
 }
 
 impl LinkState {
@@ -85,14 +85,14 @@ impl LinkState {
         Noticed::Changed
     }
 
-    /// The link cannot go on for now: the sentence says why. The same
-    /// sentence again (a retry that failed the same way) changes nothing.
-    pub(crate) fn failed(&mut self, sentence: String) -> Noticed {
-        if self.connection == Connection::Stopped && self.failure.as_deref() == Some(&*sentence) {
+    /// The link cannot go on for now: the failure says why. The same
+    /// failure again (a retry that failed the same way) changes nothing.
+    pub(crate) fn failed(&mut self, failure: LinkFailure) -> Noticed {
+        if self.connection == Connection::Stopped && self.failure.as_ref() == Some(&failure) {
             return Noticed::Nothing;
         }
         self.connection = Connection::Stopped;
-        self.failure = Some(sentence);
+        self.failure = Some(failure);
         Noticed::Changed
     }
 
@@ -145,10 +145,7 @@ impl LinkState {
         match self.connection {
             Connection::Connected => Ok(self.reading.clone()),
             Connection::Starting | Connection::Lost => Err(LinkFailure::NoAnswer),
-            Connection::Stopped => Err(self
-                .failure
-                .clone()
-                .map_or(LinkFailure::NoAnswer, LinkFailure::Bluetooth)),
+            Connection::Stopped => Err(self.failure.clone().unwrap_or(LinkFailure::NoAnswer)),
         }
     }
 }

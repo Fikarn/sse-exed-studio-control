@@ -22,6 +22,7 @@ use crate::cameras::model::{
     ALREADY_RECORDING, CAMERA_NUMBERS, NOT_CONFIRMED, NOT_RECORDING, RECORDING_CAMERA,
     STARTED_RECORDING, STOPPED_RECORDING, VMIX_INPUT_MAX, VMIX_INPUT_MIN,
 };
+use crate::cameras::pocket::pairing::{parse_pin, NOT_WANTED};
 use crate::cameras::runtime::{with_cameras, Cameras};
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
 use crate::cameras::snapshot::{
@@ -69,7 +70,7 @@ pub(crate) fn handle_cameras_request(
             "cameras.release" => release_request(cameras, params)?,
             "cameras.connect" => connect_request(cameras, bodies, params, now)?,
             "cameras.setup.update" => setup_update_request(db_path, cameras, bodies, params, now)?,
-            "cameras.setup.pair" => setup_pair_request(db_path, cameras, bodies, params, now)?,
+            "cameras.setup.pair" => setup_pair_request(cameras, bodies, params, now)?,
             "cameras.setup.forget" => setup_forget_request(db_path, cameras, bodies, params, now)?,
             // The page shows the pictures: frames go while it says so, once a
             // second, and a while after. It changes nothing a camera holds.
@@ -857,34 +858,59 @@ fn setup_update_request(
     save_setup(db_path, cameras, bodies, setup, now, hold)
 }
 
-/// `cameras.setup.pair { camera: 1 }`: with the simulated link at once; the
-/// real one comes in Slice 11 (`CAMERA_NO_LINK` until then).
+/// `cameras.setup.pair { camera: 1, pin? }` (D15 rule 2; two steps since
+/// 2026-10-06). Without `pin` a pairing begins, and one that runs starts
+/// over: the link looks for the camera and Windows begins to pair, so the
+/// camera shows a 6-digit PIN. With `pin` it hands that PIN over
+/// (`CAMERA_PAIRING_NOT_WANTED` when no pairing waits for one). A step
+/// raises `cameras.changed { reason: "pairing" }`; a pairing that succeeds
+/// saves CAM 1's pairing and its Bluetooth address and holds it (`setup`).
+/// The simulated camera shows its PIN at once and pairs at its own,
+/// `123456`. In a build with no link to it, `CAMERA_NO_LINK`.
 fn setup_pair_request(
-    db_path: &Path,
     cameras: &mut Cameras,
     bodies: &SimulatedCameras,
     params: &Value,
     now: SystemTime,
 ) -> Handled {
     let camera = camera_param(params)?;
-    if camera != 1 {
+    if camera != RECORDING_CAMERA {
         return Err(CameraError::Invalid(String::from(
             "Only CAM 1 is paired; CAM 2 and CAM 3 take an address.",
         )));
     }
+    let pin_refused =
+        || CameraError::Invalid(String::from("pin must be the 6 digits CAM 1 shows."));
+    let pin = match params.get("pin") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(text)) => Some(parse_pin(text).ok_or_else(pin_refused)?),
+        Some(_) => return Err(pin_refused()),
+    };
     if !cameras.camera(camera).has_link {
         return Err(CameraError::Refused(
             "CAMERA_NO_LINK",
             model(camera).no_link_refusal(),
         ));
     }
-    let mut setup = cameras.camera(camera).setup.clone();
-    setup.paired = true;
-    save_setup(db_path, cameras, bodies, setup, now, true)
+    let reason = match pin {
+        None => {
+            cameras.begin_pairing();
+            "pairing"
+        }
+        Some(pin) => cameras.give_pin(pin, bodies, now)?.ok_or_else(|| {
+            CameraError::Refused("CAMERA_PAIRING_NOT_WANTED", String::from(NOT_WANTED))
+        })?,
+    };
+    Ok((
+        json!({ "camera": camera, "setup": cameras.camera(camera).setup_summary() }),
+        Some((reason, Some(camera))),
+    ))
 }
 
 /// `cameras.setup.forget { camera }`: takes the address or the pairing away
-/// (the vMix input stays); the camera is not set up again.
+/// (the vMix input stays), and stops CAM 1's pairing if one runs; the
+/// camera is not set up again. Windows' own pairing stays: the next
+/// pairing makes it afresh.
 fn setup_forget_request(
     db_path: &Path,
     cameras: &mut Cameras,
@@ -893,6 +919,9 @@ fn setup_forget_request(
     now: SystemTime,
 ) -> Handled {
     let camera = camera_param(params)?;
+    if camera == RECORDING_CAMERA {
+        cameras.cancel_pairing();
+    }
     let mut setup = cameras.camera(camera).setup.clone();
     setup.address = None;
     setup.paired = false;

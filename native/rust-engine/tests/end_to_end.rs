@@ -376,8 +376,20 @@ fn the_simulated_cameras_answer_over_the_pipe() {
         "{snapshot}"
     );
 
+    // Pairing is two steps (2026-10-06): `Pair CAM 1`, then the PIN the
+    // camera shows, which the simulated CAM 1 shows at once.
     engine.send(&json!({
-        "type": "request", "id": "cameras-2", "method": "cameras.setup.pair", "params": { "camera": 1 }
+        "type": "request", "id": "cameras-2a", "method": "cameras.setup.pair", "params": { "camera": 1 }
+    }));
+    let begun = engine.wait_for("cameras.setup.pair", response_with_id("cameras-2a"));
+    assert_eq!(
+        begun.pointer("/result/setup/pairing/state"),
+        Some(&json!("pin")),
+        "{begun}"
+    );
+    engine.send(&json!({
+        "type": "request", "id": "cameras-2", "method": "cameras.setup.pair",
+        "params": { "camera": 1, "pin": "123456" }
     }));
     // The response comes first, then the events it raised.
     let paired = engine.wait_for("cameras.setup.pair", response_with_id("cameras-2"));

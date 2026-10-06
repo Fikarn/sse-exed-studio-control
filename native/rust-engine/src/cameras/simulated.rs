@@ -14,6 +14,10 @@
 use crate::cameras::model::{model, AutoKind, Setting, CAMERA_NUMBERS};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+/// The PIN the simulated CAM 1 shows when Setup pairs it (2026-10-06): the
+/// page tests and the fixture double type the same.
+pub(crate) const SIMULATED_PIN: &str = "123456";
+
 /// What a camera reports: each setting, or `None` when it does not report
 /// it (or, in the hardware link's view, has not been read).
 #[derive(Debug, Clone, PartialEq, Default)]
