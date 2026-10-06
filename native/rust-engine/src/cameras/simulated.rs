@@ -91,6 +91,26 @@ impl CameraReading {
             _ => {}
         }
     }
+
+    /// Stops reporting a setting (a test hook): the Pocket before its first
+    /// payload, or a lens that reports no position.
+    #[cfg(test)]
+    fn clear(&mut self, setting: Setting) {
+        match setting {
+            Setting::Iso => self.iso = None,
+            Setting::Shutter => self.shutter = None,
+            Setting::Iris => self.iris = None,
+            Setting::Nd => self.nd = None,
+            Setting::WhiteBalance => self.white_balance = None,
+            Setting::Tint => self.tint = None,
+            Setting::Focus => self.focus = None,
+            Setting::Resolution => self.resolution = None,
+            Setting::FrameRate => self.frame_rate = None,
+            Setting::DynamicRange => self.dynamic_range = None,
+            Setting::DisplayLut => self.display_lut = None,
+            Setting::DisplayLutOn => self.display_lut_on = None,
+        }
+    }
 }
 
 /// A value sent to a camera.
@@ -283,6 +303,13 @@ impl SimulatedCameras {
     #[cfg(test)]
     pub(crate) fn body_sets(&mut self, camera: u8, setting: Setting, value: CameraValue) {
         self.camera_mut(camera).values.set(setting, &value);
+    }
+
+    /// The body stops reporting a setting (test hook): the camera before its
+    /// first payload, or a lens without a position.
+    #[cfg(test)]
+    pub(crate) fn body_clears(&mut self, camera: u8, setting: Setting) {
+        self.camera_mut(camera).values.clear(setting);
     }
 
     /// The body starts or stops a take (test hook): the iPad, or the

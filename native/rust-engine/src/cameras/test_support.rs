@@ -159,6 +159,13 @@ impl TestCameras {
         });
     }
 
+    /// The body stops reporting a setting.
+    pub(crate) fn body_clears(&self, camera: u8, setting: Setting) {
+        runtime::with_bodies(&self.db_path, |bodies| {
+            bodies.body_clears(camera, setting);
+        });
+    }
+
     /// The body starts or stops a take.
     pub(crate) fn body_records(&self, camera: u8, recording: bool) {
         runtime::with_bodies(&self.db_path, |bodies| {

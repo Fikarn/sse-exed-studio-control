@@ -4,7 +4,8 @@
 //! shape, not set up, released, unreachable, a setting the camera does not
 //! report or offer, a value it does not allow, the second press.
 
-use crate::cameras::simulated::CameraCommand;
+use crate::cameras::model::Setting;
+use crate::cameras::simulated::{CameraCommand, CameraValue};
 use crate::cameras::test_support::{
     assert_operator_words, refusal, take_announced, TestCameras, CAM2_ADDRESS,
 };
@@ -465,6 +466,120 @@ fn a_step_moves_in_the_camera_s_own_steps_and_stops_at_the_ends() {
             "{params}"
         );
     }
+}
+
+// The step rule (the roadmap's Pocket part, 2026-10-06): a step starts from
+// what the camera reports. From a value that is not on its list it moves
+// from the nearest listed option in the step's direction; from a level
+// between two steps, from the next step that way; a setting the camera has
+// not reported, or reports with no number in it, is refused: a step has
+// nothing to start from. Until then a step from an unlisted value went from
+// the list's first option.
+#[test]
+fn a_step_from_a_value_off_the_list_moves_from_the_nearest_listed_option() {
+    let cameras = TestCameras::set_up("step-off-list");
+    let step = |camera: u8, setting: &str, step: i64| {
+        cameras.call(
+            "cameras.step",
+            json!({ "camera": camera, "setting": setting, "step": step }),
+        )["value"]
+            .clone()
+    };
+    let text = |value: &str| CameraValue::Text(String::from(value));
+
+    // A rising list: CAM 1's ISO, iris, ND and shutter angle.
+    cameras.body_sets(1, Setting::Iso, text("450"));
+    assert_eq!(step(1, "iso", 1), "500");
+    cameras.body_sets(1, Setting::Iso, text("450"));
+    assert_eq!(step(1, "iso", -1), "400");
+    cameras.body_sets(1, Setting::Iso, text("450"));
+    assert_eq!(
+        step(1, "iso", 2),
+        "640",
+        "the second listed option that way"
+    );
+    cameras.body_sets(1, Setting::Iso, text("30000"));
+    assert_eq!(
+        step(1, "iso", -1),
+        "25600",
+        "above the list: the last option"
+    );
+    cameras.body_sets(1, Setting::Iso, text("30000"));
+    assert_eq!(step(1, "iso", 1), "25600", "and a step up stops there");
+    cameras.body_sets(1, Setting::Iso, text("50"));
+    assert_eq!(step(1, "iso", 1), "100", "below the list: the first option");
+    cameras.body_sets(1, Setting::Iris, text("f/3.0"));
+    assert_eq!(step(1, "iris", 1), "f/3.2");
+    cameras.body_sets(1, Setting::Iris, text("f/3.0"));
+    assert_eq!(step(1, "iris", -1), "f/2.8");
+    cameras.body_sets(1, Setting::Iris, text("f/2.80"));
+    assert_eq!(
+        step(1, "iris", 1),
+        "f/3.2",
+        "the same value in other words is the listed one"
+    );
+    cameras.body_sets(1, Setting::Nd, text("3 stops"));
+    assert_eq!(step(1, "nd", -1), "2 stops");
+    cameras.body_sets(1, Setting::Shutter, text("150°"));
+    assert_eq!(step(1, "shutter", 1), "172.8°");
+    // A falling list: the BGH1's shutter speeds.
+    cameras.body_sets(2, Setting::Shutter, text("1/45"));
+    assert_eq!(step(2, "shutter", 1), "1/50");
+    cameras.body_sets(2, Setting::Shutter, text("1/45"));
+    assert_eq!(step(2, "shutter", -1), "1/40");
+    // A level between two steps.
+    cameras.body_sets(1, Setting::WhiteBalance, CameraValue::Number(5625.0));
+    assert_eq!(number(&step(1, "whiteBalance", 1)), Some(5650.0));
+    cameras.body_sets(1, Setting::WhiteBalance, CameraValue::Number(5625.0));
+    assert_eq!(number(&step(1, "whiteBalance", -1)), Some(5600.0));
+    cameras.body_sets(1, Setting::WhiteBalance, CameraValue::Number(5625.0));
+    assert_eq!(number(&step(1, "whiteBalance", -2)), Some(5550.0));
+    cameras.body_sets(1, Setting::Focus, CameraValue::Number(0.625));
+    assert_eq!(number(&step(1, "focus", 1)), Some(0.63));
+
+    // Nothing to start from: refused, and nothing is sent.
+    let sent = cameras.sent(1).len();
+    let not_read_iso = "CAM 1 has not reported its ISO yet, so a step has nothing to start from.";
+    let not_read_focus =
+        "CAM 1 has not reported its focus yet, so a step has nothing to start from.";
+    let no_number = "CAM 1 reports ISO Auto, which Studio Control cannot step from.";
+    cameras.body_clears(1, Setting::Iso);
+    assert_eq!(
+        cameras.refused(
+            "cameras.step",
+            json!({ "camera": 1, "setting": "iso", "step": 1 })
+        ),
+        refusal("CAMERA_VALUE_NOT_ALLOWED", not_read_iso)
+    );
+    cameras.body_clears(1, Setting::Focus);
+    assert_eq!(
+        cameras.refused(
+            "cameras.step",
+            json!({ "camera": 1, "setting": "focus", "step": -1 })
+        ),
+        refusal("CAMERA_VALUE_NOT_ALLOWED", not_read_focus)
+    );
+    cameras.body_sets(1, Setting::Iso, text("Auto"));
+    assert_eq!(
+        cameras.refused(
+            "cameras.step",
+            json!({ "camera": 1, "setting": "iso", "step": 1 })
+        ),
+        refusal("CAMERA_VALUE_NOT_ALLOWED", no_number)
+    );
+    assert_eq!(cameras.sent(1).len(), sent, "a refusal sends nothing");
+    for sentence in [not_read_iso, not_read_focus, no_number] {
+        assert_operator_words(sentence);
+    }
+    // A BGH1's focus steps need no position.
+    cameras.body_clears(2, Setting::Iris);
+    assert_eq!(
+        cameras.call(
+            "cameras.step",
+            json!({ "camera": 2, "setting": "focus", "step": 1 })
+        )["value"],
+        Value::Null
+    );
 }
 
 // D11: a one-shot auto the camera offers; the answer is the value it

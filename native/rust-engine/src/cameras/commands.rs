@@ -18,9 +18,9 @@
 
 use crate::action_log::{list_recent_domain_actions, DOMAIN_CAMERAS};
 use crate::cameras::model::{
-    address_refusal, model, parse_camera_address, AutoKind, Setting, ALREADY_RECORDING,
-    CAMERA_NUMBERS, NOT_CONFIRMED, NOT_RECORDING, RECORDING_CAMERA, STARTED_RECORDING,
-    STOPPED_RECORDING, VMIX_INPUT_MAX, VMIX_INPUT_MIN,
+    address_refusal, model, parse_camera_address, step_choice, step_level, AutoKind, Setting,
+    ALREADY_RECORDING, CAMERA_NUMBERS, NOT_CONFIRMED, NOT_RECORDING, RECORDING_CAMERA,
+    STARTED_RECORDING, STOPPED_RECORDING, VMIX_INPUT_MAX, VMIX_INPUT_MIN,
 };
 use crate::cameras::runtime::{with_cameras, Cameras};
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
@@ -394,24 +394,22 @@ pub(super) fn step_request(
     let step = step_param(params)?;
     held(cameras, camera)?;
     let model = model(camera);
+    // The step rule (2026-10-06): a step starts from what the camera
+    // reports. From a value that is not on the list, or a level between
+    // two steps, it moves from the nearest listed value in the step's
+    // direction; a setting not read, or read with no number, is refused.
     let command = if setting == Setting::Focus && model.focus_steps() {
         CameraCommand::FocusSteps(step)
     } else if setting.is_level() {
         let scale = model.scale(setting).map_err(unsupported)?;
-        let current = reading(cameras, camera)
-            .number(setting)
-            .map_or(0, |value| scale.steps_of(value));
-        let target = (current + step).clamp(0, scale.last_step());
-        CameraCommand::Set(setting, CameraValue::Number(scale.at(target)))
+        let target = step_level(&scale, reading(cameras, camera).number(setting), step)
+            .map_err(|from| not_allowed(model.step_refusal(setting, &from)))?;
+        CameraCommand::Set(setting, CameraValue::Number(target))
     } else {
         let options = model.options(setting).map_err(unsupported)?;
         let current = reading(cameras, camera);
-        let index = current
-            .text(setting)
-            .and_then(|value| options.iter().position(|option| *option == value))
-            .unwrap_or(0) as i64;
-        let last = options.len().saturating_sub(1) as i64;
-        let target = usize::try_from((index + step).clamp(0, last)).unwrap_or(0);
+        let target = step_choice(options, current.text(setting), step)
+            .map_err(|from| not_allowed(model.step_refusal(setting, &from)))?;
         CameraCommand::Set(setting, CameraValue::Text(String::from(options[target])))
     };
     let after = press(cameras, bodies, camera, &[command], now)?;
