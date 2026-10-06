@@ -30,6 +30,19 @@ pub const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 /// builds, all forty characters.
 pub const STUDIO_BUILD_ENV: &str = "SSE_STUDIO_BUILD";
 
+/// Bluetooth's switch (D41): `SSE_CAMERA_BLUETOOTH=1` lets a development
+/// build's CAM 1 be the real Pocket over Windows' Bluetooth, a hardware test
+/// the owner asks for and attends. Only `npm run app -- --bluetooth` sets it:
+/// every other run sets it to `0`, the lanes refuse it, and a test build is
+/// refused whatever it holds. A studio build never reads it.
+pub const CAMERA_BLUETOOTH_ENV: &str = "SSE_CAMERA_BLUETOOTH";
+
+/// Only `1` asks for Bluetooth; the value is trimmed first, as the other
+/// switches are.
+pub fn camera_bluetooth_requested(value: &str) -> bool {
+    value.trim() == "1"
+}
+
 /// The commit a studio build was made from; `None` in a development build.
 ///
 /// A studio build is a release build that `npm run release` made. The

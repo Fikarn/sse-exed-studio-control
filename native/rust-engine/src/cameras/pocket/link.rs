@@ -23,7 +23,9 @@ use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use studio_control_protocol::development::development_build;
+use studio_control_protocol::development::{
+    camera_bluetooth_requested, development_build, CAMERA_BLUETOOTH_ENV,
+};
 
 #[cfg(not(windows))]
 use crate::cameras::pocket::stub as platform;
@@ -39,20 +41,32 @@ pub(crate) const SEND_TIMEOUT: Duration = Duration::from_secs(2);
 /// second, not one each.
 pub(crate) const NOTICE_INTERVAL: Duration = Duration::from_millis(250);
 
-/// Why no test and no development run opens Bluetooth.
+/// Why no test and no plain development run opens Bluetooth.
 const TEST_REFUSAL: &str =
     "A test run does not open Bluetooth: CAM 1 is reached by the studio's build alone (rule 2).";
 const DEVELOPMENT_REFUSAL: &str =
-    "A development run does not open Bluetooth: CAM 1 is reached by the studio's build alone (rule 2).";
+    "A development run does not open Bluetooth unless it was started with npm run app -- --bluetooth, a hardware test the owner attends (rule 2).";
 
-/// The one check before Bluetooth is opened. A test build is refused
-/// whatever else is true; a development build is refused (rule 2); the
-/// studio's build passes.
+/// The one check before Bluetooth is opened (rule 2). A test build is
+/// refused whatever else is true; a development build passes only with
+/// Bluetooth's switch, which `npm run app -- --bluetooth` alone sets (D41);
+/// the studio's build passes, and never reads the switch.
 pub(crate) fn guard_bluetooth() -> Result<(), String> {
-    if cfg!(test) {
+    let switch =
+        std::env::var(CAMERA_BLUETOOTH_ENV).is_ok_and(|value| camera_bluetooth_requested(&value));
+    guard_bluetooth_for(cfg!(test), development_build(), switch)
+}
+
+/// The guard's rule over plain facts, for the tests.
+pub(crate) fn guard_bluetooth_for(
+    test_build: bool,
+    development: bool,
+    switch: bool,
+) -> Result<(), String> {
+    if test_build {
         return Err(String::from(TEST_REFUSAL));
     }
-    if development_build() {
+    if development && !switch {
         return Err(String::from(DEVELOPMENT_REFUSAL));
     }
     Ok(())
@@ -206,6 +220,12 @@ impl PocketLink {
                 shared.with_state(|state| state.failed(sentence));
             }
             Ok(()) => {
+                if development_build() {
+                    log_event(
+                        LogLevel::Info,
+                        "CAM 1's Bluetooth link starts in a development run (SSE_CAMERA_BLUETOOTH=1): a hardware test the owner attends.",
+                    );
+                }
                 let notifier = thread::Builder::new()
                     .name(String::from("cam1-notice"))
                     .spawn(move || run_notifier(&notice_queue, notify));

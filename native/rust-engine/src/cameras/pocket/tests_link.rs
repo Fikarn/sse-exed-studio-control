@@ -5,7 +5,7 @@
 
 use crate::cameras::model::Setting;
 use crate::cameras::pocket::characteristics::{Notified, Writable, CAMERA_STATUS};
-use crate::cameras::pocket::link::{guard_bluetooth, PocketLink};
+use crate::cameras::pocket::link::{guard_bluetooth, guard_bluetooth_for, PocketLink};
 use crate::cameras::pocket::protocol::{Message, Parameter, TYPE_INT32, VIDEO_ISO};
 use crate::cameras::pocket::state::{
     Connection, LinkState, Noticed, STATUS_CAMERA_READY, STATUS_INITIAL_PAYLOAD_RECEIVED,
@@ -21,6 +21,43 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 const POCKET_ADDRESS: &str = "D4:3A:2C:11:22:33";
+
+// Rule 2 and D41: a test build is refused whatever the switch says; a
+// development build passes only with Bluetooth's switch, which `npm run app
+// -- --bluetooth` alone sets; the studio's build passes without reading it.
+#[test]
+fn the_guard_s_rule_over_the_build_and_the_switch() {
+    for switch in [false, true] {
+        let refused = guard_bluetooth_for(true, true, switch).expect_err("a test build");
+        assert!(
+            refused.starts_with("A test run does not open Bluetooth"),
+            "{refused}"
+        );
+        assert_operator_words(&refused);
+    }
+    let refused = guard_bluetooth_for(false, true, false).expect_err("a plain development run");
+    assert!(
+        refused.contains("npm run app -- --bluetooth"),
+        "it names the switch: {refused}"
+    );
+    assert_operator_words(&refused);
+    assert_eq!(
+        guard_bluetooth_for(false, true, true),
+        Ok(()),
+        "the attended run"
+    );
+    assert_eq!(
+        guard_bluetooth_for(false, false, false),
+        Ok(()),
+        "the studio's build"
+    );
+    assert_eq!(guard_bluetooth_for(false, false, true), Ok(()));
+    assert!(
+        studio_control_protocol::development::camera_bluetooth_requested(" 1 ")
+            && !studio_control_protocol::development::camera_bluetooth_requested("true")
+            && !studio_control_protocol::development::camera_bluetooth_requested("0")
+    );
+}
 
 fn pocket_address() -> BluetoothAddress {
     BluetoothAddress {
