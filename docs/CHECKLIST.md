@@ -116,15 +116,21 @@ The pictures, with vMix running and its Outputs 2, 3 and 4 sent over NDI:
 - [ ] The `⋯` in a small picture's label opens its camera's menu over the picture, and the picture stays drawn round the label and the menu. A right-click on the small picture opens the same menu at the pointer. (The picture is drawn natively over the page in the app's window, and whether a right-click there reaches the page is not known yet: if it does not, note it; the `⋯` is the way that always works.)
 - [ ] The `⋯` beside a camera's key and in the plate's title open the same menu; a right-click on a camera's key does too. A menu stays on screen while it is open, and Esc closes it.
 
-Until the links to the cameras are built:
+Until the BGH1s' link is built:
 
-- [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
-- [ ] `Camera setup` opens Setup / Support's `Cameras`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
+- [ ] CAM 2 and CAM 3 read `NOT SET UP` and say that their link comes with a later version; their controls are locked.
+- [ ] `Camera setup` opens Setup / Support's `Cameras`: the screen says it has no link to CAM 2 and CAM 3 and takes no address for them, their addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
 - [ ] Setup / Support's About ends with `NDI® is a registered trademark of Vizrt NDI AB · ndi.video`, as words.
-- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a beige outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC`, on every page, and the dials are grey and do nothing.
+- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a beige outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. On a camera that is not held, the dials are grey and do nothing, and so is `REC`, on every page, while CAM 1 is not held.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
-Once the links are built, with the cameras on vMix's outputs:
+CAM 1's pairing, once, with the Pocket beside you (its Bluetooth on, the iPad's app closed, nothing recording):
+
+- [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised and the one Windows holds.
+- [ ] A wrong PIN says so and saves nothing; `Pair CAM 1` again starts over.
+- [ ] After a close and a start, CAM 1 is held again with no pairing and no setting changed.
+
+Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on vMix's outputs:
 
 - [ ] All three cameras show; the selected one is big enough to judge framing and exposure, and the 1:1 view sharp enough to judge focus.
 - [ ] A hand waved at a camera moves on the page with no delay you can see beside vMix's own preview.
