@@ -20,7 +20,7 @@ use crate::cameras::pocket::pairing::{
 use crate::cameras::real_link::BluetoothAddress;
 use crate::diagnostics::{log_event, LogLevel};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use windows::core::{Error as WinError, HSTRING};
@@ -171,7 +171,55 @@ fn listen(
     Err(failed(NOT_FOUND))
 }
 
-/// Pairs the camera heard at `address` afresh.
+/// A cancel waiting in the inbox (Forget, a new pairing), or nobody holding
+/// the pairing any more: it is let go before its next step.
+fn cancelled(inbox: &PairingInbox) -> bool {
+    matches!(
+        inbox.try_recv(),
+        Ok(PairingOrder::Cancel) | Err(TryRecvError::Disconnected)
+    )
+}
+
+/// Waits for one of Windows' operations, `ANSWER_TIMEOUT` at most, serving
+/// the inbox meanwhile: a cancel lets the pairing go, and an operation left
+/// unfinished is cancelled. `status`, `cancel` and `results` are the
+/// operation's own (its type is `windows-future`'s, which the engine does
+/// not name); `late` says what a wait that runs out means.
+fn wait_for<T>(
+    inbox: &PairingInbox,
+    status: impl Fn() -> windows::core::Result<i32>,
+    cancel: impl Fn(),
+    results: impl FnOnce() -> windows::core::Result<T>,
+    late: &str,
+) -> Result<T, Stop> {
+    let until = Instant::now() + ANSWER_TIMEOUT;
+    loop {
+        match status() {
+            Ok(ASYNC_STARTED) => {}
+            // Completed, cancelled or failed: the results say which.
+            Ok(_) => return results().map_err(|error| windows_failed(&error)),
+            Err(error) => {
+                cancel();
+                return Err(windows_failed(&error));
+            }
+        }
+        let stop = match inbox.recv_timeout(TICK) {
+            Ok(PairingOrder::Cancel) | Err(RecvTimeoutError::Disconnected) => Some(Stop::LetGo),
+            Ok(PairingOrder::Pin(_)) | Err(RecvTimeoutError::Timeout) => {
+                (Instant::now() > until).then(|| failed(late))
+            }
+        };
+        if let Some(stop) = stop {
+            cancel();
+            return Err(stop);
+        }
+    }
+}
+
+/// Pairs the camera heard at `address` afresh. The address saved is the one
+/// Windows holds for the device once it is paired, which the advertisement's
+/// may not be (a camera that advertises a private address that changes):
+/// both are in the log.
 fn pair_with(
     shared: &Arc<PairingShared>,
     inbox: &PairingInbox,
@@ -183,17 +231,46 @@ fn pair_with(
     } else {
         BluetoothAddressType::Public
     };
-    let device = BluetoothLEDevice::FromBluetoothAddressWithBluetoothAddressTypeAsync(
-        address.address,
-        kind,
+    let pending =
+        BluetoothLEDevice::FromBluetoothAddressWithBluetoothAddressTypeAsync(address.address, kind)
+            .map_err(|error| windows_failed(&error))?;
+    let not_found =
+        "Windows did not find CAM 1 at the address it heard. Press Pair CAM 1 to try again.";
+    let device = wait_for(
+        inbox,
+        || pending.Status().map(|status| status.0),
+        || {
+            let _ = pending.Cancel();
+        },
+        || pending.GetResults(),
+        not_found,
     )
-    .and_then(|pending| pending.get())
-    .map_err(|_| {
-        failed("Windows did not find CAM 1 at the address it heard. Press Pair CAM 1 to try again.")
+    .map_err(|stop| match stop {
+        Stop::LetGo => Stop::LetGo,
+        Stop::Failed(_) => failed(not_found),
     })?;
-    let outcome = pair_device(shared, inbox, notify, &device);
+    let outcome = pair_device(shared, inbox, notify, &device).map(|()| {
+        let held = device
+            .BluetoothAddress()
+            .and_then(|held| {
+                device.BluetoothAddressType().map(|kind| BluetoothAddress {
+                    address: held,
+                    random: kind == BluetoothAddressType::Random,
+                })
+            })
+            .unwrap_or(address);
+        log_event(
+            LogLevel::Info,
+            &format!(
+                "CAM 1 advertised at {}; Windows holds it at {}.",
+                address.text(),
+                held.text()
+            ),
+        );
+        held
+    });
     let _ = device.Close();
-    outcome.map(|()| address)
+    outcome
 }
 
 /// Removes a pairing Windows holds for the device, then pairs it with the
@@ -209,11 +286,21 @@ fn pair_device(
         .and_then(|information| information.Pairing())
         .map_err(|error| windows_failed(&error))?;
     if pairing.IsPaired().map_err(|error| windows_failed(&error))? {
-        let status = pairing
+        if cancelled(inbox) {
+            return Err(Stop::LetGo);
+        }
+        let pending = pairing
             .UnpairAsync()
-            .and_then(|pending| pending.get())
-            .and_then(|result| result.Status())
             .map_err(|error| windows_failed(&error))?;
+        let status = wait_for(
+            inbox,
+            || pending.Status().map(|status| status.0),
+            || {
+                let _ = pending.Cancel();
+            },
+            || pending.GetResults().and_then(|result| result.Status()),
+            "Windows took too long to remove its old pairing with CAM 1. Press Pair CAM 1 to try again.",
+        )?;
         if status != DeviceUnpairingResultStatus::Unpaired
             && status != DeviceUnpairingResultStatus::AlreadyUnpaired
         {
@@ -262,6 +349,9 @@ fn answer(
     custom: &DeviceInformationCustomPairing,
     asked_for: &Receiver<(DevicePairingRequestedEventArgs, Deferral)>,
 ) -> Result<(), Stop> {
+    if cancelled(inbox) {
+        return Err(Stop::LetGo);
+    }
     let operation = custom
         .PairWithProtectionLevelAsync(
             DevicePairingKinds::ProvidePin | DevicePairingKinds::ConfirmOnly,
@@ -284,6 +374,10 @@ fn answer(
                 break status.and_then(|status| {
                     if refused_kind {
                         Err(failed(OTHER_KIND))
+                    } else if held.is_some() {
+                        // The ceremony ended while the PIN was awaited:
+                        // the camera's time for it ran out first.
+                        Err(failed(NO_PIN))
                     } else {
                         pairing_result(status.0).map_err(Stop::Failed)
                     }
@@ -300,7 +394,10 @@ fn answer(
         if let Ok((args, deferral)) = asked_for.try_recv() {
             match args.PairingKind().map(|kind| asked(kind.0)) {
                 Ok(Asked::Pin) => {
-                    held = Some((args, deferral));
+                    // A second request replaces the first, which is refused.
+                    if let Some((_, earlier)) = held.replace((args, deferral)) {
+                        let _ = earlier.Complete();
+                    }
                     shared.set(PairingStep::Pin);
                     notify();
                     deadline = Instant::now() + PIN_TIMEOUT;
@@ -342,7 +439,12 @@ fn answer(
             break Err(failed(late));
         }
     };
+    // Whatever Windows asked and is unanswered is refused: the one held, and
+    // any that came in the loop's last pass.
     if let Some((_, deferral)) = held.take() {
+        let _ = deferral.Complete();
+    }
+    while let Ok((_, deferral)) = asked_for.try_recv() {
         let _ = deferral.Complete();
     }
     if operation.Status().map(|status| status.0).ok() == Some(ASYNC_STARTED) {

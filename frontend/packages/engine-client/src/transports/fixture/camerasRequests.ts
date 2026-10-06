@@ -519,7 +519,8 @@ function pinParam(params: JsonObject): string | null {
 /**
  * `cameras.setup.pair { camera: 1, pin? }`, in two steps (2026-10-06): without `pin` a pairing
  * begins, and one that runs starts over — the simulated CAM 1 shows its PIN at once; in the
- * studio's build the double has no Pocket, so the pairing looks for one. With `pin` it hands
+ * studio's build the double has no Pocket, so the pairing looks for one, and keeps looking
+ * where the hardware link gives up after a minute (the double has no clock). With `pin` it hands
  * the PIN over: the simulated camera's own (`123456`) pairs it, saved and held (`setup`); any
  * other fails and saves nothing. Each step is `cameras.changed { reason: "pairing" }`.
  */

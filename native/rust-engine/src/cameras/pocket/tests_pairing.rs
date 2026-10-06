@@ -90,7 +90,7 @@ fn each_step_says_what_to_do() {
         shown(PairingStep::Pin),
         Some((
             CameraPairingState::Pin,
-            String::from("CAM 1 shows a 6-digit PIN. Enter it here.")
+            String::from("CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.")
         ))
     );
     assert_eq!(

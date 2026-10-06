@@ -233,7 +233,7 @@ fn cam_1_pairs_at_the_pin_it_shows_and_is_held() {
         .reply("cameras.setup.pair", json!({ "camera": 1 }))
         .expect("the pairing begins");
     let wanted = json!({
-        "state": "pin", "sentence": "CAM 1 shows a 6-digit PIN. Enter it here."
+        "state": "pin", "sentence": "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds."
     });
     assert_eq!(
         begun.result,
@@ -262,7 +262,7 @@ fn cam_1_pairs_at_the_pin_it_shows_and_is_held() {
     );
     assert_eq!(cameras.camera(1)["state"], "held");
     assert!(saved(&cameras)[0].paired);
-    assert_operator_words("CAM 1 shows a 6-digit PIN. Enter it here.");
+    assert_operator_words("CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.");
     assert!(cameras.nothing_sent());
 }
 

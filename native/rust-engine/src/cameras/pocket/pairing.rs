@@ -9,8 +9,8 @@
 //! run starts it.
 //!
 //! The steps: `Finding` (a passive listen for the Pocket's advertisement, a
-//! minute at most), `Pin` (Windows asked for the PIN the camera shows; ninety
-//! seconds at most), `Pairing` (the PIN handed over), then `Paired` with the
+//! minute at most), `Pin` (Windows asked for the PIN the camera shows; thirty
+//! seconds at most, as Bluetooth's pairing allows), `Pairing` (the PIN handed over), then `Paired` with the
 //! camera's address, which the runtime saves and holds, or `Failed` with the
 //! sentence. A pairing is always made afresh: a pairing Windows still holds
 //! for the camera it found is removed first, so the camera shows its PIN and
@@ -36,20 +36,22 @@ use crate::cameras::pocket::winrt_pairing as platform;
 
 /// How long the pairing looks for the camera.
 pub(crate) const FIND_TIMEOUT: Duration = Duration::from_secs(60);
-/// How long it waits for the PIN once the camera shows it.
-pub(crate) const PIN_TIMEOUT: Duration = Duration::from_secs(90);
+/// How long it waits for the PIN once the camera shows it: Bluetooth's
+/// pairing gives the PIN about 30 seconds (its timer), and a pairing that
+/// ends sooner while the PIN is awaited says `NO_PIN` too.
+pub(crate) const PIN_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long Windows may take to ask for the PIN once it has the camera, and
 /// to pair once it has the PIN.
 pub(crate) const ANSWER_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) const FINDING: &str =
     "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.";
-pub(crate) const PIN_WANTED: &str = "CAM 1 shows a 6-digit PIN. Enter it here.";
+pub(crate) const PIN_WANTED: &str = "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.";
 pub(crate) const PAIRING: &str = "Pairing with CAM 1…";
 pub(crate) const NOT_FOUND: &str = "CAM 1 was not found within a minute. Check that its Bluetooth is on and the iPad's app is closed, then press Pair CAM 1 again.";
 pub(crate) const PIN_REFUSED: &str = "CAM 1 did not accept the PIN. Press Pair CAM 1 to try again.";
 pub(crate) const NO_PIN: &str =
-    "No PIN was entered within 90 seconds. Press Pair CAM 1 to try again.";
+    "The PIN was not entered within 30 seconds. Press Pair CAM 1 to try again.";
 pub(crate) const NO_ANSWER: &str =
     "CAM 1 did not answer Windows' pairing. Press Pair CAM 1 to try again.";
 pub(crate) const OTHER_KIND: &str = "CAM 1 asked for a kind of pairing Studio Control does not offer. Press Pair CAM 1 to try again.";
@@ -152,6 +154,7 @@ pub(crate) fn pairing_result(status: i32) -> Result<(), String> {
         9 => return Err(String::from(PIN_REFUSED)),
         11 => "CAM 1 does not offer a pairing with a PIN.",
         14 => "The pairing was cancelled.",
+        15 => "Windows is still busy with an earlier pairing of CAM 1: wait a moment.",
         17 => return Err(String::from(OTHER_KIND)),
         other => {
             return Err(format!(

@@ -112,7 +112,7 @@ export const SIMULATED_PIN = "123456";
 /** Each running step's sentence, as Setup shows it. */
 export const PAIRING_SENTENCES = {
   finding: "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.",
-  pin: "CAM 1 shows a 6-digit PIN. Enter it here.",
+  pin: "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.",
   pairing: "Pairing with CAM 1…",
 } as const;
 

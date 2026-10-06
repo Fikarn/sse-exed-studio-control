@@ -1462,7 +1462,9 @@ test.describe("Setup / Support's camera section", () => {
     const pin = page.getByTestId("setup-camera-1-pin");
     await expect(pin).toBeVisible();
     await expect(pin).toHaveAttribute("inputmode", "numeric");
-    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveText("CAM 1 shows a 6-digit PIN. Enter it here.");
+    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveText(
+      "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds."
+    );
     await expect(page.getByTestId("setup-camera-1-pairing")).toHaveAttribute("data-state", "pin");
     await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
     const send = page.getByTestId("setup-camera-1-send-pin");

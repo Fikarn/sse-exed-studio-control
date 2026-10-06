@@ -402,6 +402,7 @@ fn the_pairing_writes_nothing_and_only_listens() {
         "GattSession",
         "GetGattServices",
         "BluetoothLEScanningMode::Active",
+        "BluetoothLEScanningMode(",
         "CAMERA_STATUS",
         "DeviceWatcher",
         "FindAllAsync",

@@ -615,7 +615,7 @@ describe("the fixture double's cameras: Setup", () => {
 
   it("pairs CAM 1 at the PIN it shows, and forgets a camera's address or pairing", async () => {
     const { call, refused, seen, camera, cameras } = openCamerasDouble();
-    const wanted = { state: "pin", sentence: "CAM 1 shows a 6-digit PIN. Enter it here." };
+    const wanted = { state: "pin", sentence: "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds." };
     expect(await call("cameras.setup.pair", { camera: 1 })).toEqual({
       camera: 1,
       setup: { setUp: false, address: null, paired: false, vmixInput: 1, vmixOutput: 2, noLink: null, pairing: wanted },

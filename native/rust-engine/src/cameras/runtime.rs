@@ -495,7 +495,16 @@ impl Cameras {
         if !self.links.give_pin(pin) {
             return Ok(None);
         }
-        self.camera_mut(RECORDING_CAMERA).pairing = Some(PairingStep::Pairing);
+        // `Pairing`, or why the PIN could not be handed over (its thread
+        // gone): the pairing's own word.
+        let step = self
+            .links
+            .pairing_step()
+            .unwrap_or_else(|| PairingStep::Failed(String::from(STOPPED)));
+        if !step.running() {
+            self.links.end_pairing();
+        }
+        self.camera_mut(RECORDING_CAMERA).pairing = Some(step);
         Ok(Some("pairing"))
     }
 
