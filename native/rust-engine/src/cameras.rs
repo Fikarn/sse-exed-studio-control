@@ -16,6 +16,7 @@ pub(crate) mod commands;
 pub(crate) mod deck;
 pub(crate) mod model;
 pub(crate) mod pictures;
+pub(crate) mod pocket;
 pub(crate) mod real_link;
 pub(crate) mod report;
 pub(crate) mod runtime;
