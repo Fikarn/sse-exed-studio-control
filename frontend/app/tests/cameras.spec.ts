@@ -556,10 +556,10 @@ test.describe("the Cameras page", () => {
     await expect(rec).toHaveAttribute("data-rec", "last-known");
   });
 
-  test("without a link every camera is NOT SET UP and says why, and REC is locked", async ({ page }) => {
+  test("in the studio's build before pairing CAM 1 is NOT SET UP and says why, and REC is locked", async ({ page }) => {
     await openCameras(page, "cameras-no-link");
     await expect(state(page)).toContainText("NOT SET UP");
-    await expect(state(page)).toContainText("Studio Control has no link to CAM 1 yet: it comes with a later version.");
+    await expect(state(page)).toContainText("CAM 1 is not paired. Pair it in Setup, with the camera beside you.");
     await expect(page.getByTestId("cameras-rec")).toHaveAttribute("data-rec", "locked");
     await expect(page.getByTestId("cameras-rec")).toContainText("locked · CAM 1 is not set up");
     // The design system's empty line (the polish, 2026-10-05): the head's
@@ -1365,6 +1365,23 @@ test.describe("the header with the cameras", () => {
   });
 });
 
+/** Setup's camera section with CAM 1 forgotten, nothing else changed (the clock installed for Forget's two presses). */
+async function openForgottenCam1(page: Page) {
+  await page.clock.install();
+  await openFixture(page, "setup-cameras");
+  await expectWorkspaceMounted(page, "setup");
+  await page.getByTestId("setup-camera-menu-1").click();
+  await pressTwice(page, "setup-camera-1-forget");
+  await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("not paired");
+}
+
+/** `Pair CAM 1`, then the PIN the simulated CAM 1 shows. */
+async function pairCam1(page: Page) {
+  await page.getByTestId("setup-camera-1-pair").click();
+  await page.getByTestId("setup-camera-1-pin").fill("123456");
+  await page.getByTestId("setup-camera-1-send-pin").click();
+}
+
 test.describe("Setup / Support's camera section", () => {
   test("Camera setup opens it from the page, and it is no step of the runner", async ({ page }) => {
     await openCameras(page);
@@ -1429,22 +1446,83 @@ test.describe("Setup / Support's camera section", () => {
     await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
     await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("not paired");
     await expect(page.getByTestId("setup-camera-1-output")).toHaveText("vMix Output 2");
-    await page.getByTestId("setup-camera-1-pair").click();
+    await pairCam1(page);
     await expect(page.getByTestId("setup-camera-1-state")).toHaveText("HELD");
     await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("paired");
   });
 
-  test("without a link it takes no pairing and no address, and says why", async ({ page }) => {
+  // CAM 1's pairing in two steps (the Pocket's link, 2026-10-06): `Pair
+  // CAM 1` begins it and the camera shows a 6-digit PIN; a PIN row stands
+  // under the pairing until the PIN is handed over.
+  test("Pair CAM 1 asks for the PIN the camera shows, and its Pair key waits for six digits", async ({ page }) => {
+    await openForgottenCam1(page);
+    await expect(page.getByTestId("setup-camera-1-pin")).toHaveCount(0);
+    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveCount(0);
+    await page.getByTestId("setup-camera-1-pair").click();
+    const pin = page.getByTestId("setup-camera-1-pin");
+    await expect(pin).toBeVisible();
+    await expect(pin).toHaveAttribute("inputmode", "numeric");
+    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveText(
+      "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds."
+    );
+    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveAttribute("data-state", "pin");
+    await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
+    const send = page.getByTestId("setup-camera-1-send-pin");
+    await expect(send).toHaveAttribute("aria-disabled", "true");
+    // Only digits are taken, six at most.
+    await pin.fill("12a34");
+    await expect(pin).toHaveValue("1234");
+    await expect(send).toHaveAttribute("aria-disabled", "true");
+    await pin.fill("12345678");
+    await expect(pin).toHaveValue("123456");
+    await expect(send).not.toHaveAttribute("aria-disabled", "true");
+    expect(await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.sent(1))).toBe(0);
+  });
+
+  test("the PIN CAM 1 shows pairs it: paired, held, and said so", async ({ page }) => {
+    await openForgottenCam1(page);
+    await pairCam1(page);
+    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 1 is paired. Studio Control holds it now.");
+    await expect(page.getByTestId("setup-camera-1-state")).toHaveText("HELD");
+    await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("paired");
+    await expect(page.getByTestId("setup-camera-1-pin")).toHaveCount(0);
+    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveCount(0);
+    await expect(page.getByTestId("setup-camera-1-pair")).toHaveAttribute("aria-disabled", "true");
+    expect(await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.sent(1))).toBe(0);
+  });
+
+  test("a PIN that is not the camera's fails, says so, and Pair CAM 1 starts again", async ({ page }) => {
+    await openForgottenCam1(page);
+    await page.getByTestId("setup-camera-1-pair").click();
+    await page.getByTestId("setup-camera-1-pin").fill("654321");
+    await page.getByTestId("setup-camera-1-send-pin").click();
+    const step = page.getByTestId("setup-camera-1-pairing");
+    await expect(step).toHaveText("CAM 1 did not accept the PIN. Press Pair CAM 1 to try again.");
+    await expect(step).toHaveAttribute("data-state", "failed");
+    await expect(page.getByTestId("setup-camera-1-pin")).toHaveCount(0);
+    await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
+    await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("not paired");
+    await pairCam1(page);
+    await expect(page.getByTestId("setup-camera-1-state")).toHaveText("HELD");
+  });
+
+  test("without a link to CAM 2 and CAM 3 it takes no address for them, and says why; CAM 1 pairs", async ({
+    page,
+  }) => {
     await openCameras(page, "cameras-no-link");
     await page.getByTestId("cameras-state-setup").click();
     await expectWorkspaceMounted(page, "setup");
     await expect(page.getByTestId("setup-screen-cameras")).toContainText(
-      "This version has no link to the cameras yet, so it takes no pairing and no address."
+      "This version has no link to CAM 2 and CAM 3 yet, so it takes no address for them."
+    );
+    await expect(page.getByTestId("setup-camera-1-no-link")).toHaveCount(0);
+    // The studio's build has CAM 1's link; the double has no Pocket for it to find.
+    await page.getByTestId("setup-camera-1-pair").click();
+    await expect(page.getByTestId("setup-camera-1-pairing")).toHaveText(
+      "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed."
     );
     await expect(page.getByTestId("setup-camera-1-pair")).toHaveAttribute("aria-disabled", "true");
-    await expect(page.getByTestId("setup-camera-1-no-link")).toHaveText(
-      "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version."
-    );
+    await expect(page.getByTestId("setup-camera-1-pin")).toHaveCount(0);
     await expect(page.getByTestId("setup-camera-2-address")).toBeDisabled();
     await expect(page.getByTestId("setup-camera-2-save-address")).toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("setup-camera-2-no-link")).toHaveText(

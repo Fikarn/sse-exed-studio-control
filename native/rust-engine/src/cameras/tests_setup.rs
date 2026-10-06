@@ -6,7 +6,8 @@
 use crate::cameras::model::parse_camera_address;
 use crate::cameras::store::{read_setup, write_setup, StoredSetup};
 use crate::cameras::test_support::{
-    announced_changes, assert_operator_words, refusal, TestCameras, CAM2_ADDRESS, CAM3_ADDRESS,
+    announced_changes, assert_operator_words, refusal, take_announced, TestCameras, CAM2_ADDRESS,
+    CAM3_ADDRESS,
 };
 use crate::storage::open_connection;
 use serde_json::{json, Value};
@@ -33,7 +34,7 @@ fn an_address_sets_a_camera_up_and_holds_it() {
             "camera": 2,
             "setup": {
                 "setUp": true, "address": "172.16.16.85", "paired": false, "vmixInput": 2,
-                "vmixOutput": 3, "noLink": null
+                "vmixOutput": 3, "noLink": null, "pairing": null
             }
         })
     );
@@ -162,7 +163,7 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
         )["setup"],
         json!({
             "setUp": false, "address": null, "paired": false, "vmixInput": 12,
-            "vmixOutput": 4, "noLink": null
+            "vmixOutput": 4, "noLink": null, "pairing": null
         })
     );
     let cam3 = cameras.camera(3);
@@ -182,7 +183,7 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
             "camera": 1,
             "setup": {
                 "setUp": false, "address": null, "paired": false, "vmixInput": 5,
-                "vmixOutput": 2, "noLink": null
+                "vmixOutput": 2, "noLink": null, "pairing": null
             }
         })
     );
@@ -214,38 +215,248 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
     assert!(cameras.nothing_sent());
 }
 
-// D15 rule 2: CAM 1 is paired (the simulated link at once), then held;
-// CAM 2 and CAM 3 take an address instead.
+/// CAM 1's setup as the answers carry it, with its pairing's step.
+fn cam_1_setup(set_up: bool, pairing: Value) -> Value {
+    json!({
+        "setUp": set_up, "address": null, "paired": set_up, "vmixInput": 1,
+        "vmixOutput": 2, "noLink": null, "pairing": pairing
+    })
+}
+
+// D15 rule 2, in two steps (2026-10-06): `Pair CAM 1` begins, the camera
+// shows a 6-digit PIN (the simulated one at once), and the PIN it shows
+// pairs it: saved, then held and read. Each step is the reply's own event.
 #[test]
-fn cam_1_is_paired_and_held() {
+fn cam_1_pairs_at_the_pin_it_shows_and_is_held() {
     let cameras = TestCameras::new("pair");
-    let reply = cameras
+    let begun = cameras
         .reply("cameras.setup.pair", json!({ "camera": 1 }))
+        .expect("the pairing begins");
+    let wanted = json!({
+        "state": "pin", "sentence": "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds."
+    });
+    assert_eq!(
+        begun.result,
+        json!({ "camera": 1, "setup": cam_1_setup(false, wanted.clone()) })
+    );
+    assert_eq!(begun.event, Some(("pairing", Some(1))));
+    assert_eq!(cameras.camera(1)["setup"]["pairing"], wanted);
+    assert_eq!(cameras.camera(1)["state"], "not-set-up");
+    assert!(!saved(&cameras)[0].paired, "nothing is saved yet");
+
+    let paired = cameras
+        .reply(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": " 123456 " }),
+        )
         .expect("CAM 1 pairs");
     assert_eq!(
-        reply.result,
-        json!({
-            "camera": 1,
-            "setup": {
-                "setUp": true, "address": null, "paired": true, "vmixInput": 1,
-                "vmixOutput": 2, "noLink": null
-            }
-        })
+        paired.result,
+        json!({ "camera": 1, "setup": cam_1_setup(true, Value::Null) })
     );
+    assert_eq!(paired.event, Some(("setup", Some(1))));
     assert_eq!(
         announced_changes(),
         (Vec::new(), false),
-        "the reply carries its event"
+        "the replies carry their events"
     );
     assert_eq!(cameras.camera(1)["state"], "held");
     assert!(saved(&cameras)[0].paired);
+    assert_operator_words("CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.");
+    assert!(cameras.nothing_sent());
+}
+
+// A PIN that is not the camera's fails the pairing and saves nothing; the
+// next `Pair CAM 1` starts over, as does a second one while a pairing waits.
+#[test]
+fn a_wrong_pin_fails_and_saves_nothing_and_a_new_pairing_starts_over() {
+    let cameras = TestCameras::new("pair-wrong");
+    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    let failed = cameras
+        .reply(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": "654321" }),
+        )
+        .expect("the PIN is handed over");
+    let refused = "CAM 1 did not accept the PIN. Press Pair CAM 1 to try again.";
+    assert_eq!(
+        failed.result["setup"],
+        cam_1_setup(false, json!({ "state": "failed", "sentence": refused }))
+    );
+    assert_eq!(failed.event, Some(("pairing", Some(1))));
+    assert_operator_words(refused);
+    assert_eq!(saved(&cameras)[0], StoredSetup::new(1));
+    assert_eq!(cameras.camera(1)["state"], "not-set-up");
+    assert_eq!(
+        cameras.refused(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": "123456" })
+        ),
+        refusal(
+            "CAMERA_PAIRING_NOT_WANTED",
+            "CAM 1's pairing does not wait for a PIN now. Press Pair CAM 1 first."
+        ),
+        "a failed pairing takes no PIN"
+    );
+
+    for _ in 0..2 {
+        assert_eq!(
+            cameras.call("cameras.setup.pair", json!({ "camera": 1 }))["setup"]["pairing"]["state"],
+            "pin",
+            "Pair CAM 1 starts over"
+        );
+    }
+    cameras.call(
+        "cameras.setup.pair",
+        json!({ "camera": 1, "pin": "123456" }),
+    );
+    assert_eq!(cameras.camera(1)["state"], "held");
+    assert!(cameras.nothing_sent());
+}
+
+// The PIN's shape is the request's (`INVALID_PARAMS`), checked before
+// anything else; a PIN with no pairing waiting for it is refused; only CAM 1
+// is paired. A refused request changes nothing and raises nothing.
+#[test]
+fn a_pin_is_six_digits_and_taken_only_while_the_camera_shows_one() {
+    let cameras = TestCameras::new("pair-pin");
+    assert_eq!(
+        cameras.refused(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": "123456" })
+        ),
+        refusal(
+            "CAMERA_PAIRING_NOT_WANTED",
+            "CAM 1's pairing does not wait for a PIN now. Press Pair CAM 1 first."
+        )
+    );
+    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    take_announced();
+    for pin in [
+        json!("12345"),
+        json!("1234567"),
+        json!("12a456"),
+        json!("12 456"),
+        json!(""),
+        json!(123456),
+        json!(true),
+    ] {
+        assert_eq!(
+            cameras.refused("cameras.setup.pair", json!({ "camera": 1, "pin": pin })),
+            refusal("INVALID_PARAMS", "pin must be the 6 digits CAM 1 shows."),
+            "{pin}"
+        );
+    }
     for camera in [2, 3, 0] {
         assert_eq!(
             cameras.code("cameras.setup.pair", json!({ "camera": camera })),
             "INVALID_PARAMS"
         );
     }
+    assert_eq!(announced_changes(), (Vec::new(), false));
+    assert_eq!(
+        cameras.camera(1)["setup"]["pairing"]["state"],
+        "pin",
+        "the pairing still waits"
+    );
     assert!(cameras.nothing_sent());
+}
+
+// Forget stops a pairing that runs: Setup shows none, and the PIN is no
+// longer taken.
+#[test]
+fn forget_stops_a_pairing_that_runs() {
+    let cameras = TestCameras::new("pair-forget");
+    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    let forgotten = cameras
+        .reply("cameras.setup.forget", json!({ "camera": 1 }))
+        .expect("Forget answers");
+    assert_eq!(forgotten.result["setup"], cam_1_setup(false, Value::Null));
+    assert_eq!(forgotten.event, Some(("setup", Some(1))));
+    assert_eq!(
+        cameras.code(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": "123456" })
+        ),
+        "CAMERA_PAIRING_NOT_WANTED"
+    );
+    assert_eq!(saved(&cameras)[0], StoredSetup::new(1));
+    assert!(cameras.nothing_sent());
+}
+
+// The real pairing in a test build on Windows: Setup takes it (CAM 1 has
+// its link there), and the guard stops it before Bluetooth is opened, so it
+// fails at once with the guard's sentence and saves nothing (D15 rule 2).
+// Linux has no link to CAM 1: `CAMERA_NO_LINK` (`tests_link.rs`).
+#[cfg(windows)]
+#[test]
+fn a_test_build_s_real_pairing_is_stopped_by_the_guard() {
+    let cameras = TestCameras::without_simulation("pair-guarded");
+    let reply = cameras
+        .reply("cameras.setup.pair", json!({ "camera": 1 }))
+        .expect("Setup takes the pairing");
+    let pairing = &reply.result["setup"]["pairing"];
+    assert_eq!(pairing["state"], "failed");
+    assert!(
+        pairing["sentence"]
+            .as_str()
+            .is_some_and(|sentence| sentence.starts_with("A test run does not open Bluetooth")),
+        "{pairing}"
+    );
+    assert_eq!(reply.event, Some(("pairing", Some(1))));
+    assert_eq!(
+        cameras.code(
+            "cameras.setup.pair",
+            json!({ "camera": 1, "pin": "123456" })
+        ),
+        "CAMERA_PAIRING_NOT_WANTED"
+    );
+    assert_eq!(saved(&cameras)[0], StoredSetup::new(1));
+    assert_eq!(cameras.camera(1)["state"], "not-set-up");
+}
+
+// A pairing the link finds gone (Windows no longer holds it, or the row
+// holds no Bluetooth address): CAM 1 reads NOT SET UP with the link's
+// sentence, Setup offers `Pair CAM 1` again, a control is refused as not
+// set up, and the row is kept. Here the row without an address, which a
+// Windows test build reads as the link would.
+#[cfg(windows)]
+#[test]
+fn a_pairing_the_link_finds_gone_reads_not_set_up_and_keeps_the_row() {
+    let cameras = TestCameras::without_simulation("pair-gone");
+    let row = StoredSetup {
+        paired: true,
+        ..StoredSetup::new(1)
+    };
+    write_setup(
+        &open_connection(cameras.path()).expect("connection should open"),
+        &row,
+    )
+    .expect("the row writes");
+    cameras.restart();
+    let gone = "CAM 1's pairing holds no Bluetooth address. Pair it again in Setup.";
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "not-set-up");
+    assert_eq!(cam1["word"], "NOT SET UP");
+    assert_eq!(cam1["sentence"], gone);
+    assert_eq!(cam1["setup"], cam_1_setup(false, Value::Null));
+    assert_operator_words(gone);
+    assert_eq!(
+        cameras.refused(
+            "cameras.set",
+            json!({ "camera": 1, "setting": "iso", "value": "800" })
+        ),
+        refusal("CAMERA_NOT_SET_UP", gone)
+    );
+    assert_eq!(
+        cameras.code("cameras.release", json!({ "camera": 1, "confirm": true })),
+        "CAMERA_NOT_SET_UP"
+    );
+    assert!(
+        !cameras.health().raises_whole_status(),
+        "NOT SET UP lights the Cameras lamp only"
+    );
+    assert_eq!(saved(&cameras)[0], row, "the row is kept");
 }
 
 // CAM 1's row may carry its Bluetooth address beside its pairing (the

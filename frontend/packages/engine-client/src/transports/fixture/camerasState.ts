@@ -5,6 +5,7 @@ import type { CameraDialBank } from "../../generated/snapshots/CameraDialBank";
 import type { CameraDials } from "../../generated/snapshots/CameraDials";
 import type { CameraHealthEntry } from "../../generated/snapshots/CameraHealthEntry";
 import type { CameraLevel } from "../../generated/snapshots/CameraLevel";
+import type { CameraPairing } from "../../generated/snapshots/CameraPairing";
 import type { CameraPicture } from "../../generated/snapshots/CameraPicture";
 import type { CameraRecentAction } from "../../generated/snapshots/CameraRecentAction";
 import type { CameraSetupSummary } from "../../generated/snapshots/CameraSetupSummary";
@@ -59,9 +60,12 @@ import type { MutableFixtureState } from "./state";
 //
 // Each camera's link is the simulated one — the double stands for every test, lane and
 // scratch run (`SSE_CAMERAS_SIMULATED=1`) — unless a scenario says `simulated: false`, as
-// the studio's build is until Slices 11 and 13: Setup then takes no pairing and no address
-// (`CAMERA_NO_LINK`), so a camera reads NOT SET UP and says there is no link to it yet; one
-// the saved data holds all the same reads UNREACHABLE with that sentence. The simulated camera ("the body") holds its own values, answers or not,
+// the studio's build is: CAM 1's link is built there (the Pocket's pairing, 2026-10-06), and
+// CAM 2's and CAM 3's are not until Slice 13, so Setup takes no address for them
+// (`CAMERA_NO_LINK`) and each reads NOT SET UP and says there is no link to it yet; one the
+// saved data holds all the same reads UNREACHABLE with that sentence. The double has no
+// Pocket: there a pairing looks for CAM 1 and finds nothing, and a paired CAM 1 does not
+// answer. The simulated camera ("the body") holds its own values, answers or not,
 // and counts what it is sent (D12: nothing is sent by itself); the hardware link reads it
 // and keeps what it read. A held camera that answers is read before every request; one
 // that stops answering keeps what it last reported and when (`readAt`), as doubt; a
@@ -109,6 +113,8 @@ export interface HeldCamera {
   failure: LinkFailure | null;
   /** When the hardware link saw the take start; `null` when it started before it looked. */
   startedAt: number | null;
+  /** CAM 1's pairing while it runs, or why the last one failed; `null` otherwise. */
+  pairing: CameraPairing | null;
 }
 
 /** What reading a camera again found (`Transition`): each is a `cameras.changed` reason. */
@@ -173,6 +179,7 @@ function notSetUp(camera: CameraNumber): HeldCamera {
     read: null,
     failure: null,
     startedAt: null,
+    pairing: null,
   };
 }
 
@@ -203,9 +210,12 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
   return cameras;
 }
 
-/** Whether this build can reach the camera at all (`real_link::has_link`): through the simulated link. */
-export function hasLink(cameras: FixtureCameras, _camera: CameraNumber): boolean {
-  return cameras.simulated;
+/**
+ * Whether this build can reach the camera at all (`real_link::has_link`): through the simulated
+ * link, or CAM 1 through its own on Windows, as the studio's build is.
+ */
+export function hasLink(cameras: FixtureCameras, camera: CameraNumber): boolean {
+  return cameras.simulated || camera === 1;
 }
 
 /** CAM 1 once it is paired, CAM 2 and CAM 3 once their address is entered. */
@@ -258,7 +268,8 @@ function sameValues(left: CameraReport, right: CameraReport): boolean {
 
 /** What the camera's link answers: what it reports, or why it does not. */
 function linkRead(cameras: FixtureCameras, camera: CameraNumber): CameraReport | LinkFailure {
-  if (!cameras.simulated) return "no-link";
+  // The studio's build: CAM 1's link has no Pocket to reach here; the others have no link.
+  if (!cameras.simulated) return camera === 1 ? "no-answer" : "no-link";
   const body = cameras.bodies[camera];
   return body.answering ? cloneReport(body.report) : "no-answer";
 }
@@ -325,6 +336,7 @@ export function setupSummary(cameras: FixtureCameras, camera: CameraNumber): Cam
     vmixInput: held.vmixInput,
     vmixOutput: VMIX_OUTPUTS[camera - 1]!,
     noLink: hasLink(cameras, camera) ? null : noLinkRefusalSentence(cameraModel(camera)),
+    pairing: held.pairing === null ? null : { ...held.pairing },
   };
 }
 

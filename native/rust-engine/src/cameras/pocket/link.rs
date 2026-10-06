@@ -152,11 +152,14 @@ impl Shared {
         self.noticed(noticed);
     }
 
-    /// The link cannot go on for now: the sentence says why. The same
-    /// sentence again changes nothing and says nothing.
-    pub(crate) fn fail(&self, sentence: String) {
-        let line = format!("CAM 1's Bluetooth link stopped: {sentence}");
-        let noticed = self.with_state(|state| state.failed(sentence));
+    /// The link cannot go on for now: the failure says why. The same
+    /// failure again changes nothing and says nothing.
+    pub(crate) fn fail(&self, failure: LinkFailure) {
+        let line = format!(
+            "CAM 1's Bluetooth link stopped: {}",
+            failure.sentence(1, None)
+        );
+        let noticed = self.with_state(|state| state.failed(failure));
         if noticed == Noticed::Changed {
             log_event(LogLevel::Warn, &line);
         }
@@ -172,10 +175,10 @@ impl Shared {
     /// while it is stopped.
     pub(crate) fn failure_sentence(&self) -> String {
         self.with_state(|state| {
-            state
-                .failure
-                .clone()
-                .unwrap_or_else(|| String::from("CAM 1 is not connected over Bluetooth."))
+            state.failure.as_ref().map_or_else(
+                || String::from("CAM 1 is not connected over Bluetooth."),
+                |failure| failure.sentence(1, None),
+            )
         })
     }
 }
@@ -217,7 +220,7 @@ impl PocketLink {
             // Not through `fail`: nobody is to be told to look at a link
             // that never started.
             Err(sentence) => {
-                shared.with_state(|state| state.failed(sentence));
+                shared.with_state(|state| state.failed(LinkFailure::Bluetooth(sentence)));
             }
             Ok(()) => {
                 if development_build() {
@@ -236,7 +239,9 @@ impl PocketLink {
                     .spawn(move || platform::run(thread_shared, inbox, events));
                 if let Err(error) = notifier.and(link) {
                     shared.with_state(|state| {
-                        state.failed(format!("CAM 1's link could not start its thread: {error}"))
+                        state.failed(LinkFailure::Bluetooth(format!(
+                            "CAM 1's link could not start its thread: {error}"
+                        )))
                     });
                 }
             }

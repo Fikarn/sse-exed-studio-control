@@ -14,6 +14,7 @@
 
 use crate::cameras::model::{model, RECORDING_CAMERA};
 use crate::cameras::pocket::link::PocketLink;
+use crate::cameras::pocket::pairing::{PairingStep, PocketPairing};
 use crate::cameras::runtime::notice;
 use crate::cameras::simulated::{CameraCommand, CameraReading};
 use crate::cameras::store::StoredSetup;
@@ -29,8 +30,13 @@ pub(crate) enum LinkFailure {
     /// A test build refused to reach for it (the drift guard); the reason.
     Refused(String),
     /// The Bluetooth link cannot reach it, in the link's own words: the
-    /// guard's refusal, Windows without its pairing, no session.
+    /// guard's refusal, no session.
     Bluetooth(String),
+    /// Windows no longer holds CAM 1's pairing, or its row holds no
+    /// Bluetooth address: the camera reads `NOT SET UP` and Setup pairs it
+    /// again. The saved row is kept, so an adapter that is off erases
+    /// nothing.
+    NotPaired(String),
     /// The press cannot be carried by the camera's protocol; nothing was
     /// sent, and the camera is as reachable as before.
     NotCarried(String),
@@ -43,16 +49,24 @@ impl LinkFailure {
         match self {
             Self::NoAnswer => model.unreachable_sentence(address),
             Self::NoLinkYet => model.no_link_sentence(),
-            Self::Refused(reason) | Self::Bluetooth(reason) | Self::NotCarried(reason) => {
-                reason.clone()
-            }
+            Self::Refused(reason)
+            | Self::Bluetooth(reason)
+            | Self::NotPaired(reason)
+            | Self::NotCarried(reason) => reason.clone(),
         }
     }
 }
 
-/// The cameras whose real link is built: none yet. CAM 1 joins with the
-/// Pocket's pairing, CAM 2 and CAM 3 with the LUMIX SDK's part.
-const BUILT: [u8; 0] = [];
+/// The sentence of a CAM 1 row that is paired and holds no Bluetooth
+/// address (saved data from before the link: only a database backup brings
+/// one).
+pub(crate) const NO_BLUETOOTH_ADDRESS: &str =
+    "CAM 1's pairing holds no Bluetooth address. Pair it again in Setup.";
+
+/// The cameras whose real link is built: CAM 1 on Windows, with the
+/// Pocket's pairing (part 5, 2026-10-06); CAM 2 and CAM 3 join with the
+/// LUMIX SDK's part. Linux, where only CI builds the engine, has none.
+const BUILT: [u8; 1] = [RECORDING_CAMERA];
 
 /// Whether this build can reach the camera at all: through the simulated
 /// link, or through its real one once that is built. Without a link Setup
@@ -61,7 +75,7 @@ const BUILT: [u8; 0] = [];
 /// address all the same (a database backup restored whole) is the one way
 /// to a fault there: that camera reads `UNREACHABLE` until it is forgotten.
 pub(crate) fn has_link(camera: u8, simulated: bool) -> bool {
-    simulated || BUILT.contains(&camera)
+    simulated || (cfg!(windows) && BUILT.contains(&camera))
 }
 
 /// The addresses a test build may connect to: this PC's own.
@@ -91,8 +105,7 @@ pub(crate) struct BluetoothAddress {
 
 impl BluetoothAddress {
     /// The address as CAM 1's row holds it: `D4:3A:2C:11:22:33`, with
-    /// ` random` after it for a random address. The pairing part writes it.
-    #[allow(dead_code)]
+    /// ` random` after it for a random address. The pairing writes it.
     pub(crate) fn text(self) -> String {
         let bytes = self.address.to_be_bytes();
         let pairs: Vec<String> = bytes[2..]
@@ -144,14 +157,17 @@ pub(crate) fn parse_bluetooth_address(text: &str) -> Option<BluetoothAddress> {
 /// on a thread of its own); and it is sent the operator's presses, which may
 /// wait a bounded moment for the camera's answer. With the simulated cameras
 /// the runtime never speaks to it. CAM 1's link starts when its row holds a
-/// pairing and the camera's Bluetooth address; CAM 2 and CAM 3 read
-/// `NoLinkYet` after the drift guard.
+/// pairing and the camera's Bluetooth address, and CAM 1's pairing runs here
+/// too (`begin_pairing`); CAM 2 and CAM 3 read `NoLinkYet` after the drift
+/// guard.
 #[derive(Debug, Clone)]
 pub(crate) struct RealLinks {
     /// The saved data the links belong to: what a link's thread tells the
     /// runtime to look at again (`notice`).
     db_path: PathBuf,
     pocket: Option<PocketLink>,
+    /// CAM 1's pairing while the runtime follows it.
+    pairing: Option<PocketPairing>,
     /// What the runtime told the links, in order (`hold 2`, `let go 2`), for
     /// the tests of the seam.
     #[cfg(test)]
@@ -163,9 +179,48 @@ impl RealLinks {
         Self {
             db_path: db_path.to_path_buf(),
             pocket: None,
+            pairing: None,
             #[cfg(test)]
             told: std::sync::Arc::default(),
         }
+    }
+
+    /// Begins CAM 1's pairing, a pairing that runs given up first; its
+    /// first step. The pairing's thread tells the runtime of each step after
+    /// it (`notice`).
+    pub(crate) fn begin_pairing(&mut self) -> PairingStep {
+        self.cancel_pairing();
+        let db_path = self.db_path.clone();
+        let pairing = PocketPairing::start(move || notice(&db_path));
+        let step = pairing.step();
+        self.pairing = Some(pairing);
+        step
+    }
+
+    /// Where CAM 1's pairing stands; `None` when none is followed.
+    pub(crate) fn pairing_step(&self) -> Option<PairingStep> {
+        self.pairing.as_ref().map(PocketPairing::step)
+    }
+
+    /// Hands the camera's PIN to the pairing; `false` when it does not
+    /// wait for one.
+    pub(crate) fn give_pin(&self, pin: String) -> bool {
+        self.pairing
+            .as_ref()
+            .is_some_and(|pairing| pairing.pin(pin))
+    }
+
+    /// Stops CAM 1's pairing (Forget, a new pairing).
+    pub(crate) fn cancel_pairing(&mut self) {
+        if let Some(pairing) = self.pairing.take() {
+            pairing.cancel();
+        }
+    }
+
+    /// The pairing has ended and the runtime took its end: it is followed
+    /// no more.
+    pub(crate) fn end_pairing(&mut self) {
+        self.pairing = None;
     }
 
     /// Holds a set-up camera: its link connects and keeps reading it. CAM 1
@@ -249,9 +304,14 @@ impl RealLinks {
     }
 }
 
+/// A camera with no link running. CAM 1 on Windows: its row is paired and
+/// holds no Bluetooth address (a link starts for any address it holds).
 /// Until the links are built: CAM 2 and CAM 3 pass the drift guard first;
 /// then there is no link to read them with.
 fn no_link_yet(setup: &StoredSetup) -> LinkFailure {
+    if setup.camera == RECORDING_CAMERA && has_link(RECORDING_CAMERA, false) {
+        return LinkFailure::NotPaired(String::from(NO_BLUETOOTH_ADDRESS));
+    }
     if let Some(address) = setup
         .address
         .as_deref()

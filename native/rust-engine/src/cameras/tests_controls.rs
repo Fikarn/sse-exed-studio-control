@@ -67,7 +67,7 @@ fn a_fresh_start_holds_nothing_and_selects_cam_1() {
             camera["setup"],
             json!({
                 "setUp": false, "address": null, "paired": false, "vmixInput": number,
-                "vmixOutput": number + 1, "noLink": null
+                "vmixOutput": number + 1, "noLink": null, "pairing": null
             })
         );
         assert_eq!(camera["readAt"], Value::Null);
@@ -900,7 +900,7 @@ fn a_control_on_a_camera_that_is_not_held_is_refused_with_its_sentence() {
         "cameras.setup.update",
         json!({ "camera": 2, "address": CAM2_ADDRESS }),
     );
-    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    cameras.pair_cam_1();
     cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
     assert_eq!(
         cameras.refused("cameras.set", iso(2)),

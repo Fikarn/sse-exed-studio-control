@@ -42,7 +42,7 @@ fn nothing_but_a_press_sends_anything_to_a_camera() {
         "cameras.setup.update",
         json!({ "camera": 3, "address": CAM3_ADDRESS }),
     );
-    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    cameras.pair_cam_1();
     cameras.health();
     crate::cameras::after_archive_restore(cameras.path(), true).expect("the restore settles");
     cameras.restart();
@@ -260,7 +260,7 @@ fn a_release_is_kept_across_a_start_until_connect() {
     // Forget ends it: the camera is not set up, and a new pairing holds it.
     cameras.call("cameras.setup.forget", json!({ "camera": 1 }));
     assert_eq!(cameras.camera(1)["state"], "not-set-up");
-    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    cameras.pair_cam_1();
     assert_eq!(cameras.camera(1)["state"], "held");
     cameras.restart();
     assert_eq!(cameras.camera(1)["state"], "held");
@@ -302,7 +302,7 @@ fn the_health_check_names_the_worst_camera() {
     assert_eq!(check.cameras[1].tag, "CAM 2");
     assert_eq!(check.cameras[1].state, CameraState::NotSetUp);
 
-    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    cameras.pair_cam_1();
     cameras.call(
         "cameras.setup.update",
         json!({ "camera": 2, "address": CAM2_ADDRESS }),
@@ -352,20 +352,33 @@ fn the_health_check_names_the_worst_camera() {
     }
 }
 
-// The studio's build before Slices 11 and 13: without a link Setup takes
-// no pairing and no address, so every camera reads NOT SET UP and says why,
-// and the whole status stays as it is. The vMix input, taking an address
-// away and Forget stay.
+// The studio's build before Slice 13: without a link Setup takes no
+// address, so a BGH1 reads NOT SET UP and says why, and the whole status
+// stays as it is. The vMix input, taking an address away and Forget stay.
+// CAM 1's link is built on Windows (the Pocket's pairing, 2026-10-06): there
+// it reads NOT SET UP until it is paired; Linux, where only CI builds the
+// engine, has no link to it and takes no pairing either.
 #[test]
 fn without_a_link_setup_takes_no_pairing_and_no_address() {
     let cameras = TestCameras::without_simulation("no-link-setup");
     let cannot_pair =
         "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
     let cannot_take = "Studio Control cannot take CAM 2's address yet: its network link comes with a later version.";
-    assert_eq!(
-        cameras.refused("cameras.setup.pair", json!({ "camera": 1 })),
-        refusal("CAMERA_NO_LINK", cannot_pair)
-    );
+    let (cam1_sentence, cam1_cannot) = if cfg!(windows) {
+        (
+            "CAM 1 is not paired. Pair it in Setup, with the camera beside you.",
+            None,
+        )
+    } else {
+        assert_eq!(
+            cameras.refused("cameras.setup.pair", json!({ "camera": 1 })),
+            refusal("CAMERA_NO_LINK", cannot_pair)
+        );
+        (
+            "Studio Control has no link to CAM 1 yet: it comes with a later version.",
+            Some(cannot_pair),
+        )
+    };
     assert_eq!(
         cameras.refused(
             "cameras.setup.update",
@@ -402,20 +415,16 @@ fn without_a_link_setup_takes_no_pairing_and_no_address() {
 
     let snapshot = cameras.snapshot();
     for (index, no_link, cannot) in [
-        (
-            0,
-            "Studio Control has no link to CAM 1 yet: it comes with a later version.",
-            cannot_pair,
-        ),
+        (0, cam1_sentence, cam1_cannot),
         (
             1,
             "Studio Control has no link to CAM 2 yet: it comes with a later version.",
-            cannot_take,
+            Some(cannot_take),
         ),
         (
             2,
             "Studio Control has no link to CAM 3 yet: it comes with a later version.",
-            "Studio Control cannot take CAM 3's address yet: its network link comes with a later version.",
+            Some("Studio Control cannot take CAM 3's address yet: its network link comes with a later version."),
         ),
     ] {
         let camera = &snapshot["cameras"][index];
@@ -426,18 +435,15 @@ fn without_a_link_setup_takes_no_pairing_and_no_address() {
             camera["setup"],
             json!({
                 "setUp": false, "address": null, "paired": false, "vmixInput": index + 1,
-                "vmixOutput": index + 2, "noLink": cannot
+                "vmixOutput": index + 2, "noLink": cannot, "pairing": null
             })
         );
         assert_operator_words(no_link);
-        assert_operator_words(cannot);
+        assert_operator_words(cannot.unwrap_or_default());
     }
     let check = cameras.health();
     assert_eq!(check.word, "NOT SET UP");
-    assert_eq!(
-        check.summary,
-        "Studio Control has no link to CAM 1 yet: it comes with a later version."
-    );
+    assert_eq!(check.summary, cam1_sentence);
     assert!(!check.raises_whole_status());
     assert_eq!(
         cameras.refused(
@@ -466,7 +472,7 @@ fn without_a_link_setup_takes_no_pairing_and_no_address() {
     );
     assert_eq!(
         cameras.call("cameras.setup.forget", json!({ "camera": 1 }))["setup"]["noLink"],
-        cannot_pair
+        json!(cam1_cannot)
     );
     assert!(cameras.nothing_sent());
 }
@@ -516,8 +522,8 @@ fn without_a_link_a_camera_the_saved_data_holds_does_not_answer() {
 // The seam to the real links (2026-10-06): the runtime tells them to hold a
 // camera at a start and at Connect, and to let it go at Release and when its
 // setup is taken away; with the simulated cameras it tells them nothing.
-// Until the Pocket's parts are built the links read no link yet, CAM 1's
-// pairing from saved data included.
+// CAM 2 and CAM 3 read no link yet; CAM 1's pairing from saved data without
+// its Bluetooth address reads as gone on Windows and no link on Linux.
 #[test]
 fn the_real_links_are_told_what_to_hold_and_to_let_go() {
     let cameras = TestCameras::without_simulation("told");
@@ -538,9 +544,15 @@ fn the_real_links_are_told_what_to_hold_and_to_let_go() {
         vec!["hold 1", "hold 2", "let go 3"],
         "a start holds every set-up camera"
     );
-    let no_link = "Studio Control has no link to CAM 1 yet: it comes with a later version.";
-    assert_eq!(cameras.camera(1)["state"], "unreachable");
-    assert_eq!(cameras.camera(1)["sentence"], no_link);
+    // A pairing without its Bluetooth address: on Windows the link finds
+    // it gone (NOT SET UP, `tests_setup.rs`); Linux has no link to CAM 1.
+    if cfg!(windows) {
+        assert_eq!(cameras.camera(1)["state"], "not-set-up");
+    } else {
+        let no_link = "Studio Control has no link to CAM 1 yet: it comes with a later version.";
+        assert_eq!(cameras.camera(1)["state"], "unreachable");
+        assert_eq!(cameras.camera(1)["sentence"], no_link);
+    }
 
     cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
     cameras.call("cameras.connect", json!({ "camera": 2 }));

@@ -23,10 +23,11 @@
 //! health check changed — whoever noticed first.
 
 use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
-use crate::cameras::real_link::{self, LinkFailure, RealLinks};
-use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras};
+use crate::cameras::pocket::pairing::{PairingStep, PIN_REFUSED, STOPPED};
+use crate::cameras::real_link::{self, BluetoothAddress, LinkFailure, RealLinks};
+use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras, SIMULATED_PIN};
 use crate::cameras::snapshot::{CameraDialBank, CameraSetupSummary, CameraState};
-use crate::cameras::store::{read_setup, StoredSetup};
+use crate::cameras::store::{read_setup, write_setup, StoredSetup};
 use crate::cameras::CameraError;
 use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
@@ -88,6 +89,10 @@ pub(crate) struct CameraRuntime {
     /// before the link looked, or nothing records. The page counts the take's
     /// length from it, and the deck's `REC` the same way (2026-10-03).
     pub started_at: Option<SystemTime>,
+    /// CAM 1's pairing as Setup shows it: running, or why the last one
+    /// failed; `None` when none runs, and always for CAM 2 and CAM 3. Kept
+    /// in memory: a start shows none.
+    pub pairing: Option<PairingStep>,
 }
 
 /// What reading a camera again found.
@@ -121,6 +126,7 @@ impl CameraRuntime {
             read_at: None,
             failure: None,
             started_at: None,
+            pairing: None,
         }
     }
 
@@ -128,8 +134,15 @@ impl CameraRuntime {
         self.setup.camera
     }
 
+    /// Its row says paired and the link found the pairing gone (Windows no
+    /// longer holds it, or the row holds no Bluetooth address): it reads
+    /// `NOT SET UP` and Setup pairs it again; the row is kept.
+    fn pairing_lost(&self) -> bool {
+        matches!(self.failure, Some(LinkFailure::NotPaired(_)))
+    }
+
     pub(crate) fn state(&self) -> CameraState {
-        if !self.setup.set_up() {
+        if !self.setup.set_up() || self.pairing_lost() {
             CameraState::NotSetUp
         } else if self.released {
             CameraState::Released
@@ -147,8 +160,11 @@ impl CameraRuntime {
         failure.sentence(self.camera(), self.setup.address.as_deref())
     }
 
-    /// The state's sentence.
+    /// The state's sentence; a lost pairing's own.
     pub(crate) fn sentence(&self) -> String {
+        if self.pairing_lost() {
+            return self.unreachable_sentence();
+        }
         model(self.camera()).state_sentence(
             self.state(),
             self.has_link,
@@ -156,12 +172,18 @@ impl CameraRuntime {
         )
     }
 
-    /// What Setup holds for it, and why Setup can take no more in a build
-    /// with no link to it.
+    /// What Setup holds for it, why Setup can take no more in a build with
+    /// no link to it, and CAM 1's pairing. A lost pairing reads as none, so
+    /// Setup offers `Pair CAM 1` again.
     pub(crate) fn setup_summary(&self) -> CameraSetupSummary {
+        let saved = self.setup.summary();
+        let lost = self.pairing_lost();
         CameraSetupSummary {
+            set_up: saved.set_up && !lost,
+            paired: saved.paired && !lost,
             no_link: (!self.has_link).then(|| model(self.camera()).no_link_refusal()),
-            ..self.setup.summary()
+            pairing: self.pairing.as_ref().and_then(PairingStep::shown),
+            ..saved
         }
     }
 
@@ -406,18 +428,162 @@ impl Cameras {
             .collect()
     }
 
-    /// Reads every camera again and announces what changed.
+    /// Follows CAM 1's pairing, reads every camera again and announces what
+    /// changed.
     fn settle(&mut self, bodies: &SimulatedCameras, now: SystemTime) {
         let before = self.health_check();
+        let paired = self.follow_pairing(bodies, now);
         let transitions = self.refresh(bodies, now);
-        if transitions.is_empty() {
+        if paired.is_none() && transitions.is_empty() {
             return;
+        }
+        if let Some(reason) = paired {
+            announce(reason, Some(RECORDING_CAMERA));
         }
         for (camera, transition) in transitions {
             announce(transition.reason(), Some(camera));
         }
         if self.health_check() != before {
             announce_health();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // CAM 1's pairing (D15 rule 2; the Pocket's link, part 5, 2026-10-06)
+    // -----------------------------------------------------------------------
+
+    /// Setup's `Pair CAM 1`: a pairing begins, and one that runs starts
+    /// over. The real link looks for the camera and Windows pairs it; the
+    /// simulated camera shows its PIN at once.
+    pub(crate) fn begin_pairing(&mut self) {
+        let step = if self.simulated {
+            PairingStep::Pin
+        } else {
+            self.links.begin_pairing()
+        };
+        if !step.running() {
+            // Ended as it began (the guard): nothing to follow.
+            self.links.end_pairing();
+        }
+        self.camera_mut(RECORDING_CAMERA).pairing = Some(step);
+    }
+
+    /// Hands over the PIN the camera shows. `None` when no pairing waits
+    /// for one (`CAMERA_PAIRING_NOT_WANTED`); otherwise the reason to
+    /// announce: `setup` once CAM 1 is paired (the simulated camera, at its
+    /// own PIN), `pairing` while Windows pairs or when the PIN failed.
+    pub(crate) fn give_pin(
+        &mut self,
+        pin: String,
+        bodies: &SimulatedCameras,
+        now: SystemTime,
+    ) -> Result<Option<&'static str>, CameraError> {
+        if self.camera(RECORDING_CAMERA).pairing != Some(PairingStep::Pin) {
+            return Ok(None);
+        }
+        if self.simulated {
+            if pin == SIMULATED_PIN {
+                self.finish_pairing(None, bodies, now)?;
+                return Ok(Some("setup"));
+            }
+            self.camera_mut(RECORDING_CAMERA).pairing =
+                Some(PairingStep::Failed(String::from(PIN_REFUSED)));
+            return Ok(Some("pairing"));
+        }
+        // A pairing that moved on meanwhile (its time for the PIN ran out)
+        // says so at its next notice.
+        if !self.links.give_pin(pin) {
+            return Ok(None);
+        }
+        // `Pairing`, or why the PIN could not be handed over (its thread
+        // gone). A pairing that is already `Paired` is left to its own
+        // notice, which `follow_pairing` saves from `Pairing`.
+        let step = match self.links.pairing_step() {
+            Some(failed @ PairingStep::Failed(_)) => {
+                self.links.end_pairing();
+                failed
+            }
+            None => PairingStep::Failed(String::from(STOPPED)),
+            Some(_) => PairingStep::Pairing,
+        };
+        self.camera_mut(RECORDING_CAMERA).pairing = Some(step);
+        Ok(Some("pairing"))
+    }
+
+    /// Stops CAM 1's pairing, and what Setup shows of it (Forget).
+    pub(crate) fn cancel_pairing(&mut self) {
+        if !self.simulated {
+            self.links.cancel_pairing();
+        }
+        self.camera_mut(RECORDING_CAMERA).pairing = None;
+    }
+
+    /// CAM 1 is paired: the pairing and the camera's Bluetooth address (the
+    /// real link's; the simulated camera has none) are saved, and the camera
+    /// is held and read at once, its release gone.
+    fn finish_pairing(
+        &mut self,
+        address: Option<BluetoothAddress>,
+        bodies: &SimulatedCameras,
+        now: SystemTime,
+    ) -> Result<(), CameraError> {
+        let mut setup = self.camera(RECORDING_CAMERA).setup.clone();
+        setup.paired = true;
+        if let Some(address) = address {
+            setup.address = Some(address.text());
+        }
+        write_setup(&open_connection(&self.db_path)?, &setup)?;
+        self.camera_mut(RECORDING_CAMERA).pairing = None;
+        self.take_setup(setup, bodies, now, true);
+        Ok(())
+    }
+
+    /// The real pairing's thread moved on (its `notice`): Setup shows its
+    /// step, and a camera Windows paired is saved and held. The reason to
+    /// announce: `pairing` for a step, `setup` once saved.
+    fn follow_pairing(
+        &mut self,
+        bodies: &SimulatedCameras,
+        now: SystemTime,
+    ) -> Option<&'static str> {
+        if self.simulated {
+            return None;
+        }
+        let followed = self
+            .camera(RECORDING_CAMERA)
+            .pairing
+            .clone()
+            .filter(PairingStep::running)?;
+        let step = self
+            .links
+            .pairing_step()
+            .unwrap_or_else(|| PairingStep::Failed(String::from(STOPPED)));
+        if step == followed {
+            return None;
+        }
+        if !step.running() {
+            self.links.end_pairing();
+        }
+        let PairingStep::Paired(address) = step else {
+            self.camera_mut(RECORDING_CAMERA).pairing = Some(step);
+            return Some("pairing");
+        };
+        match self.finish_pairing(Some(address), bodies, now) {
+            Ok(()) => Some("setup"),
+            Err(
+                CameraError::Storage(error)
+                | CameraError::Invalid(error)
+                | CameraError::Refused(_, error),
+            ) => {
+                log_event(
+                    LogLevel::Warn,
+                    &format!("CAM 1's pairing could not be saved: {error}"),
+                );
+                self.camera_mut(RECORDING_CAMERA).pairing = Some(PairingStep::Failed(format!(
+                    "CAM 1 paired, but Studio Control could not save the pairing: {error}. Press Pair CAM 1 to try again."
+                )));
+                Some("pairing")
+            }
         }
     }
 

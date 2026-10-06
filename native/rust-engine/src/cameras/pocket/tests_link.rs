@@ -1,7 +1,9 @@
 //! The Pocket's link without a camera: its state machine, the guard that
 //! keeps every test off Bluetooth, what the runtime reads through it, and
-//! the two things the source must hold: only `winrt.rs` names Windows'
-//! Bluetooth, and nothing writes the Camera Status characteristic.
+//! what the source must hold: only the two Windows modules (`winrt.rs`, the
+//! link; `winrt_pairing.rs`, the pairing) name Windows' Bluetooth, nothing
+//! writes the Camera Status characteristic, and the pairing writes nothing
+//! and only listens.
 
 use crate::cameras::model::Setting;
 use crate::cameras::pocket::characteristics::{Notified, Writable, CAMERA_STATUS};
@@ -150,19 +152,19 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
     );
     assert!(!state.initial_payload_received());
 
-    let off = String::from("Bluetooth is off on this PC.");
+    let off = LinkFailure::Bluetooth(String::from("Bluetooth is off on this PC."));
     assert_eq!(state.failed(off.clone()), Noticed::Changed);
     assert_eq!(state.connection, Connection::Stopped);
-    assert_eq!(state.read(), Err(LinkFailure::Bluetooth(off.clone())));
+    assert_eq!(state.read(), Err(off.clone()));
     assert_eq!(
         state.failed(off.clone()),
         Noticed::Nothing,
         "the same failure again, a retry that failed the same way"
     );
     assert_eq!(
-        state.failed(String::from(
+        state.failed(LinkFailure::Bluetooth(String::from(
             "Windows did not find CAM 1 at its Bluetooth address."
-        )),
+        ))),
         Noticed::Changed,
         "another failure is a change"
     );
@@ -279,11 +281,19 @@ fn a_test_build_reads_the_guard_s_sentence_as_cam_1_s_unreachable_sentence() {
     .expect("the row writes");
     crate::cameras::after_archive_restore(cameras.path(), false).expect("the restore settles");
     let cam1 = cameras.camera(1);
-    assert_eq!(cam1["state"], "unreachable");
-    assert_eq!(
-        cam1["sentence"],
-        "Studio Control has no link to CAM 1 yet: it comes with a later version."
-    );
+    if cfg!(windows) {
+        assert_eq!(cam1["state"], "not-set-up");
+        assert_eq!(
+            cam1["sentence"],
+            "CAM 1's pairing holds no Bluetooth address. Pair it again in Setup."
+        );
+    } else {
+        assert_eq!(cam1["state"], "unreachable");
+        assert_eq!(
+            cam1["sentence"],
+            "Studio Control has no link to CAM 1 yet: it comes with a later version."
+        );
+    }
     assert!(cameras.nothing_sent());
 }
 
@@ -364,20 +374,61 @@ fn nothing_writes_the_camera_status_characteristic() {
         !code.contains("CAMERA_STATUS"),
         "winrt.rs names the status characteristic only through Notified"
     );
-    assert!(!code.contains("PairAsync"), "pairing is the next part's");
+    assert!(
+        code.contains("Writable::DeviceName"),
+        "the controller's name goes through the same write"
+    );
+    assert!(!code.contains("PairAsync"), "pairing is winrt_pairing.rs's");
 }
 
-// D15 rule 2: only `winrt.rs` speaks to Windows' Bluetooth; every other
-// file of the cameras names no Bluetooth crate.
+/// A source without its comment lines.
+fn code_of(source: &str) -> String {
+    source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+// The pairing (part 5) writes none of the camera's characteristics, listens
+// passively and never scans actively, takes only the Pocket's advertisement,
+// and removes no pairing but the one of the camera it found.
+#[test]
+fn the_pairing_writes_nothing_and_only_listens() {
+    let code = code_of(include_str!("winrt_pairing.rs"));
+    for forbidden in [
+        "WriteValue",
+        "WriteClientCharacteristic",
+        "GattSession",
+        "GetGattServices",
+        "BluetoothLEScanningMode::Active",
+        "BluetoothLEScanningMode(",
+        "CAMERA_STATUS",
+        "DeviceWatcher",
+        "FindAllAsync",
+    ] {
+        assert!(
+            !code.contains(forbidden),
+            "winrt_pairing.rs names {forbidden}"
+        );
+    }
+    assert_eq!(code.matches("BluetoothLEScanningMode::Passive").count(), 1);
+    assert_eq!(code.matches("is_pocket(").count(), 1);
+    assert_eq!(code.matches("UnpairAsync").count(), 1);
+}
+
+// D15 rule 2: only the two Windows modules speak to Windows' Bluetooth;
+// every other file of the cameras names no Bluetooth crate.
 #[test]
 fn only_the_windows_module_names_bluetooth() {
-    let sources: [(&str, &str); 11] = [
+    let sources: [(&str, &str); 12] = [
         ("real_link.rs", include_str!("../real_link.rs")),
         ("runtime.rs", include_str!("../runtime.rs")),
         ("commands.rs", include_str!("../commands.rs")),
         ("model.rs", include_str!("../model.rs")),
         ("store.rs", include_str!("../store.rs")),
         ("pocket/link.rs", include_str!("link.rs")),
+        ("pocket/pairing.rs", include_str!("pairing.rs")),
         ("pocket/state.rs", include_str!("state.rs")),
         ("pocket/protocol.rs", include_str!("protocol.rs")),
         ("pocket/format.rs", include_str!("format.rs")),
@@ -395,4 +446,5 @@ fn only_the_windows_module_names_bluetooth() {
         }
     }
     assert!(include_str!("winrt.rs").contains("windows::Devices::Bluetooth"));
+    assert!(include_str!("winrt_pairing.rs").contains("windows::Devices::Bluetooth"));
 }

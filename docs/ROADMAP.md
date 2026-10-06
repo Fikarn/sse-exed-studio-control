@@ -232,7 +232,7 @@ Two experiments come before the build.
 ### The Pocket 6K Pro over Bluetooth (was Slice 11)
 
 - The engine speaks Blackmagic's published Bluetooth protocol for CAM 1. Battery and card time are not in it, and read "not reported".
-- Pairing (`cameras.setup.pair`) happens once, in Setup, with the owner present, through Windows' own pairing on the `windows` crate.
+- Pairing (`cameras.setup.pair`) happens once, in Setup, with the owner present, through Windows' own pairing on the `windows` crate. Built (part 5): `Pair CAM 1` listens passively for the Pocket for a minute, makes Windows' pairing afresh, and Setup takes the 6-digit PIN the camera shows.
 - A watch reads the camera between requests, off the request loop. A change on the camera shows within about a second, and a silent camera never holds up a request.
 - A value that keeps moving by itself (an auto setting) must not keep the pages reading: every `cameras.*` request reads the cameras and says `reported`, and the pages' store answers `cameras.changed` with a read. With the simulated cameras that ends after one read.
 
@@ -241,7 +241,7 @@ Guards:
 - No test can reach a Bluetooth call. The one function that opens the adapter calls the guard first, and a test build reads the guard's sentence as CAM 1's `UNREACHABLE` sentence.
 - Nothing ever writes the Pocket's status characteristic: a write there can switch the camera off. A test holds it.
 - A step from a value that is not on the model's list moves from the nearest listed option in the step's direction, and is refused when the value cannot be read. Done (2026-10-06): a level between two steps moves from the next step that way; a setting not reported, or reported with no number in it, is `CAMERA_VALUE_NOT_ALLOWED`; `tests_controls.rs` holds it through `body_sets`. Until then a step from an unlisted value went from the list's first option.
-- The `paired` flag that a database backup brings back is held to Windows' own pairing.
+- The `paired` flag that a database backup brings back is held to Windows' own pairing. Built (part 5): a pairing Windows no longer holds, or a row without the camera's Bluetooth address, reads `NOT SET UP` and Setup offers the pairing again; the row is kept.
 
 Find out first: whether the service carries timecode, whether it reports focus as a lens position, and whether the display LUT reaches the HDMI output that vMix gets. Read on the web on 2026-10-06 (Blackmagic's Developer Information, nothing tried on the camera; the facts are in `docs/HARDWARE.md`): the service carries timecode as a characteristic of its own (32-bit BCD, `HH:MM:SS:FF`, by notification); the protocol has focus as a position from 0.0 (near) to 1.0 (far), and whether the Pocket reports its lens's position back is checked with the camera; which output a display LUT reaches is not in the protocol, so it is checked with the camera, vMix showing Output 2.
 
@@ -249,7 +249,7 @@ Heard on 2026-10-06 (the owner's decision 2, D40): a passive listen of 150 s and
 
 Asked and answered on 2026-10-06 (D41): a start takes a released camera back without a press, and that would disturb the iPad, since a connected Pocket advertises to nobody else and takes one controller at a time. So a release is kept across a start, as a saved setting. The controller's name is written to the camera at each connection, and the attended part runs as `npm run app -- --bluetooth`.
 
-Built, in parts, on 2026-10-06: the step rule (#312); the seam to the real links (#313); the protocol, pure (#314); the link over Windows' Bluetooth with the watch off the request loop and the guards (#315, one review and a second look). Then the attended run's switch (D41, #317) and the kept release (D41: saved as `cameras.released.<camera>`, ended by `Connect`, `Forget`, a new pairing or address). Left, in order: pairing (with the PIN typed in Setup, `setup.pairing` in the snapshot, the simulated link's PIN `123456`, Setup's PIN field, the controller's name written at each connection), and the close-out. The plan in detail is `camera-links-plan-2026-10-06.md` in the owner's plans folder.
+Built, in parts, on 2026-10-06: the step rule (#312); the seam to the real links (#313); the protocol, pure (#314); the link over Windows' Bluetooth with the watch off the request loop and the guards (#315, one review and a second look). Then the attended run's switch (D41, #317) and the kept release (D41, #318: saved as `cameras.released.<camera>`, ended by `Connect`, `Forget`, a new pairing or address). Then pairing (part 5): two steps of `cameras.setup.pair` (the PIN typed in Setup, `CAMERA_PAIRING_NOT_WANTED` when none is wanted), `setup.pairing` in the snapshot and `cameras.changed { reason: "pairing" }`, CAM 1's link on Windows (`has_link`; Linux keeps `CAMERA_NO_LINK`), the simulated link's PIN `123456`, Setup's PIN row, the controller's name written at each connection (D41). Left: the close-out, then the attended run. The plan in detail is `camera-links-plan-2026-10-06.md` in the owner's plans folder.
 
 ### The BGH1s over the network (was Slice 13)
 

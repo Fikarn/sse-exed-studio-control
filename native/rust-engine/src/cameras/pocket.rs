@@ -6,7 +6,8 @@
 //! (`state.rs`). The link itself (`link.rs`) runs one thread, which speaks
 //! to Windows' own Bluetooth (`winrt.rs`; `stub.rs` where there is no
 //! Windows) behind the guard that no test and no development run can pass.
-//! Pairing is the next part's.
+//! Pairing (`pairing.rs`, part 5) runs a thread of its own behind the same
+//! guard, which speaks to Windows' own pairing (`winrt_pairing.rs`).
 //!
 //! What the protocol is, read on the web on 2026-10-06 from Blackmagic's
 //! Developer Information and not yet tried on the camera (`docs/HARDWARE.md`,
@@ -23,6 +24,7 @@
 pub(crate) mod characteristics;
 pub(crate) mod format;
 pub(crate) mod link;
+pub(crate) mod pairing;
 pub(crate) mod protocol;
 pub(crate) mod state;
 #[cfg(not(windows))]
@@ -31,6 +33,10 @@ mod stub;
 mod tests;
 #[cfg(test)]
 mod tests_link;
+#[cfg(test)]
+mod tests_pairing;
 pub(crate) mod timecode;
 #[cfg(windows)]
 mod winrt;
+#[cfg(windows)]
+mod winrt_pairing;

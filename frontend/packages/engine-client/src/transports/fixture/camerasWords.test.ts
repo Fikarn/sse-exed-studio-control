@@ -57,6 +57,11 @@ import {
   stoppedRecordingSentence,
   unreachableSentence,
   vmixNothingDetail,
+  PAIRING_SENTENCES,
+  pairingNotWantedRefusal,
+  PIN_INVALID_MESSAGE,
+  PIN_REFUSED_SENTENCE,
+  SIMULATED_PIN,
 } from "./camerasWords";
 import { openCamerasDouble } from "./camerasTestSupport";
 
@@ -199,7 +204,12 @@ const CAMERAS_RS = (() => {
     if (!files.includes(needed))
       throw new Error(`cameras/${needed} is not in the hardware link any more; update this test`);
   }
-  return [rustSource("cameras.rs"), ...files.map((name) => rustSource(`cameras/${name}`))]
+  // CAM 1's pairing words its steps in its own file (the Pocket's link, part 5).
+  return [
+    rustSource("cameras.rs"),
+    ...files.map((name) => rustSource(`cameras/${name}`)),
+    rustSource("cameras/pocket/pairing.rs"),
+  ]
     .map((source) => source.replace(/^\s*\/\/.*$/gm, ""))
     .join("\n");
 })();
@@ -687,9 +697,23 @@ describe("the fixture double's camera words: the hardware link's", () => {
       "CAMERA_ALREADY_RECORDING",
       "CAMERA_NOT_RECORDING",
       "CAMERA_ADDRESS_INVALID",
+      "CAMERA_PAIRING_NOT_WANTED",
     ]) {
       expect(LITERALS, code).toContain(code);
     }
+  });
+
+  it("words CAM 1's pairing as the hardware link does, with the simulated camera's PIN", () => {
+    for (const sentence of [
+      ...Object.values(PAIRING_SENTENCES),
+      PIN_REFUSED_SENTENCE,
+      PIN_INVALID_MESSAGE,
+      pairingNotWantedRefusal().message,
+      SIMULATED_PIN,
+    ]) {
+      expect(LITERALS, sentence).toContain(sentence);
+    }
+    expect(pairingNotWantedRefusal().code).toBe("CAMERA_PAIRING_NOT_WANTED");
   });
 
   it("refuses a request of the wrong shape in the hardware link's words", async () => {
