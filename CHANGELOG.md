@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- CAM 1, the Pocket 6K Pro, tried on the camera: `Pair CAM 1` finds it with the PC's antenna on, its values show after the connection, the page's `REC`, take length and `Timecode` follow a take started from the page or on the camera, and after a quick restart Studio Control asks the camera for its settings instead of waiting for one to change (#321).
 - Setup pairs CAM 1, the Pocket 6K Pro, over Windows' own Bluetooth: `Pair CAM 1` looks for the camera, the camera shows a 6-digit PIN, and you type it in Setup; then Studio Control holds CAM 1 and names itself on the camera. A pairing Windows has lost reads `NOT SET UP` and can be made again (#319).
 - A camera released to the iPad or LUMIX Tether stays released when Studio Control starts again, until `Connect`; `Forget` and a new pairing or address end it too. Before, every start took the camera back (#318).
 - A camera's step keys and the deck's dials step from the value the camera reports, also when it is not on the list: to the nearest listed value in the step's direction. A setting the camera has not reported, or reports as `Auto`, cannot be stepped, and the refusal says so (#312).
