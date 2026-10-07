@@ -1,9 +1,9 @@
 //! Blackmagic's SDI camera control protocol as the Pocket speaks it over
 //! Bluetooth: the messages the camera notifies (read into a `CameraReading`)
 //! and the messages a press sends (written from a `CameraCommand`). Read on
-//! the web on 2026-10-06 from Blackmagic's Developer Information; nothing
-//! here has met the camera yet, and the attended check settles what it
-//! reports (`docs/ROADMAP.md`, the Pocket's part).
+//! the web on 2026-10-06 from Blackmagic's Developer Information, and tried
+//! on the camera in the attended run of 2026-10-07: what it reports is in
+//! `docs/HARDWARE.md` (Cameras) and `docs/ROADMAP.md` (the Pocket's part).
 //!
 //! A message is a four-byte header — the destination (255, every camera),
 //! the length of what follows without padding, the command (0, change a
@@ -11,7 +11,9 @@
 //! a data type, an operation, and the data; the whole padded with zeros to a
 //! multiple of four bytes, 64 bytes at most. The data types: 0 a void or a
 //! boolean, 1 int8, 2 int16, 3 int32, 4 int64, 5 a UTF-8 string, 128 a 5.11
-//! fixed-point number (the value × 2048). The operation: 0 assign, 1 offset.
+//! fixed-point number (the value × 2048). The operation: 0 assign, 1 offset
+//! (the data is added to the value the camera holds); the camera's own
+//! reports carry 2.
 //!
 //! The parameters CAM 1 reports and takes here: focus 0.0 (0.0 near to 1.0
 //! far) and the autofocus 0.1; the aperture 0.2 as an aperture value (the
@@ -98,6 +100,17 @@ impl Message {
             parameter,
             data_type,
             operation: OPERATION_ASSIGN,
+            data,
+        }
+    }
+
+    /// An offset: the data is added to the value the camera holds
+    /// (operation 1). Only the settings probe sends one, with zeros.
+    fn offset(parameter: Parameter, data_type: u8, data: Vec<u8>) -> Self {
+        Self {
+            parameter,
+            data_type,
+            operation: OPERATION_OFFSET,
             data,
         }
     }
@@ -356,6 +369,11 @@ fn display_lut_of(word: &str) -> Option<i8> {
 /// message was one of them; anything else is read past, and a value that
 /// cannot be read leaves the reading as it was.
 pub(crate) fn apply(reading: &mut CameraReading, message: &Message) -> bool {
+    // An offset is a change to a value, never the value itself: it is not
+    // read. The camera's reports carry their own operation code (2) and are.
+    if message.operation == OPERATION_OFFSET {
+        return false;
+    }
     match (message.parameter, message.data_type) {
         (LENS_FOCUS, TYPE_FIXED16) => {
             if let Some(position) = message.fixed16s().first() {
@@ -436,6 +454,39 @@ pub(crate) fn apply(reading: &mut CameraReading, message: &Message) -> bool {
         _ => return false,
     }
     true
+}
+
+// ---------------------------------------------------------------------------
+// The settings probe (D43)
+// ---------------------------------------------------------------------------
+
+/// The settings the probe asks after, in the order it asks: ISO, the shutter
+/// angle, the aperture, the ND filter, and white balance with tint; each
+/// with its type and how many bytes of zero it carries.
+pub(crate) const PROBED: [(Parameter, u8, usize); 5] = [
+    (VIDEO_ISO, TYPE_INT32, 4),
+    (VIDEO_SHUTTER_ANGLE, TYPE_INT32, 4),
+    (LENS_APERTURE_VALUE, TYPE_FIXED16, 2),
+    (VIDEO_ND_FILTER, TYPE_FIXED16, 2),
+    (VIDEO_WHITE_BALANCE, TYPE_INT16, 4),
+];
+
+/// The settings probe (D43, 2026-10-07). The camera sends every setting to a
+/// controller that connects after it was some minutes without one, or after
+/// a power-on, and nothing to one back within seconds (a restart of the app,
+/// a `Connect` soon after a `Release`). After a connection that brought no
+/// settings the link sends these five messages, one setting each, every one
+/// an offset of zero: the camera adds nothing to the value it holds and
+/// reports it. Nothing is assigned, so nothing changes, mid-take or not.
+pub(crate) fn probe_messages() -> Vec<Vec<u8>> {
+    PROBED
+        .iter()
+        .filter_map(|&(parameter, data_type, bytes)| {
+            Message::offset(parameter, data_type, vec![0; bytes])
+                .encode()
+                .ok()
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------

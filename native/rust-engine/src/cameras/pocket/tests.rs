@@ -6,8 +6,9 @@
 use crate::cameras::model::{AutoKind, Setting};
 use crate::cameras::pocket::format::RecordingFormat;
 use crate::cameras::pocket::protocol::{
-    aperture_value_of, apply, encode_commands, f_number_text, fixed16_from, fixed16_to, Message,
-    Parameter, LENS_AUTOFOCUS, LENS_FOCUS, MEDIA_TRANSPORT_MODE, TYPE_FIXED16, TYPE_INT16,
+    aperture_value_of, apply, encode_commands, f_number_text, fixed16_from, fixed16_to,
+    probe_messages, Message, Parameter, LENS_APERTURE_VALUE, LENS_AUTOFOCUS, LENS_FOCUS,
+    MEDIA_TRANSPORT_MODE, OPERATION_ASSIGN, OPERATION_OFFSET, PROBED, TYPE_FIXED16, TYPE_INT16,
     TYPE_INT32, TYPE_INT8, VIDEO_DISPLAY_LUT, VIDEO_DYNAMIC_RANGE, VIDEO_ISO, VIDEO_ND_FILTER,
     VIDEO_RECORDING_FORMAT, VIDEO_SHUTTER_ANGLE, VIDEO_SHUTTER_SPEED, VIDEO_WHITE_BALANCE,
 };
@@ -577,6 +578,84 @@ fn the_timecode_is_four_bcd_bytes() {
     );
     assert_eq!(timecode_text(&[0; 11]), None);
     assert_eq!(timecode_text(&[0; 13]), None);
+}
+
+// The settings probe (D43): after a connection that brought no settings,
+// one message for each of ISO, the shutter angle, the aperture, the ND
+// filter and the white balance, every one an offset of zero, so the camera
+// reports the value it holds and changes nothing. Nothing else is in it,
+// and an offset is never read as a value, the camera's own reports
+// (operation 2) are.
+#[test]
+fn the_settings_probe_is_offsets_of_zero_and_nothing_else() {
+    let writes = probe_messages();
+    assert_eq!(writes.len(), 5);
+    let messages: Vec<Message> = writes
+        .iter()
+        .map(|bytes| {
+            assert_eq!(bytes.len() % 4, 0, "padded to four bytes: {bytes:?}");
+            let decoded = Message::decode_all(bytes);
+            assert_eq!(decoded.len(), 1, "one message in each write: {bytes:?}");
+            decoded.into_iter().next().expect("one message")
+        })
+        .collect();
+    let asked: Vec<(Parameter, u8, usize)> = messages
+        .iter()
+        .map(|message| (message.parameter, message.data_type, message.data.len()))
+        .collect();
+    assert_eq!(asked, PROBED.to_vec());
+    assert_eq!(
+        asked
+            .iter()
+            .map(|(parameter, _, _)| *parameter)
+            .collect::<Vec<_>>(),
+        [
+            VIDEO_ISO,
+            VIDEO_SHUTTER_ANGLE,
+            LENS_APERTURE_VALUE,
+            VIDEO_ND_FILTER,
+            VIDEO_WHITE_BALANCE
+        ]
+    );
+    for message in &messages {
+        assert_eq!(message.operation, OPERATION_OFFSET, "{message:?}");
+        assert!(
+            message.data.iter().all(|byte| *byte == 0),
+            "zeros only: {message:?}"
+        );
+        // Met as a report, an offset leaves the reading as it was.
+        let mut reading = board();
+        assert!(!apply(&mut reading, message), "{message:?}");
+        assert!(reading.same_values(&board()), "{message:?}");
+    }
+    // The first write, byte for byte: the frame (every camera, eight bytes,
+    // a change, a zero), then category 1, parameter 14 (ISO), type 3
+    // (int32), operation 1 (offset), four zeros.
+    assert_eq!(writes[0], [255, 8, 0, 0, 1, 14, 3, 1, 0, 0, 0, 0]);
+    // An offset that is not zero is not read as a value either; the camera's
+    // own report of the same parameter, with its operation code, is.
+    let mut reading = board();
+    let offset = Message {
+        parameter: VIDEO_ISO,
+        data_type: TYPE_INT32,
+        operation: OPERATION_OFFSET,
+        data: 800i32.to_le_bytes().to_vec(),
+    };
+    assert!(!apply(&mut reading, &offset));
+    assert_eq!(reading.iso, board().iso);
+    let report = Message {
+        operation: 2,
+        data: 1600i32.to_le_bytes().to_vec(),
+        ..offset.clone()
+    };
+    assert!(apply(&mut reading, &report));
+    assert_eq!(reading.iso.as_deref(), Some("1600"));
+    let assigned = Message {
+        operation: OPERATION_ASSIGN,
+        ..offset
+    };
+    assert!(apply(&mut reading, &assigned));
+    assert_eq!(reading.iso.as_deref(), Some("800"));
 }
 
 // What the Pocket does not take is refused before anything is sent.

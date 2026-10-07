@@ -168,10 +168,14 @@ impl Shared {
                 }
                 let noticed = state.control(bytes);
                 // What the camera reports beyond the model, each kind once
-                // per connection: the attended run reads it.
-                lines.extend(state.take_unread().into_iter().map(|report| {
-                    format!("CAM 1 reports {report}, which the link does not read.")
-                }));
+                // per connection, in a development run: about thirty lines
+                // a connection, which a studio build's log does without.
+                let unread = state.take_unread();
+                if trace {
+                    lines.extend(unread.into_iter().map(|report| {
+                        format!("CAM 1 reports {report}, which the link does not read.")
+                    }));
+                }
                 (noticed, lines)
             }
             Event::Timecode(bytes) => {
@@ -244,6 +248,12 @@ impl Shared {
                 |failure| failure.sentence(1, None),
             )
         })
+    }
+
+    /// Whether the camera has reported a setting since it connected: the
+    /// settings probe (D43) is sent when it has not.
+    pub(crate) fn settings_read(&self) -> bool {
+        self.with_state(|state| state.settings_read())
     }
 }
 

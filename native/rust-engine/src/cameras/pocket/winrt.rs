@@ -9,10 +9,17 @@
 //! reached by a test or a development run: `guard_bluetooth` stands before
 //! this thread.
 //!
-//! Once each connection is made it writes the controller's name to the
-//! camera's Device Name characteristic (D41), so the camera's Bluetooth menu
-//! names Studio Control, as the iPad's app does; a camera that does not take
-//! it is a line in the log, and the link goes on.
+//! Once each connection is made it reads the camera's protocol version,
+//! writes the controller's name to the camera's Device Name characteristic
+//! (D41), so the camera's Bluetooth menu names Studio Control, as the iPad's
+//! app does, and then subscribes (Magic Pocket Control's order). Every
+//! characteristic is looked up first, and a lookup or the version read that
+//! fails (Windows has not connected yet) is tried again in silence: the
+//! version and the characteristics' kinds are logged once, when the
+//! connection stands. A camera that sent no setting within `PROBE_AFTER` of
+//! connecting is sent the settings probe (D43, `protocol::probe_messages`):
+//! five offsets of zero, which change nothing and which the camera answers
+//! with its values.
 //!
 //! What it never does: write the Camera Status characteristic (a `0x00`
 //! there switches the camera off), pair (that is Setup's, `winrt_pairing.rs`),
@@ -21,6 +28,7 @@
 
 use crate::cameras::pocket::characteristics::{Notified, Writable, PROTOCOL_VERSION, SERVICE};
 use crate::cameras::pocket::link::{Event, Events, Inbox, Order, PocketLink, Shared};
+use crate::cameras::pocket::protocol::probe_messages;
 use crate::cameras::real_link::LinkFailure;
 use crate::diagnostics::{log_event, LogLevel};
 use std::sync::mpsc::RecvTimeoutError;
@@ -44,6 +52,11 @@ const RETRY: Duration = Duration::from_secs(5);
 
 /// The controller's name the camera shows (D41; up to 32 characters).
 const CONTROLLER_NAME: &str = "Studio Control";
+
+/// How long after a connection the link waits for the camera's settings
+/// before it asks for them (D43). A camera that sends them begins within
+/// about two seconds (the attended run, 2026-10-07).
+const PROBE_AFTER: Duration = Duration::from_secs(4);
 
 /// How a session ended.
 enum Ended {
@@ -228,17 +241,25 @@ fn serve(
         .map_err(text)?;
 
     let mut subscribed: Option<Subscribed> = None;
+    // When the settings probe (D43) is due; `None` once it went, or while
+    // the camera is not connected.
+    let mut probe_due: Option<Instant> = None;
     let outcome = loop {
         if subscribed.is_none() {
             // Asks Windows for the camera's service, which connects when
             // the camera is free; while it is not, this is tried again
-            // every `RETRY`, and Windows connects by itself meanwhile.
+            // every `RETRY`, in silence, and Windows connects by itself
+            // meanwhile.
             if let Ok(fresh) = subscribe(device, events) {
                 subscribed = Some(fresh);
+                probe_due = Some(Instant::now() + PROBE_AFTER);
                 shared.take(&Event::Connected(true));
             }
         }
-        match inbox.recv_timeout(RETRY) {
+        let wait = probe_due.map_or(RETRY, |due| {
+            due.saturating_duration_since(Instant::now()).min(RETRY)
+        });
+        match inbox.recv_timeout(wait) {
             Ok(Order::LetGo) | Err(RecvTimeoutError::Disconnected) => break Ok(()),
             Ok(Order::Send {
                 messages,
@@ -266,6 +287,7 @@ fn serve(
                 if let Some(gone) = subscribed.take() {
                     gone.end();
                 }
+                probe_due = None;
                 shared.take(&Event::Connected(false));
             }
             // Subscribed at the loop's top, when not already.
@@ -274,7 +296,17 @@ fn serve(
             Err(RecvTimeoutError::Timeout) => {}
         }
         // On every pass, not only a quiet one: a running camera's timecode
-        // keeps the inbox busy, and an abandoned link must still end.
+        // keeps the inbox busy, and the probe and an abandoned link's end
+        // must not wait on a quiet one.
+        if probe_due.is_some_and(|due| Instant::now() >= due) {
+            probe_due = None;
+            if let Some(outgoing) = subscribed
+                .as_ref()
+                .and_then(|subscribed| subscribed.characteristic(Writable::OutgoingControl))
+            {
+                probe(shared, outgoing);
+            }
+        }
         if PocketLink::abandoned(shared) {
             break Ok(());
         }
@@ -302,6 +334,18 @@ fn subscribe(device: &BluetoothLEDevice, events: &Events) -> Result<Subscribed, 
     }
 }
 
+/// Every characteristic of the camera's service, looked up before anything
+/// is read or written. While Windows has not connected yet a lookup fails,
+/// and the session is tried again in silence: logged, the two lines each
+/// retry would fill a studio build's log all day with the camera off (seen
+/// in the attended run, 2026-10-07).
+struct Found {
+    version: GattCharacteristic,
+    name: GattCharacteristic,
+    outgoing: GattCharacteristic,
+    notified: Vec<(Notified, GattCharacteristic)>,
+}
+
 fn fill(
     device: &BluetoothLEDevice,
     events: &Events,
@@ -319,74 +363,16 @@ fn fill(
         .and_then(|list| list.GetAt(0))
         .map_err(|_| String::from("CAM 1 offers no camera service."))?;
     subscribed.service = Some(service.clone());
-    // The camera's control characteristics are encrypted: asked for
-    // encryption up front, Windows secures the bonded link before the first
-    // descriptor write rather than after a refusal.
-    let characteristic = |uuid: u128| -> Result<GattCharacteristic, String> {
-        let found = service
-            .GetCharacteristicsForUuidAsync(guid(uuid))
-            .and_then(|pending| pending.get())
-            .map_err(text)?;
-        if found.Status().map_err(text)? != GattCommunicationStatus::Success {
-            return Err(String::from(
-                "One of CAM 1's characteristics did not answer.",
-            ));
-        }
-        let one = found
-            .Characteristics()
-            .and_then(|list| list.GetAt(0))
-            .map_err(|_| String::from("CAM 1 lacks one of the protocol's characteristics."))?;
-        let _ = one.SetProtectionLevel(GattProtectionLevel::EncryptionRequired);
-        Ok(one)
-    };
+    let found = look_up(&service)?;
     // The order of Magic Pocket Control's connection (an ESP32 controller
     // that gets the camera's settings at each connection): the protocol
     // version read, the controller's name written, then the subscriptions.
-    // The camera's protocol version, read once each connection.
-    match characteristic(PROTOCOL_VERSION).and_then(|version| {
-        version
-            .ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached)
-            .and_then(|pending| pending.get())
-            .map_err(text)
-    }) {
-        Ok(read) if read.Status().ok() == Some(GattCommunicationStatus::Success) => {
-            let bytes = read
-                .Value()
-                .and_then(|value| bytes_of(&value))
-                .unwrap_or_default();
-            let hex: Vec<String> = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
-            let shown: String = String::from_utf8_lossy(&bytes)
-                .chars()
-                .filter(|letter| !letter.is_control())
-                .collect();
-            log_event(
-                LogLevel::Info,
-                &format!(
-                    "CAM 1's protocol version reads: {} (\"{}\").",
-                    hex.join(" "),
-                    shown.trim()
-                ),
-            );
-        }
-        Ok(_) => log_event(
-            LogLevel::Info,
-            "CAM 1's protocol version could not be read.",
-        ),
-        Err(sentence) => log_event(
-            LogLevel::Info,
-            &format!("CAM 1's protocol version could not be read: {sentence}"),
-        ),
-    }
-    // The controller's name, once each connection, before the subscriptions
-    // (D41). A camera that does not take it is a line in the log, and the
-    // link goes on without it.
-    match characteristic(Writable::DeviceName.uuid()) {
-        Ok(name) => subscribed.writable.push((Writable::DeviceName, name)),
-        Err(sentence) => log_event(
-            LogLevel::Warn,
-            &format!("CAM 1 offers no place for Studio Control's name: {sentence}"),
-        ),
-    }
+    // The version is required: a camera that does not answer it is not
+    // connected yet, and the session is tried again.
+    let version = read_version(&found.version)?;
+    // The controller's name, once each connection (D41). A camera that does
+    // not take it is a line in the log, and the link goes on without it.
+    subscribed.writable.push((Writable::DeviceName, found.name));
     if let Some(name) = subscribed.characteristic(Writable::DeviceName) {
         if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes()) {
             log_event(
@@ -395,13 +381,11 @@ fn fill(
             );
         }
     }
-    subscribed.writable.push((
-        Writable::OutgoingControl,
-        characteristic(Writable::OutgoingControl.uuid())?,
-    ));
+    subscribed
+        .writable
+        .push((Writable::OutgoingControl, found.outgoing));
     let mut kinds: Vec<String> = Vec::new();
-    for notified in Notified::ALL {
-        let listened = characteristic(notified.uuid())?;
+    for (notified, listened) in found.notified {
         let properties = listened.CharacteristicProperties().map_err(text)?;
         let (wanted, kind) = subscription_of(properties);
         kinds.push(format!("{notified:?} {kind} ({:#04x})", properties.0));
@@ -435,11 +419,97 @@ fn fill(
             return Err(format!("CAM 1 refused the notifications of {notified:?}."));
         }
     }
+    // Once a connection, when it stands.
+    log_event(
+        LogLevel::Info,
+        &format!("CAM 1's protocol version reads {version}."),
+    );
     log_event(
         LogLevel::Info,
         &format!("CAM 1's characteristics: {}.", kinds.join(", ")),
     );
     Ok(())
+}
+
+/// The camera's characteristics, each asked for encryption up front: the
+/// control characteristics are encrypted, and so asked Windows secures the
+/// bonded link before the first descriptor write rather than after a
+/// refusal. `Err` while one cannot be looked up: the camera is not connected
+/// yet, or lacks it.
+fn look_up(service: &GattDeviceService) -> Result<Found, String> {
+    let characteristic = |uuid: u128| -> Result<GattCharacteristic, String> {
+        let found = service
+            .GetCharacteristicsForUuidAsync(guid(uuid))
+            .and_then(|pending| pending.get())
+            .map_err(text)?;
+        if found.Status().map_err(text)? != GattCommunicationStatus::Success {
+            return Err(String::from(
+                "One of CAM 1's characteristics did not answer.",
+            ));
+        }
+        let one = found
+            .Characteristics()
+            .and_then(|list| list.GetAt(0))
+            .map_err(|_| String::from("CAM 1 lacks one of the protocol's characteristics."))?;
+        let _ = one.SetProtectionLevel(GattProtectionLevel::EncryptionRequired);
+        Ok(one)
+    };
+    let mut notified = Vec::with_capacity(Notified::ALL.len());
+    for which in Notified::ALL {
+        notified.push((which, characteristic(which.uuid())?));
+    }
+    Ok(Found {
+        version: characteristic(PROTOCOL_VERSION)?,
+        name: characteristic(Writable::DeviceName.uuid())?,
+        outgoing: characteristic(Writable::OutgoingControl.uuid())?,
+        notified,
+    })
+}
+
+/// The camera's protocol version, read once each connection, as the log
+/// writes it: `"0.1.0" (30 2E 31 2E 30 00 …)`. `Err` while the camera does
+/// not answer it.
+fn read_version(version: &GattCharacteristic) -> Result<String, String> {
+    let read = version
+        .ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached)
+        .and_then(|pending| pending.get())
+        .map_err(text)?;
+    if read.Status().map_err(text)? != GattCommunicationStatus::Success {
+        return Err(String::from("CAM 1's protocol version did not answer."));
+    }
+    let bytes = read
+        .Value()
+        .and_then(|value| bytes_of(&value))
+        .map_err(text)?;
+    let hex: Vec<String> = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+    let shown: String = String::from_utf8_lossy(&bytes)
+        .chars()
+        .filter(|letter| !letter.is_control())
+        .collect();
+    Ok(format!("\"{}\" ({})", shown.trim(), hex.join(" ")))
+}
+
+/// The settings probe (D43): a camera that reported no setting since it
+/// connected is asked for them with offsets of zero, once a connection, and
+/// the log says so. Written through the one write, to the one characteristic
+/// a press goes to.
+fn probe(shared: &Arc<Shared>, outgoing: &GattCharacteristic) {
+    if shared.settings_read() {
+        return;
+    }
+    match write_all(outgoing, &probe_messages()) {
+        Ok(()) => log_event(
+            LogLevel::Info,
+            &format!(
+                "CAM 1 sent no settings within {} s of connecting: asked for them with five offsets of zero, which change nothing.",
+                PROBE_AFTER.as_secs()
+            ),
+        ),
+        Err(sentence) => log_event(
+            LogLevel::Warn,
+            &format!("CAM 1 did not take the settings probe: {sentence}"),
+        ),
+    }
 }
 
 fn bytes_of(buffer: &IBuffer) -> windows::core::Result<Vec<u8>> {
