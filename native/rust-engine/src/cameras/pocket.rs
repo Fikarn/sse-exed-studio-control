@@ -10,11 +10,13 @@
 //! guard, which speaks to Windows' own pairing (`winrt_pairing.rs`).
 //!
 //! What the protocol is, read on the web on 2026-10-06 from Blackmagic's
-//! Developer Information and not yet tried on the camera (`docs/HARDWARE.md`,
-//! Cameras): the SDI camera control protocol's messages, written to the
-//! Outgoing Camera Control characteristic and notified back on the Incoming
-//! one, the camera sending every setting once after the connection and then
-//! each change; the timecode on a characteristic of its own.
+//! Developer Information and tried on the camera on 2026-10-07
+//! (`docs/HARDWARE.md`, Cameras): the SDI camera control protocol's
+//! messages, written to the Outgoing Camera Control characteristic and
+//! indicated back on the Incoming one, the camera sending every setting
+//! after a connection that follows some minutes without a controller or a
+//! power-on (else asked for them, D43) and then each change; the timecode
+//! on a characteristic of its own.
 
 // Some of the protocol's record (its types, the status flags, the format's
 // flags, the characteristics the link does not write) is named for the

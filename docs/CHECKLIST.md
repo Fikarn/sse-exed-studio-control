@@ -126,9 +126,9 @@ Until the BGH1s' link is built:
 
 CAM 1's pairing, once, with the Pocket beside you (its Bluetooth on, the iPad's app closed, nothing recording):
 
-- [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised (with its signal) and the one Windows holds, then the three characteristics' kinds (`Control indicates`) and the camera's status word.
+- [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised (with its signal) and the one Windows holds, then the camera's protocol version (`"0.1.0"`), the three characteristics' kinds (`Control indicates`) and the camera's status word (`power on, connected`). Within a few seconds the page shows CAM 1's values: ISO, shutter, iris, ND, white balance and tint, format, dynamic range and display LUT.
 - [ ] A wrong PIN says so and saves nothing; `Pair CAM 1` again starts over.
-- [ ] After a close and a start, CAM 1 is held again with no pairing and no setting changed.
+- [ ] After a close and a start, CAM 1 is held again with no pairing and no setting changed, and its values are back within about five seconds: a camera reconnected within minutes sends nothing by itself, so the link asks (the log says `asked for them with five offsets of zero`), and nothing on the camera's display changes.
 
 Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on vMix's outputs:
 
@@ -138,7 +138,7 @@ Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on 
 - [ ] Every value on the page matches the camera's own display, on all three cameras.
 - [ ] Every setting changed from the page or the deck reaches the camera, and the page shows what the camera reports.
 - [ ] A change made on the camera shows on the page within about a second.
-- [ ] `REC` starts CAM 1 whichever camera is selected; stopping needs the second press, on the page and on the deck (`STOP?`).
+- [ ] `REC` starts CAM 1 whichever camera is selected; the page reads `REC`, the take's length counts from the start and `Timecode` runs, for a take started from the page and for one started on the camera's body alike; stopping needs the second press, on the page and on the deck (`STOP?`).
 - [ ] On the deck, two quick presses of `REC` start one take and arm nothing; two quick presses on `STOP?` stop it and start no other. `STOP?` left alone reads `REC` again within about four seconds. While CAM 1 records, `REC` on every page shows the take's length, the same as the Cameras page's.
 - [ ] The deck's dials step the selected camera's values in every bank, and the strip shows what the camera reports; a push of the first dial on focus runs the autofocus once.
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
