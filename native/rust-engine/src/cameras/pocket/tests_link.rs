@@ -10,7 +10,8 @@ use crate::cameras::pocket::characteristics::{Notified, Writable, CAMERA_STATUS}
 use crate::cameras::pocket::link::{guard_bluetooth, guard_bluetooth_for, PocketLink};
 use crate::cameras::pocket::protocol::{Message, Parameter, TYPE_INT32, VIDEO_ISO};
 use crate::cameras::pocket::state::{
-    Connection, LinkState, Noticed, STATUS_CAMERA_READY, STATUS_INITIAL_PAYLOAD_RECEIVED,
+    status_words, Connection, LinkState, Noticed, STATUS_CAMERA_READY,
+    STATUS_INITIAL_PAYLOAD_RECEIVED,
 };
 use crate::cameras::real_link::{parse_bluetooth_address, BluetoothAddress, LinkFailure};
 use crate::cameras::runtime;
@@ -112,11 +113,17 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         state.read().expect("connected").timecode.as_deref(),
         Some("09:12:53:10")
     );
-    assert_eq!(
-        state.status_flags(&[STATUS_CAMERA_READY | STATUS_INITIAL_PAYLOAD_RECEIVED]),
-        Noticed::Nothing
-    );
+    let ready = STATUS_CAMERA_READY | STATUS_INITIAL_PAYLOAD_RECEIVED;
+    assert_eq!(state.status_flags(&[ready]), Some(ready), "new flags");
+    assert_eq!(state.status_flags(&[ready]), None, "the same flags again");
+    assert_eq!(state.status_flags(&[]), None, "no bytes");
     assert!(state.initial_payload_received());
+    assert_eq!(status_words(ready), "initial payload sent, camera ready");
+    assert_eq!(status_words(0), "none");
+    assert_eq!(
+        status_words(0x3F | 0x40),
+        "power on, connected, paired, versions verified, initial payload sent, camera ready, 0x40"
+    );
     // Two messages in one notification, one of them nobody's.
     let mut two = iso(1600);
     two.extend(
@@ -391,8 +398,8 @@ fn code_of(source: &str) -> String {
 }
 
 // The pairing (part 5) writes none of the camera's characteristics, listens
-// passively and never scans actively, takes only the Pocket's advertisement,
-// and removes no pairing but the one of the camera it found.
+// actively (scan requests only, D42) in one place, takes only the Pocket's
+// advertisement, and removes no pairing but the one of the camera it found.
 #[test]
 fn the_pairing_writes_nothing_and_only_listens() {
     let code = code_of(include_str!("winrt_pairing.rs"));
@@ -401,7 +408,7 @@ fn the_pairing_writes_nothing_and_only_listens() {
         "WriteClientCharacteristic",
         "GattSession",
         "GetGattServices",
-        "BluetoothLEScanningMode::Active",
+        "BluetoothLEScanningMode::Passive",
         "BluetoothLEScanningMode(",
         "CAMERA_STATUS",
         "DeviceWatcher",
@@ -412,7 +419,7 @@ fn the_pairing_writes_nothing_and_only_listens() {
             "winrt_pairing.rs names {forbidden}"
         );
     }
-    assert_eq!(code.matches("BluetoothLEScanningMode::Passive").count(), 1);
+    assert_eq!(code.matches("BluetoothLEScanningMode::Active").count(), 1);
     assert_eq!(code.matches("is_pocket(").count(), 1);
     assert_eq!(code.matches("UnpairAsync").count(), 1);
 }

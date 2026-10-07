@@ -5,7 +5,8 @@
 
 use crate::cameras::pocket::characteristics::SERVICE;
 use crate::cameras::pocket::pairing::{
-    asked, is_pocket, pairing_result, parse_pin, Asked, PairingStep, PocketPairing, PIN_REFUSED,
+    asked, heard_entry, heard_line, is_pocket, pairing_result, parse_pin, Asked, Heard,
+    PairingStep, PocketPairing, HEARD_KEPT, PIN_REFUSED,
 };
 use crate::cameras::real_link::BluetoothAddress;
 use crate::cameras::snapshot::CameraPairingState;
@@ -31,22 +32,68 @@ fn a_pin_is_the_six_digits_the_camera_shows() {
 }
 
 // The pairing takes no device but the Pocket: Blackmagic's camera service
-// in its advertisement, or the camera's own name.
+// in its advertisement or scan reply. Its name (`A:F901D868` on the
+// studio's Pocket) is not looked at.
 #[test]
 fn only_the_pocket_s_advertisement_is_taken() {
-    assert!(is_pocket(&[SERVICE], ""));
-    assert!(is_pocket(&[0x1234, SERVICE], "TimoTwo"));
-    assert!(is_pocket(&[], "Pocket Cinema Camera 6K Pro"));
-    assert!(is_pocket(&[], " pocket cinema camera 6K Pro A:1B2C"));
-    for (services, name) in [
-        (vec![], ""),
-        (vec![], "TimoTwo"),
-        (vec![], "INFINIMAT-13F156"),
-        (vec![0x1234_u128], "Blackmagic"),
-        (vec![], "My Pocket Cinema Camera"),
-    ] {
-        assert!(!is_pocket(&services, name), "{name} {services:?}");
+    assert!(is_pocket(&[SERVICE]));
+    assert!(is_pocket(&[0x1234, SERVICE]));
+    assert!(!is_pocket(&[]));
+    assert!(!is_pocket(&[0x1234]));
+    assert!(!is_pocket(&[SERVICE.wrapping_add(1)]));
+}
+
+// A listen that did not hear the Pocket says in the log what it heard:
+// each device's address, name and services once, `HEARD_KEPT` at most.
+#[test]
+fn a_listen_that_missed_the_pocket_says_what_it_heard() {
+    let light = BluetoothAddress {
+        address: 0xD43A_2C11_2233,
+        random: false,
+    };
+    let module = BluetoothAddress {
+        address: 0x0102_0304_0506,
+        random: true,
+    };
+    assert_eq!(heard_entry(light, "", &[], &[], &[]), "D4:3A:2C:11:22:33");
+    assert_eq!(
+        heard_entry(light, " INFINIMAT-13F156 ", &[0x180F], &[], &[0x01, 0x09]),
+        "D4:3A:2C:11:22:33 \"INFINIMAT-13F156\" [00000000-0000-0000-0000-00000000180F] sections 01 09"
+    );
+    assert_eq!(
+        heard_entry(module, "TimoTwo", &[SERVICE, 0x1], &[0x004C, 0x0075], &[]),
+        "01:02:03:04:05:06 random \"TimoTwo\" [291D567A-6D75-11E6-8B77-86F30CA893D3, 00000000-0000-0000-0000-000000000001] maker 004C, 0075"
+    );
+
+    let mut heard = Heard::default();
+    assert_eq!(
+        heard.line(0),
+        "CAM 1 was not heard: 0 advertisements in all, none the Pocket's."
+    );
+    heard.note(heard_entry(light, "INFINIMAT-13F156", &[], &[], &[]), -97);
+    heard.note(heard_entry(module, "TimoTwo", &[], &[], &[]), -80);
+    heard.note(heard_entry(light, "INFINIMAT-13F156", &[], &[], &[]), -91);
+    assert_eq!(
+        heard.line(3),
+        "CAM 1 was not heard: 3 advertisements in all, none the Pocket's. Heard: 01:02:03:04:05:06 random \"TimoTwo\" (-80 dBm, 1×); D4:3A:2C:11:22:33 \"INFINIMAT-13F156\" (-91 dBm, 2×)."
+    );
+
+    let mut many = Heard::default();
+    for index in 0..HEARD_KEPT + 2 {
+        many.note(format!("device {index:03}"), -70);
     }
+    let line = many.line(99);
+    assert_eq!(line.matches("device ").count(), HEARD_KEPT);
+    assert!(line.ends_with("; and more."), "{line}");
+
+    assert_eq!(
+        heard_line(light, -62, true),
+        "CAM 1 was heard at D4:3A:2C:11:22:33 (-62 dBm, in its scan reply)."
+    );
+    assert_eq!(
+        heard_line(module, -70, false),
+        "CAM 1 was heard at 01:02:03:04:05:06 random (-70 dBm, in its advertisement)."
+    );
 }
 
 // Windows' answers, by their numbers: paired (or already), or a sentence

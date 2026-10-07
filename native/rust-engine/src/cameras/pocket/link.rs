@@ -14,7 +14,7 @@
 //! sentence. Only the studio's build passes.
 
 use crate::cameras::pocket::protocol::encode_commands;
-use crate::cameras::pocket::state::{Connection, LinkState, Noticed};
+use crate::cameras::pocket::state::{status_words, Connection, LinkState, Noticed};
 use crate::cameras::real_link::{BluetoothAddress, LinkFailure};
 use crate::cameras::simulated::{CameraCommand, CameraReading};
 use crate::diagnostics::{log_event, LogLevel};
@@ -129,12 +129,23 @@ impl Shared {
     /// Takes what Windows handed over, and tells the runtime when it
     /// should look. A connection that came or went is a line in the log.
     pub(crate) fn take(&self, event: &Event) {
+        if let Event::Status(bytes) = event {
+            // The camera's own account of the connection, each time it
+            // changes: it says whether the camera has sent its settings.
+            if let Some(flags) = self.with_state(|state| state.status_flags(bytes)) {
+                log_event(
+                    LogLevel::Info,
+                    &format!("CAM 1's status reads: {}.", status_words(flags)),
+                );
+            }
+            return;
+        }
         let noticed = self.with_state(|state| match event {
             Event::Connected(true) => state.connected(),
             Event::Connected(false) => state.lost(),
             Event::Control(bytes) => state.control(bytes),
             Event::Timecode(bytes) => state.timecode(bytes),
-            Event::Status(bytes) => state.status_flags(bytes),
+            Event::Status(_) => Noticed::Nothing,
         });
         if noticed == Noticed::Changed {
             match event {

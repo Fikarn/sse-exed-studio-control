@@ -44,6 +44,33 @@ pub(crate) const STATUS_VERSIONS_VERIFIED: u8 = 0x08;
 pub(crate) const STATUS_INITIAL_PAYLOAD_RECEIVED: u8 = 0x10;
 pub(crate) const STATUS_CAMERA_READY: u8 = 0x20;
 
+/// The status flags in words, for the log: `power on, connected, paired`;
+/// `none` for no flag; an unknown bit as its hex.
+pub(crate) fn status_words(flags: u8) -> String {
+    const NAMED: [(u8, &str); 6] = [
+        (STATUS_POWER_ON, "power on"),
+        (STATUS_CONNECTED, "connected"),
+        (STATUS_PAIRED, "paired"),
+        (STATUS_VERSIONS_VERIFIED, "versions verified"),
+        (STATUS_INITIAL_PAYLOAD_RECEIVED, "initial payload sent"),
+        (STATUS_CAMERA_READY, "camera ready"),
+    ];
+    let mut words: Vec<String> = NAMED
+        .iter()
+        .filter(|(bit, _)| flags & bit != 0)
+        .map(|(_, word)| String::from(*word))
+        .collect();
+    let unknown = flags & !NAMED.iter().fold(0, |all, (bit, _)| all | bit);
+    if unknown != 0 {
+        words.push(format!("0x{unknown:02X}"));
+    }
+    if words.is_empty() {
+        String::from("none")
+    } else {
+        words.join(", ")
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LinkState {
     pub connection: Connection,
@@ -125,12 +152,15 @@ impl LinkState {
         Noticed::Nothing
     }
 
-    /// Bytes from the Camera Status characteristic: the flags.
-    pub(crate) fn status_flags(&mut self, bytes: &[u8]) -> Noticed {
-        if let Some(flags) = bytes.first() {
-            self.status = Some(*flags);
+    /// Bytes from the Camera Status characteristic: the flags. `Some` with
+    /// the new flags when they differ from the last, for the log.
+    pub(crate) fn status_flags(&mut self, bytes: &[u8]) -> Option<u8> {
+        let flags = *bytes.first()?;
+        if self.status == Some(flags) {
+            return None;
         }
-        Noticed::Nothing
+        self.status = Some(flags);
+        Some(flags)
     }
 
     /// The camera has sent every setting once since it connected.

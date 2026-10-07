@@ -126,7 +126,7 @@ Until the BGH1s' link is built:
 
 CAM 1's pairing, once, with the Pocket beside you (its Bluetooth on, the iPad's app closed, nothing recording):
 
-- [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised and the one Windows holds.
+- [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised (with its signal) and the one Windows holds, then the three characteristics' kinds (`Control indicates`) and the camera's status word.
 - [ ] A wrong PIN says so and saves nothing; `Pair CAM 1` again starts over.
 - [ ] After a close and a start, CAM 1 is held again with no pairing and no setting changed.
 

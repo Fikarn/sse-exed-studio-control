@@ -28,8 +28,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use windows::core::{Error as WinError, IInspectable, GUID};
 use windows::Devices::Bluetooth::GenericAttributeProfile::{
-    GattCharacteristic, GattClientCharacteristicConfigurationDescriptorValue,
-    GattCommunicationStatus, GattDeviceService, GattSession, GattValueChangedEventArgs,
+    GattCharacteristic, GattCharacteristicProperties,
+    GattClientCharacteristicConfigurationDescriptorValue, GattCommunicationStatus,
+    GattDeviceService, GattProtectionLevel, GattSession, GattValueChangedEventArgs,
 };
 use windows::Devices::Bluetooth::{
     BluetoothAddressType, BluetoothConnectionStatus, BluetoothLEDevice,
@@ -106,6 +107,9 @@ fn guid(uuid: u128) -> GUID {
 /// listens to, with their handlers' tokens, and the ones it may write.
 #[derive(Default)]
 struct Subscribed {
+    /// The camera service, held for the connection's life: Windows stops a
+    /// characteristic's notifications once its service is let go.
+    service: Option<GattDeviceService>,
     handled: Vec<(GattCharacteristic, i64)>,
     writable: Vec<(Writable, GattCharacteristic)>,
 }
@@ -118,11 +122,38 @@ impl Subscribed {
             .map(|(_, characteristic)| characteristic)
     }
 
-    /// Takes the handlers off; the characteristics go with it.
+    /// Takes the handlers off and closes the service; the characteristics
+    /// go with it.
     fn end(self) {
         for (characteristic, token) in self.handled {
             let _ = characteristic.RemoveValueChanged(token);
         }
+        if let Some(service) = self.service {
+            let _ = service.Close();
+        }
+    }
+}
+
+/// How a notified characteristic is subscribed to: as the camera offers it.
+/// The Pocket indicates its Incoming Camera Control (what BlueMagic32 asks
+/// for; asked for notifications, it sent nothing, 2026-10-07); a descriptor
+/// asked for the wrong kind is written without an error and stays silent.
+fn subscription_of(
+    properties: GattCharacteristicProperties,
+) -> (
+    GattClientCharacteristicConfigurationDescriptorValue,
+    &'static str,
+) {
+    if properties.contains(GattCharacteristicProperties::Indicate) {
+        (
+            GattClientCharacteristicConfigurationDescriptorValue::Indicate,
+            "indicates",
+        )
+    } else {
+        (
+            GattClientCharacteristicConfigurationDescriptorValue::Notify,
+            "notifies",
+        )
     }
 }
 
@@ -287,6 +318,10 @@ fn fill(
         .Services()
         .and_then(|list| list.GetAt(0))
         .map_err(|_| String::from("CAM 1 offers no camera service."))?;
+    subscribed.service = Some(service.clone());
+    // The camera's control characteristics are encrypted: asked for
+    // encryption up front, Windows secures the bonded link before the first
+    // descriptor write rather than after a refusal.
     let characteristic = |uuid: u128| -> Result<GattCharacteristic, String> {
         let found = service
             .GetCharacteristicsForUuidAsync(guid(uuid))
@@ -297,17 +332,23 @@ fn fill(
                 "One of CAM 1's characteristics did not answer.",
             ));
         }
-        found
+        let one = found
             .Characteristics()
             .and_then(|list| list.GetAt(0))
-            .map_err(|_| String::from("CAM 1 lacks one of the protocol's characteristics."))
+            .map_err(|_| String::from("CAM 1 lacks one of the protocol's characteristics."))?;
+        let _ = one.SetProtectionLevel(GattProtectionLevel::EncryptionRequired);
+        Ok(one)
     };
     subscribed.writable.push((
         Writable::OutgoingControl,
         characteristic(Writable::OutgoingControl.uuid())?,
     ));
+    let mut kinds: Vec<String> = Vec::new();
     for notified in Notified::ALL {
         let listened = characteristic(notified.uuid())?;
+        let properties = listened.CharacteristicProperties().map_err(text)?;
+        let (wanted, kind) = subscription_of(properties);
+        kinds.push(format!("{notified:?} {kind} ({:#04x})", properties.0));
         let sender = events.clone();
         let token = listened
             .ValueChanged(&TypedEventHandler::<
@@ -330,9 +371,7 @@ fn fill(
         // takes the handler off (`Subscribed::end`).
         subscribed.handled.push((listened.clone(), token));
         let status = listened
-            .WriteClientCharacteristicConfigurationDescriptorWithResultAsync(
-                GattClientCharacteristicConfigurationDescriptorValue::Notify,
-            )
+            .WriteClientCharacteristicConfigurationDescriptorWithResultAsync(wanted)
             .and_then(|pending| pending.get())
             .and_then(|result| result.Status())
             .map_err(text)?;
@@ -340,6 +379,10 @@ fn fill(
             return Err(format!("CAM 1 refused the notifications of {notified:?}."));
         }
     }
+    log_event(
+        LogLevel::Info,
+        &format!("CAM 1's characteristics: {}.", kinds.join(", ")),
+    );
     // The controller's name, once each connection, after the subscriptions
     // (D41). A camera that does not take it is a line in the log, and the
     // link goes on without it.
