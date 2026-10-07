@@ -104,6 +104,28 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         "the same value again"
     );
     assert_eq!(state.read().expect("connected").iso.as_deref(), Some("800"));
+    // A report the model does not read is kept for the log, each kind once
+    // per connection, with its bytes.
+    assert!(state.take_unread().is_empty(), "ISO is read");
+    let unknown = [255, 6, 0, 0, 9, 9, 1, 0, 0x07, 0x02, 0, 0];
+    assert_eq!(state.control(&unknown), Noticed::Nothing);
+    assert_eq!(
+        state.take_unread(),
+        vec![String::from("9.9 (type 1, operation 0, data 07 02)")]
+    );
+    assert_eq!(state.control(&unknown), Noticed::Nothing);
+    assert!(
+        state.take_unread().is_empty(),
+        "the same kind again is not repeated"
+    );
+    state.connected();
+    assert_eq!(state.control(&unknown), Noticed::Nothing);
+    assert_eq!(
+        state.take_unread().len(),
+        1,
+        "a new connection notes it afresh"
+    );
+    assert_eq!(state.control(&iso(800)), Noticed::Changed);
     assert_eq!(
         state.timecode(&[0x10, 0x53, 0x12, 0x09]),
         Noticed::Nothing,

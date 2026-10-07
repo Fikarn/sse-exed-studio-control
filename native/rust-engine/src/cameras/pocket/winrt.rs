@@ -19,7 +19,7 @@
 //! or scan. `Writable` names the characteristics it may write, and the one
 //! function that writes takes one of them.
 
-use crate::cameras::pocket::characteristics::{Notified, Writable, SERVICE};
+use crate::cameras::pocket::characteristics::{Notified, Writable, PROTOCOL_VERSION, SERVICE};
 use crate::cameras::pocket::link::{Event, Events, Inbox, Order, PocketLink, Shared};
 use crate::cameras::real_link::LinkFailure;
 use crate::diagnostics::{log_event, LogLevel};
@@ -33,7 +33,7 @@ use windows::Devices::Bluetooth::GenericAttributeProfile::{
     GattDeviceService, GattProtectionLevel, GattSession, GattValueChangedEventArgs,
 };
 use windows::Devices::Bluetooth::{
-    BluetoothAddressType, BluetoothConnectionStatus, BluetoothLEDevice,
+    BluetoothAddressType, BluetoothCacheMode, BluetoothConnectionStatus, BluetoothLEDevice,
 };
 use windows::Foundation::TypedEventHandler;
 use windows::Storage::Streams::{DataReader, DataWriter, IBuffer};
@@ -339,6 +339,62 @@ fn fill(
         let _ = one.SetProtectionLevel(GattProtectionLevel::EncryptionRequired);
         Ok(one)
     };
+    // The order of Magic Pocket Control's connection (an ESP32 controller
+    // that gets the camera's settings at each connection): the protocol
+    // version read, the controller's name written, then the subscriptions.
+    // The camera's protocol version, read once each connection.
+    match characteristic(PROTOCOL_VERSION).and_then(|version| {
+        version
+            .ReadValueWithCacheModeAsync(BluetoothCacheMode::Uncached)
+            .and_then(|pending| pending.get())
+            .map_err(text)
+    }) {
+        Ok(read) if read.Status().ok() == Some(GattCommunicationStatus::Success) => {
+            let bytes = read
+                .Value()
+                .and_then(|value| bytes_of(&value))
+                .unwrap_or_default();
+            let hex: Vec<String> = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+            let shown: String = String::from_utf8_lossy(&bytes)
+                .chars()
+                .filter(|letter| !letter.is_control())
+                .collect();
+            log_event(
+                LogLevel::Info,
+                &format!(
+                    "CAM 1's protocol version reads: {} (\"{}\").",
+                    hex.join(" "),
+                    shown.trim()
+                ),
+            );
+        }
+        Ok(_) => log_event(
+            LogLevel::Info,
+            "CAM 1's protocol version could not be read.",
+        ),
+        Err(sentence) => log_event(
+            LogLevel::Info,
+            &format!("CAM 1's protocol version could not be read: {sentence}"),
+        ),
+    }
+    // The controller's name, once each connection, before the subscriptions
+    // (D41). A camera that does not take it is a line in the log, and the
+    // link goes on without it.
+    match characteristic(Writable::DeviceName.uuid()) {
+        Ok(name) => subscribed.writable.push((Writable::DeviceName, name)),
+        Err(sentence) => log_event(
+            LogLevel::Warn,
+            &format!("CAM 1 offers no place for Studio Control's name: {sentence}"),
+        ),
+    }
+    if let Some(name) = subscribed.characteristic(Writable::DeviceName) {
+        if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes()) {
+            log_event(
+                LogLevel::Warn,
+                &format!("CAM 1 did not take Studio Control's name: {sentence}"),
+            );
+        }
+    }
     subscribed.writable.push((
         Writable::OutgoingControl,
         characteristic(Writable::OutgoingControl.uuid())?,
@@ -383,24 +439,6 @@ fn fill(
         LogLevel::Info,
         &format!("CAM 1's characteristics: {}.", kinds.join(", ")),
     );
-    // The controller's name, once each connection, after the subscriptions
-    // (D41). A camera that does not take it is a line in the log, and the
-    // link goes on without it.
-    match characteristic(Writable::DeviceName.uuid()) {
-        Ok(name) => subscribed.writable.push((Writable::DeviceName, name)),
-        Err(sentence) => log_event(
-            LogLevel::Warn,
-            &format!("CAM 1 offers no place for Studio Control's name: {sentence}"),
-        ),
-    }
-    if let Some(name) = subscribed.characteristic(Writable::DeviceName) {
-        if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes()) {
-            log_event(
-                LogLevel::Warn,
-                &format!("CAM 1 did not take Studio Control's name: {sentence}"),
-            );
-        }
-    }
     Ok(())
 }
 

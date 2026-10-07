@@ -570,6 +570,13 @@ fn the_timecode_is_four_bcd_bytes() {
     );
     assert_eq!(timecode_text(&[0x10, 0x53, 0x12]), None);
     assert_eq!(timecode_text(&[0x10, 0x53, 0x12, 0x09, 0x00]), None);
+    // The camera notifies twelve bytes: the timecode is the last four.
+    assert_eq!(
+        timecode_text(&[255, 8, 0, 0, 9, 4, 3, 0, 0x10, 0x53, 0x12, 0x09]).as_deref(),
+        Some("09:12:53:10")
+    );
+    assert_eq!(timecode_text(&[0; 11]), None);
+    assert_eq!(timecode_text(&[0; 13]), None);
 }
 
 // What the Pocket does not take is refused before anything is sent.

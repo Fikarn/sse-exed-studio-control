@@ -14,7 +14,11 @@
 //! sentence. Only the studio's build passes.
 
 use crate::cameras::pocket::protocol::encode_commands;
-use crate::cameras::pocket::state::{status_words, Connection, LinkState, Noticed};
+use crate::cameras::pocket::state::{
+    describe, hex, status_words, Connection, LinkState, Noticed, TRACE_CONTROL,
+    TRACE_TIMECODE_EVERY, TRACE_TIMECODE_FIRST,
+};
+use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::real_link::{BluetoothAddress, LinkFailure};
 use crate::cameras::simulated::{CameraCommand, CameraReading};
 use crate::diagnostics::{log_event, LogLevel};
@@ -129,7 +133,16 @@ impl Shared {
     /// Takes what Windows handed over, and tells the runtime when it
     /// should look. A connection that came or went is a line in the log.
     pub(crate) fn take(&self, event: &Event) {
+        // A development run (the owner's attended `--bluetooth`) traces what
+        // the camera sends, so what it reports is read, not guessed.
+        let trace = development_build();
         if let Event::Status(bytes) = event {
+            if trace {
+                log_event(
+                    LogLevel::Info,
+                    &format!("Trace: CAM 1's status notifies {}.", hex(bytes)),
+                );
+            }
             // The camera's own account of the connection, each time it
             // changes: it says whether the camera has sent its settings.
             if let Some(flags) = self.with_state(|state| state.status_flags(bytes)) {
@@ -140,13 +153,53 @@ impl Shared {
             }
             return;
         }
-        let noticed = self.with_state(|state| match event {
-            Event::Connected(true) => state.connected(),
-            Event::Connected(false) => state.lost(),
-            Event::Control(bytes) => state.control(bytes),
-            Event::Timecode(bytes) => state.timecode(bytes),
-            Event::Status(_) => Noticed::Nothing,
+        let (noticed, lines) = self.with_state(|state| match event {
+            Event::Connected(true) => (state.connected(), Vec::new()),
+            Event::Connected(false) => (state.lost(), Vec::new()),
+            Event::Control(bytes) => {
+                let mut lines = Vec::new();
+                if trace && state.traced_control < TRACE_CONTROL {
+                    state.traced_control += 1;
+                    lines.push(format!(
+                        "Trace: CAM 1 indicates {} ({} bytes).",
+                        describe(bytes),
+                        bytes.len()
+                    ));
+                }
+                let noticed = state.control(bytes);
+                // What the camera reports beyond the model, each kind once
+                // per connection: the attended run reads it.
+                lines.extend(state.take_unread().into_iter().map(|report| {
+                    format!("CAM 1 reports {report}, which the link does not read.")
+                }));
+                (noticed, lines)
+            }
+            Event::Timecode(bytes) => {
+                let first = state.reading.timecode.is_none();
+                let noticed = state.timecode(bytes);
+                let mut lines = Vec::new();
+                state.traced_timecode += 1;
+                let count = state.traced_timecode;
+                if trace && (count <= TRACE_TIMECODE_FIRST || count % TRACE_TIMECODE_EVERY == 0) {
+                    lines.push(format!(
+                        "Trace: CAM 1's timecode notification {count}: {} ({} bytes) reads {}.",
+                        hex(bytes),
+                        bytes.len(),
+                        timecode_text(bytes).unwrap_or_else(|| String::from("nothing"))
+                    ));
+                }
+                if let (Some(timecode), true) = (&state.reading.timecode, first) {
+                    lines.push(format!(
+                        "CAM 1's first timecode since it connected: {timecode}."
+                    ));
+                }
+                (noticed, lines)
+            }
+            Event::Status(_) => (Noticed::Nothing, Vec::new()),
         });
+        for line in lines {
+            log_event(LogLevel::Info, &line);
+        }
         if noticed == Noticed::Changed {
             match event {
                 Event::Connected(true) => log_event(
