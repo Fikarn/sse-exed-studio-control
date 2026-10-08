@@ -763,8 +763,9 @@ impl Cameras {
         // parameter would carry the other half from the kept reading, which
         // the camera has not reported in this connection: never a guess
         // (D12, the lesson of D43). It is refused until the camera reports;
-        // a whole parameter, an auto and REC go.
-        if self.camera(camera).values_last_read {
+        // a whole parameter, an auto and REC go. The halves are Blackmagic's
+        // protocol: CAM 1's; a BGH1's white balance is a whole value.
+        if camera == RECORDING_CAMERA && self.camera(camera).values_last_read {
             for command in commands {
                 if let CameraCommand::Set(setting, _) = command {
                     if let Some((what, press)) = half_parameter(setting) {
