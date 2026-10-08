@@ -382,7 +382,7 @@ test("Support keeps the shell header, tabs and lamps (H1)", async ({ page }) => 
   const header = page.getByRole("banner");
   await expect(header).toBeVisible();
   const headerBox = await header.boundingBox();
-  expect(Math.abs((headerBox?.height ?? 0) - 80)).toBeLessThanOrEqual(2);
+  expect(Math.abs((headerBox?.height ?? 0) - 88)).toBeLessThanOrEqual(2);
   await expect(page.getByRole("navigation", { name: "Workspace navigation" })).toBeVisible();
   await expect(header.getByRole("button", { name: /^Lighting/ })).toBeVisible();
   await expect(page.getByTestId("setup-health-bar")).toBeVisible();

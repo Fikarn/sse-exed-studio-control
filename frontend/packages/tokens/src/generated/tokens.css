@@ -65,7 +65,7 @@
   --prompter-glass-line: rgba(255, 255, 255, 0.35); /** the thin line across at the reading line, off by default */
   --prompter-glass-number: rgba(255, 255, 255, 0.45); /** a paragraph number on the glass, off by default */
   --prompter-glass-read: rgba(0, 0, 0, 0.55); /** laid over text already read: white on black reads at 45 % */
-  --chrome-studio-header: 80px;
+  --chrome-studio-header: 88px; /** 80 until 2026-10-08 (the walk's finding 6: more room); the cameras' picture stack leaves the bay room for 91 at most */
   --chrome-studio-footer: 40px;
   --chrome-studio-cluster: 440px;
   --chrome-studio-plate: 440px;

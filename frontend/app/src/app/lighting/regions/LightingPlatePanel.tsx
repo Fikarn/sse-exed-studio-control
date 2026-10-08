@@ -61,6 +61,7 @@ export function LightingPlatePanel({ editor }: { editor: LightingEditor }) {
     handleToggleFixturePower,
     handleIntensityCommit,
     setFixtureValuePreview,
+    sendLiveValues,
     handleCctCommit,
     handleControlValuesCommit,
     handleIdentifyBurst,
@@ -210,12 +211,17 @@ export function LightingPlatePanel({ editor }: { editor: LightingEditor }) {
       onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
       onTogglePower={handleToggleFixturePower}
       onIntensityCommit={handleIntensityCommit}
-      onIntensityPreview={(fixtureId, intensity, phase) =>
-        setFixtureValuePreview(fixtureId, "intensity", intensity, phase)
-      }
+      onIntensityPreview={(fixtureId, intensity, phase) => {
+        setFixtureValuePreview(fixtureId, "intensity", intensity, phase);
+        sendLiveValues(fixtureId, { intensity }, phase);
+      }}
       onCctCommit={handleCctCommit}
-      onCctPreview={(fixtureId, cct, phase) => setFixtureValuePreview(fixtureId, "cct", cct, phase)}
+      onCctPreview={(fixtureId, cct, phase) => {
+        setFixtureValuePreview(fixtureId, "cct", cct, phase);
+        sendLiveValues(fixtureId, { cct }, phase);
+      }}
       onControlValuesCommit={handleControlValuesCommit}
+      onControlValuesPreview={(fixtureId, controlValues, phase) => sendLiveValues(fixtureId, { controlValues }, phase)}
       onIdentifyBurst={handleIdentifyBurst}
       onPatchCommit={handlePatchCommit}
       onToggleGroupPower={handleToggleGroupPower}

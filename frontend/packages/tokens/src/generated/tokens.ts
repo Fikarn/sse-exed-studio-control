@@ -101,7 +101,7 @@ export const tokenValues = {
   "PrompterGlassLine": "rgba(255, 255, 255, 0.35)",
   "PrompterGlassNumber": "rgba(255, 255, 255, 0.45)",
   "PrompterGlassRead": "rgba(0, 0, 0, 0.55)",
-  "ChromeStudioHeader": "80px",
+  "ChromeStudioHeader": "88px",
   "ChromeStudioFooter": "40px",
   "ChromeStudioCluster": "440px",
   "ChromeStudioPlate": "440px",

@@ -431,7 +431,8 @@
     "$description": "The chrome budget of the one surface, 2560x1440 (docs/DESIGN.md section 2).",
     "studio": {
       "header": {
-        "$value": "80px"
+        "$value": "88px",
+        "$description": "80 until 2026-10-08 (the walk's finding 6: more room); the cameras' picture stack leaves the bay room for 91 at most"
       },
       "footer": {
         "$value": "40px"

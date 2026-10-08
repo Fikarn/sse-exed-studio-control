@@ -8,6 +8,9 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The header is taller, 88 px where it was 80, so its lamps and words have more room (#329).
+- A light's plate sliders move the light while you drag them, not only when you let go (#329).
+- The prompter's glass keeps the same room left and right of the text at every margin, with paragraph numbers too (#329).
 - The deck's AUDIO strip prints the real minus (`−6.0 dB`), as the Console does, and a long name on one line (`WINDOWS`, not `WINDOWS OU` on two) (#328).
 - `engine.log` says when TotalMix did not confirm a change, and `shell.log` when the hardware link started and when it stopped by itself (#328).
 - `Connect` on a camera writes a Recent actions row at the press, also when the camera answers a second later (#328).
