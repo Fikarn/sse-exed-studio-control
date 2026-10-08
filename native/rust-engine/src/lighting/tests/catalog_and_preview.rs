@@ -506,6 +506,24 @@ fn lighting_infinibar_pb12_sends_aputure_profile_1() {
     );
     assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
 
+    // A highlight shows the bar in white light at 4500 K, its colour and
+    // the crossfade at 0 (the review of #323: a bar at 100 % in a colour
+    // would not flash otherwise); Off brings the colour back untouched.
+    let highlight = |mode: FixtureHighlightMode| {
+        set_lighting_fixture_highlight(
+            test_dir.db_path().as_path(),
+            &LightingFixtureHighlightRequest {
+                fixture_ids: vec![String::from("fixture-house-practicals")],
+                mode,
+            },
+        )
+        .expect("the highlight is set");
+    };
+    highlight(FixtureHighlightMode::Highlight);
+    assert_eq!(frame(), [255, 80, 70, 0, 0, 0, 0, 0]);
+    highlight(FixtureHighlightMode::Off);
+    assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
+
     // The colour taken away: the bar is back on its CCT light.
     set(
         HashMap::from([

@@ -93,6 +93,18 @@ export function lightingIdList(value: unknown): string[] {
  * never changed by an override, so a light comes back as it was when the
  * override ends.
  */
+/**
+ * A bar whose colour crosses over its CCT light (the INFINIBAR PB12, D44)
+ * shows the overlay's white light, as the hardware link draws it: its Red,
+ * Green and Blue read 0 under a flash or a highlight. The stored colour is
+ * untouched and is back when the overlay ends.
+ */
+function whiteLightUnderOverlay(fixture: JsonObject): JsonObject {
+  const profile = fixtureProfileForFixture(fixture);
+  if (!profile.channels.some((channel) => asString(channel.controlId) === "cct-rgb-crossfade")) return fixture;
+  return { ...fixture, controlValues: { ...(asRecord(fixture.controlValues) ?? {}), red: 0, green: 0, blue: 0 } };
+}
+
 export function lightingSnapshotView(snapshot: JsonObject, bursts: IdentifyBursts, nowMs: number): JsonObject {
   const view = cloneJson(snapshot);
   const highlightIds = lightingIdList(view.highlightFixtureIds);
@@ -109,15 +121,15 @@ export function lightingSnapshotView(snapshot: JsonObject, bursts: IdentifyBurst
     const fixtureId = asString(fixture.id);
     const cctRange = lightingFixtureCctRange(fixture);
     if (flashing.has(fixtureId)) {
-      return { ...fixture, intensity: 100, on: true, cct: cctRange.max };
+      return whiteLightUnderOverlay({ ...fixture, intensity: 100, on: true, cct: cctRange.max });
     }
     if (highlighted.has(fixtureId)) {
-      return {
+      return whiteLightUnderOverlay({
         ...fixture,
         intensity: 100,
         on: true,
         cct: clampNumber(NEUTRAL_HIGHLIGHT_CCT, cctRange.min, cctRange.max),
-      };
+      });
     }
     if (soloed.size > 0 && !soloed.has(fixtureId)) {
       return { ...fixture, intensity: 0, on: false };

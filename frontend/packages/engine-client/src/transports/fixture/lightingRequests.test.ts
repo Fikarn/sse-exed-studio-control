@@ -4,6 +4,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import { createFixtureTransport } from "../fixtureTransport";
+import { aputureGreenMagentaToDmx } from "./lighting";
 import { lightingFixtureCctRange } from "./lightingCatalog";
 
 // The fixture double answers the rig's eight actions the way the hardware link
@@ -355,8 +356,29 @@ describe("the fixture double's rig actions", () => {
       ["Blue", 0],
       ["Strobe", 0],
     ]);
+    // A highlight shows the bar in white light at 4500 K, its colour and the
+    // crossfade at 0, as the hardware link draws it; Off brings the colour back.
+    await request("lighting.fixture.highlight", { fixtureIds: ["fixture-back"], mode: "highlight" });
+    expect(await bar()).toEqual([
+      ["Dimmer", 255],
+      ["CCT", 80],
+      ["G/M", 70],
+      ["CCT/RGB Crossfade", 0],
+      ["Red", 0],
+      ["Green", 0],
+      ["Blue", 0],
+      ["Strobe", 0],
+    ]);
+    await request("lighting.fixture.highlight", { fixtureIds: [], mode: "off" });
+    expect((await bar())[3]).toEqual(["CCT/RGB Crossfade", 255]);
+    expect((await bar())[4]).toEqual(["Red", 255]);
     await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { red: 0, green: 0 } });
     expect((await bar())[3]).toEqual(["CCT/RGB Crossfade", 0]);
+
+    // Aputure's banded green/magenta table, each band's edge, as the engine's.
+    expect([-100, -99, -1, 0, 1, 99, 100, 300].map(aputureGreenMagentaToDmx)).toEqual([
+      15, 21, 119, 132, 146, 244, 250, 250,
+    ]);
   });
 
   it("lighting.power.all off ends the overlays outside Preview, and leaves them in it", async () => {
