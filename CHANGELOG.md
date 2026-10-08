@@ -8,9 +8,9 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
-- The deck's AUDIO strip prints the real minus (`−6.0 dB`), as the Console does, and a long name on one line (`WINDOWS`, not `WINDOWS OU` on two) (#NNN).
-- `engine.log` says when TotalMix did not confirm a change, and `shell.log` when the hardware link started and when it stopped by itself (#NNN).
-- `Connect` on a camera writes a Recent actions row at the press, also when the camera answers a second later (#NNN).
+- The deck's AUDIO strip prints the real minus (`−6.0 dB`), as the Console does, and a long name on one line (`WINDOWS`, not `WINDOWS OU` on two) (#328).
+- `engine.log` says when TotalMix did not confirm a change, and `shell.log` when the hardware link started and when it stopped by itself (#328).
+- `Connect` on a camera writes a Recent actions row at the press, also when the camera answers a second later (#328).
 - CAM 1 back within minutes of its last controller (a restart, `Connect` soon after `Release`) shows what it last reported, in amber with `last read` and the time, also after a start, until it reports a setting; before, it read `HELD` with nothing read (#327).
 - After a scene recall with a fade, a light the scene holds off keeps the scene's level, as it does without a fade: switched on later it comes up at that level, not at 0 % (#326).
 - A click on the Prompter XL's glass no longer takes the keyboard from the app: the app takes it back at once, so typing in the editor goes on, and `shell.log` says so (#325).
