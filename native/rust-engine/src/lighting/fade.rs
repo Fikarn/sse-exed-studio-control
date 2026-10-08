@@ -30,6 +30,19 @@ pub(super) fn sample_lighting_fade_state(
     progress: f64,
 ) -> LightingEditorSceneFixtureState {
     let t = progress.clamp(0.0, 1.0);
+    // The fade's end is the scene's state itself, as a snap recall writes
+    // it: a light the scene holds off keeps the level the scene stores, so
+    // switched on later it comes up at that level. Until 2026-10-08 the
+    // fade wrote such a light at 0 % (the walk of 2026-10-07, finding 10).
+    if t >= 1.0 {
+        return LightingEditorSceneFixtureState {
+            fixture_id: target.fixture_id.clone(),
+            intensity: target.intensity,
+            cct: target.cct,
+            on: target.on,
+            control_values: target.control_values.clone(),
+        };
+    }
     let origin_level = if origin.on { origin.intensity } else { 0 };
     let target_level = if target.on { target.intensity } else { 0 };
     let intensity = lerp_i64(origin_level, target_level, t).clamp(0, 100);
@@ -212,6 +225,35 @@ mod tests {
         assert_eq!(first_sample.cct, 3800);
         assert_eq!(restarted.intensity, 33);
         assert_eq!(restarted.cct, 3900);
+    }
+
+    // The walk of 2026-10-07, finding 10: after a faded recall the lights
+    // the scene held off sat at 0 %, where the scene stored them at their
+    // levels; a snap recall kept the levels. The fade dims such a light to
+    // 0 and ends it at the scene's own state.
+    #[test]
+    fn a_fade_ends_a_light_the_scene_holds_off_at_the_scene_s_level() {
+        let lit = state("fixture-key", 100, 3200, true);
+        let held_off = state("fixture-key", 39, 5600, false);
+
+        let halfway = sample_lighting_fade_state(&lit, &held_off, 0.5);
+        assert_eq!(halfway.intensity, 50);
+        assert!(halfway.on);
+
+        let ended = sample_lighting_fade_state(&lit, &held_off, 1.0);
+        assert_eq!(ended.intensity, 39);
+        assert_eq!(ended.cct, 5600);
+        assert!(!ended.on);
+
+        // A light off before and after the fade keeps the scene's level too.
+        let dark = state("fixture-key", 20, 3200, false);
+        let ended = sample_lighting_fade_state(&dark, &held_off, 1.0);
+        assert_eq!(ended.intensity, 39);
+        assert!(!ended.on);
+        assert_eq!(
+            sample_lighting_fade_state(&dark, &held_off, 0.5).intensity,
+            0
+        );
     }
 
     #[test]
