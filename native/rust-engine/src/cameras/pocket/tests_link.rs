@@ -466,7 +466,7 @@ fn the_pairing_writes_nothing_and_only_listens() {
 // every other file of the cameras names no Bluetooth crate.
 #[test]
 fn only_the_windows_module_names_bluetooth() {
-    let sources: [(&str, &str); 12] = [
+    let sources: [(&str, &str); 11] = [
         ("real_link.rs", include_str!("../real_link.rs")),
         ("runtime.rs", include_str!("../runtime.rs")),
         ("commands.rs", include_str!("../commands.rs")),
@@ -478,7 +478,6 @@ fn only_the_windows_module_names_bluetooth() {
         ("pocket/protocol.rs", include_str!("protocol.rs")),
         ("pocket/format.rs", include_str!("format.rs")),
         ("pocket/timecode.rs", include_str!("timecode.rs")),
-        ("pocket/stub.rs", include_str!("stub.rs")),
     ];
     for (name, source) in sources {
         let code: String = source

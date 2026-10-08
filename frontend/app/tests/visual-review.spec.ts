@@ -5,9 +5,8 @@ import { stepToBoard } from "./helpers/ui-contract/boards.mjs";
 
 // The captures of the pages at 2560×1440, the one screen Studio Control runs
 // on: `toHaveScreenshot` baselines under
-// `tests/__visual__/visual-review.spec.ts-snapshots/`, compared on the Windows
-// workstation only (`ignoreSnapshots` in playwright.config.ts) — on CI's Linux
-// runner these cases make their other checks and compare no screenshot.
+// `tests/__visual__/visual-review.spec.ts-snapshots/`, compared on the studio
+// PC, the one place the page tests run (D46).
 //
 // A page's capture is its workspace: the header and the footer are masked,
 // and captured once, as strips of their own (the last block). Until

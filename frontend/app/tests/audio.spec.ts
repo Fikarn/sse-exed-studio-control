@@ -749,7 +749,7 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   // Production readiness S13. Old: the second click followed the first in real
   // time and was expected inside the 350 ms dwell. New: the page's clock is
   // stopped for the two presses and moved past the dwell for the confirm.
-  // Reason: on a CI runner the two clicks are over a second apart, so the
+  // Reason: on a slow runner the two clicks are over a second apart, so the
   // second one confirmed and 48 V moved — nineteen of the branch's first thirty
   // runs (helpers/pageClock.ts). What is checked is unchanged.
   await pausePageClock(page);

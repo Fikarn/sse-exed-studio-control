@@ -22,8 +22,7 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // boards are gone too, their components retired or on the A primitives boards.
 //
 // New pages program, Slice SW (D22): Studio Control runs on Windows at
-// 2560×1440. Off Windows Playwright skips the comparison (`ignoreSnapshots`),
-// so CI's Linux runner still checks that every story loads and paints.
+// 2560×1440, and the captures are compared on the studio PC alone (D46).
 
 const STORYBOOK_BASE = "http://127.0.0.1:6007";
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");

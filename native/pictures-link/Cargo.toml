@@ -17,8 +17,7 @@ studio-control-protocol.workspace = true
 # The pictures are drawn with Direct3D 11 into a composition surface of the
 # shell's (`renderer.rs`, D30), and vMix's are received with NDI's library,
 # loaded by its full path (`ndi_library.rs`, D33). The crate is the one the
-# shell and Tauri's wry already lock, so nothing new is fetched; the Linux CI
-# builds do not see it.
+# shell and Tauri's wry already lock, so nothing new is fetched.
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
     "Win32_Foundation",

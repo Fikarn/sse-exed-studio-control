@@ -65,7 +65,7 @@ pub(crate) const NO_BLUETOOTH_ADDRESS: &str =
 
 /// The cameras whose real link is built: CAM 1 on Windows, with the
 /// Pocket's pairing (part 5, 2026-10-06); CAM 2 and CAM 3 join with the
-/// LUMIX SDK's part. Linux, where only CI builds the engine, has none.
+/// LUMIX SDK's part.
 const BUILT: [u8; 1] = [RECORDING_CAMERA];
 
 /// Whether this build can reach the camera at all: through the simulated

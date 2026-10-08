@@ -221,9 +221,7 @@ test("isInside compares real paths, and only the folder itself counts", () => {
   assert.equal(isInside(appDir, appDir), true);
   assert.equal(isInside(path.join(root, "release", "native-installer", "x.exe"), appDir), false);
   assert.equal(isInside(path.join(root, "native", "target", "release", "sse-exed-tauri-shell.exe"), appDir), false);
-  if (process.platform !== "linux") {
-    assert.equal(isInside(path.join(root, WINDOWS_APP).toUpperCase(), appDir), true);
-  }
+  assert.equal(isInside(path.join(root, WINDOWS_APP).toUpperCase(), appDir), true);
 
   // The same folder reached by another spelling — a junction or a symlink here, a mapped drive or an 8.3 short
   // name on a workstation: a process is reported by one spelling, the repository is opened by another.

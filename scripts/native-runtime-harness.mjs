@@ -63,7 +63,7 @@ export function defaultAppDataDirs(env, platform = process.platform) {
 // A path as the file system knows it: the nearest folder that exists is
 // resolved (a junction, a symbolic link or a short 8.3 name spell the same
 // folder differently) and the rest is appended as written; compared without
-// case where the file system ignores it.
+// case, as Windows' file system does.
 function canonicalPath(target) {
   const rest = [];
   let existing = path.resolve(target);
@@ -81,7 +81,7 @@ function canonicalPath(target) {
       }
     }
     if (resolved !== null) {
-      return process.platform === "linux" ? resolved : resolved.toLowerCase();
+      return resolved.toLowerCase();
     }
   }
 }

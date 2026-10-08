@@ -8,10 +8,6 @@
 //! (`exp1-ndi-receive.py` in the owner's plans folder) took every frame of
 //! vMix's three outputs with the same structures.
 
-// On a system without NDI (CI's Linux) nothing calls the library, so what
-// only its calls use is unused there; it is compiled and tested all the same.
-#![cfg_attr(not(windows), allow(dead_code))]
-
 use crate::picture::{MAX_FRAME_HEIGHT, MAX_FRAME_WIDTH};
 use std::ffi::{c_char, c_int};
 use std::ptr::{null, null_mut};

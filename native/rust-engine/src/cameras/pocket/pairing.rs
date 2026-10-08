@@ -30,9 +30,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-#[cfg(not(windows))]
-use crate::cameras::pocket::stub as platform;
-#[cfg(windows)]
 use crate::cameras::pocket::winrt_pairing as platform;
 
 /// How long the pairing looks for the camera.

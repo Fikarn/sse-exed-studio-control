@@ -219,8 +219,8 @@ pub fn development_build() -> bool {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostPlatform {
-    /// The Linux CI runners, which build and test the engine and the shell
-    /// (D22: Studio Control itself runs on Windows only).
+    /// Any other system. Studio Control runs on Windows only (D22); the
+    /// folder rules are plain data over the platform, so both are tested.
     Unix,
     Windows,
 }
@@ -788,8 +788,8 @@ mod tests {
             &folder
         ));
 
-        // Windows does not tell `Studio Data` from `STUDIO DATA`; the Linux
-        // CI runners do.
+        // Windows does not tell `Studio Data` from `STUDIO DATA`; a
+        // case-sensitive file system would.
         assert_eq!(
             same_or_inside(&test_dir.path().join("STUDIO DATA"), &folder),
             cfg!(target_os = "windows")

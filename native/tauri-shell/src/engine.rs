@@ -148,17 +148,9 @@ pub struct EngineBootstrapSummary {
     pub generation: u64,
 }
 
-/// What a helper's connection asks its surface of: the native layer on
-/// Windows, and nothing on a system without it.
+/// What a helper's connection asks its surface of: the native layer.
 fn picture_layer() -> Arc<dyn LayerSink> {
-    #[cfg(windows)]
-    {
-        Arc::new(crate::shell_picture_layer::LayerLink)
-    }
-    #[cfg(not(windows))]
-    {
-        Arc::new(crate::shell_pictures::NoLayer)
-    }
+    Arc::new(crate::shell_picture_layer::LayerLink)
 }
 
 impl EngineBridge {
@@ -218,7 +210,6 @@ impl EngineBridge {
         };
         // The engine is a console-subsystem binary; without CREATE_NO_WINDOW a
         // GUI-subsystem shell would pop a fresh terminal for it on Windows.
-        #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -728,12 +719,7 @@ fn env_path(name: &str) -> Option<PathBuf> {
 /// started the studio engine `npm run release` leaves there, which drives
 /// the studio's devices.
 pub(crate) fn resolve_engine_binary() -> Result<PathBuf, NotStarted> {
-    let binary_name = if cfg!(target_os = "windows") {
-        "studio-control-engine.exe"
-    } else {
-        // The Linux CI runners' build.
-        "studio-control-engine"
-    };
+    let binary_name = "studio-control-engine.exe";
 
     engine_to_start(
         std::env::current_exe().ok(),

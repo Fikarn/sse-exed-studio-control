@@ -2,8 +2,8 @@ import type { Page } from "@playwright/test";
 
 // Production readiness S13. The arm-then-confirm dwell (AUDIO_ARM_MIN_DWELL_MS,
 // 350 ms) is measured on the page's `performance.now()`. Two Playwright clicks
-// are not 350 ms apart on a CI runner — each waits for actionability and a
-// software-rendered 2560×1440 frame, and the trace of run 35327014360 has them
+// are not 350 ms apart on a slow runner — each waits for actionability and a
+// software-rendered 2560×1440 frame, and a trace of 2026-09 had them
 // 1.8 s apart — so a case that says "a second click inside the dwell" with real
 // time was never inside it there: `audio-arm-countdown.spec.ts:45` failed on
 // every one of the branch's first thirty runs and `audio.spec.ts:1054` on

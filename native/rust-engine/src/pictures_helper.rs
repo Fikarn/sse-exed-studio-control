@@ -759,7 +759,6 @@ impl Supervisor {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
             // No console window of its own, and below normal priority: the

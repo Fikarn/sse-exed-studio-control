@@ -30,14 +30,12 @@
 //   topmost on the main window.
 
 mod engine;
-#[cfg(windows)]
 mod shell_browser_keys;
 mod shell_commands;
 mod shell_display_watch;
 mod shell_displays;
 mod shell_log;
 mod shell_paths;
-#[cfg(windows)]
 mod shell_picture_layer;
 mod shell_pictures;
 mod shell_prompter_window;
@@ -48,7 +46,6 @@ mod shell_window_layout;
 mod shell_windows;
 
 use engine::EngineBridge;
-#[cfg(windows)]
 use shell_browser_keys::switch_off_browser_keys;
 use shell_commands::gated;
 use shell_display_watch::start_display_watch;
@@ -93,8 +90,7 @@ fn main() {
         // its arguments to the running shell, which brings its window
         // forward, and exits. The engine's own lock on
         // `<app-data>/engine.lock` guards the database and the light
-        // outputs even where this plugin cannot (a Linux CI runner's session
-        // without a D-Bus session bus).
+        // outputs as well.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             focus_main_window(app);
         }))
@@ -115,7 +111,6 @@ fn main() {
             // Decision 12: WebView2's own reload, find, print and zoom
             // keys go off first — before WebView2 delivers the page's
             // first NavigationStarting, and before the window shows.
-            #[cfg(windows)]
             switch_off_browser_keys(app.handle(), &window);
             let _ = window.show();
             let app_handle = app.handle().clone();
@@ -123,7 +118,6 @@ fn main() {
             // The native layer the pictures helper draws the cameras'
             // pictures in, topmost on this window, once the window stands
             // where it stays: in every build, the studio's included (D34).
-            #[cfg(windows)]
             shell_picture_layer::start(&app_handle, &window);
             // The window's display is saved by the watch over the screens,
             // which starts now that the window stands on it, and by the
@@ -151,7 +145,6 @@ fn main() {
                         );
                     } else {
                         // The layer lets go of the window before the window goes.
-                        #[cfg(windows)]
                         shell_picture_layer::stop();
                     }
                 }

@@ -15,16 +15,13 @@ import {
 } from "./boards.mjs";
 
 // New pages program, Slice SW (D22): Studio Control runs on Windows, so the
-// contrast sampled from a screenshot is Windows' pixels alone. Off Windows (CI's
-// Linux runner) no screenshot is taken, the contrast measures are null and the
-// gate does not judge them; every other measure is the DOM's and is checked
-// everywhere.
-export const SAMPLES_CONTRAST = process.platform === "win32";
+// contrast sampled from a screenshot is Windows' pixels. Since 2026-10-09 (D46)
+// the measures run on the studio PC alone, so the contrast is always sampled.
+export const SAMPLES_CONTRAST = true;
 
 // SSE Adelia is SSE's licensed face: it is installed on the studio PC and never
-// committed (docs/DESIGN.md section 3), so CI's runner falls back to PT Serif.
-// Whether it loaded is judged where it is installed.
-export const ADELIA_INSTALLED = process.platform === "win32";
+// committed (docs/DESIGN.md section 3). Whether it loaded is judged here.
+export const ADELIA_INSTALLED = true;
 
 /**
  * Navigate a page to a fixture board and let it settle: hydration, fonts, then
