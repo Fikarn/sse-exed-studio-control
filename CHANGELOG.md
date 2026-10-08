@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- A click on the Prompter XL's glass no longer takes the keyboard from the app: the app takes it back at once, so typing in the editor goes on, and `shell.log` says so (#325).
 - The prompter's speed number is the pace of a full line of running text: at 140 the text passes the reading line at 140 words a minute, where it read 22 to 29 % faster. The gaps between paragraphs and the cue lines pass at that speed, so a script takes a little longer than its words at the pace, and `Left` says so (#324).
 - The INFINIBAR PB12s take Aputure's profile 1, `CCT & RGB`, the one the studio's bars run: the plate offers Intensity, CCT, Green/Magenta, Red, Green and Blue; a colour shows as soon as one is set, the white light comes back when all three are 0, and nothing Studio Control sends can strobe a bar; `Highlight` and `Find` show a bar that holds a colour in white light. Before, `Red` turned a bar black and `Speed` strobed it (#323).
 - CAM 1, the Pocket 6K Pro, tried on the camera: `Pair CAM 1` finds it with the PC's antenna on, its values show after the connection, and the page's `REC`, take length and `Timecode` follow a take started from the page or on the camera (#321).

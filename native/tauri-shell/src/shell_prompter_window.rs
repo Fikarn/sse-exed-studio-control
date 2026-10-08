@@ -18,7 +18,10 @@
 //! and sized to cover the Prompter XL's part of the desktop, and is not made
 //! fullscreen the way the operator's window is: that call makes a window the
 //! one the keyboard goes to, whatever the window says of itself (tried on
-//! 2026-09-28, on one of the workstation's own screens).
+//! 2026-09-28, on one of the workstation's own screens). A click on the
+//! glass still gave it the keyboard (the walk of 2026-10-07, finding 12):
+//! the moment the window gains the focus, the operator's window takes it
+//! back (`give_the_keyboard_back`).
 //!
 //! The hardware link is told that the glass draws only when it does: the
 //! window's page says so, once a second (`prompter_window_alive`). A report
@@ -523,6 +526,7 @@ fn open(app: &AppHandle, place: Place) -> Result<(), String> {
     // development build's ordinary window could be given a browser key.
     #[cfg(windows)]
     crate::shell_browser_keys::switch_off_browser_keys(app, &window);
+    give_the_keyboard_back(app, &window);
     let shown = match placed {
         None => show_the_ordinary_window(app, &window),
         Some(rect) => put_on_the_prompter(app, &window, &rect),
@@ -531,6 +535,41 @@ fn open(app: &AppHandle, place: Place) -> Result<(), String> {
         let _ = window.destroy();
     }
     shown
+}
+
+/// The window is built never to take the keyboard, yet a click on the glass
+/// gave it the keyboard (the walk of 2026-10-07, finding 12, read with a
+/// focus recorder): WebView2's own window takes the focus on a mouse press,
+/// whatever the window says of itself, and the operator's typing went to
+/// the glass until the next click in the editor. So the moment the window
+/// gains the focus, the operator's window takes it back, and the log says
+/// so. A window disabled for input (`EnableWindow`) would take no mouse at
+/// all, but Windows beeps at a click on a disabled window, as at the owner
+/// of a dialog, and a disabled window cannot hide the pointer over the
+/// glass; eating the press in WebView2's own windows would mean subclassing
+/// them.
+fn give_the_keyboard_back(app: &AppHandle, window: &WebviewWindow) {
+    let app = app.clone();
+    window.on_window_event(move |event| {
+        if !matches!(event, WindowEvent::Focused(true)) {
+            return;
+        }
+        let Ok(main) = main_window(&app) else {
+            return;
+        };
+        match main.set_focus() {
+            Ok(()) => log_shell_line(
+                &app,
+                "The prompter's window took the keyboard: given back to the studio window.",
+            ),
+            Err(error) => log_shell_line(
+                &app,
+                &format!(
+                    "The prompter's window took the keyboard, and the studio window could not take it back: {error}"
+                ),
+            ),
+        }
+    });
 }
 
 /// An ordinary window takes the keyboard when it is shown, as any window
