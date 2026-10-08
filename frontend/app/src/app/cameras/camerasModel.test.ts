@@ -191,7 +191,7 @@ describe("the REC key", () => {
     const released = await main({ cameras: [{ camera: 1, paired: true, released: true }] });
     expect(recKeyView(await released.cam1())).toMatchObject({
       kind: "locked",
-      hint: "locked · CAM 1 is released to the iPad",
+      hint: "locked · CAM 1 is released",
     });
 
     const unpaired = await main({ cameras: [] });
@@ -220,15 +220,8 @@ describe("what is known about the take", () => {
         explain: null,
       },
       { id: "timecode", label: "Timecode", value: "07:11:00:00", note: "", doubt: false, explain: null },
-      // The hardware link's sentence is the row's tooltip; the row says it in two words.
-      {
-        id: "card",
-        label: "Card time left",
-        value: null,
-        note: "not reported",
-        doubt: false,
-        explain: "CAM 1 does not report its card time over Bluetooth.",
-      },
+      // The record time left as CAM 1 reports it (2026-10-08).
+      { id: "card", label: "Card time left", value: "17 h 00 min", note: "", doubt: false, explain: null },
     ]);
     expect(recordingWord(cam1, false, later)).toBe("CAM 1 · recording · 12:41 counted here");
     expect(recordingWord(cam1, true, later)).toBe("CAM 1 · recording · stop armed");
@@ -262,7 +255,7 @@ describe("what is known about the take", () => {
     expect(takeReadouts(cam1, NOW).map((row) => [row.value, row.note])).toEqual([
       [null, "not read while released"],
       [null, "not read while released"],
-      [null, "not reported"],
+      [null, "not read while released"],
     ]);
     expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · not read while released");
 

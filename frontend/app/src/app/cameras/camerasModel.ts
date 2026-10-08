@@ -53,9 +53,18 @@ export function formatTakeLength(totalSeconds: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
 
-/** Who a camera is handed to on Release: the iPad, or LUMIX Tether. */
-export function releasedTo(camera: Pick<CameraSnapshot, "link">): string {
-  return camera.link === "bluetooth" ? "the iPad" : "LUMIX Tether";
+/**
+ * Who a camera is handed to on Release: LUMIX Tether for a BGH1; `null` for
+ * CAM 1, which a release leaves alone (the iPad is no longer used, 2026-10-07).
+ */
+export function releasedTo(camera: Pick<CameraSnapshot, "link">): string | null {
+  return camera.link === "bluetooth" ? null : "LUMIX Tether";
+}
+
+/** The release's words: `Release CAM 1`, `Release CAM 2 to LUMIX Tether`. */
+export function releaseLabel(camera: Pick<CameraSnapshot, "link" | "tag">): string {
+  const to = releasedTo(camera);
+  return to === null ? `Release ${camera.tag}` : `Release ${camera.tag} to ${to}`;
 }
 
 /** How the camera is reached: `Bluetooth`, or `network · 172.16.16.85`. */
@@ -222,7 +231,7 @@ export function recKeyView(main: CameraSnapshot | null): RecKeyView {
     case "released":
       return {
         kind: "locked",
-        hint: `locked · CAM 1 is released to ${releasedTo(main)}`,
+        hint: "locked · CAM 1 is released",
         reason: main.sentence,
       };
     case "not-set-up":
@@ -246,7 +255,7 @@ export interface TakeReadout {
 /**
  * What is known about the take. Its length is Studio Control's own count from
  * the start it saw, and says so; the timecode is CAM 1's; the card's time is
- * what CAM 1 reports, or why it does not.
+ * what CAM 1 reports, or why it does not (its battery stands in the plate's head).
  */
 export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeReadout[] {
   const notRead =
@@ -300,18 +309,24 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
     timecode = { value: recording.timecode, note: lastRead ? "last read" : "", doubt: lastRead };
   }
 
-  // The hardware link's sentence for a card time it cannot read is the row's
-  // tooltip; the row says it in two words, on one line.
-  const card: Pick<TakeReadout, "value" | "note" | "explain"> = recording?.cardTimeLeft
-    ? { value: recording.cardTimeLeft, note: "", explain: null }
-    : recording?.cardTimeNotReported
-      ? { value: null, note: "not reported", explain: recording.cardTimeNotReported }
-      : { value: null, note: notRead ?? "not reported", explain: null };
+  // The last read (finding 19) and an unreachable camera's values are doubt.
+  const doubtful = unreachable || main?.valuesLastRead === true;
+  // The hardware link's sentence for a record time it cannot read is the
+  // row's tooltip; the row says it in two words, on one line. Since
+  // 2026-10-08 CAM 1 reports it (its 9.2, summed over its media).
+  const card: Pick<TakeReadout, "value" | "note" | "doubt" | "explain"> =
+    notRead !== null
+      ? { value: null, note: notRead, doubt: false, explain: null }
+      : recording?.cardTimeLeft
+        ? { value: recording.cardTimeLeft, note: doubtful ? "last read" : "", doubt: doubtful, explain: null }
+        : recording?.cardTimeNotReported
+          ? { value: null, note: "not reported", doubt: false, explain: recording.cardTimeNotReported }
+          : { value: null, note: "not reported", doubt: false, explain: null };
 
   return [
     { id: "length", label: "Take length", doubt: false, ...length },
     { id: "timecode", label: "Timecode", explain: null, ...timecode },
-    { id: "card", label: "Card time left", doubt: false, ...card },
+    { id: "card", label: "Card time left", ...card },
   ];
 }
 
@@ -611,7 +626,10 @@ export function camerasFingerprint(snapshot: CamerasSnapshot | null | undefined)
       state: camera.state,
       sentence: camera.sentence,
       setup: camera.setup,
-      values: Object.entries(camera.values).map(([setting, entry]) => [setting, entry.value]),
+      // `displayLutLock` is a sentence, not a value (2026-10-08).
+      values: Object.entries(camera.values).map(([setting, entry]) =>
+        typeof entry === "object" && entry !== null ? [setting, entry.value] : [setting, entry]
+      ),
       recording: camera.recording.recording,
       startedAt: camera.recording.startedAt,
       picture: camera.picture,

@@ -68,6 +68,7 @@ import {
   pairingNotWantedRefusal,
   PIN_INVALID_MESSAGE,
   PIN_REFUSED_SENTENCE,
+  readOnlyRefusal,
   releasedRefusal,
   releasedToSentence,
   SIMULATED_PIN,
@@ -367,6 +368,10 @@ function lookRequest(cameras: FixtureCameras, params: JsonObject, now: number): 
   if (displayLutOn !== null && !isReported(model.displayLutOn)) {
     throw unsupportedRefusal(model.displayLutOn.notReported);
   }
+  // CAM 1 reports its display LUT and takes no change to it (finding 16): the lock, before the list.
+  if ((displayLut !== null || displayLutOn !== null) && model.displayLutLock !== null) {
+    throw readOnlyRefusal(model.displayLutLock);
+  }
   if (dynamicRange !== null) allowedChoice(model, "dynamicRange", dynamicRange);
   if (displayLut !== null) allowedChoice(model, "displayLut", displayLut);
   if (!confirm) throw notConfirmedRefusal();
@@ -418,7 +423,7 @@ function recordStopRequest(cameras: FixtureCameras, params: JsonObject, now: num
 }
 
 /**
- * `cameras.release { camera, confirm }`: hands the camera back to the iPad or LUMIX Tether.
+ * `cameras.release { camera, confirm }`: lets the camera go, to LUMIX Tether or to nobody.
  * The hardware link stops reading it and sends it nothing; its values are no longer shown.
  * A recording CAM 1 goes on recording. Kept in memory only (D13).
  */
@@ -704,7 +709,7 @@ export interface SimulatedCameraHooks {
   /** How many commands the camera has been sent (D12: only a press sends). */
   sent(camera: CameraNumber): number;
   /**
-   * A value the camera changed itself — on its body, or from the iPad: the camera wins
+   * A value the camera changed itself — on its body, or from another controller: the camera wins
    * (D12), and a held camera's change comes back as `cameras.changed { reason: "reported" }`.
    * `recording` starts or stops CAM 1's take.
    */

@@ -9,14 +9,14 @@
 use crate::cameras::model::Setting;
 use crate::cameras::real_link::guard_camera_address;
 use crate::cameras::runtime;
-use crate::cameras::simulated::{CameraCommand, CameraValue};
+use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue};
 use crate::cameras::snapshot::{CameraState, CameraTone};
 use crate::cameras::store::{write_setup, StoredSetup};
 use crate::cameras::test_support::{
     announced_changes, assert_operator_words, refusal, take_announced, TestCameras, CAM2_ADDRESS,
     CAM3_ADDRESS,
 };
-use crate::storage::open_connection;
+use crate::storage::{open_connection, set_settings};
 use serde_json::{json, Value};
 
 fn change(reason: &str, camera: Value) -> (String, Value) {
@@ -362,7 +362,7 @@ fn a_release_is_kept_across_a_start_until_connect() {
     assert_eq!(snapshot["cameras"][2]["state"], "held");
     assert_eq!(
         snapshot["cameras"][0]["sentence"],
-        "CAM 1 is released to the iPad. Connect it to control it here."
+        "CAM 1 is released: Studio Control reads it no more and sends it nothing. Connect it to control it here."
     );
     assert_eq!(take_announced(), Vec::new(), "a start announces nothing");
 
@@ -759,4 +759,37 @@ fn the_simulated_cameras_name_no_socket_and_no_bluetooth_crate() {
             "simulated.rs names {forbidden}"
         );
     }
+}
+
+// A reading saved before 2026-10-08, without the battery and the record
+// time, loads: the two read as none, and a start shows its values as the
+// last read. The camera's own status then comes with every read, the last
+// read too (the simulated body's here).
+#[test]
+fn a_reading_saved_before_the_status_fields_loads_as_the_last_read() {
+    let reading_json = concat!(
+        r#"{"iso":"1600","shutter":"180°","iris":"f/4.0","nd":"Clear","white_balance":5600.0,"#,
+        r#""tint":0.0,"focus":null,"resolution":"6K","frame_rate":"25","dynamic_range":"Film","#,
+        r#""display_lut":"None","display_lut_on":false,"recording":false,"timecode":null}"#
+    );
+    let loaded: CameraReading = serde_json::from_str(reading_json).expect("an older reading loads");
+    assert_eq!(loaded.battery, None);
+    assert_eq!(loaded.record_time_left_minutes, None);
+    assert_eq!(loaded.iso.as_deref(), Some("1600"));
+
+    let cameras = TestCameras::set_up("older-saved-reading");
+    let older = format!(r#"{{"read_at":"2026-10-07T18:14:16.000Z","reading":{reading_json}}}"#);
+    set_settings(&cameras.db_path, &[("cameras.lastReading.1", older)])
+        .expect("the setting writes");
+    cameras.reporting(1, false);
+    cameras.restart();
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["valuesLastRead"], true);
+    assert_eq!(cam1["values"]["iso"]["value"], "1600");
+    assert_eq!(cam1["readAt"], "2026-10-07T18:14:16.000Z");
+    assert_eq!(
+        cam1["battery"], "100 % · on mains",
+        "the status rides along"
+    );
+    assert_eq!(cam1["recording"]["cardTimeLeft"], "17 h 00 min");
 }

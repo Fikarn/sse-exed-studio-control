@@ -90,7 +90,11 @@ describe("the fixture double's cameras: where they start", () => {
       });
       expect(camera.readAt).toBeNull();
       // Never read: no value, but the camera's model — its options — stays.
-      expect(Object.values(camera.values).every((value) => value.value === null)).toBe(true);
+      expect(
+        Object.values(camera.values).every(
+          (value) => typeof value !== "object" || value === null || value.value === null
+        )
+      ).toBe(true);
       expect(camera.recording.recording).toBeNull();
       expect(camera.recording.timecode).toBeNull();
       expect(cameras.sent(camera.camera as 1 | 2 | 3), "a fresh start contacts nothing").toBe(0);
@@ -133,7 +137,9 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         nd: choice(["Clear", "2 stops", "4 stops", "6 stops"], "2 stops"),
         whiteBalance: level(2500, 10000, 50, "K", 5600),
         tint: level(-50, 50, 1, "", 2),
-        focus: level(0, 1, 0.01, "", 0.62),
+        focus: notReportedLevel(
+          "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works."
+        ),
         resolution: choice(["HD", "UHD", "4K DCI", "6K"], "6K"),
         frameRate: {
           ...choice(["24", "25", "30", "50", "60"], "25"),
@@ -142,6 +148,8 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         dynamicRange: choice(["Film", "Extended video", "Video"], "Film"),
         displayLut: choice(["None", "Custom", "Film → Video", "Film → Ext. video"], "Film → Ext. video"),
         displayLutOn: { reported: true, value: true, notReported: null },
+        displayLutLock:
+          "CAM 1's display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.",
       },
       auto: { focus: true, whiteBalance: true, iris: true },
       focusSteps: false,
@@ -151,9 +159,10 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         timecode: "12:00:00:00",
         timecodeReported: true,
         startedAt: null,
-        cardTimeLeft: null,
-        cardTimeNotReported: "CAM 1 does not report its card time over Bluetooth.",
+        cardTimeLeft: "17 h 00 min",
+        cardTimeNotReported: null,
       },
+      battery: "100 % · on mains",
       picture: { state: "showing", word: "LIVE", tone: "ok", detail: "test picture", sentence: null, advice: null },
     });
   });
@@ -198,6 +207,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         dynamicRange: notReportedChoice("CAM 2 does not report its dynamic range."),
         displayLut: notReportedChoice("CAM 2 does not report a display LUT."),
         displayLutOn: { reported: false, value: null, notReported: "CAM 2 does not report a display LUT." },
+        displayLutLock: null,
       },
       auto: { focus: true, whiteBalance: false, iris: false },
       focusSteps: true,
@@ -210,6 +220,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         cardTimeLeft: null,
         cardTimeNotReported: null,
       },
+      battery: null,
       picture: { state: "showing", word: "LIVE", tone: "ok", detail: "test picture", sentence: null, advice: null },
     });
     const cam3 = await camera(3);
@@ -223,7 +234,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
 
   it("keeps each camera's model in one place: the three cameras' tags, models and links", () => {
     expect(Object.values(CAMERA_MODELS).map((model) => [model.tag, model.model, model.link, model.app])).toEqual([
-      ["CAM 1", "Blackmagic Pocket Cinema Camera 6K Pro", "bluetooth", "the iPad"],
+      ["CAM 1", "Blackmagic Pocket Cinema Camera 6K Pro", "bluetooth", null],
       ["CAM 2", "Panasonic LUMIX BGH1", "network", "LUMIX Tether"],
       ["CAM 3", "Panasonic LUMIX BGH1", "network", "LUMIX Tether"],
     ]);
@@ -254,7 +265,11 @@ describe("the fixture double's cameras: what a camera not read shows", () => {
     await call("cameras.release", { camera: 1, confirm: true });
     const released = await camera(1);
     expect(released).toMatchObject({ state: "released", readAt: null, recording: { recording: null, timecode: null } });
-    expect(Object.values(released.values).every((value) => value.value === null)).toBe(true);
+    expect(
+      Object.values(released.values).every(
+        (value) => typeof value !== "object" || value === null || value.value === null
+      )
+    ).toBe(true);
     expect(released.values.iso.options).toEqual(ISO_CAM1);
 
     await call("cameras.set", { camera: 2, setting: "iso", value: "1250" });

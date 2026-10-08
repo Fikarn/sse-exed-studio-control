@@ -24,11 +24,13 @@ export type CameraRecording = {
    */
   startedAt: string | null;
   /**
-   * The card's time left, when it reports it.
+   * The record time left on the camera's media, as it reports it
+   * (`17 h 00 min`; the Pocket's 9.2, summed over its slots).
    */
   cardTimeLeft: string | null;
   /**
-   * Why it does not report its card time.
+   * Why there is none though the camera was read: it reports no record
+   * time left (no cause: no medium, or a full one).
    */
   cardTimeNotReported: string | null;
 };

@@ -47,7 +47,7 @@ describe("the fixture double's cameras seed", () => {
           paired: true,
           recording: true,
           vmixInput: 11,
-          values: { iso: "800", focus: 0.3, displayLutOn: false },
+          values: { iso: "800", tint: 5, displayLutOn: false },
         },
         { camera: 2, address: CAM2_ADDRESS, released: true, values: { shutter: "1/100" } },
         { camera: 3, address: ` ${CAM3_ADDRESS} `, unreachable: true, vmixInput: 1000, values: { whiteBalance: 3200 } },
@@ -63,9 +63,9 @@ describe("the fixture double's cameras seed", () => {
       readAt: new Date(NOW).toISOString(),
       recording: { recording: true, startedAt: null },
     });
-    expect([cam1!.values.iso.value, cam1!.values.focus.value, cam1!.values.displayLutOn.value]).toEqual([
+    expect([cam1!.values.iso.value, cam1!.values.tint.value, cam1!.values.displayLutOn.value]).toEqual([
       "800",
-      0.3,
+      5,
       false,
     ]);
     expect(cam2).toMatchObject({ state: "released", setup: { address: CAM2_ADDRESS }, readAt: null });

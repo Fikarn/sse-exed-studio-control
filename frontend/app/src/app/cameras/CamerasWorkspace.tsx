@@ -26,7 +26,7 @@ import {
   cameraOf,
   camerasFingerprint,
   camerasStateView,
-  releasedTo,
+  releaseLabel,
   selectedCamera,
 } from "./camerasModel";
 import { STOP_WINDOW_MS, type PerformAction } from "./perform";
@@ -225,7 +225,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
     const camera = cameraNumber(target);
     arm.armOrApply(
       camerasArmKey.release(camera),
-      `Release ${target.tag} to ${releasedTo(target)}`,
+      releaseLabel(target),
       () => void perform(() => store.releaseCamera(camera, true), true)
     );
   };
@@ -248,7 +248,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
     const now = store.getSnapshot().camerasSnapshot;
     const target = now?.selected === camera ? cameraOf(now, camera) : null;
     if (target?.state !== "held") return;
-    arm.armOnly(camerasArmKey.release(camera), `Release ${target.tag} to ${releasedTo(target)}`);
+    arm.armOnly(camerasArmKey.release(camera), releaseLabel(target));
   });
   const format = useLiveCallback((setting: "resolution" | "frameRate", value: string) => {
     if (!selected) return;

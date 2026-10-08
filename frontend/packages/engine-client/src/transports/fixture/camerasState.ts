@@ -21,8 +21,12 @@ import {
   CHOICE_SETTINGS,
   DIAL_BANK_SETS,
   LEVEL_SETTINGS,
+  batteryText,
   cameraModel,
   isReported,
+  noRecordTimeSentence,
+  recordTimeText,
+  type CameraBattery,
   type CameraNumber,
   type ChoiceSetting,
   type LevelSetting,
@@ -88,6 +92,10 @@ export interface SimulatedCamera {
   reporting: boolean;
   /** How many commands it has been sent (D12: only a press sends). */
   sent: number;
+  /** Its battery as it reports it (CAM 1); `null` for a camera that reports none. */
+  battery: CameraBattery | null;
+  /** The record time left in minutes, summed over its media (CAM 1); `null` for a camera that reports none. */
+  recordTimeLeftMinutes: number | null;
 }
 
 /** What the hardware link read from a camera, and when. */
@@ -95,6 +103,9 @@ export interface CameraRead {
   report: CameraReport;
   /** Its timecode when it was read, if it reports one. */
   timecode: string | null;
+  /** Its battery and its record time left as read with it: the camera's own status, no settings. */
+  battery: CameraBattery | null;
+  recordTimeLeftMinutes: number | null;
   at: number;
 }
 
@@ -108,7 +119,7 @@ export interface HeldCamera {
   /** CAM 1 is paired. */
   paired: boolean;
   vmixInput: number;
-  /** Handed back to the iPad or LUMIX Tether, in memory only. */
+  /** Let go (to LUMIX Tether, or to nobody), in memory only. */
   released: boolean;
   /** What it last reported, and when; `null` when never read since the start, or released. */
   read: CameraRead | null;
@@ -206,9 +217,31 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
       places: null,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
-        1: { report: startingReport(1), answering: true, reporting: true, sent: 0 },
-        2: { report: startingReport(2), answering: true, reporting: true, sent: 0 },
-        3: { report: startingReport(3), answering: true, reporting: true, sent: 0 },
+        // CAM 1's battery and record time: what the studio's Pocket reported on 2026-10-07.
+        1: {
+          report: startingReport(1),
+          answering: true,
+          reporting: true,
+          sent: 0,
+          battery: { millivolts: 11304, percent: 100, flags: 0b1011 },
+          recordTimeLeftMinutes: 1020,
+        },
+        2: {
+          report: startingReport(2),
+          answering: true,
+          reporting: true,
+          sent: 0,
+          battery: null,
+          recordTimeLeftMinutes: null,
+        },
+        3: {
+          report: startingReport(3),
+          answering: true,
+          reporting: true,
+          sent: 0,
+          battery: null,
+          recordTimeLeftMinutes: null,
+        },
       },
     };
     doubles.set(state, cameras);
@@ -278,6 +311,8 @@ function sameValues(left: CameraReport, right: CameraReport): boolean {
 interface LinkRead {
   report: CameraReport;
   lastRead: boolean;
+  battery: CameraBattery | null;
+  recordTimeLeftMinutes: number | null;
 }
 
 /** What the camera's link answers: what it reports, or why it does not. */
@@ -285,7 +320,14 @@ function linkRead(cameras: FixtureCameras, camera: CameraNumber): LinkRead | Lin
   // The studio's build: CAM 1's link has no Pocket to reach here; the others have no link.
   if (!cameras.simulated) return camera === 1 ? "no-answer" : "no-link";
   const body = cameras.bodies[camera];
-  return body.answering ? { report: cloneReport(body.report), lastRead: !body.reporting } : "no-answer";
+  return body.answering
+    ? {
+        report: cloneReport(body.report),
+        lastRead: !body.reporting,
+        battery: body.battery,
+        recordTimeLeftMinutes: body.recordTimeLeftMinutes,
+      }
+    : "no-answer";
 }
 
 /**
@@ -322,6 +364,9 @@ export function readCamera(cameras: FixtureCameras, camera: CameraNumber, now: n
   held.read = {
     report: read,
     timecode: cameraModel(camera).timecodeReported ? timecodeAt(now) : null,
+    // The camera's own status follows at every read, the last read too.
+    battery: link.battery,
+    recordTimeLeftMinutes: link.recordTimeLeftMinutes,
     at: link.lastRead && last !== null ? last.at : now,
   };
   held.lastRead = lastRead;
@@ -414,6 +459,7 @@ function cameraValues(camera: CameraNumber, report: CameraReport | null): Camera
     displayLutOn: isReported(lutOn)
       ? { reported: true, value: report?.displayLutOn ?? null, notReported: null }
       : { reported: false, value: null, notReported: lutOn.notReported },
+    displayLutLock: model.displayLutLock,
   };
 }
 
@@ -448,9 +494,10 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
       timecode: read?.timecode ?? null,
       timecodeReported: model.timecodeReported,
       startedAt: recording === true ? iso(held.startedAt) : null,
-      cardTimeLeft: null,
-      cardTimeNotReported: model.cardTimeNotReported,
+      cardTimeLeft: read?.recordTimeLeftMinutes ? recordTimeText(read.recordTimeLeftMinutes) : null,
+      cardTimeNotReported: read?.recordTimeLeftMinutes === 0 ? noRecordTimeSentence(model) : null,
     },
+    battery: read?.battery ? batteryText(read.battery) : null,
     picture: cameraPicture(cameras, camera),
   };
 }

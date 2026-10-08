@@ -381,9 +381,10 @@ pub(crate) struct CameraModel {
     /// The camera's make and model.
     pub model: &'static str,
     pub link: CameraLink,
-    /// Who a release hands the camera to: the iPad (CAM 1), LUMIX Tether
-    /// (CAM 2, CAM 3).
-    pub app: &'static str,
+    /// Who a release hands the camera to: LUMIX Tether (CAM 2, CAM 3);
+    /// `None` for CAM 1, which a release leaves alone (the iPad is no
+    /// longer in the studio, 2026-10-07).
+    pub app: Option<&'static str>,
     /// A BGH1: no ND, tint, focus position, dynamic range, display LUT or
     /// recording here.
     bgh1: bool,
@@ -396,7 +397,7 @@ const MODELS: [CameraModel; 3] = [
         tag: "CAM 1",
         model: "Blackmagic Pocket Cinema Camera 6K Pro",
         link: CameraLink::Bluetooth,
-        app: "the iPad",
+        app: None,
         bgh1: false,
         iris: CAM1_IRIS,
     },
@@ -405,7 +406,7 @@ const MODELS: [CameraModel; 3] = [
         tag: "CAM 2",
         model: "Panasonic LUMIX BGH1",
         link: CameraLink::Network,
-        app: "LUMIX Tether",
+        app: Some("LUMIX Tether"),
         bgh1: true,
         iris: CAM2_IRIS,
     },
@@ -414,7 +415,7 @@ const MODELS: [CameraModel; 3] = [
         tag: "CAM 3",
         model: "Panasonic LUMIX BGH1",
         link: CameraLink::Network,
-        app: "LUMIX Tether",
+        app: Some("LUMIX Tether"),
         bgh1: true,
         iris: CAM3_IRIS,
     },
@@ -473,12 +474,12 @@ impl CameraModel {
                 unit: "",
             }),
             (Setting::Tint, true) => Err(format!("{tag} does not report tint.")),
-            (Setting::Focus, false) => Ok(LevelScale {
-                min: 0.0,
-                max: 1.0,
-                step: 0.01,
-                unit: "",
-            }),
+            // The Pocket's EF lens reports no position and takes none: its
+            // mount moves focus by offsets, which the app does not send
+            // (finding 15, 2026-10-07). Autofocus once is its focus control.
+            (Setting::Focus, false) => Err(format!(
+                "{tag}'s EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works."
+            )),
             (Setting::Focus, true) => Err(format!("{tag} does not report a focus position.")),
             _ => Err(format!(
                 "{tag} does not report {} as a level.",
@@ -539,10 +540,23 @@ impl CameraModel {
         !self.bgh1
     }
 
-    /// Why it does not report its card's time left; `None` for a camera that
-    /// does not record here.
-    pub(crate) fn card_time_not_reported(&self) -> Option<String> {
-        (!self.bgh1).then(|| format!("{} does not report its card time over Bluetooth.", self.tag))
+    /// Why the camera takes no change to a setting it reports; `None` when
+    /// it takes one. CAM 1 reports its display LUT and ignores every write
+    /// to it over Bluetooth, switch and choice (finding 16, 2026-10-07): the
+    /// LUT is set in the camera's own menu.
+    pub(crate) fn read_only(&self, setting: Setting) -> Option<String> {
+        (!self.bgh1 && matches!(setting, Setting::DisplayLut | Setting::DisplayLutOn)).then(|| {
+            format!(
+                "{}'s display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.",
+                self.tag
+            )
+        })
+    }
+
+    /// The camera reported a record time of nothing (every slot 0): what is
+    /// known, no cause (the protocol gives none: no medium, or a full one).
+    pub(crate) fn no_record_time_sentence(&self) -> String {
+        format!("{} reports no record time left.", self.tag)
     }
 
     // -----------------------------------------------------------------------
@@ -566,10 +580,12 @@ impl CameraModel {
             CameraState::Held => {
                 format!("{tag} is held: Studio Control reads it and sends only what you press.")
             }
-            CameraState::Released => format!(
-                "{tag} is released to {}. Connect it to control it here.",
-                self.app
-            ),
+            CameraState::Released => match self.app {
+                Some(app) => format!("{tag} is released to {app}. Connect it to control it here."),
+                None => format!(
+                    "{tag} is released: Studio Control reads it no more and sends it nothing. Connect it to control it here."
+                ),
+            },
             CameraState::NotSetUp if self.bgh1 => {
                 format!("{tag} has no address. Enter it in Setup.")
             }
@@ -666,7 +682,10 @@ impl CameraModel {
 
     /// The release's sentence (its answer and its Recent actions row).
     pub(crate) fn released_sentence(&self) -> String {
-        format!("{} released to {}.", self.tag, self.app)
+        match self.app {
+            Some(app) => format!("{} released to {app}.", self.tag),
+            None => format!("{} released.", self.tag),
+        }
     }
 
     /// Connect's sentence when the camera is held again.

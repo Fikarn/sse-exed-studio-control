@@ -1,7 +1,7 @@
 import { useArm, type UseArmResult } from "@sse/design-system";
 import type { CameraNumber, CamerasSnapshot } from "@sse/engine-client";
 
-import { cameraOf, releasedTo } from "./camerasModel";
+import { cameraOf, releaseLabel } from "./camerasModel";
 
 // The visual overhaul's Cameras page (2026-10-05): one arm for the page, as
 // Lighting's (`useLightingArming`). REC's stop, the plate's Release, the
@@ -57,7 +57,7 @@ export function camerasArmedWords(armed: { key: string; label: string }, snapsho
   const match = /^menu:release:([123])$/.exec(armed.key);
   if (!match) return armed.label;
   const camera = snapshot ? cameraOf(snapshot, Number(match[1])) : null;
-  return camera ? `Release ${camera.tag} to ${releasedTo(camera)}` : armed.label;
+  return camera ? releaseLabel(camera) : armed.label;
 }
 
 export function useCamerasArming(): UseArmResult {

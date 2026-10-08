@@ -8,7 +8,9 @@
 use crate::cameras::model::Setting;
 use crate::cameras::pocket::characteristics::{Notified, Writable, CAMERA_STATUS};
 use crate::cameras::pocket::link::{guard_bluetooth, guard_bluetooth_for, PocketLink};
-use crate::cameras::pocket::protocol::{Message, Parameter, TYPE_INT32, VIDEO_ISO};
+use crate::cameras::pocket::protocol::{
+    Message, Parameter, STATUS_BATTERY, TYPE_INT16, TYPE_INT32, VIDEO_ISO,
+};
 use crate::cameras::pocket::state::{
     status_words, Connection, LinkState, Noticed, STATUS_CAMERA_READY,
     STATUS_INITIAL_PAYLOAD_RECEIVED,
@@ -510,4 +512,47 @@ fn the_link_starts_from_the_saved_reading_as_the_last_read() {
     assert_eq!(state.control(&iso(800)), Noticed::Changed);
     assert!(!state.last_read());
     assert_eq!(state.read().expect("connected").iso.as_deref(), Some("800"));
+}
+
+// The camera's own status (its battery every second, its record time) is
+// no setting: it reads into the reading and does not end the last read
+// (finding 19); a setting reported does.
+#[test]
+fn a_status_report_reads_in_and_does_not_end_the_last_read() {
+    let mut state = LinkState::with_last(CameraReading {
+        iso: Some(String::from("400")),
+        ..CameraReading::default()
+    });
+    state.connected();
+    let battery = Message {
+        parameter: STATUS_BATTERY,
+        data_type: TYPE_INT16,
+        operation: 2,
+        data: vec![0x28, 0x2C, 0x64, 0x00, 0x0B, 0x00],
+    };
+    assert_eq!(
+        state.control(&battery.encode().expect("the battery encodes")),
+        Noticed::Nothing
+    );
+    assert!(state.last_read(), "a battery report is no setting");
+    assert_eq!(
+        state
+            .read()
+            .expect("connected")
+            .battery
+            .map(|battery| battery.text())
+            .as_deref(),
+        Some("100 % · on mains")
+    );
+    let iso = Message {
+        parameter: VIDEO_ISO,
+        data_type: TYPE_INT32,
+        operation: 2,
+        data: 800i32.to_le_bytes().to_vec(),
+    };
+    assert_eq!(
+        state.control(&iso.encode().expect("the ISO encodes")),
+        Noticed::Changed
+    );
+    assert!(!state.last_read(), "a setting reported ends the last read");
 }

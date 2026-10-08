@@ -188,7 +188,15 @@ fn the_bank_goes_round_and_the_page_reads_and_sets_it() {
         cameras.snapshot()["dials"]["sets"],
         json!(["focus", null, null, null])
     );
-    assert_eq!(strip(&cameras), ["FOCUS\\n0.62", "", "", ""]);
+    assert_eq!(strip(&cameras), ["FOCUS\\n--", "", "", ""]);
+    // CAM 1's EF lens reports no position (finding 15): the dial is refused.
+    let (code, sentence) = refused(&cameras, "dial", Some("1:up"));
+    assert_eq!(code, "CAMERA_SETTING_UNSUPPORTED");
+    assert_eq!(
+        sentence,
+        "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works."
+    );
+    assert!(cameras.nothing_sent());
     assert_eq!(press(&cameras, "bank", None)["bank"], "exposure");
 
     // From the page.
@@ -305,7 +313,7 @@ fn a_push_is_autofocus_on_the_focus_bank_and_nothing_elsewhere() {
     press(&cameras, "bank", None);
     assert_eq!(
         press(&cameras, "dialPush", Some("1")),
-        json!({ "camera": 1, "setting": "focus", "value": 0.5 })
+        json!({ "camera": 1, "setting": "focus", "value": null })
     );
     assert_eq!(
         cameras.sent(1),

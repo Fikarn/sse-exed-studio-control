@@ -56,6 +56,11 @@ export type CameraSnapshot = {
   focusSteps: boolean;
   recording: CameraRecording;
   /**
+   * The battery as the camera reports it (`100 % · on mains`); `null`
+   * when it does not, or the camera is not shown.
+   */
+  battery: string | null;
+  /**
    * Its picture, whatever state the camera is in: the picture comes from
    * vMix, not from the camera's link.
    */

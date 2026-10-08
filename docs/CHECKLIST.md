@@ -129,7 +129,7 @@ Until the BGH1s' link is built:
 - [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a beige outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. On a camera that is not held, the dials are grey and do nothing, and so is `REC`, on every page, while CAM 1 is not held.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
-CAM 1's pairing, once, with the Pocket beside you (its Bluetooth on, the iPad's app closed, nothing recording):
+CAM 1's pairing, once, with the Pocket beside you (its Bluetooth on, no other controller connected to it, nothing recording):
 
 - [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised (with its signal) and the one Windows holds, then the camera's protocol version (`"0.1.0"`), the three characteristics' kinds (`Control indicates`) and the camera's status word (`power on, connected`). Within a few seconds the page shows CAM 1's values: ISO, shutter, iris, ND, white balance and tint, format, dynamic range and display LUT.
 - [ ] A wrong PIN says so and saves nothing; `Pair CAM 1` again starts over.
@@ -149,9 +149,13 @@ Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on 
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.
 - [ ] After `Release` (press twice) CAM 1 reads `RELEASED` and Studio Control sends it nothing, so another controller could take it (the iPad is no longer used); LUMIX Tether reaches a released BGH1. `Connect` takes the camera back within a second, and Recent actions has a row at the press (`CAM 1 taken back; it is held again when it answers.`); CAM 1's values return when the camera next reports (`docs/ROADMAP.md`, Found to check, 19).
+- [ ] The plate's key reads `Release · press twice` for CAM 1 and `Release to LUMIX Tether · press twice` for a BGH1; the menu's armed row `Press again to release CAM 1`; nothing on screen names the iPad (2026-10-08). After `Release` (press twice) CAM 1 reads `RELEASED` and Studio Control sends it nothing, so another controller could take it; LUMIX Tether reaches a released BGH1. `Connect` takes the camera back within a second; CAM 1's values return when the camera next reports (`docs/ROADMAP.md`, Found to check, 19).
 - [ ] Closing the app while CAM 1 records leaves it recording, and a restart changes no camera setting.
 - [ ] A camera released before the app is closed is still released after the start, and `Connect` takes it back.
 - [ ] A camera switched off reads `UNREACHABLE`, and nothing else changes.
+- [ ] CAM 1's Focus section shows no slider but the sentence about its EF lens; `Autofocus once` works, and the deck's focus dial (BANK on focus) is refused with the same sentence, its strip cell `--` (finding 15, fixed 2026-10-08).
+- [ ] CAM 1's `Display LUT` and `LUT` rows are locked with the sentence that the camera takes no change over Bluetooth, and the readout shows what the camera reports; a LUT changed in the camera's menu shows within about a second (finding 16, fixed 2026-10-08).
+- [ ] The plate's head reads `Battery` with the camera's own percentage, `on mains` with the power cable in and `charging` while it charges; under `REC`, `Card time left` reads what the camera's own display shows for its record time, within a minute. **If it reads 60 times too large or too small, the unit of the camera's 9.2 is not minutes; if it reads far above the display, a slot's number is not a time (every slot above 0 is summed; a development run's trace decodes 9.2's bytes): say so** (2026-10-08, the unit and the slots are not in the published protocol).
 
 ## Saved data and recovery
 

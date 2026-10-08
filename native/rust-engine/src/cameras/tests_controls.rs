@@ -137,15 +137,12 @@ fn each_camera_reports_what_its_model_reports() {
         (Some(2.0), Some(-50.0), Some(50.0), Some(1.0))
     );
     assert_eq!(tint["unit"], "");
+    // The Pocket's EF lens reports no focus position (finding 15).
     let focus = values(&cam1, "focus");
+    assert_eq!(focus["reported"], false);
     assert_eq!(
-        (
-            number(&focus["value"]),
-            number(&focus["min"]),
-            number(&focus["max"]),
-            number(&focus["step"])
-        ),
-        (Some(0.62), Some(0.0), Some(1.0), Some(0.01))
+        focus["notReported"],
+        "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works."
     );
     assert_eq!(
         values(&cam1, "resolution"),
@@ -173,6 +170,12 @@ fn each_camera_reports_what_its_model_reports() {
         cam1["auto"],
         json!({ "focus": true, "whiteBalance": true, "iris": true })
     );
+    // CAM 1's display LUT is read-only (finding 16); its battery is read (9.0).
+    assert_eq!(
+        cam1["values"]["displayLutLock"],
+        "CAM 1's display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth."
+    );
+    assert_eq!(cam1["battery"], "100 % · on mains");
     assert_eq!(cam1["focusSteps"], false);
     assert_eq!(
         cam1["recording"],
@@ -182,8 +185,8 @@ fn each_camera_reports_what_its_model_reports() {
             "timecode": "10:00:00:12",
             "timecodeReported": true,
             "startedAt": null,
-            "cardTimeLeft": null,
-            "cardTimeNotReported": "CAM 1 does not report its card time over Bluetooth."
+            "cardTimeLeft": "17 h 00 min",
+            "cardTimeNotReported": null
         })
     );
 
@@ -224,6 +227,8 @@ fn each_camera_reports_what_its_model_reports() {
             values(&bgh1, "focus")["notReported"],
             format!("{tag} does not report a focus position.")
         );
+        assert!(bgh1["values"]["displayLutLock"].is_null());
+        assert!(bgh1["battery"].is_null());
         assert_eq!(bgh1["focusSteps"], true);
         assert_eq!(
             values(&bgh1, "resolution"),
@@ -293,7 +298,6 @@ fn a_press_sets_what_the_camera_allows() {
         Some(3200.0)
     );
     assert_eq!(number(&answer(1, "tint", json!(-3))), Some(-3.0));
-    assert_eq!(number(&answer(1, "focus", json!(0.25))), Some(0.25));
     assert_eq!(answer(1, "nd", json!("Clear")), "Clear");
     assert_eq!(answer(1, "shutter", json!("172.8°")), "172.8°");
     assert_eq!(answer(2, "iris", json!("f/8.0")), "f/8.0");
@@ -303,8 +307,7 @@ fn a_press_sets_what_the_camera_allows() {
     );
     let cam1 = cameras.camera(1);
     assert_eq!(values(&cam1, "iso")["value"], "800");
-    assert_eq!(number(&values(&cam1, "focus")["value"]), Some(0.25));
-    assert_eq!(cameras.sent(1).len(), 6);
+    assert_eq!(cameras.sent(1).len(), 5);
     assert_eq!(cameras.sent(2).len(), 1);
 
     let refused = |params: Value| cameras.refused("cameras.set", params);
@@ -335,10 +338,10 @@ fn a_press_sets_what_the_camera_allows() {
         refusal("CAMERA_VALUE_NOT_ALLOWED", "CAM 1 does not allow tint 51.")
     );
     assert_eq!(
-        refused(json!({ "camera": 1, "setting": "focus", "value": 1.5 })),
+        refused(json!({ "camera": 1, "setting": "focus", "value": 0.5 })),
         refusal(
-            "CAMERA_VALUE_NOT_ALLOWED",
-            "CAM 1 does not allow focus 1.5."
+            "CAMERA_SETTING_UNSUPPORTED",
+            "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works."
         )
     );
     assert_eq!(
@@ -393,7 +396,7 @@ fn a_press_sets_what_the_camera_allows() {
             "{params}"
         );
     }
-    assert_eq!(cameras.sent(1).len(), 6, "a refusal sends nothing");
+    assert_eq!(cameras.sent(1).len(), 5, "a refusal sends nothing");
 }
 
 // D11: a step is a number of the camera's own steps, stopping at the ends;
@@ -415,8 +418,6 @@ fn a_step_moves_in_the_camera_s_own_steps_and_stops_at_the_ends() {
     assert_eq!(number(&step(1, "whiteBalance", 2)), Some(5700.0));
     assert_eq!(number(&step(1, "whiteBalance", 1000)), Some(10000.0));
     assert_eq!(number(&step(1, "tint", -1)), Some(1.0));
-    assert_eq!(number(&step(1, "focus", 1)), Some(0.63));
-    assert_eq!(number(&step(1, "focus", -100)), Some(0.0));
     assert_eq!(
         number(&step(2, "whiteBalance", 1)),
         Some(5700.0),
@@ -534,14 +535,12 @@ fn a_step_from_a_value_off_the_list_moves_from_the_nearest_listed_option() {
     assert_eq!(number(&step(1, "whiteBalance", -1)), Some(5600.0));
     cameras.body_sets(1, Setting::WhiteBalance, CameraValue::Number(5625.0));
     assert_eq!(number(&step(1, "whiteBalance", -2)), Some(5550.0));
-    cameras.body_sets(1, Setting::Focus, CameraValue::Number(0.625));
-    assert_eq!(number(&step(1, "focus", 1)), Some(0.63));
 
     // Nothing to start from: refused, and nothing is sent.
     let sent = cameras.sent(1).len();
     let not_read_iso = "CAM 1 has not reported its ISO yet, so a step has nothing to start from.";
-    let not_read_focus =
-        "CAM 1 has not reported its focus yet, so a step has nothing to start from.";
+    let not_read_white_balance =
+        "CAM 1 has not reported its white balance yet, so a step has nothing to start from.";
     let no_number = "CAM 1 reports ISO Auto, which Studio Control cannot step from.";
     cameras.body_clears(1, Setting::Iso);
     assert_eq!(
@@ -551,13 +550,13 @@ fn a_step_from_a_value_off_the_list_moves_from_the_nearest_listed_option() {
         ),
         refusal("CAMERA_VALUE_NOT_ALLOWED", not_read_iso)
     );
-    cameras.body_clears(1, Setting::Focus);
+    cameras.body_clears(1, Setting::WhiteBalance);
     assert_eq!(
         cameras.refused(
             "cameras.step",
-            json!({ "camera": 1, "setting": "focus", "step": -1 })
+            json!({ "camera": 1, "setting": "whiteBalance", "step": -1 })
         ),
-        refusal("CAMERA_VALUE_NOT_ALLOWED", not_read_focus)
+        refusal("CAMERA_VALUE_NOT_ALLOWED", not_read_white_balance)
     );
     cameras.body_sets(1, Setting::Iso, text("Auto"));
     assert_eq!(
@@ -568,7 +567,7 @@ fn a_step_from_a_value_off_the_list_moves_from_the_nearest_listed_option() {
         refusal("CAMERA_VALUE_NOT_ALLOWED", no_number)
     );
     assert_eq!(cameras.sent(1).len(), sent, "a refusal sends nothing");
-    for sentence in [not_read_iso, not_read_focus, no_number] {
+    for sentence in [not_read_iso, not_read_white_balance, no_number] {
         assert_operator_words(sentence);
     }
     // A BGH1's focus steps need no position.
@@ -590,9 +589,10 @@ fn an_auto_settles_on_what_the_camera_reports() {
     let auto = |camera: u8, what: &str| {
         cameras.call("cameras.auto", json!({ "camera": camera, "what": what }))
     };
+    // CAM 1's EF lens reports no position back (finding 15): the auto runs, the value is none.
     assert_eq!(
         auto(1, "focus"),
-        json!({ "camera": 1, "setting": "focus", "value": 0.5 })
+        json!({ "camera": 1, "setting": "focus", "value": null })
     );
     assert_eq!(number(&auto(1, "whiteBalance")["value"]), Some(5600.0));
     assert_eq!(
@@ -755,12 +755,15 @@ fn a_look_change_needs_a_second_press_and_says_what_changed() {
             "CAM 1 does not allow dynamic range Log."
         )
     );
+    // CAM 1's display LUT is read-only (finding 16): the lock, before the list.
+    let lut_lock = "CAM 1's display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.";
     assert_eq!(
         look(json!({ "camera": 1, "displayLut": "Rec 709", "confirm": true })),
-        refusal(
-            "CAMERA_VALUE_NOT_ALLOWED",
-            "CAM 1 does not allow display LUT Rec 709."
-        )
+        refusal("CAMERA_VALUE_NOT_ALLOWED", lut_lock)
+    );
+    assert_eq!(
+        look(json!({ "camera": 1, "displayLutOn": false, "confirm": true })),
+        refusal("CAMERA_VALUE_NOT_ALLOWED", lut_lock)
     );
     assert_eq!(
         look(json!({ "camera": 2, "dynamicRange": "Video", "confirm": true })),
@@ -795,22 +798,13 @@ fn a_look_change_needs_a_second_press_and_says_what_changed() {
             .to_string()
     };
     assert_eq!(
-        sentence(
-            json!({ "camera": 1, "dynamicRange": "Video", "displayLutOn": false, "confirm": true })
-        ),
-        "CAM 1: dynamic range Film → Video; display LUT off."
+        sentence(json!({ "camera": 1, "dynamicRange": "Video", "confirm": true })),
+        "CAM 1: dynamic range Film → Video."
     );
-    assert_eq!(
-        sentence(json!({ "camera": 1, "displayLut": "Custom", "confirm": true })),
-        "CAM 1: display LUT Film → Ext. video → Custom."
-    );
-    assert_eq!(
-        sentence(json!({ "camera": 1, "displayLutOn": true, "confirm": true })),
-        "CAM 1: display LUT on."
-    );
+    // The LUT stays the camera's: CAM 1 takes no change to it (finding 16).
     let cam1 = cameras.camera(1);
     assert_eq!(values(&cam1, "dynamicRange")["value"], "Video");
-    assert_eq!(values(&cam1, "displayLut")["value"], "Custom");
+    assert_eq!(values(&cam1, "displayLut")["value"], "Film → Ext. video");
     assert_eq!(values(&cam1, "displayLutOn")["value"], true);
 }
 
@@ -975,7 +969,7 @@ fn release_and_connect_hand_a_camera_back_and_take_it_again() {
     assert_eq!(reply.event, Some(("release", Some(2))));
     assert_eq!(
         cameras.call("cameras.release", json!({ "camera": 1, "confirm": true })),
-        json!({ "camera": 1, "state": "released", "sentence": "CAM 1 released to the iPad." })
+        json!({ "camera": 1, "state": "released", "sentence": "CAM 1 released." })
     );
     let cam2 = cameras.camera(2);
     assert_eq!(cam2["state"], "released");
@@ -987,7 +981,7 @@ fn release_and_connect_hand_a_camera_back_and_take_it_again() {
     );
     assert_eq!(
         cameras.camera(1)["sentence"],
-        "CAM 1 is released to the iPad. Connect it to control it here."
+        "CAM 1 is released: Studio Control reads it no more and sends it nothing. Connect it to control it here."
     );
     assert_eq!(cam2["readAt"], Value::Null);
     assert_eq!(values(&cam2, "iso")["value"], Value::Null);

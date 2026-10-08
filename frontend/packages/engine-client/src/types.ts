@@ -395,7 +395,7 @@ export interface FixtureCameraValuesSeed {
 /**
  * One camera a scenario starts with (new pages program, Slice 8): set up by `paired`
  * (CAM 1) or `address` (CAM 2, CAM 3), its vMix input (its number without it), `released`
- * to the iPad or LUMIX Tether, `unreachable` (it answered at the start, then stopped:
+ * to LUMIX Tether or to nobody, `unreachable` (it answered at the start, then stopped:
  * it keeps what it reported), CAM 1 `recording` (a take started before the hardware link
  * looked), and `values` that differ from board 2's.
  */

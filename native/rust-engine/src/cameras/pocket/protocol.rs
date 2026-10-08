@@ -25,11 +25,13 @@
 //! shutter speed 1.12 (1/x) when the camera shows speeds; ISO 1.14; the
 //! display LUT 1.15 (which one, and whether it is on); the ND filter 1.16
 //! (stops); and the transport mode 10.1, whose first byte is 2 while the
-//! camera records. Everything else the camera sends is read past.
+//! camera records. Of the camera itself: its battery 9.0 and the record
+//! time left 9.2 (status, no settings). Everything else the camera sends
+//! is read past.
 
 use crate::cameras::model::{AutoKind, Setting};
 use crate::cameras::pocket::format::RecordingFormat;
-use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue};
+use crate::cameras::simulated::{CameraBattery, CameraCommand, CameraReading, CameraValue};
 
 /// The largest message the camera takes.
 pub(crate) const MAX_MESSAGE: usize = 64;
@@ -71,6 +73,10 @@ pub(crate) const VIDEO_ISO: Parameter = Parameter(1, 14);
 pub(crate) const VIDEO_DISPLAY_LUT: Parameter = Parameter(1, 15);
 pub(crate) const VIDEO_ND_FILTER: Parameter = Parameter(1, 16);
 pub(crate) const MEDIA_TRANSPORT_MODE: Parameter = Parameter(10, 1);
+/// The status category: what the camera reports of itself, no setting.
+pub(crate) const STATUS_CATEGORY: u8 = 9;
+pub(crate) const STATUS_BATTERY: Parameter = Parameter(STATUS_CATEGORY, 0);
+pub(crate) const STATUS_RECORD_TIME: Parameter = Parameter(STATUS_CATEGORY, 2);
 
 /// The transport mode's first byte while the camera records.
 const TRANSPORT_RECORD: i8 = 2;
@@ -208,6 +214,13 @@ impl Message {
         self.data
             .chunks_exact(2)
             .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+            .collect()
+    }
+
+    fn int32s(&self) -> Vec<i32> {
+        self.data
+            .chunks_exact(4)
+            .map(|four| i32::from_le_bytes([four[0], four[1], four[2], four[3]]))
             .collect()
     }
 
@@ -442,6 +455,31 @@ pub(crate) fn apply(reading: &mut CameraReading, message: &Message) -> bool {
             if let Some(mode) = message.int8s().first() {
                 reading.recording = Some(*mode == TRANSPORT_RECORD);
             }
+        }
+        // The battery (9.0): millivolts, percent and flags, three int16.
+        (STATUS_BATTERY, TYPE_INT16) => {
+            if let [millivolts, percent, flags, ..] = message.int16s()[..] {
+                reading.battery = Some(CameraBattery {
+                    millivolts: millivolts.max(0) as u16,
+                    percent: percent.clamp(0, 100) as u8,
+                    flags: flags as u8,
+                });
+            }
+        }
+        // The record time left (9.2): one number per media slot, in minutes
+        // (the Pocket sent four int16 in the run of 2026-10-07, the third
+        // holding the time; an int32 frame reads the same). The camera goes
+        // on to the next medium when one fills, so their sum is what is
+        // left. The unit and the slots are checked against the camera's own
+        // display at the walk (`docs/CHECKLIST.md`).
+        (STATUS_RECORD_TIME, TYPE_INT16 | TYPE_INT32) => {
+            let slots: Vec<i64> = if message.data_type == TYPE_INT16 {
+                message.int16s().into_iter().map(i64::from).collect()
+            } else {
+                message.int32s().into_iter().map(i64::from).collect()
+            };
+            let total: i64 = slots.into_iter().filter(|minutes| *minutes > 0).sum();
+            reading.record_time_left_minutes = Some(total.min(i64::from(u32::MAX)) as u32);
         }
         _ => return false,
     }

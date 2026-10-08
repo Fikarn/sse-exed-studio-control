@@ -4,7 +4,7 @@
 //! notification, a failure) and asks it what the runtime should notice; the
 //! runtime reads it at once, never waiting on the camera.
 
-use crate::cameras::pocket::protocol::{apply, Message};
+use crate::cameras::pocket::protocol::{apply, Message, STATUS_CATEGORY};
 use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::real_link::LinkFailure;
 use crate::cameras::simulated::CameraReading;
@@ -214,7 +214,12 @@ impl LinkState {
         let before = self.reading.clone();
         for message in Message::decode_all(bytes) {
             if apply(&mut self.reading, &message) {
-                self.reported_since_connection = true;
+                // The camera's own status (its battery every second, its
+                // record time) is no setting: it does not end the last read
+                // (finding 19).
+                if message.parameter.0 != STATUS_CATEGORY {
+                    self.reported_since_connection = true;
+                }
                 continue;
             }
             let key = (message.parameter.0, message.parameter.1, message.data_type);

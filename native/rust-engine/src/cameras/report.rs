@@ -4,7 +4,7 @@
 
 use crate::cameras::model::{model, CameraModel, Setting, CAMERA_NUMBERS, RECORDING_CAMERA};
 use crate::cameras::runtime::{CameraRuntime, Cameras};
-use crate::cameras::simulated::CameraReading;
+use crate::cameras::simulated::{record_time_text, CameraReading};
 use crate::cameras::snapshot::{
     CameraChoice, CameraDials, CameraHealthEntry, CameraLevel, CameraPicture, CameraRecentAction,
     CameraRecording, CameraSnapshot, CameraState, CameraSwitch, CameraTone, CameraUnavailable,
@@ -91,6 +91,7 @@ fn values(model: &CameraModel, reading: &CameraReading) -> CameraValues {
             value: reading.display_lut_on.filter(|_| lut_on.is_none()),
             not_reported: lut_on,
         },
+        display_lut_lock: model.read_only(Setting::DisplayLut),
     }
 }
 
@@ -133,9 +134,14 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime, picture: CameraPicture) -
                 .started_at
                 .filter(|_| shown && recording == Some(true))
                 .map(crate::cameras::runtime::utc_text),
-            card_time_left: None,
-            card_time_not_reported: model.card_time_not_reported(),
+            card_time_left: reading
+                .record_time_left_minutes
+                .filter(|minutes| *minutes > 0)
+                .map(record_time_text),
+            card_time_not_reported: (reading.record_time_left_minutes == Some(0))
+                .then(|| model.no_record_time_sentence()),
         },
+        battery: reading.battery.map(|battery| battery.text()),
         picture,
     }
 }

@@ -371,7 +371,9 @@ export function CamerasPlate({
               testId="cameras-release"
               onClick={onRelease}
             >
-              {releaseIsArmed ? undefined : `Release to ${releasedTo(camera)} · press twice`}
+              {releaseIsArmed
+                ? undefined
+                : `${releasedTo(camera) === null ? "Release" : `Release to ${releasedTo(camera)}`} · press twice`}
             </ArmKey>
           ),
         };
@@ -380,7 +382,7 @@ export function CamerasPlate({
       // screen's one primary.
       case "released":
         return {
-          detail: `to ${releasedTo(camera)} · not read`,
+          detail: releasedTo(camera) === null ? "not read" : `to ${releasedTo(camera)} · not read`,
           key: (
             <Key size="small" testId="cameras-connect" onClick={() => onConnect(number)}>
               Connect
@@ -411,14 +413,20 @@ export function CamerasPlate({
 
   const note = releaseAsked
     ? camera.link === "bluetooth" && mainRecording
-      ? { warn: true, text: "CAM 1 is recording: after Release, REC stops only on the camera or the iPad." }
-      : { warn: false, text: `${releasedTo(camera)} can then reach ${camera.tag}. Connect takes it back.` }
+      ? { warn: true, text: "CAM 1 is recording: after Release, REC stops only on the camera." }
+      : {
+          warn: false,
+          text:
+            camera.link === "bluetooth"
+              ? "CAM 1 is then left alone: nothing read, nothing sent. Connect takes it back."
+              : `${releasedTo(camera)} can then reach ${camera.tag}. Connect takes it back.`,
+        }
     : camera.state === "released"
       ? {
           warn: false,
           text:
             camera.link === "bluetooth"
-              ? "The iPad can reach CAM 1 now. REC here is locked until Connect."
+              ? "CAM 1 is left alone: nothing read, nothing sent. REC here is locked until Connect."
               : `LUMIX Tether can reach ${camera.tag} now. Connect takes it back.`,
         }
       : null;
@@ -476,6 +484,14 @@ export function CamerasPlate({
           </div>
           {connectionKey}
         </div>
+        {shown && camera.battery ? (
+          // CAM 1's battery as it reports it (9.0, read since 2026-10-08); the
+          // last read (finding 19) and an unreachable camera's are doubt.
+          <p className={styles.fine} data-doubt={doubt ? "" : undefined} data-testid="cameras-battery">
+            Battery {camera.battery}
+            {doubt ? " · last read" : ""}
+          </p>
+        ) : null}
         {note ? (
           <p className={styles.fine} data-warn={note.warn ? "" : undefined} data-testid="cameras-connection-note">
             {note.text}
@@ -600,6 +616,12 @@ export function CamerasPlate({
             {shown && lut.value === "Custom" ? (
               <p className={styles.fine}>{camera.tag} does not report a custom LUT's name.</p>
             ) : null}
+            {camera.values.displayLutLock ? (
+              // Finding 16 (2026-10-07): CAM 1 reports its LUT and takes no change to it.
+              <p className={styles.fine} data-testid="cameras-displayLut-lock">
+                {camera.values.displayLutLock}
+              </p>
+            ) : null}
           </>
         ) : (
           notReported("displayLut", "Display LUT", lut.notReported)
@@ -699,7 +721,7 @@ export function CamerasPlate({
                 setting: "displayLutOn",
                 label: "Display LUT",
                 value: lutOn.value,
-                lock,
+                lock: lock ?? camera.values.displayLutLock,
                 armKey: (on) => camerasArmKey.look(number, "displayLutOn", on),
                 onPress: (on) => onLook("displayLutOn", on),
               }}
@@ -713,7 +735,7 @@ export function CamerasPlate({
                 label: "LUT",
                 choice: lut,
                 unit: "",
-                lock,
+                lock: lock ?? camera.values.displayLutLock,
                 tall: true,
                 armKey: (option) => camerasArmKey.look(number, "displayLut", option),
                 onPress: (option) => onLook("displayLut", option),

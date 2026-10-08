@@ -8,12 +8,14 @@ use crate::cameras::pocket::format::RecordingFormat;
 use crate::cameras::pocket::protocol::{
     aperture_value_of, apply, encode_commands, f_number_text, fixed16_from, fixed16_to, Message,
     Parameter, LENS_AUTOFOCUS, LENS_FOCUS, MEDIA_TRANSPORT_MODE, OPERATION_ASSIGN,
-    OPERATION_OFFSET, TYPE_FIXED16, TYPE_INT16, TYPE_INT32, TYPE_INT8, VIDEO_DISPLAY_LUT,
-    VIDEO_DYNAMIC_RANGE, VIDEO_ISO, VIDEO_ND_FILTER, VIDEO_RECORDING_FORMAT, VIDEO_SHUTTER_ANGLE,
-    VIDEO_SHUTTER_SPEED, VIDEO_WHITE_BALANCE,
+    OPERATION_OFFSET, STATUS_BATTERY, STATUS_RECORD_TIME, TYPE_FIXED16, TYPE_INT16, TYPE_INT32,
+    TYPE_INT8, VIDEO_DISPLAY_LUT, VIDEO_DYNAMIC_RANGE, VIDEO_ISO, VIDEO_ND_FILTER,
+    VIDEO_RECORDING_FORMAT, VIDEO_SHUTTER_ANGLE, VIDEO_SHUTTER_SPEED, VIDEO_WHITE_BALANCE,
 };
 use crate::cameras::pocket::timecode::timecode_text;
-use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
+use crate::cameras::simulated::{
+    record_time_text, CameraBattery, CameraCommand, CameraReading, CameraValue, SimulatedCameras,
+};
 use proptest::prelude::*;
 
 fn text(value: &str) -> CameraValue {
@@ -487,7 +489,7 @@ fn the_initial_payload_is_read_into_one_reading() {
             &fixed16_from(2.0).to_le_bytes(),
         ),
         message(VIDEO_WHITE_BALANCE, TYPE_INT16, &int16s(&[5600, 2])),
-        message(LENS_FOCUS, TYPE_FIXED16, &fixed16_from(0.62).to_le_bytes()),
+        // No focus position: the EF lens sends none (finding 15).
         message(
             VIDEO_RECORDING_FORMAT,
             TYPE_INT16,
@@ -507,7 +509,7 @@ fn the_initial_payload_is_read_into_one_reading() {
     .flat_map(|message| message.encode().expect("it encodes"))
     .collect();
     let messages = Message::decode_all(&payload);
-    assert_eq!(messages.len(), 11);
+    assert_eq!(messages.len(), 10);
     let reading = applied(&messages);
     assert!(
         reading.same_values(&board()),
@@ -717,4 +719,60 @@ proptest! {
         }
         let _ = timecode_text(&bytes);
     }
+}
+
+// The camera's own status, read on 2026-10-07: the battery (9.0) and the
+// record time left (9.2) read into the reading, and neither is a change
+// the camera made.
+#[test]
+fn the_battery_and_the_record_time_are_read_and_are_no_change() {
+    // What the studio's Pocket sent: 9.0 as three int16 (11304 mV, 100 %,
+    // flags 0b1011) and 9.2 as four int16 minutes, the third slot's 1020.
+    let reading = applied(&[
+        message(STATUS_BATTERY, TYPE_INT16, &int16s(&[11304, 100, 0b1011])),
+        message(STATUS_RECORD_TIME, TYPE_INT16, &int16s(&[0, 0, 1020, 0])),
+    ]);
+    assert_eq!(
+        reading.battery,
+        Some(CameraBattery {
+            millivolts: 11304,
+            percent: 100,
+            flags: 0b1011
+        })
+    );
+    assert_eq!(
+        reading.battery.map(|battery| battery.text()).as_deref(),
+        Some("100 % · on mains")
+    );
+    assert_eq!(reading.record_time_left_minutes, Some(1020));
+    assert_eq!(record_time_text(1020), "17 h 00 min");
+    assert_eq!(record_time_text(45), "45 min");
+    // An int32 frame reads the same, and the slots add up.
+    let int32 = applied(&[message(
+        STATUS_RECORD_TIME,
+        TYPE_INT32,
+        &[30, 0, 0, 0, 40, 0, 0, 0],
+    )]);
+    assert_eq!(int32.record_time_left_minutes, Some(70));
+    // Neither is a change the camera made.
+    let mut moved = reading.clone();
+    moved.battery = Some(CameraBattery {
+        millivolts: 11200,
+        percent: 99,
+        flags: 0b1011,
+    });
+    moved.record_time_left_minutes = Some(1019);
+    assert!(reading.same_values(&moved));
+    // The battery's words.
+    let battery = |percent: u8, flags: u8| {
+        CameraBattery {
+            millivolts: 7400,
+            percent,
+            flags,
+        }
+        .text()
+    };
+    assert_eq!(battery(63, 0b111), "63 % · charging");
+    assert_eq!(battery(63, 0b1), "63 %");
+    assert_eq!(battery(63, 0b1_0001), "7.4 V");
 }
