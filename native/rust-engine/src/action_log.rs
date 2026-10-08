@@ -691,6 +691,32 @@ pub(crate) fn ui_actions(
                     ),
                 ));
             }
+            // Setup's list of the strips TotalMix hides (2026-10-08): the row
+            // names what the list holds after the change.
+            if params.get("hiddenChannelIds").is_some_and(Value::is_array) {
+                let names = result
+                    .pointer("/channels")
+                    .and_then(Value::as_array)
+                    .map(|channels| {
+                        channels
+                            .iter()
+                            .filter(|channel| {
+                                channel.get("hidden").and_then(Value::as_bool) == Some(true)
+                            })
+                            .filter_map(|channel| text(channel, "/name"))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                rows.push(audio(
+                    "console-hidden-strips-set",
+                    "TotalMix",
+                    if names.is_empty() {
+                        String::from("Strips TotalMix hides: none")
+                    } else {
+                        format!("Strips TotalMix hides: {}", names.join(", "))
+                    },
+                ));
+            }
             rows
         }
 

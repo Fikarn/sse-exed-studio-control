@@ -126,6 +126,7 @@ fn restore_support_backup_round_trips_native_archive() {
             expected_compatibility_mode: Some(true),
             faders_per_bank: None,
             view_mode: None,
+            hidden_channel_ids: None,
         },
     )
     .expect("audio settings should persist before restore");

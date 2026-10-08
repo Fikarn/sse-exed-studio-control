@@ -51,6 +51,12 @@ const AUDIO_EXPECTED_SUBMIX_LOCK_KEY: &str = "app.audio.expected_submix_lock";
 const AUDIO_EXPECTED_COMPATIBILITY_MODE_KEY: &str = "app.audio.expected_compatibility_mode";
 const AUDIO_FADERS_PER_BANK_KEY: &str = "app.audio.faders_per_bank";
 const AUDIO_VIEW_MODE_KEY: &str = "app.audio.view_mode";
+/// The channels TotalMix hides in its Channel Layout, as the owner lists
+/// them in Setup (2026-10-08, the walk's finding 3): a JSON array of channel
+/// ids. TotalMix's dump does not say which channels it hides, and a write to
+/// one is dropped unanswered, so the Console locks these strips and the deck
+/// leaves them out. Empty on new saved data.
+const AUDIO_HIDDEN_CHANNEL_IDS_KEY: &str = "app.audio.hidden_channel_ids";
 const AUDIO_METERING_SOURCE_KEY: &str = "app.audio.metering_source";
 const AUDIO_LAST_CONSOLE_PULL_AT_KEY: &str = "app.audio.last_console_pull_at";
 const AUDIO_LAST_CONSOLE_PULL_VALUES_KEY: &str = "app.audio.last_console_pull_values";

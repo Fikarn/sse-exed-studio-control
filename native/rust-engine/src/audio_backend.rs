@@ -568,6 +568,7 @@ fn simulated_channel(
         pad: false,
         instrument: id == "audio-input-12",
         auto_set: false,
+        hidden: false,
     }
 }
 

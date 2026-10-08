@@ -130,6 +130,8 @@ pub fn parse_audio_settings_update_request(
         optional_integer_range(params.get("fadersPerBank"), "fadersPerBank", 1, 24)?;
     let view_mode =
         optional_enum_string(params.get("viewMode"), "viewMode", &["submix", "master"])?;
+    let hidden_channel_ids =
+        optional_string_list(params.get("hiddenChannelIds"), "hiddenChannelIds")?;
 
     if osc_enabled.is_none()
         && send_host.is_none()
@@ -142,6 +144,7 @@ pub fn parse_audio_settings_update_request(
         && expected_compatibility_mode.is_none()
         && faders_per_bank.is_none()
         && view_mode.is_none()
+        && hidden_channel_ids.is_none()
     {
         return Err(String::from(
             "audio.settings.update requires one or more supported fields",
@@ -160,6 +163,7 @@ pub fn parse_audio_settings_update_request(
         expected_compatibility_mode,
         faders_per_bank,
         view_mode,
+        hidden_channel_ids,
     })
 }
 
@@ -225,6 +229,29 @@ pub(super) fn optional_trimmed_string(
                 .ok_or_else(|| format!("{field_name} must be a non-empty string"))?;
             Ok(Some(parsed))
         }
+        None => Ok(None),
+    }
+}
+
+/// An optional list of non-empty strings, each trimmed; an empty list is a
+/// list (it clears what was listed).
+pub(super) fn optional_string_list(
+    value: Option<&Value>,
+    field_name: &str,
+) -> Result<Option<Vec<String>>, String> {
+    match value {
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|item| {
+                item.as_str()
+                    .map(str::trim)
+                    .filter(|entry| !entry.is_empty())
+                    .map(String::from)
+                    .ok_or_else(|| format!("{field_name} must be a list of non-empty strings"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some),
+        Some(_) => Err(format!("{field_name} must be a list of non-empty strings")),
         None => Ok(None),
     }
 }

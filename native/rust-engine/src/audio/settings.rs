@@ -41,6 +41,31 @@ pub fn update_audio_settings(
         }
     }
 
+    // Setup's list of the strips TotalMix hides (2026-10-08): every id names
+    // a channel of this console; saved once each, in the console's order.
+    let hidden_channel_ids = match &request.hidden_channel_ids {
+        Some(ids) => {
+            if let Some(unknown) = ids
+                .iter()
+                .find(|id| !snapshot.channels.iter().any(|entry| entry.id == **id))
+            {
+                return Err(AudioCommandError::Rejected(
+                    "AUDIO_CHANNEL_NOT_FOUND",
+                    format!("Channel '{unknown}' is not part of this console."),
+                ));
+            }
+            Some(
+                snapshot
+                    .channels
+                    .iter()
+                    .filter(|entry| ids.contains(&entry.id))
+                    .map(|entry| (entry.id.clone(), entry.name.clone()))
+                    .collect::<Vec<_>>(),
+            )
+        }
+        None => None,
+    };
+
     let transport_changed = request.osc_enabled.is_some()
         || request.send_host.is_some()
         || request.send_port.is_some()
@@ -168,6 +193,27 @@ pub fn update_audio_settings(
     if let Some(view_mode) = &request.view_mode {
         updates.push((String::from(AUDIO_VIEW_MODE_KEY), view_mode.clone()));
         summary_parts.push(format!("view mode -> {}", view_mode));
+    }
+
+    if let Some(hidden) = &hidden_channel_ids {
+        let ids = hidden.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>();
+        updates.push((
+            String::from(AUDIO_HIDDEN_CHANNEL_IDS_KEY),
+            serde_json::to_string(&ids)
+                .map_err(|error| AudioCommandError::Storage(error.to_string()))?,
+        ));
+        summary_parts.push(if hidden.is_empty() {
+            String::from("no strip hidden in TotalMix")
+        } else {
+            format!(
+                "strips TotalMix hides -> {}",
+                hidden
+                    .iter()
+                    .map(|(_, name)| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        });
     }
 
     if transport_changed {

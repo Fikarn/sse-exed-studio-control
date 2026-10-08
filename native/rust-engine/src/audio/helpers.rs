@@ -25,9 +25,11 @@ pub(super) fn apply_channel_state(
     channels: Vec<AudioChannelSnapshot>,
 ) -> Vec<AudioChannelSnapshot> {
     let stored_state = read_channel_state_map(settings);
+    let hidden = read_hidden_channel_ids(settings);
     channels
         .into_iter()
         .map(|mut channel| {
+            channel.hidden = hidden.contains(&channel.id);
             if let Some(state) = stored_state.get(&channel.id) {
                 if let Some(name) = state
                     .name
@@ -107,6 +109,25 @@ pub(super) fn read_mix_target_state_map(
     settings: &HashMap<String, String>,
 ) -> HashMap<String, StoredAudioMixTargetState> {
     read_json_state_map(settings, AUDIO_MIX_TARGET_STATE_KEY)
+}
+
+/// The channel ids Setup lists as hidden in TotalMix, in the order saved; a
+/// value that does not read is no list.
+pub(super) fn read_hidden_channel_ids(settings: &HashMap<String, String>) -> Vec<String> {
+    settings
+        .get(AUDIO_HIDDEN_CHANNEL_IDS_KEY)
+        .and_then(|value| serde_json::from_str::<Vec<String>>(value).ok())
+        .unwrap_or_default()
+}
+
+/// The refusal of a change to a channel TotalMix hides (Setup's list).
+pub(crate) const AUDIO_CHANNEL_HIDDEN: &str = "AUDIO_CHANNEL_HIDDEN";
+
+/// Why a change to a hidden channel is refused: TotalMix drops a write to a
+/// hidden channel unanswered (`Receive on hidden channels` is off), so the
+/// Console would read ASSUMED for nothing (the walk of 2026-10-07, finding 3).
+pub(super) fn hidden_channel_refusal(name: &str) -> String {
+    format!("TotalMix hides {name}: unhide it in TotalMix, or take it off the list in Setup.")
 }
 
 pub(super) fn read_json_state_map<T>(

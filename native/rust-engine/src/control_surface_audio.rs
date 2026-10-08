@@ -370,10 +370,13 @@ pub(crate) fn resolve_audio_deck_strip(
     strip_index: usize,
 ) -> Result<AudioDeckStrip, ControlSurfaceError> {
     match bank {
+        // A strip TotalMix hides (Setup's list, 2026-10-08) is left off the
+        // banks: the next shown strip takes its cell, and no turn or push goes
+        // to a channel TotalMix would not answer.
         "playback" => snapshot
             .channels
             .iter()
-            .filter(|channel| channel.role == AUDIO_ROLE_PLAYBACK_PAIR)
+            .filter(|channel| channel.role == AUDIO_ROLE_PLAYBACK_PAIR && !channel.hidden)
             .nth(strip_index - 1)
             .cloned()
             .map(|channel| AudioDeckStrip::Channel(Box::new(channel)))
@@ -395,7 +398,7 @@ pub(crate) fn resolve_audio_deck_strip(
         _ => snapshot
             .channels
             .iter()
-            .filter(|channel| channel.role == AUDIO_ROLE_FRONT_PREAMP)
+            .filter(|channel| channel.role == AUDIO_ROLE_FRONT_PREAMP && !channel.hidden)
             .nth(strip_index - 1)
             .cloned()
             .map(|channel| AudioDeckStrip::Channel(Box::new(channel)))
@@ -454,6 +457,7 @@ fn audio_settings_update_request() -> AudioSettingsUpdateRequest {
         expected_compatibility_mode: None,
         faders_per_bank: None,
         view_mode: None,
+        hidden_channel_ids: None,
     }
 }
 
@@ -869,6 +873,72 @@ mod tests {
             resolve_audio_deck_strip(&snapshot, "outputs", 4),
             Err(ControlSurfaceError::Rejected(_))
         ));
+    }
+
+    // The walk of 2026-10-07, finding 3: a strip TotalMix hides (Setup's
+    // list) is left off the deck's banks, so the next shown strip takes its
+    // cell and a turn or a push never goes to a channel TotalMix would not
+    // answer. The cell's text follows the strip that takes the cell.
+    #[test]
+    fn a_strip_totalmix_hides_is_left_off_the_deck() {
+        let test_dir = ready_audio_test_db("hidden-strips");
+        let mut request = audio_settings_update_request();
+        request.hidden_channel_ids = Some(vec![
+            String::from("audio-playback-1-2"),
+            String::from("audio-input-10"),
+        ]);
+        update_audio_settings(test_dir.db_path().as_path(), &request).expect("the list is saved");
+        let (app_settings, snapshot) = current_audio_snapshot(test_dir.db_path().as_path())
+            .expect("audio snapshot should load");
+
+        let playback = (1..=4)
+            .map(
+                |strip| match resolve_audio_deck_strip(&snapshot, "playback", strip) {
+                    Ok(AudioDeckStrip::Channel(channel)) => channel.id,
+                    other => panic!("playback strip {strip} should resolve: {other:?}"),
+                },
+            )
+            .collect::<Vec<_>>();
+        assert_eq!(
+            playback,
+            vec![
+                "audio-playback-3-4",
+                "audio-playback-5-6",
+                "audio-playback-7-8",
+                "audio-playback-9-10"
+            ]
+        );
+        let inputs = (1..=3)
+            .map(
+                |strip| match resolve_audio_deck_strip(&snapshot, "inputs", strip) {
+                    Ok(AudioDeckStrip::Channel(channel)) => channel.id,
+                    other => panic!("input strip {strip} should resolve: {other:?}"),
+                },
+            )
+            .collect::<Vec<_>>();
+        assert_eq!(
+            inputs,
+            vec!["audio-input-9", "audio-input-11", "audio-input-12"]
+        );
+        assert!(matches!(
+            resolve_audio_deck_strip(&snapshot, "inputs", 4),
+            Err(ControlSurfaceError::Rejected(_))
+        ));
+        // The second input cell now carries the third preamp's name.
+        assert!(
+            audio_strip_lcd_text(&app_settings, &snapshot, 2).starts_with(&strip_name(
+                &snapshot
+                    .channels
+                    .iter()
+                    .find(|channel| channel.id == "audio-input-11")
+                    .expect("the third preamp")
+                    .name
+            )),
+            "{}",
+            audio_strip_lcd_text(&app_settings, &snapshot, 2)
+        );
+        // The inputs bank's fourth cell has no strip: no text, no refusal line.
+        assert_eq!(audio_strip_lcd_text(&app_settings, &snapshot, 4), "");
     }
 
     #[test]

@@ -127,6 +127,10 @@ pub struct AudioChannelSnapshot {
     pub instrument: bool,
     #[serde(rename = "autoSet")]
     pub auto_set: bool,
+    /// TotalMix hides the channel in its Channel Layout, by Setup's list
+    /// (2026-10-08): the Console locks the strip, the deck leaves it out,
+    /// and a change to it is refused (`AUDIO_CHANNEL_HIDDEN`).
+    pub hidden: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -396,6 +400,9 @@ pub struct AudioSettingsUpdateRequest {
     pub expected_compatibility_mode: Option<bool>,
     pub faders_per_bank: Option<i64>,
     pub view_mode: Option<String>,
+    /// The whole list of the channels TotalMix hides, as Setup sends it;
+    /// `Some(vec![])` hides none.
+    pub hidden_channel_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]

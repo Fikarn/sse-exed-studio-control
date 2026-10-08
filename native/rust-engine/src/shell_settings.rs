@@ -26,10 +26,10 @@ pub const DEFAULT_WORKSPACE: &str = "audio";
 /// Teleprompter's did before its page.
 pub const WORKSPACES: &[&str] = &["lighting", "audio", "setup", "teleprompter", "cameras"];
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
-/// Setup / Support's sections: the runner, Support, and the cameras' setup
-/// (the Cameras page's "Camera setup" opens it). The fixture double's guard
-/// reads this list.
-pub const SETUP_SECTIONS: &[&str] = &["commissioning", "support", "cameras"];
+/// Setup / Support's sections: the runner, Support, the cameras' setup (the
+/// Cameras page's "Camera setup" opens it) and the Console's setup (the strips
+/// TotalMix hides, 2026-10-08). The fixture double's guard reads this list.
+pub const SETUP_SECTIONS: &[&str] = &["commissioning", "support", "cameras", "console"];
 pub const DEFAULT_WINDOW_WIDTH: i64 = 1280;
 pub const DEFAULT_WINDOW_HEIGHT: i64 = 800;
 pub const DEFAULT_WINDOW_MAXIMIZED: bool = false;
@@ -832,7 +832,7 @@ mod tests {
         let error = parse_settings_update(&params).expect_err("section should be rejected");
         assert_eq!(
             error,
-            "setup.activeSection must be one of: commissioning, support, cameras"
+            "setup.activeSection must be one of: commissioning, support, cameras, console"
         );
     }
 
