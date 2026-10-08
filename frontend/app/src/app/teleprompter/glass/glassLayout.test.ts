@@ -119,9 +119,26 @@ describe("the glass's layout", () => {
     ]);
     expect(layout.endTop).toBe(1600);
     expect(layout.paragraphWords).toEqual([5, 0, 3]);
-    // Seven read words ([CUE] is a direction) over the text from its top to
-    // the last line's bottom.
-    expect(layout.pxPerReadWord).toBeCloseTo(600 / 7);
+    // The pace from the full lines of running text (finding 13 of the walk of
+    // 2026-10-07): the first line, three read words at 100 px; the cue line
+    // holds no read word, and the short last lines and the gaps are left out.
+    // Until 2026-10-08 the seven read words shared the whole 600 px.
+    expect(layout.pxPerReadWord).toBeCloseTo(100 / 3);
+  });
+
+  it("paces by the lines that hold a read word when no line wraps", () => {
+    const layout = layoutFromMeasure(
+      "k",
+      [
+        { top: 0, wordCentres: [50, 50] },
+        { top: 150, wordCentres: [200, 200] },
+      ],
+      800,
+      LINE,
+      glassParagraphs([paragraph("one two"), paragraph("three four")])
+    );
+    // Two words a line at 100 px, the gap between the paragraphs left out.
+    expect(layout.pxPerReadWord).toBeCloseTo(50);
   });
 
   it("keeps its lines in order when a measure wobbles", () => {

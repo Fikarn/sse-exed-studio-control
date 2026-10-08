@@ -431,6 +431,53 @@ fn a_script_of_cues_alone_is_paced_by_its_words() {
     assert!(close(layout.px_per_read_word, text_height / 40.0));
 }
 
+// The walk of 2026-10-07, finding 13: the pace's pixels per read word come
+// from the full lines of running text (the owner's choice), not from the
+// whole height, which spread the paragraph gaps, the cue lines and the short
+// last lines over the words and read 22 to 29 % faster than the number.
+#[test]
+fn the_pace_comes_from_the_full_lines_of_running_text() {
+    // Two paragraphs of seven words, three a line (3, 3, 1), then a cue on a
+    // line of its own: four full lines of three read words at 100 px.
+    let mut paragraphs: Vec<PrompterParagraph> = (*script(2, 7)).clone();
+    paragraphs.push(PrompterParagraph::plain("[CUE]"));
+    let layout = layout_of("k", &paragraphs, 3, 100.0);
+    assert!(
+        close(layout.px_per_read_word, 100.0 / 3.0),
+        "{}",
+        layout.px_per_read_word
+    );
+
+    // No line wraps: the lines that hold a read word, without the gaps.
+    let short = script(3, 2);
+    let layout = layout_of("k", &short, 5, 100.0);
+    assert!(
+        close(layout.px_per_read_word, 50.0),
+        "{}",
+        layout.px_per_read_word
+    );
+
+    // So a script takes a little longer than its words at the pace: the time
+    // left comes from the pixels to END.
+    let now = Instant::now();
+    let mut clock = GlassClock::paused(
+        now,
+        String::from("script-a"),
+        short.clone(),
+        String::from("k"),
+        PrompterPlace::TOP,
+        140,
+    );
+    clock.accept_layout(now, layout);
+    let (left, estimated) = clock.time_left(now);
+    assert!(!estimated);
+    let words_at_the_pace = read_words_from(&short, PrompterPlace::TOP) as f64 * 60.0 / 140.0;
+    assert!(
+        left > words_at_the_pace,
+        "{left} s for {words_at_the_pace} s of words"
+    );
+}
+
 // §5.3: the time left is exact from the layout, estimated from the words
 // without one, and the same when the layout and the words agree.
 #[test]

@@ -5,6 +5,7 @@ import type { PrompterLayoutLine } from "../../generated/snapshots/PrompterLayou
 import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagraph";
 import type { PrompterPlace } from "../../generated/snapshots/PrompterPlace";
 import { speedAt, wordsAdvanced } from "../../prompter/motion";
+import { pacePixels } from "../../prompter/pace";
 import {
   TOP,
   advanceByReadWords,
@@ -118,15 +119,14 @@ export function newLayout(
   const last = lines[lines.length - 1]!;
   const textBottom = last.top + last.height;
   if (!Number.isFinite(endTop) || endTop < textBottom - 0.5) return "The layout's END must stand below its last line.";
-  const readWords = paragraphs.reduce((sum, paragraph) => sum + readFlags(paragraph).filter(Boolean).length, 0);
-  // A script of cues alone has no read word: it is paced by all its words, so it does not
-  // run through in one word's time (review of 2026-09-27).
-  const paceWords = readWords > 0 ? readWords : wordCounts.reduce((sum, words) => sum + words, 0);
+  // The pace's pixels per read word, from the full lines of running text, as
+  // the hardware link works it out (`pacePixels`; the walk of 2026-10-07,
+  // finding 13).
   return {
     key,
     lines,
     endTop,
-    pxPerReadWord: (textBottom - first.top) / Math.max(paceWords, 1),
+    pxPerReadWord: pacePixels(lines, wordCounts, paragraphs.map(readFlags), textBottom - first.top),
     paragraphWords: wordCounts,
   };
 }

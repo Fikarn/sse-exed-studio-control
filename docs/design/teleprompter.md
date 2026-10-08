@@ -122,7 +122,7 @@ Every control in this table is one press (D11). None of them starts the scroll. 
 
 ### 5.1 Speed, in words a minute
 
-Speed is the presenter's pace in words a minute, from 40 to 300; a new script starts at 140. Studio Control works out the scroll's pixels per second from the pace and the script's average words per line in the current look. A bigger text size or wider margins therefore keep the pace: the text moves faster and the presenter reads at the same speed. Each script keeps its own speed.
+Speed is the presenter's pace in words a minute, from 40 to 300; a new script starts at 140. Studio Control works out the scroll's pixels per second from the pace and the words a full line of running text holds in the current look (since 2026-10-08; before, from the whole text's height, which spread the paragraph gaps, the cue lines and the short last lines over the words, so running text read 22 to 29 % faster than the number). A bigger text size or wider margins therefore keep the pace: the text moves faster and the presenter reads at the same speed. The gaps and the cue lines pass at that speed too, so a script takes a little longer than its words at the pace, and the time left says so. Each script keeps its own speed.
 
 At the standard look and 140 words a minute, the text moves about 55 px a second, just under a pixel a frame at 60 Hz.
 

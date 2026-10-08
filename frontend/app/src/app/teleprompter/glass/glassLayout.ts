@@ -1,3 +1,4 @@
+import { pacePixels } from "@sse/engine-client";
 import type { PrompterLayoutLine, PrompterLook } from "@sse/engine-client";
 
 import type { GlassParagraph } from "./glassText";
@@ -130,25 +131,27 @@ export function layoutFromMeasure(
   const last = lines[lines.length - 1];
   const first = lines[0];
   const textBottom = last ? last.top + last.height : 0;
-  const readWords = text.reduce(
-    (sum, paragraph) =>
-      sum +
-      paragraph.lines.reduce(
-        (lineSum, line) => lineSum + line.tokens.filter((token) => token.kind === "word" && !token.word.cue).length,
-        0
-      ),
-    0
-  );
-  const allWords = text.reduce((sum, paragraph) => sum + paragraph.wordCount, 0);
-  // A script of cues alone is paced by all its words (clock.rs, review of
-  // 2026-09-27).
-  const paceWords = readWords > 0 ? readWords : allWords;
+  const paragraphWords = text.map((paragraph) => paragraph.wordCount);
+  // For each word of each paragraph, whether the presenter reads it (a word
+  // all inside a cue is a direction).
+  const readFlags = text.map((paragraph) => {
+    const flags = Array.from({ length: paragraph.wordCount }, () => false);
+    for (const line of paragraph.lines) {
+      for (const token of line.tokens) {
+        if (token.kind === "word") flags[token.word.index] = !token.word.cue;
+      }
+    }
+    return flags;
+  });
+  // The pace's pixels per read word, from the full lines of running text, as
+  // the hardware link works it out (`pacePixels`; the walk of 2026-10-07,
+  // finding 13).
   return {
     key,
     lines,
     endTop,
-    pxPerReadWord: first ? (textBottom - first.top) / Math.max(paceWords, 1) : 0,
-    paragraphWords: text.map((paragraph) => paragraph.wordCount),
+    pxPerReadWord: first ? pacePixels(lines, paragraphWords, readFlags, textBottom - first.top) : 0,
+    paragraphWords,
   };
 }
 

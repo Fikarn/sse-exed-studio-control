@@ -358,11 +358,14 @@ describe("the fixture double's prompter: the take", () => {
     const saved = async () => ((await snapshot()).scripts as JsonObject[])[0]!.place;
 
     // The timer saved the place at 1 s; half a second on, a read (which saves only once
-    // a second has passed) shows the glass further on than the saved place.
+    // a second has passed) shows the glass further on than the saved place. The pace
+    // is a full line's (2026-10-08): five words at 100 px, 20 px a read word, so the
+    // read words moved are the words of the first line (2.0 at 1 s, 3.15 at 1.5 s);
+    // until then the whole 3,500 px over 120 words moved the place half as fast again.
     await vi.advanceTimersByTimeAsync(1_000);
     vi.setSystemTime(NOW + 1_500);
-    expect(await saved()).toEqual({ paragraph: 0, word: 2 });
-    expect((await glass()).place).toEqual({ paragraph: 0, word: 4 });
+    expect(await saved()).toEqual({ paragraph: 0, word: 1 });
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 3 });
 
     // A new size: no layout until the view reports one, and the timer still wakes.
     await call("prompter.textSize", { step: 1 });
@@ -370,8 +373,8 @@ describe("the fixture double's prompter: the take", () => {
     expect(vi.getTimerCount()).toBe(1);
     await vi.advanceTimersByTimeAsync(1_000);
     vi.setSystemTime(NOW + 3_000);
-    expect(await saved()).toEqual({ paragraph: 0, word: 6 });
-    expect((await glass()).place).toEqual({ paragraph: 0, word: 8 });
+    expect(await saved()).toEqual({ paragraph: 0, word: 5 });
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 6 });
   });
 
   // Review of 2026-09-27 (L2): a pause saves where its 0.3 s ease stops the text, not
@@ -387,10 +390,13 @@ describe("the fixture double's prompter: the take", () => {
     await call("prompter.play");
     await vi.advanceTimersByTimeAsync(1_000);
     await call("prompter.pause");
-    expect((await glass()).place).toEqual({ paragraph: 0, word: 6 });
-    expect(((await snapshot()).scripts as JsonObject[])[0]!.place).toEqual({ paragraph: 0, word: 7 });
+    // At 300 the first second moves 4.25 read words (the 0.3 s ease), and the pause's
+    // ease adds 0.75: the text rests at the first line's fifth word (the pace is a
+    // full line's, 20 px a read word, since 2026-10-08).
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 4 });
+    expect(((await snapshot()).scripts as JsonObject[])[0]!.place).toEqual({ paragraph: 0, word: 5 });
     await vi.advanceTimersByTimeAsync(1_000);
-    expect((await glass()).place).toEqual({ paragraph: 0, word: 7 });
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 5 });
   });
 
   // The hardware link's `the_first_layout_for_a_key_is_the_one_the_clock_runs_on` (review
