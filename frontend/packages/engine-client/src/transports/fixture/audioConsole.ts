@@ -117,6 +117,7 @@ export function buildAudioChannel(
     pad: false,
     instrument: options.instrument === true,
     autoSet: options.autoSet === true,
+    hidden: options.hidden === true,
   };
 }
 

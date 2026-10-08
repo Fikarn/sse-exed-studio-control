@@ -263,6 +263,10 @@ const STATE_FIXTURES = [
   // PROMPTER, as the hardware link's page model gives them.
   "setup-map-cameras",
   "setup-map-prompter",
+  // The strips TotalMix hides (2026-10-08): Setup's Console screen with the
+  // studio's list, and the Console with those strips locked, one on the plate.
+  "setup-console",
+  "audio-hidden-strips",
 ] as const;
 
 // The fixtures no capture draws: their state display says the whole of its

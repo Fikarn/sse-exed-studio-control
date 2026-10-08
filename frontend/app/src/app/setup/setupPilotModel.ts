@@ -1,16 +1,17 @@
 import { type SnapshotRecord, type StatusToneLike, asRecord, getCommissioningChecks } from "../shellData";
-import type { CamerasSnapshot, JsonValue, SetupSection, ShellStore } from "@sse/engine-client";
+import type { AudioSnapshot, CamerasSnapshot, JsonValue, SetupSection, ShellStore } from "@sse/engine-client";
 
 export const APP_VERSION = `v${__APP_VERSION__}`;
 
-/** Setup / Support's screens: the runner's steps, Support, and the cameras' setup. */
-export type SetupMode = "runner" | "support" | "cameras";
+/** Setup / Support's screens: the runner's steps, Support, the cameras' setup and the Console's setup (2026-10-08). */
+export type SetupMode = "runner" | "support" | "cameras" | "console";
 
 /** The section the hardware link saves for each mode (`setup.activeSection`). */
 export const SETUP_MODE_SECTIONS: Record<SetupMode, SetupSection> = {
   runner: "commissioning",
   support: "support",
   cameras: "cameras",
+  console: "console",
 };
 export type RunnerStepId = "import" | "probe" | "map" | "verify" | "publish";
 
@@ -52,6 +53,8 @@ export interface ActionFeedback {
 
 export interface SetupSupportPilotProps {
   appSnapshot: SnapshotRecord | null;
+  /** The Console, for its setup (the strips TotalMix hides); `null` until it was read. */
+  audioSnapshot: AudioSnapshot | null;
   /** The cameras, for their setup; `null` until they were read. */
   camerasSnapshot: CamerasSnapshot | null;
   commissioningSnapshot: SnapshotRecord | null;
@@ -195,7 +198,8 @@ export function deckKeySlots(buttons: ControlSurfaceControl[]): (ControlSurfaceC
 export function normalizeSetupMode(appSnapshot: SnapshotRecord | null): SetupMode {
   const shell = asRecord(appSnapshot?.shell);
   const setup = asRecord(shell?.setup);
-  return setup?.activeSection === "support" ? "support" : setup?.activeSection === "cameras" ? "cameras" : "runner";
+  const section = setup?.activeSection;
+  return section === "support" || section === "cameras" || section === "console" ? section : "runner";
 }
 
 export function normalizeRunnerStage(snapshot: SnapshotRecord | null): RunnerStepId | null {

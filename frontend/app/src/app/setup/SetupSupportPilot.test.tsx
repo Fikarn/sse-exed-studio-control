@@ -54,6 +54,7 @@ function PilotOnStore({
       >
         <SetupSupportPilot
           appSnapshot={state.appSnapshot}
+          audioSnapshot={state.audioSnapshot}
           camerasSnapshot={state.camerasSnapshot}
           commissioningSnapshot={state.commissioningSnapshot}
           controlSurfaceSnapshot={state.controlSurfaceSnapshot}

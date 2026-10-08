@@ -231,6 +231,7 @@ pub(super) fn pull_test_db(label: &str, fake_port: u16) -> TestDir {
             expected_compatibility_mode: None,
             faders_per_bank: None,
             view_mode: None,
+            hidden_channel_ids: None,
         },
     )
     .expect("transport settings should persist");

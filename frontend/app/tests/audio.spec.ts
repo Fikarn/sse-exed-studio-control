@@ -1277,3 +1277,39 @@ test("strip context menu clamps to the viewport at the edges", async ({ page }) 
   await probe(1280, 1430, "bottom edge");
   await probe(2550, 1430, "corner");
 });
+
+// The walk of 2026-10-07, finding 3 (2026-10-08): a strip TotalMix hides in
+// its Channel Layout (Setup's list) is locked with the sentence whatever the
+// desk's state, says so on the strip, and the plate says it too; the strips
+// beside it are not locked.
+test("a strip TotalMix hides is locked with the sentence, on the strip and on the plate", async ({ page }) => {
+  await openFixture(page, "audio-hidden-strips");
+  await expectWorkspaceMounted(page, "audio");
+  const sentence = "TotalMix hides this channel: unhide it there, or take it off the list in Setup.";
+  const strip = page.getByTestId("audio-strip-audio-playback-9-10");
+  await expect(strip).toHaveAttribute("data-hidden", "");
+  await expect(strip.getByTestId("audio-lane-hidden-audio-playback-9-10")).toHaveText("hidden");
+  await expect(strip.getByTestId("audio-lane-readout-audio-playback-9-10")).toHaveText("—");
+  const mute = strip.getByRole("button", { name: "Mute Playback 9/10" });
+  await expect(mute).toBeDisabled();
+  await expect(mute).toHaveAttribute("title", sentence);
+  await expect(strip.getByRole("slider", { name: "Playback 9/10 send level" })).toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
+  // The menu's items say why, in the short reason.
+  await page.getByTestId("audio-lane-menu-audio-playback-9-10").click();
+  const level = page.getByTestId("audio-lane-menu-audio-playback-9-10-level");
+  await expect(level).toHaveAttribute("aria-disabled", "true");
+  await expect(level).toContainText("hidden in TotalMix");
+  await page.keyboard.press("Escape");
+  // The strip beside it is offered as before.
+  const music = page.getByTestId("audio-strip-audio-playback-7-8");
+  await expect(music).not.toHaveAttribute("data-hidden", "");
+  await expect(music.getByRole("button", { name: "Mute Music 7/8" })).toBeEnabled();
+  await expect(music.getByTestId("audio-lane-hidden-audio-playback-7-8")).toHaveCount(0);
+  // The plate: the fixture selects the hidden strip, and the plate says so.
+  await expect(page.getByTestId("audio-plate-hidden")).toHaveText(sentence);
+  await expect(page.getByTestId("audio-plate-head")).toContainText("hidden in TotalMix");
+  await expectAudioInspectorPanelsFit(page);
+});

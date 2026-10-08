@@ -1452,7 +1452,15 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return performAudioRequest("audio.mixTarget.update", request as unknown as JsonObject);
     },
     async updateAudioSettings(request: AudioSettingsUpdateRequest) {
-      return performAudioRequest("audio.settings.update", request as unknown as JsonObject);
+      const result = await performAudioRequest("audio.settings.update", request as unknown as JsonObject);
+      // A change of the strips TotalMix hides (2026-10-08) is a Recent actions
+      // row, and Setup / Support lists the rows on its plate beside the keys
+      // that change the list: the list moves with the press, as it does for
+      // the light outputs switch (`METHOD_DOMAIN_REFRESH`).
+      if (request.hiddenChannelIds !== undefined && state.lifecycle === "ready") {
+        await refreshDomains(["support"]);
+      }
+      return result;
     },
     async updateLightingSettings(request: LightingSettingsUpdateRequest) {
       return performRequest("lighting.settings.update", request as JsonObject);

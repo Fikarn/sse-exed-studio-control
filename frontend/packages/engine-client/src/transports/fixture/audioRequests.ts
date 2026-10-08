@@ -84,6 +84,28 @@ export function handleFixtureAudioRequest(
       if (params.viewMode === "submix" || params.viewMode === "master") {
         audioSnapshot.viewMode = params.viewMode;
       }
+      if ("hiddenChannelIds" in params) {
+        // Setup's list of the strips TotalMix hides (2026-10-08), as the
+        // hardware link takes it: the whole list, every id a channel of the
+        // console, else the request is refused and nothing changes.
+        const ids = params.hiddenChannelIds;
+        if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || !id.trim())) {
+          throw new EngineRequestError("INVALID_PARAMS", "hiddenChannelIds must be a list of non-empty strings");
+        }
+        const channels = asArray(audioSnapshot.channels)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is JsonObject => entry !== null);
+        const unknown = ids.find((id) => !channels.some((channel) => asString(channel.id) === id));
+        if (unknown !== undefined) {
+          throw new EngineRequestError(
+            "AUDIO_CHANNEL_NOT_FOUND",
+            `Channel '${String(unknown)}' is not part of this console.`
+          );
+        }
+        for (const channel of channels) {
+          channel.hidden = ids.includes(asString(channel.id));
+        }
+      }
 
       if (transportChanged) {
         if (audioCheck) {
@@ -204,7 +226,8 @@ export function handleFixtureAudioRequest(
       const audioSnapshot = ensureAudioActionAllowed(state);
       let cleared = 0;
       for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
-        if (!channel || !asBoolean(channel.solo, false)) continue;
+        // A hidden channel's solo stays: nothing sent to it is answered.
+        if (!channel || !asBoolean(channel.solo, false) || asBoolean(channel.hidden, false)) continue;
         channel.solo = false;
         cleared += 1;
       }
@@ -233,6 +256,14 @@ export function handleFixtureAudioRequest(
       const channel = channels.find((entry) => asString(entry.id) === channelId);
       if (!channel) {
         throw new Error(`Audio channel '${channelId}' is not exposed by the fixture transport.`);
+      }
+      // A channel TotalMix hides (Setup's list, 2026-10-08) takes no change,
+      // as the hardware link refuses it: TotalMix would drop the write.
+      if (asBoolean(channel.hidden, false)) {
+        throw new EngineRequestError(
+          "AUDIO_CHANNEL_HIDDEN",
+          `TotalMix hides ${asString(channel.name, channelId)}: unhide it in TotalMix, or take it off the list in Setup.`
+        );
       }
 
       const role = asString(channel.role);

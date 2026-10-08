@@ -23,4 +23,10 @@ export type AudioChannelSnapshot = {
   pad: boolean;
   instrument: boolean;
   autoSet: boolean;
+  /**
+   * TotalMix hides the channel in its Channel Layout, by Setup's list
+   * (2026-10-08): the Console locks the strip, the deck leaves it out,
+   * and a change to it is refused (`AUDIO_CHANNEL_HIDDEN`).
+   */
+  hidden: boolean;
 };

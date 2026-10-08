@@ -221,6 +221,21 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
     }
   }
 
+  // Setup's list of the strips TotalMix hides (2026-10-08): a fixture names
+  // them as `clipChannelIds` names the clipped ones.
+  const fixtureHiddenChannelIds = asArray(asRecord(state.audioSnapshot)?.hiddenChannelIds)
+    .map((entry) => asString(entry).trim())
+    .filter(Boolean);
+  if (state.audioSnapshot && asRecord(state.audioSnapshot)?.hiddenChannelIds !== undefined) {
+    delete state.audioSnapshot.hiddenChannelIds;
+    const hiddenIds = new Set(fixtureHiddenChannelIds);
+    for (const channel of asArray(state.audioSnapshot.channels).map((entry) => asRecord(entry))) {
+      if (channel && hiddenIds.has(asString(channel.id))) {
+        channel.hidden = true;
+      }
+    }
+  }
+
   const fixtureMixLevelOverrides = asArray(asRecord(state.audioSnapshot)?.mixLevelOverrides)
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null);

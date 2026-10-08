@@ -113,3 +113,10 @@
 .meter {
   height: 100%;
 }
+
+/* A strip TotalMix hides (Setup's list, 2026-10-08): its word stands in the
+   tools row, where a preamp's keys would be; the ⋯ keeps its place. */
+.hiddenWord {
+  display: inline-flex;
+  min-width: 0;
+}

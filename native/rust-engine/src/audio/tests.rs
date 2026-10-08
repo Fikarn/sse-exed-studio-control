@@ -699,6 +699,7 @@ fn meter_test_channel(
         pad: false,
         instrument: false,
         auto_set: false,
+        hidden: false,
     }
 }
 
@@ -1040,6 +1041,7 @@ fn bind_console_probe_receiver(db_path: &std::path::Path) -> std::net::UdpSocket
             expected_compatibility_mode: None,
             faders_per_bank: None,
             view_mode: None,
+            hidden_channel_ids: None,
         },
     )
     .expect("transport settings should persist");
@@ -1459,6 +1461,7 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
             expected_compatibility_mode: Some(true),
             faders_per_bank: Some(8),
             view_mode: Some(String::from("master")),
+            hidden_channel_ids: None,
         },
     )
     .expect("settings update should succeed");
@@ -1474,6 +1477,190 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
     assert_eq!(snapshot.faders_per_bank, 8);
     assert_eq!(snapshot.view_mode, "master");
     assert_eq!(snapshot.last_action_status, "succeeded");
+}
+
+// The walk of 2026-10-07, finding 3: TotalMix's Channel Layout hides Line 1
+// to 8 and the playback pairs 9/10 and 11/12, and a write to a hidden channel
+// is dropped unanswered. TotalMix's dump does not say which channels it
+// hides, so the owner lists them in Setup (2026-10-08): the list is a
+// setting, the strips read hidden, a change to one is refused with the
+// sentence, Clear all leaves a hidden solo alone, and an empty list shows
+// every strip again.
+#[test]
+fn the_strips_totalmix_hides_are_listed_in_setup_and_take_no_change() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let test_dir = TestDir::new("hidden-strips");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+    let list = |ids: &[&str]| AudioSettingsUpdateRequest {
+        osc_enabled: None,
+        send_host: None,
+        send_port: None,
+        receive_port: None,
+        selected_channel_id: None,
+        selected_mix_target_id: None,
+        expected_peak_data: None,
+        expected_submix_lock: None,
+        expected_compatibility_mode: None,
+        faders_per_bank: None,
+        view_mode: None,
+        hidden_channel_ids: Some(ids.iter().map(|id| String::from(*id)).collect()),
+    };
+    let settings_now = || {
+        list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load")
+    };
+
+    // Listed out of order and twice: saved once each, in the console's order.
+    let snapshot = update_audio_settings(
+        test_dir.db_path().as_path(),
+        &list(&[
+            "audio-playback-11-12",
+            "audio-input-1",
+            "audio-playback-9-10",
+            "audio-input-1",
+        ]),
+    )
+    .expect("the list is saved");
+    let hidden = snapshot
+        .channels
+        .iter()
+        .filter(|channel| channel.hidden)
+        .map(|channel| channel.id.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        hidden,
+        vec![
+            "audio-input-1",
+            "audio-playback-9-10",
+            "audio-playback-11-12"
+        ]
+    );
+    assert_eq!(
+        settings_now()
+            .get(AUDIO_HIDDEN_CHANNEL_IDS_KEY)
+            .map(String::as_str),
+        Some(r#"["audio-input-1","audio-playback-9-10","audio-playback-11-12"]"#)
+    );
+    let said = snapshot.last_action_message.clone().unwrap_or_default();
+    assert!(
+        said.contains("strips TotalMix hides -> Line 1, Playback 9/10, Playback 11/12"),
+        "{said}"
+    );
+
+    // A change to a hidden strip is refused with the sentence; the strip
+    // keeps its value, and the Console's last action says why.
+    let change = |channel_id: &str| AudioChannelUpdateRequest {
+        channel_id: String::from(channel_id),
+        mix_target_id: None,
+        gain: None,
+        fader: Some(0.25),
+        mute: None,
+        solo: None,
+        phantom: None,
+        phase: None,
+        pad: None,
+        instrument: None,
+        auto_set: None,
+    };
+    match update_audio_channel(test_dir.db_path().as_path(), &change("audio-playback-9-10")) {
+        Err(AudioCommandError::Rejected(code, message)) => {
+            assert_eq!(code, "AUDIO_CHANNEL_HIDDEN");
+            assert_eq!(
+                message,
+                "TotalMix hides Playback 9/10: unhide it in TotalMix, or take it off the list in Setup."
+            );
+        }
+        other => panic!("a hidden strip takes no change: {other:?}"),
+    }
+    let snapshot = read_audio_snapshot(&settings_now());
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_CHANNEL_HIDDEN")
+    );
+    let pair = snapshot
+        .channels
+        .iter()
+        .find(|channel| channel.id == "audio-playback-9-10")
+        .expect("the pair");
+    assert!(pair.hidden);
+    assert_ne!(pair.fader, 0.25);
+    // A strip off the list changes as before.
+    let shown = update_audio_channel(test_dir.db_path().as_path(), &change("audio-playback-1-2"))
+        .expect("a shown strip changes");
+    assert!(!shown.hidden);
+    assert_eq!(shown.fader, 0.25);
+
+    // An id of no channel is refused, and the list stays as it was.
+    assert!(matches!(
+        update_audio_settings(test_dir.db_path().as_path(), &list(&["audio-input-99"])),
+        Err(AudioCommandError::Rejected("AUDIO_CHANNEL_NOT_FOUND", _))
+    ));
+    assert_eq!(
+        super::helpers::read_hidden_channel_ids(&settings_now()).len(),
+        3
+    );
+
+    // Clear all clears the shown solos and leaves a hidden one as it is.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from(AUDIO_CHANNEL_STATE_KEY),
+            String::from(
+                r#"{"audio-playback-9-10":{"solo":true},"audio-playback-3-4":{"solo":true}}"#,
+            ),
+        )],
+    )
+    .expect("solo state should persist");
+    let cleared = clear_all_audio_solo(test_dir.db_path().as_path()).expect("clear all");
+    let solo = |id: &str| {
+        cleared
+            .channels
+            .iter()
+            .find(|channel| channel.id == id)
+            .expect("the channel")
+            .solo
+    };
+    assert!(!solo("audio-playback-3-4"));
+    assert!(solo("audio-playback-9-10"));
+    assert_eq!(
+        cleared.last_action_message.as_deref(),
+        Some("Cleared solo on 1 audio channel(s).")
+    );
+
+    // An empty list shows every strip again; the request's shape is checked
+    // as the pages send it.
+    let parsed = parse_audio_settings_update_request(&serde_json::json!({
+        "hiddenChannelIds": []
+    }))
+    .expect("an empty list parses");
+    assert_eq!(parsed.hidden_channel_ids, Some(Vec::new()));
+    assert!(
+        parse_audio_settings_update_request(&serde_json::json!({ "hiddenChannelIds": [" "] }))
+            .is_err()
+    );
+    assert!(parse_audio_settings_update_request(
+        &serde_json::json!({ "hiddenChannelIds": "audio-input-1" })
+    )
+    .is_err());
+    let snapshot = update_audio_settings(test_dir.db_path().as_path(), &parsed)
+        .expect("the empty list is saved");
+    assert!(snapshot.channels.iter().all(|channel| !channel.hidden));
+    assert!(snapshot
+        .last_action_message
+        .as_deref()
+        .is_some_and(|said| said.contains("no strip hidden in TotalMix")));
 }
 
 #[test]
@@ -1524,6 +1711,7 @@ fn audio_settings_update_resets_probe_when_transport_changes() {
             expected_compatibility_mode: None,
             faders_per_bank: None,
             view_mode: None,
+            hidden_channel_ids: None,
         },
     )
     .expect("transport settings update should succeed");

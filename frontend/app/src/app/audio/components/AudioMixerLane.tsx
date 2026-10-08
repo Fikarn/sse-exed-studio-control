@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { ArmKey, Groove, Key, MenuButton, Meter, Readout, type UseArmResult } from "@sse/design-system";
+import { ArmKey, Groove, Key, LampWord, MenuButton, Meter, Readout, type UseArmResult } from "@sse/design-system";
 
 import styles from "./AudioMixerLane.module.css";
 import { AudioGainEntryDialog, AudioLevelEntryDialog, clampPreampGain } from "./AudioEntryDialogs";
@@ -9,7 +9,14 @@ import { AUDIO_ARM_TIMEOUT_MS, AUDIO_THROTTLE_FADER_MS } from "../audioConstants
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
 import { AUDIO_FADER_TICKS } from "../audioFaderScale";
-import { AUDIO_FADER_UNITY, AUDIO_FADER_UNITY_SNAP, formatAudioDb, meterFill } from "../audioFormatting";
+import {
+  AUDIO_FADER_UNITY,
+  AUDIO_FADER_UNITY_SNAP,
+  AUDIO_HIDDEN_STRIP_MENU_LOCK,
+  AUDIO_HIDDEN_STRIP_SENTENCE,
+  formatAudioDb,
+  meterFill,
+} from "../audioFormatting";
 import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLevel } from "../audioViewModel";
 import { buildChannelMenu } from "./audioChannelMenu";
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
@@ -86,6 +93,13 @@ export function AudioChannelLane({
   const gain = useAudioControlDraftValue(draftStore, gainDraftKey, getDraftValue(gainDraftKey, channel.gain));
   const supportsPreamp = audioChannelSupportsGain(channel);
   const group = getAudioChannelGroup(channel);
+  // A strip TotalMix hides (Setup's list, 2026-10-08): every write on it is
+  // locked with the sentence, whatever the desk's state, and the tools row
+  // says so in a word.
+  const hidden = channel.hidden;
+  const laneActionsAllowed = actionsAllowed && !hidden;
+  const laneLockedReason = hidden ? AUDIO_HIDDEN_STRIP_SENTENCE : lockedReason;
+  const laneMenuLock = hidden ? AUDIO_HIDDEN_STRIP_MENU_LOCK : menuLock;
   const phantomArmKey = audioPhantomKey(channel.id, !channel.phantom);
   const phantomArmed = armedActionKey === phantomArmKey;
   const throttledSendCommit = useMemo(
@@ -113,7 +127,7 @@ export function AudioChannelLane({
     gain,
     sendLevel,
     selectedMixTarget,
-    menuLock,
+    menuLock: laneMenuLock,
     onRequestLevel: () => setEntry("level"),
     onRequestGain: () => setEntry("gain"),
     onResetToUnity,
@@ -130,6 +144,7 @@ export function AudioChannelLane({
       data-clip={channel.clip}
       data-feeding={feeding}
       data-group={group}
+      data-hidden={hidden ? "" : undefined}
       data-no-send={!feeding && !channel.mute}
       data-role={channel.role}
       data-lit={selected ? "" : undefined}
@@ -148,8 +163,8 @@ export function AudioChannelLane({
         size="readout"
         value={formatAudioDb(sendLevel).replace(/ dB$/, "")}
         unit="dB"
-        doubt={doubt}
-        empty={!feeding && !channel.mute}
+        doubt={doubt && !hidden}
+        empty={hidden || (!feeding && !channel.mute)}
         testId={`audio-lane-readout-${channel.id}`}
       />
 
@@ -158,8 +173,8 @@ export function AudioChannelLane({
           mode="toggle"
           cap="M"
           engaged={channel.mute}
-          locked={!actionsAllowed}
-          reason={lockedReason}
+          locked={!laneActionsAllowed}
+          reason={laneLockedReason}
           size="large"
           take
           className={styles.stripKey}
@@ -176,8 +191,8 @@ export function AudioChannelLane({
           mode="toggle"
           cap="S"
           engaged={channel.solo}
-          locked={!actionsAllowed}
-          reason={lockedReason}
+          locked={!laneActionsAllowed}
+          reason={laneLockedReason}
           size="large"
           take
           className={styles.stripKey}
@@ -193,7 +208,15 @@ export function AudioChannelLane({
       </div>
 
       <div className={styles.tools}>
-        {supportsPreamp ? (
+        {hidden ? (
+          // The walk of 2026-10-07, finding 3: the strip says it is hidden, in
+          // the attention ink; the sentence is on its keys and in its menu.
+          <span className={styles.hiddenWord} title={AUDIO_HIDDEN_STRIP_SENTENCE}>
+            <LampWord tone="attention" testId={`audio-lane-hidden-${channel.id}`}>
+              hidden
+            </LampWord>
+          </span>
+        ) : supportsPreamp ? (
           <>
             {/* 48 V is the one control on the strip that can damage a source,
                 so it is a hazard key: it arms, then applies. */}
@@ -207,8 +230,8 @@ export function AudioChannelLane({
               cap={phantomArmed ? undefined : "48 V"}
               className={styles.phantomKey}
               data-control="phantom"
-              locked={!actionsAllowed}
-              reason={lockedReason}
+              locked={!laneActionsAllowed}
+              reason={laneLockedReason}
               size="small"
               take
               testId={`audio-lane-phantom-${channel.id}`}
@@ -253,7 +276,7 @@ export function AudioChannelLane({
       <div className={styles.fader}>
         <Groove
           label={`${channel.name} send level`}
-          locked={!actionsAllowed}
+          locked={!laneActionsAllowed}
           onChange={(value) => {
             setDraftValue(sendDraftKey, value);
             throttledSendCommit.schedule({
@@ -263,7 +286,7 @@ export function AudioChannelLane({
             });
           }}
           onCommit={commitSend}
-          onRequestTypedEntry={actionsAllowed ? () => setEntry("level") : undefined}
+          onRequestTypedEntry={laneActionsAllowed ? () => setEntry("level") : undefined}
           snapUnity
           take
           ticks={AUDIO_FADER_TICKS}

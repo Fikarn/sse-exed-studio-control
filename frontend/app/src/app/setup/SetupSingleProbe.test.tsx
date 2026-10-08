@@ -22,6 +22,7 @@ function PilotInShell({ store }: { store: ShellStore }) {
       <AppShellFrame activeWorkspace="setup" cluster="slot" footer="slot" monitorItems={[]} workspaces={[]}>
         <SetupSupportPilot
           appSnapshot={state.appSnapshot}
+          audioSnapshot={state.audioSnapshot}
           camerasSnapshot={state.camerasSnapshot}
           commissioningSnapshot={state.commissioningSnapshot}
           controlSurfaceSnapshot={state.controlSurfaceSnapshot}

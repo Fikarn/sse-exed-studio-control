@@ -63,6 +63,7 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **Names.** Every strip carries TotalMix's name for its channel, and is renamed in TotalMix. A channel TotalMix names nothing keeps its own.
 - **Mix target.** The lit output (yellow, `mix target`) is the mix the faders send into: press an output's key to make it the target. `DIM` and `MONO` are `Main Out`'s, whichever output is the mix target: TotalMix has neither for the phones, so their menus have neither.
 - **Strip.** Its name, the level it sends into the mix target, `M` for mute, `S` for solo, the fader. Press a strip to open it in the plate. Its `⋯`, or a right-click on it, holds the rest: the level and the gain by number, the send to 0 dB, Hi-Z, polarity, AutoSet and the clip.
+- **Strips TotalMix hides.** A strip on Setup's `Console` list reads `hidden`, with no level; its keys, fader and menu are locked with `TotalMix hides this channel: unhide it there, or take it off the list in Setup.`, and the plate says it too. TotalMix drops a change to a hidden channel without a word, which read `ASSUMED` before (2026-10-08). The deck's AUDIO banks leave such a strip out.
 - **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on. The strip's `⋯` ends in `Turn 48 V off…`, also pressed twice.
 - **Gain** shows on a preamp's strip. `Set preamp gain…` in the strip's `⋯` types it, 0 to 75 dB; the plate's knob rides it.
 - **Groups.** A row's `⋯` shows only some groups (Talent, Line, Bed, FX, Remote); the heading then says which, and `Show all` brings every strip back.
@@ -166,7 +167,7 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 
 ## Setup / Support
 
-`Runner`, `Support` and `Cameras` choose what the bay shows. The plate on the right is always Support. The state display's `⋯` holds `Export backup`, `Open the log` and `Back to the Console`, which opens the Console once the setup is published. A step's sentence, and a section's, is the tooltip on its name.
+`Runner`, `Support`, `Cameras` and `Console` choose what the bay shows. The plate on the right is always Support. The state display's `⋯` holds `Export backup`, `Open the log` and `Back to the Console`, which opens the Console once the setup is published. A step's sentence, and a section's, is the tooltip on its name.
 
 **The runner's steps**
 
@@ -181,6 +182,8 @@ On a published setup, a step, `Back to …` and `Run all probes` read `press twi
 **Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` reads `ARMED` or `HELD`, with `Armed` and `Held` under it; arming sends the current state at once. `Prompter XL` shows what Windows reports.
 
 **Cameras.** `Cameras` shows `Camera setup`: what Studio Control needs for each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. It names the vMix output each picture comes from, CAM 1 Output 2, CAM 2 Output 3 and CAM 3 Output 4, which are set in vMix and not here. Saving sends nothing to a camera. `Forget CAM n…`, the last item of the camera's `⋯` (or a right-click on it), removes a pairing or an address: it asks in the menu, press again. Studio Control contacts only an address entered here. Until a camera's link is built its address is locked (CAM 2 and CAM 3).
+
+**Console.** `Console` shows `Console setup`: TotalMix's address, as the runner's Probe step saved it, and the strips TotalMix hides. Press a strip when TotalMix's Channel Layout hides its channel, and again when it shows it: a lit strip is on the list, the record names them, and each press is a Recent actions row. Nothing here is sent to TotalMix. In the studio the list is Line 1 to 8, PH 9/10 and PH 11/12, hidden in TotalMix since 2026-09-03.
 
 **Pairing CAM 1.** Once, with the camera beside you. Switch on the Pocket's Bluetooth, with no other controller connected to it (a Pocket held by one cannot be found); the PC's Bluetooth antenna must be on its rear panel. Press `Pair CAM 1`: the line under CAM 1 reads `Looking for CAM 1…`, for a minute at most. The camera then shows a 6-digit PIN, and a `PIN` row opens: type the PIN and press `Pair` within 30 seconds. CAM 1 then reads `paired` and `HELD`, and the camera's Bluetooth menu names `Studio Control`. A camera not found, a wrong PIN or a PIN too late says so on that line, and nothing is saved: press `Pair CAM 1` again. `Forget CAM 1…` also stops a pairing that runs. Windows keeps its own pairing after `Forget`; the next pairing replaces it. If Windows loses the pairing (removed in Windows' Bluetooth settings), CAM 1 reads `NOT SET UP` and says so: pair it again.
 

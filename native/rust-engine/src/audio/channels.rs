@@ -24,11 +24,10 @@ pub fn update_audio_channel(
     // Every field is validated BEFORE anything goes on the wire, so a request
     // carrying one unsupported field can never half-apply to the console.
     let mut channel_state = read_channel_state_map(&app_settings);
-    let mut next_state = snapshot
+    let entry = snapshot
         .channels
         .iter()
         .find(|entry| entry.id == request.channel_id)
-        .map(stored_channel_state_from_snapshot)
         .ok_or_else(|| {
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
@@ -38,6 +37,15 @@ pub fn update_audio_channel(
                 ),
             )
         })?;
+    // A channel TotalMix hides (Setup's list, 2026-10-08) takes no change:
+    // TotalMix would drop the write unanswered, and the Console would read
+    // ASSUMED for nothing (the walk of 2026-10-07, finding 3).
+    if entry.hidden {
+        let message = hidden_channel_refusal(&entry.name);
+        record_audio_action_failure(db_path, AUDIO_CHANNEL_HIDDEN, &message)?;
+        return Err(AudioCommandError::Rejected(AUDIO_CHANNEL_HIDDEN, message));
+    }
+    let mut next_state = stored_channel_state_from_snapshot(entry);
 
     if let Some(gain) = request.gain {
         if !channel_supports_gain_from_role(&snapshot, &request.channel_id) {
@@ -218,11 +226,21 @@ pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioComman
     let mut cleared_count = 0usize;
 
     // Clearing a solo is a console write; the idempotent no-op stays allowed.
-    if snapshot.channels.iter().any(|entry| entry.solo) {
+    // A solo on a channel TotalMix hides is left as it is: nothing sent to a
+    // hidden channel is answered (Setup's list, 2026-10-08).
+    if snapshot
+        .channels
+        .iter()
+        .any(|entry| entry.solo && !entry.hidden)
+    {
         ensure_audio_action_allowed(db_path, &snapshot)?;
     }
 
-    for channel in snapshot.channels.iter().filter(|entry| entry.solo) {
+    for channel in snapshot
+        .channels
+        .iter()
+        .filter(|entry| entry.solo && !entry.hidden)
+    {
         let request = AudioChannelUpdateRequest {
             auto_set: None,
             channel_id: channel.id.clone(),

@@ -34,6 +34,7 @@ function PilotWithDeck({ store, press }: { store: ShellStore; press: Press | nul
       <AppShellFrame activeWorkspace="setup" cluster="slot" footer="slot" monitorItems={[]} workspaces={[]}>
         <SetupSupportPilot
           appSnapshot={state.appSnapshot}
+          audioSnapshot={state.audioSnapshot}
           camerasSnapshot={state.camerasSnapshot}
           commissioningSnapshot={state.commissioningSnapshot}
           controlSurfaceSnapshot={deck}

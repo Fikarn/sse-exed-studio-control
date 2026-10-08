@@ -312,6 +312,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
     surface = (
       <SetupSurface
         appSnapshot={shellState.appSnapshot}
+        audioSnapshot={shellState.audioSnapshot}
         camerasSnapshot={shellState.camerasSnapshot}
         commissioningSnapshot={shellState.commissioningSnapshot}
         controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}

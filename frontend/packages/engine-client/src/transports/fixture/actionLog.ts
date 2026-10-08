@@ -311,6 +311,22 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
           )
         );
       }
+      // Setup's list of the strips TotalMix hides (2026-10-08): the row names
+      // what the list holds after the change.
+      const hiddenChannelIds = asRecord(params)?.hiddenChannelIds;
+      if (Array.isArray(hiddenChannelIds)) {
+        const names = asArray(asRecord(result)?.channels)
+          .map((entry) => asRecord(entry))
+          .filter((channel): channel is JsonObject => channel !== null && channel.hidden === true)
+          .map((channel) => String(channel.name));
+        rows.push(
+          audio(
+            "console-hidden-strips-set",
+            "TotalMix",
+            names.length > 0 ? `Strips TotalMix hides: ${names.join(", ")}` : "Strips TotalMix hides: none"
+          )
+        );
+      }
       return rows;
     }
 

@@ -51,7 +51,7 @@ export function workspaceRefusal(): string {
 }
 
 /** Setup / Support's sections (`SETUP_SECTIONS` in `native/rust-engine/src/shell_settings.rs`). */
-export const SETUP_SECTIONS = ["commissioning", "support", "cameras"] as const;
+export const SETUP_SECTIONS = ["commissioning", "support", "cameras", "console"] as const;
 
 /** `settings.update`'s refusal of a section Setup / Support does not have (`setup_section_refusal`). */
 export function setupSectionRefusal(): string {

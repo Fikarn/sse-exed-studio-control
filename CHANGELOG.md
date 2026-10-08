@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Setup has a fourth screen, `Console`, with the strips TotalMix hides in its Channel Layout: press a strip to put it on the list, and again to take it off. A listed strip reads `hidden` on the Console, its keys and fader locked with `TotalMix hides this channel: unhide it there, or take it off the list in Setup.`, and the deck's AUDIO banks leave it out, so no press goes to a channel TotalMix drops without a word; a change of the list is a Recent actions row. The list is empty until you fill it: in the studio, Line 1 to 8, PH 9/10 and PH 11/12 (#331).
 - CAM 1's Focus section says that its EF lens reports no position and takes none, with `Autofocus once` as its focus control, and its display LUT rows are locked with the sentence that the camera takes no change over Bluetooth (#330).
 - Under `REC`, `Card time left` reads what CAM 1 reports (`17 h 00 min`), and the plate's head its battery (`Battery 100 % · on mains`); the card time is checked against the camera's display at the walk (#330).
 - `Release CAM 1` leaves the Pocket alone: nothing on screen names the iPad any more (#330).
