@@ -46,10 +46,10 @@ pub(crate) const PIN_TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) const ANSWER_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) const FINDING: &str =
-    "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.";
+    "Looking for CAM 1. Switch its Bluetooth on, with no other controller connected to it.";
 pub(crate) const PIN_WANTED: &str = "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.";
 pub(crate) const PAIRING: &str = "Pairing with CAM 1…";
-pub(crate) const NOT_FOUND: &str = "CAM 1 was not found within a minute. Check that its Bluetooth is on and the iPad's app is closed, then press Pair CAM 1 again.";
+pub(crate) const NOT_FOUND: &str = "CAM 1 was not found within a minute. Check that its Bluetooth is on and that no other controller holds it, then press Pair CAM 1 again.";
 pub(crate) const PIN_REFUSED: &str = "CAM 1 did not accept the PIN. Press Pair CAM 1 to try again.";
 pub(crate) const NO_PIN: &str =
     "The PIN was not entered within 30 seconds. Press Pair CAM 1 to try again.";
@@ -262,7 +262,7 @@ pub(crate) fn pairing_result(status: i32) -> Result<(), String> {
         0 | 3 => return Ok(()),
         1 => "CAM 1 was not ready to pair.",
         4 => "CAM 1 refused the connection.",
-        5 => "CAM 1 holds too many connections: close the iPad's app.",
+        5 => "CAM 1 holds too many connections: disconnect its other controller.",
         7 => "CAM 1 took too long to answer.",
         9 => return Err(String::from(PIN_REFUSED)),
         11 => "CAM 1 does not offer a pairing with a PIN.",

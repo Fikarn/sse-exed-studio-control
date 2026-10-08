@@ -188,7 +188,7 @@ fn the_bank_goes_round_and_the_page_reads_and_sets_it() {
         cameras.snapshot()["dials"]["sets"],
         json!(["focus", null, null, null])
     );
-    assert_eq!(strip(&cameras), ["FOCUS\\n0.62", "", "", ""]);
+    assert_eq!(strip(&cameras), ["FOCUS\\n--", "", "", ""]);
     assert_eq!(press(&cameras, "bank", None)["bank"], "exposure");
 
     // From the page.
@@ -305,7 +305,7 @@ fn a_push_is_autofocus_on_the_focus_bank_and_nothing_elsewhere() {
     press(&cameras, "bank", None);
     assert_eq!(
         press(&cameras, "dialPush", Some("1")),
-        json!({ "camera": 1, "setting": "focus", "value": 0.5 })
+        json!({ "camera": 1, "setting": "focus", "value": null })
     );
     assert_eq!(
         cameras.sent(1),

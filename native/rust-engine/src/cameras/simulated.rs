@@ -38,14 +38,67 @@ pub(crate) struct CameraReading {
     pub recording: Option<bool>,
     /// `HH:MM:SS:FF`; `None` for a camera that does not report one.
     pub timecode: Option<String>,
+    /// The battery as the camera reports it (the Pocket's 9.0); `None`
+    /// until it does. A reading saved before 2026-10-08 has none.
+    #[serde(default)]
+    pub battery: Option<CameraBattery>,
+    /// The record time left in minutes, summed over the camera's media (the
+    /// Pocket's 9.2 reports one number per slot, and the camera goes on to
+    /// the next medium when one fills); `None` until it reports it.
+    #[serde(default)]
+    pub record_time_left_minutes: Option<u32>,
+}
+
+/// The battery as the Pocket reports it (9.0: three int16).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct CameraBattery {
+    pub millivolts: u16,
+    pub percent: u8,
+    /// Bit 0 a battery is in, bit 1 mains power, bit 2 charging, bit 3 the
+    /// percentage is an estimate, bit 4 the camera shows the voltage.
+    pub flags: u8,
+}
+
+impl CameraBattery {
+    const MAINS: u8 = 0b10;
+    const CHARGING: u8 = 0b100;
+    const SHOW_VOLTAGE: u8 = 0b1_0000;
+
+    /// `100 % · on mains`, `63 % · charging`, `11.3 V` when the camera
+    /// shows the voltage: the page's line.
+    pub(crate) fn text(&self) -> String {
+        let level = if self.flags & Self::SHOW_VOLTAGE != 0 {
+            format!("{:.1} V", f64::from(self.millivolts) / 1000.0)
+        } else {
+            format!("{} %", self.percent)
+        };
+        if self.flags & Self::CHARGING != 0 {
+            format!("{level} · charging")
+        } else if self.flags & Self::MAINS != 0 {
+            format!("{level} · on mains")
+        } else {
+            level
+        }
+    }
+}
+
+/// `17 h 00 min`, `45 min`: the record time left as the page prints it.
+pub(crate) fn record_time_text(minutes: u32) -> String {
+    if minutes >= 60 {
+        format!("{} h {:02} min", minutes / 60, minutes % 60)
+    } else {
+        format!("{minutes} min")
+    }
 }
 
 impl CameraReading {
-    /// The same values, whatever the timecode says: a timecode that moved
-    /// is not a change the camera made.
+    /// The same values, whatever the timecode, the battery and the record
+    /// time say: what moves by itself is not a change the camera made.
     pub(crate) fn same_values(&self, other: &Self) -> bool {
         let without = |reading: &Self| Self {
             timecode: None,
+            battery: None,
+            record_time_left_minutes: None,
             ..reading.clone()
         };
         without(self) == without(other)
@@ -185,7 +238,8 @@ impl SimulatedCamera {
                 nd: text("2 stops"),
                 white_balance: Some(5600.0),
                 tint: Some(2.0),
-                focus: Some(0.62),
+                // No position: the Pocket's EF lens reports none (finding 15).
+                focus: None,
                 resolution: text("6K"),
                 frame_rate: text("25"),
                 dynamic_range: text("Film"),
@@ -193,6 +247,13 @@ impl SimulatedCamera {
                 display_lut_on: Some(true),
                 recording: Some(false),
                 timecode: None,
+                // What the studio's Pocket reported on 2026-10-07 (9.0, 9.2).
+                battery: Some(CameraBattery {
+                    millivolts: 11304,
+                    percent: 100,
+                    flags: 0b1011,
+                }),
+                record_time_left_minutes: Some(1020),
             },
             2 => CameraReading {
                 iso: text("800"),

@@ -19,4 +19,10 @@ export type CameraValues = {
   dynamicRange: CameraChoice;
   displayLut: CameraChoice;
   displayLutOn: CameraSwitch;
+  /**
+   * Why the camera takes no change to its display LUT though it reports
+   * it (CAM 1 takes none over Bluetooth: the LUT is the camera's menu's);
+   * `null` when it takes one.
+   */
+  displayLutLock: string | null;
 };

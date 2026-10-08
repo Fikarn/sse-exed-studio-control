@@ -178,6 +178,11 @@ pub struct CameraValues {
     pub display_lut: CameraChoice,
     #[serde(rename = "displayLutOn")]
     pub display_lut_on: CameraSwitch,
+    /// Why the camera takes no change to its display LUT though it reports
+    /// it (CAM 1 takes none over Bluetooth: the LUT is the camera's menu's);
+    /// `null` when it takes one.
+    #[serde(rename = "displayLutLock")]
+    pub display_lut_lock: Option<String>,
 }
 
 /// The one-shot autos a camera offers.
@@ -209,10 +214,12 @@ pub struct CameraRecording {
     /// before the hardware link looked, or nothing records.
     #[serde(rename = "startedAt")]
     pub started_at: Option<String>,
-    /// The card's time left, when it reports it.
+    /// The record time left on the camera's media, as it reports it
+    /// (`17 h 00 min`; the Pocket's 9.2, summed over its slots).
     #[serde(rename = "cardTimeLeft")]
     pub card_time_left: Option<String>,
-    /// Why it does not report its card time.
+    /// Why there is none though the camera was read: it reports no medium
+    /// it can record to.
     #[serde(rename = "cardTimeNotReported")]
     pub card_time_not_reported: Option<String>,
 }
@@ -309,6 +316,9 @@ pub struct CameraSnapshot {
     #[serde(rename = "focusSteps")]
     pub focus_steps: bool,
     pub recording: CameraRecording,
+    /// The battery as the camera reports it (`100 % · on mains`); `null`
+    /// when it does not, or the camera is not shown.
+    pub battery: Option<String>,
     /// Its picture, whatever state the camera is in: the picture comes from
     /// vMix, not from the camera's link.
     pub picture: CameraPicture,

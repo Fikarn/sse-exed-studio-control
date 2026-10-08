@@ -270,6 +270,10 @@ impl CameraRuntime {
         let reading = match (&self.reading, last_read) {
             (Some(last), true) => CameraReading {
                 timecode: reading.timecode.or_else(|| last.timecode.clone()),
+                battery: reading.battery.or(last.battery),
+                record_time_left_minutes: reading
+                    .record_time_left_minutes
+                    .or(last.record_time_left_minutes),
                 ..last.clone()
             },
             _ => reading,

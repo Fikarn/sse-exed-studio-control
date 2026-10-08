@@ -337,13 +337,13 @@ fn the_camera_rows_are_what_the_answer_says() {
     assert_eq!(
         row(
             "cameras.release",
-            json!({ "camera": 1, "state": "released", "sentence": "CAM 1 released to the iPad." })
+            json!({ "camera": 1, "state": "released", "sentence": "CAM 1 released." })
         ),
         vec![(
             DOMAIN_CAMERAS,
             "released",
             String::from("CAM 1"),
-            String::from("CAM 1 released to the iPad.")
+            String::from("CAM 1 released.")
         )]
     );
     assert_eq!(

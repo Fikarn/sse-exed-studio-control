@@ -130,7 +130,7 @@ fn each_step_says_what_to_do() {
         shown(PairingStep::Finding),
         Some((
             CameraPairingState::Finding,
-            String::from("Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.")
+            String::from("Looking for CAM 1. Switch its Bluetooth on, with no other controller connected to it.")
         ))
     );
     assert_eq!(

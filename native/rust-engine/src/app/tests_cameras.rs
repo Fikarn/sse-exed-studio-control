@@ -270,7 +270,8 @@ fn a_take_a_format_a_look_and_who_holds_a_camera_are_recent_actions() {
     result(
         &app,
         "cameras.look.set",
-        json!({ "camera": 1, "dynamicRange": "Video", "displayLutOn": false, "confirm": true }),
+        // CAM 1 takes no LUT change (finding 16): the dynamic range alone.
+        json!({ "camera": 1, "dynamicRange": "Video", "confirm": true }),
     );
     result(&app, "cameras.record.stop", json!({ "confirm": true }));
     result(
@@ -301,7 +302,7 @@ fn a_take_a_format_a_look_and_who_holds_a_camera_are_recent_actions() {
             row(
                 "look-changed",
                 "CAM 1",
-                "CAM 1: dynamic range Film → Video; display LUT off."
+                "CAM 1: dynamic range Film → Video."
             ),
             row("recording-stopped", "CAM 1", "CAM 1 stopped recording."),
             row("released", "CAM 2", "CAM 2 released to LUMIX Tether."),

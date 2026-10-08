@@ -560,6 +560,9 @@ fn look_request(
         if let Some(sentence) = model.not_reported(setting).filter(|_| given) {
             return Err(unsupported(sentence));
         }
+        if let Some(sentence) = model.read_only(setting).filter(|_| given) {
+            return Err(not_allowed(sentence));
+        }
     }
     if let Some(dynamic_range) = dynamic_range {
         allowed_choice(camera, Setting::DynamicRange, dynamic_range)?;

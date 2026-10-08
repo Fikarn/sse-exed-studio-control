@@ -362,7 +362,7 @@ fn a_release_is_kept_across_a_start_until_connect() {
     assert_eq!(snapshot["cameras"][2]["state"], "held");
     assert_eq!(
         snapshot["cameras"][0]["sentence"],
-        "CAM 1 is released to the iPad. Connect it to control it here."
+        "CAM 1 is released: Studio Control reads it no more and sends it nothing. Connect it to control it here."
     );
     assert_eq!(take_announced(), Vec::new(), "a start announces nothing");
 
