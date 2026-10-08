@@ -208,7 +208,7 @@ impl Shared {
             match event {
                 Event::Connected(true) => log_event(
                     LogLevel::Info,
-                    "CAM 1 is connected over Bluetooth and reads its settings.",
+                    "CAM 1 is connected over Bluetooth and listens for its settings.",
                 ),
                 Event::Connected(false) => log_event(
                     LogLevel::Warn,

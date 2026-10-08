@@ -14,9 +14,10 @@
 //! (D41), so the camera's Bluetooth menu names Studio Control, as the iPad's
 //! app does, and then subscribes (Magic Pocket Control's order). Every
 //! characteristic is looked up first, and a lookup or the version read that
-//! fails (Windows has not connected yet) is tried again in silence: the
-//! version and the characteristics' kinds are logged once, when the
-//! connection stands. Nothing else is written to the camera at a
+//! fails (Windows has not connected yet; a camera that lacks one) is tried
+//! again every `RETRY`, the reason said once in the log for as long as it
+//! stays the same; the version and the characteristics' kinds are logged
+//! once, when the connection stands. Nothing else is written to the camera at a
 //! connection: a camera that sends no settings (one back with its last
 //! controller within minutes) is left to report a setting when it changes
 //! (D43, tried and withdrawn).
@@ -218,11 +219,9 @@ fn serve(
         .and_then(|id| GattSession::FromDeviceIdAsync(&id))
         .and_then(|pending| pending.get())
         .map_err(|error| format!("Windows gave CAM 1 no Bluetooth session: {}", text(error)))?;
-    gatt.SetMaintainConnection(true).map_err(text)?;
-
     let connection_events = events.clone();
-    let connection_token = device
-        .ConnectionStatusChanged(&TypedEventHandler::<BluetoothLEDevice, IInspectable>::new(
+    let prepared = gatt.SetMaintainConnection(true).and_then(|()| {
+        device.ConnectionStatusChanged(&TypedEventHandler::<BluetoothLEDevice, IInspectable>::new(
             move |device, _| {
                 if let Some(device) = device.as_ref() {
                     let connected =
@@ -232,18 +231,45 @@ fn serve(
                 Ok(())
             },
         ))
-        .map_err(text)?;
+    });
+    let connection_token = match prepared {
+        Ok(token) => token,
+        Err(error) => {
+            // Closed on the way out, as at the loop's end.
+            let _ = gatt.Close();
+            return Err(text(error));
+        }
+    };
 
     let mut subscribed: Option<Subscribed> = None;
+    // Why the connection could not be made, said once in the log for as
+    // long as the reason stays the same: a camera that is off gives the same
+    // reason every `RETRY`, and so does one that lacks a characteristic, and
+    // neither fills the log (two lines a retry did, 2026-10-07).
+    let mut refused: Option<String> = None;
     let outcome = loop {
         if subscribed.is_none() {
             // Asks Windows for the camera's service, which connects when
             // the camera is free; while it is not, this is tried again
-            // every `RETRY`, in silence, and Windows connects by itself
-            // meanwhile.
-            if let Ok(fresh) = subscribe(device, events) {
-                subscribed = Some(fresh);
-                shared.take(&Event::Connected(true));
+            // every `RETRY`, and Windows connects by itself meanwhile.
+            match subscribe(device, events) {
+                Ok(fresh) => {
+                    subscribed = Some(fresh);
+                    refused = None;
+                    shared.take(&Event::Connected(true));
+                }
+                Err(sentence) => {
+                    if refused.as_deref() != Some(sentence.as_str()) {
+                        log_event(
+                            LogLevel::Info,
+                            &format!(
+                                "CAM 1 is not connected yet: {sentence} Tried again every {} s.",
+                                RETRY.as_secs()
+                            ),
+                        );
+                        refused = Some(sentence);
+                    }
+                }
             }
         }
         match inbox.recv_timeout(RETRY) {
@@ -271,10 +297,19 @@ fn serve(
                 let _ = reply.send(outcome);
             }
             Ok(Order::Event(Event::Connected(false))) => {
-                if let Some(gone) = subscribed.take() {
-                    gone.end();
+                // A drop Windows has already made good (the event waited in
+                // the inbox while `fill` ran) is not acted on: the
+                // subscription stands, and the camera's settings with it.
+                // Windows keeps a bonded camera's subscriptions across a
+                // reconnect, so nothing is subscribed to twice.
+                let still_gone =
+                    device.ConnectionStatus().ok() != Some(BluetoothConnectionStatus::Connected);
+                if still_gone {
+                    if let Some(gone) = subscribed.take() {
+                        gone.end();
+                    }
+                    shared.take(&Event::Connected(false));
                 }
-                shared.take(&Event::Connected(false));
             }
             // Subscribed at the loop's top, when not already.
             Ok(Order::Event(Event::Connected(true))) => {}
@@ -311,10 +346,7 @@ fn subscribe(device: &BluetoothLEDevice, events: &Events) -> Result<Subscribed, 
 }
 
 /// Every characteristic of the camera's service, looked up before anything
-/// is read or written. While Windows has not connected yet a lookup fails,
-/// and the session is tried again in silence: logged, the two lines each
-/// retry would fill a studio build's log all day with the camera off (seen
-/// in the attended run, 2026-10-07).
+/// is read or written.
 struct Found {
     version: GattCharacteristic,
     name: GattCharacteristic,
@@ -322,6 +354,13 @@ struct Found {
     notified: Vec<(Notified, GattCharacteristic)>,
 }
 
+/// The camera's service and every characteristic looked up first, then the
+/// version read, the controller's name written and the subscriptions made.
+/// `Err` as soon as any of it fails (Windows has not connected yet; a
+/// camera that lacks something): `serve` tries again every `RETRY` and says
+/// why once. Before, a connection that was not yet made logged two lines
+/// each retry, which would have filled a studio build's log all day with
+/// the camera off (seen in the attended run, 2026-10-07).
 fn fill(
     device: &BluetoothLEDevice,
     events: &Events,
@@ -347,7 +386,8 @@ fn fill(
     // connected yet, and the session is tried again.
     let version = read_version(&found.version)?;
     // The controller's name, once each connection (D41). A camera that does
-    // not take it is a line in the log, and the link goes on without it.
+    // not take the write is a line in the log, and the link goes on without
+    // it; one that lacks the characteristic did not get this far.
     subscribed.writable.push((Writable::DeviceName, found.name));
     if let Some(name) = subscribed.characteristic(Writable::DeviceName) {
         if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes()) {

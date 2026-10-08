@@ -559,7 +559,7 @@ fn what_cannot_be_read_is_read_past() {
 }
 
 #[test]
-fn the_timecode_is_four_bcd_bytes() {
+fn the_timecode_is_the_last_four_bcd_bytes() {
     assert_eq!(
         timecode_text(&[0x10, 0x53, 0x12, 0x09]).as_deref(),
         Some("09:12:53:10")

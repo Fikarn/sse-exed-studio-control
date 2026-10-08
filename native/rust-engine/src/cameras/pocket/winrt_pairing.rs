@@ -127,7 +127,10 @@ fn find(inbox: &PairingInbox) -> Result<BluetoothAddress, Stop> {
                         dbm,
                         scan_reply,
                     });
-                } else if let Ok(mut kept) = noted.lock() {
+                } else {
+                    // Read before the lock is taken: the handlers may run
+                    // at once on Windows' thread pool, and none waits on
+                    // another's reads.
                     let makers: Vec<u16> = advertisement
                         .ManufacturerData()
                         .map(|list| {
@@ -146,10 +149,10 @@ fn find(inbox: &PairingInbox) -> Result<BluetoothAddress, Stop> {
                                 .collect()
                         })
                         .unwrap_or_default();
-                    kept.note(
-                        heard_entry(address, &name, &services, &makers, &sections),
-                        dbm,
-                    );
+                    let entry = heard_entry(address, &name, &services, &makers, &sections);
+                    if let Ok(mut kept) = noted.lock() {
+                        kept.note(entry, dbm);
+                    }
                 }
             }
             Ok(())
