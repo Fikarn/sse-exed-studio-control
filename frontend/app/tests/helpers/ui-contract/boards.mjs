@@ -62,10 +62,10 @@ export function fixtureUrl(fixture) {
 }
 
 // The chrome budget at 2560×1440 (docs/DESIGN.md section 2; the shell, visual
-// overhaul 3, moved it to Atrium's frame: 80 · 440 | 1680 | 440 · 40); a
+// overhaul 3, moved it to Atrium's frame: 88 · 440 | 1680 | 440 · 40, the header 80 until 2026-10-08); a
 // declared `[data-region]` must sit within ±2 px of its number.
 export const D4_CHROME = {
-  header: { h: 80 },
+  header: { h: 88 }, // 80 until 2026-10-08 (the walk's finding 6: more room)
   footer: { h: 40 },
   cluster: { w: 440 },
   plate: { w: 440 },
