@@ -118,7 +118,13 @@ struct Subscribed {
     /// The camera service, held for the connection's life: Windows stops a
     /// characteristic's notifications once its service is let go.
     service: Option<GattDeviceService>,
-    handled: Vec<(GattCharacteristic, i64)>,
+    /// Each listened-to characteristic, its handler's token and the
+    /// subscription asked for (indicate or notify).
+    handled: Vec<(
+        GattCharacteristic,
+        i64,
+        GattClientCharacteristicConfigurationDescriptorValue,
+    )>,
     writable: Vec<(Writable, GattCharacteristic)>,
 }
 
@@ -130,10 +136,28 @@ impl Subscribed {
             .map(|(_, characteristic)| characteristic)
     }
 
+    /// Asks for each subscription again, as it was made. A camera that kept
+    /// them (a bonded camera across a drop Windows mended by itself) changes
+    /// nothing; one that lost them (a power cycle in that moment) listens to
+    /// the link again. `Err` when the camera does not take one.
+    fn renew(&self) -> Result<(), String> {
+        for (characteristic, _, wanted) in &self.handled {
+            let status = characteristic
+                .WriteClientCharacteristicConfigurationDescriptorWithResultAsync(*wanted)
+                .and_then(|pending| pending.get())
+                .and_then(|result| result.Status())
+                .map_err(text)?;
+            if status != GattCommunicationStatus::Success {
+                return Err(format!("CAM 1 refused a subscription again: {status:?}."));
+            }
+        }
+        Ok(())
+    }
+
     /// Takes the handlers off and closes the service; the characteristics
     /// go with it.
     fn end(self) {
-        for (characteristic, token) in self.handled {
+        for (characteristic, token, _) in self.handled {
             let _ = characteristic.RemoveValueChanged(token);
         }
         if let Some(service) = self.service {
@@ -299,12 +323,13 @@ fn serve(
             Ok(Order::Event(Event::Connected(false))) => {
                 // A drop Windows has already made good (the event waited in
                 // the inbox while `fill` ran) is not acted on: the
-                // subscription stands, and the camera's settings with it.
-                // Windows keeps a bonded camera's subscriptions across a
-                // reconnect, so nothing is subscribed to twice.
-                let still_gone =
-                    device.ConnectionStatus().ok() != Some(BluetoothConnectionStatus::Connected);
-                if still_gone {
+                // subscriptions are asked for again, which changes nothing
+                // on a camera that kept them and wakes one that lost them,
+                // and the reading stands with the camera's settings in it.
+                let mended = device.ConnectionStatus().ok()
+                    == Some(BluetoothConnectionStatus::Connected)
+                    && subscribed.as_ref().is_some_and(|live| live.renew().is_ok());
+                if !mended {
                     if let Some(gone) = subscribed.take() {
                         gone.end();
                     }
@@ -425,7 +450,7 @@ fn fill(
             .map_err(text)?;
         // Kept before the descriptor's write, so a write that fails still
         // takes the handler off (`Subscribed::end`).
-        subscribed.handled.push((listened.clone(), token));
+        subscribed.handled.push((listened.clone(), token, wanted));
         let status = listened
             .WriteClientCharacteristicConfigurationDescriptorWithResultAsync(wanted)
             .and_then(|pending| pending.get())
