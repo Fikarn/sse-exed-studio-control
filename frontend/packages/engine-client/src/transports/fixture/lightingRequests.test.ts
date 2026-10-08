@@ -372,6 +372,23 @@ describe("the fixture double's rig actions", () => {
     await request("lighting.fixture.highlight", { fixtureIds: [], mode: "off" });
     expect((await bar())[3]).toEqual(["CCT/RGB Crossfade", 255]);
     expect((await bar())[4]).toEqual(["Red", 255]);
+
+    // An identify flash: white light at the top of the range, the colour and
+    // the crossfade at 0; the colour is back when the flash ends.
+    await request("lighting.fixture.identify", { fixtureId: "fixture-back" });
+    expect(await bar()).toEqual([
+      ["Dimmer", 255],
+      ["CCT", 255],
+      ["G/M", 70],
+      ["CCT/RGB Crossfade", 0],
+      ["Red", 0],
+      ["Green", 0],
+      ["Blue", 0],
+      ["Strobe", 0],
+    ]);
+    vi.setSystemTime(START + 1_200);
+    expect((await bar())[3]).toEqual(["CCT/RGB Crossfade", 255]);
+    expect((await bar())[4]).toEqual(["Red", 255]);
     await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { red: 0, green: 0 } });
     expect((await bar())[3]).toEqual(["CCT/RGB Crossfade", 0]);
 

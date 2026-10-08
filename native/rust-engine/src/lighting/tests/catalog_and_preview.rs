@@ -524,6 +524,25 @@ fn lighting_infinibar_pb12_sends_aputure_profile_1() {
     highlight(FixtureHighlightMode::Off);
     assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
 
+    // An identify flash shows the bar in white light at the top of its
+    // range, its colour and the crossfade at 0 as well; the colour is back
+    // when the flash ends.
+    identify_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyRequest {
+            fixture_id: String::from("fixture-house-practicals"),
+            duration_ms: Some(2000),
+        },
+    )
+    .expect("the flash starts");
+    assert_eq!(frame(), [255, 255, 70, 0, 0, 0, 0, 0]);
+    clear_lighting_identify_bursts(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyClearAllRequest,
+    )
+    .expect("the flash ends");
+    assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
+
     // The colour taken away: the bar is back on its CCT light.
     set(
         HashMap::from([
