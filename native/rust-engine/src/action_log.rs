@@ -782,13 +782,21 @@ pub(crate) fn ui_actions(
                 "cameras.look.set" => "look-changed",
                 "cameras.release" => "released",
                 _ if text(result, "/state") == Some("held") => "held-again",
-                _ => return Vec::new(),
+                // A camera taken back that answers later (the real link
+                // connects within a second or so): the press is a row all
+                // the same (the walk of 2026-10-07, finding 18).
+                _ => "connected",
             };
             let (Some(camera), Some(detail)) = (
                 result.get("camera").and_then(Value::as_u64),
                 text(result, "/sentence"),
             ) else {
                 return Vec::new();
+            };
+            let detail = if action == "connected" {
+                format!("CAM {camera} taken back; it is held again when it answers.")
+            } else {
+                String::from(detail)
             };
             vec![ActionRecord::new(
                 ActionSource::Ui,

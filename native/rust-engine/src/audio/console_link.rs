@@ -28,6 +28,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::action_log::{ActionRecord, ActionSource, DOMAIN_AUDIO};
+use crate::diagnostics::{log_event, LogLevel};
 use crate::rme_console_link::{
     link_now_ms, shared_console_link, ChannelFlag, ConsoleBus, ConsoleUpdate, ConsoleValue,
     ControlRoomFunction, OutOfTouch, ParamKey, PendingSend,
@@ -275,6 +276,16 @@ fn apply_console_activity_locked(
         };
         // A send the console never confirmed leaves the app's state assumed,
         // never aligned. The operator recovers with Sync (a console pull).
+        // The log says so too, once per expiry (the walk of 2026-10-07,
+        // finding 4): an expired send is counted here once.
+        log_event(
+            LogLevel::Warn,
+            &format!(
+                "TotalMix did not confirm {} change{} ({listed}): the Console reads ASSUMED until a Sync.",
+                expired.len(),
+                if expired.len() == 1 { "" } else { "s" }
+            ),
+        );
         writes.push(confidence_setting(ConsoleConfidence::Assumed));
         writes.push((
             String::from(AUDIO_LAST_ACTION_STATUS_KEY),

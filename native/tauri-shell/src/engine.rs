@@ -338,8 +338,13 @@ impl EngineBridge {
 
         let generation = self.generations.fetch_add(1, Ordering::SeqCst) + 1;
         let pid = child.id();
+        // Said here, so that a stop by itself (below) and the start after it
+        // read side by side (the walk of 2026-10-07, finding 14).
+        if let Some(Ok(mut log)) = shell_log.as_ref().map(|log| log.lock()) {
+            let _ = log.write_line("SHELL", &format!("The hardware link started: pid {pid}."));
+        }
         spawn_stdout_thread(Arc::clone(&sink), stdout, Arc::clone(&self.pending));
-        spawn_stderr_thread(stderr, shell_log);
+        spawn_stderr_thread(stderr, shell_log.clone());
 
         let process = EngineProcess {
             child,
@@ -357,6 +362,7 @@ impl EngineBridge {
             Arc::clone(&self.process),
             Arc::clone(&self.pending),
             generation,
+            shell_log,
         );
 
         Ok(summary)
@@ -462,7 +468,7 @@ impl EngineBridge {
                 };
                 match taken {
                     Some((process, status)) => {
-                        report_engine_exit(process, status, &self.pending);
+                        report_engine_exit(process, status, &self.pending, None);
                         break;
                     }
                     None => thread::sleep(ENGINE_STOP_POLL_INTERVAL),
@@ -523,6 +529,7 @@ fn spawn_exit_watcher(
     process: Arc<Mutex<Option<EngineProcess>>>,
     pending: Arc<Mutex<HashMap<String, Sender<Value>>>>,
     generation: u64,
+    shell_log: Option<SharedShellLog>,
 ) {
     let _ = thread::Builder::new()
         .name(format!("engine-exit-watcher-{generation}"))
@@ -547,7 +554,7 @@ fn spawn_exit_watcher(
                 slot.take().map(|process| (process, status))
             };
             if let Some((process, status)) = exited {
-                report_engine_exit(process, status, &pending);
+                report_engine_exit(process, status, &pending, shell_log.as_ref());
             }
             return;
         });
@@ -560,6 +567,7 @@ fn report_engine_exit(
     mut process: EngineProcess,
     status: Option<i32>,
     pending: &Mutex<HashMap<String, Sender<Value>>>,
+    shell_log: Option<&SharedShellLog>,
 ) {
     // Reaps the process: a no-op after `try_wait` saw the exit, required
     // after a kill.
@@ -572,6 +580,20 @@ fn report_engine_exit(
     let status_text = status
         .map(|code| format!("exit status {code}"))
         .unwrap_or_else(|| "no exit status".to_string());
+    // A stop nobody asked for is a line in shell.log, beside the start that
+    // follows it (the walk of 2026-10-07, finding 14); a stop the shell made
+    // is its own line already.
+    if !process.expected_exit {
+        if let Some(Ok(mut log)) = shell_log.map(|log| log.lock()) {
+            let _ = log.write_line(
+                "SHELL",
+                &format!(
+                    "The hardware link stopped by itself ({status_text}, pid {}): the page shows the recovery screen.",
+                    process.pid
+                ),
+            );
+        }
+    }
     for (id, sender) in waiters {
         let response = error_response(
             Value::String(id),

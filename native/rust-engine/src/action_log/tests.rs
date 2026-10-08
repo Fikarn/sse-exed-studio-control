@@ -354,15 +354,24 @@ fn the_camera_rows_are_what_the_answer_says() {
         .3,
         "CAM 1: display LUT Film → Ext. video → Custom."
     );
-    assert!(row(
-        "cameras.connect",
-        json!({
-            "camera": 3,
-            "state": "unreachable",
-            "sentence": "CAM 3 does not answer at 172.16.16.86. Check that it is on and on the network."
-        })
-    )
-    .is_empty());
+    // Finding 18 (the walk of 2026-10-07): a Connect the camera has not
+    // answered yet is a row all the same, in the press's own words.
+    assert_eq!(
+        row(
+            "cameras.connect",
+            json!({
+                "camera": 3,
+                "state": "unreachable",
+                "sentence": "CAM 3 does not answer at 172.16.16.86. Check that it is on and on the network."
+            })
+        ),
+        vec![(
+            DOMAIN_CAMERAS,
+            "connected",
+            String::from("CAM 3"),
+            String::from("CAM 3 taken back; it is held again when it answers.")
+        )]
+    );
     assert!(row("cameras.record.start", json!({ "recording": true })).is_empty());
     for method in [
         "cameras.snapshot",
