@@ -549,11 +549,12 @@ test("every crate of the workspace takes its lints, so unsafe is forbidden but i
   }
 });
 
-test("the shell's windows and webview2-com are the ones Tauri's wry uses (the COM code compiles only on Windows)", () => {
+test("the shell's windows and webview2-com are the ones Tauri's wry uses (they move only with a Tauri update)", () => {
   // `set_browser_accelerator_keys_off` takes wry's ICoreWebView2Controller and returns
-  // windows::core::Result, and no CI job compiles cfg(windows) code: a second version of
-  // either crate in the lock file would break the Windows build unseen. Cargo.lock names a
-  // dependency with its version only when two versions of it are locked.
+  // windows::core::Result: a second version of either crate in the lock file would break
+  // the Windows build. Cargo.lock names a dependency with its version only when two
+  // versions of it are locked. They move by hand, with a Tauri update (until 2026-10-09
+  // Dependabot was told to leave them alone; now there is no Dependabot, D46).
   const lock = readFileSync(path.join(repoRoot, "native/Cargo.lock"), "utf8");
   const packages = lock.split(/\n(?=\[\[package\]\])/);
   const named = (name) => packages.filter((block) => block.includes(`\nname = "${name}"\n`));
@@ -571,10 +572,6 @@ test("the shell's windows and webview2-com are the ones Tauri's wry uses (the CO
     assert.ok(deps.includes("windows"), `${user} depends on the one windows`);
     assert.ok(deps.includes("webview2-com"), `${user} depends on the one webview2-com`);
   }
-  // Dependabot leaves them alone; they move by hand, with a Tauri update.
-  const dependabot = readFileSync(path.join(repoRoot, ".github/dependabot.yml"), "utf8");
-  assert.match(dependabot, /- dependency-name: "windows"/);
-  assert.match(dependabot, /- dependency-name: "webview2-com"/);
 });
 
 test("identifiers, module specifiers and test ids are not copy", () => {

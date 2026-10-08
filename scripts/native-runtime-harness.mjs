@@ -221,6 +221,15 @@ export const NDI_LIBRARY_ENV = "SSE_NDI_LIBRARY";
  * development::CAMERA_BLUETOOTH_ENV`, which the engine's guard reads).
  */
 export const CAMERA_BLUETOOTH_ENV = "SSE_CAMERA_BLUETOOTH";
+/**
+ * The bridge look's stall switch (D46): the address a development build's
+ * looks at the lighting bridge stall at, waiting the whole timeout and
+ * answering silence with no connection made. Only the Setup/Support lane
+ * sets it, for its stalled-request check (`studio_control_protocol::
+ * development::BRIDGE_LOOK_STALLS_ENV`, which the engine reads; it takes
+ * only an address of the documentation ranges, RFC 5737).
+ */
+export const BRIDGE_LOOK_STALLS_ENV = "SSE_BRIDGE_LOOK_STALLS";
 
 // Whether `env` holds a switch at all, under the name in any case, as
 // Windows reads it: anything but absent, empty or 0. Wider than the engine's

@@ -16,6 +16,12 @@
 //! Only a studio build watches: with the simulated lights, as every test and
 //! development run has, the watch is not started and contacts nothing.
 //!
+//! A development build can be told to stall (D46): a look at the address
+//! `SSE_BRIDGE_LOOK_STALLS` names waits the whole timeout and finds silence,
+//! and no connection is made. The Setup/Support lane sets it for its
+//! stalled-request check, which until 2026-10-09 connected to an address of
+//! no network instead, and so kept the lane off the studio PC.
+//!
 //! A refused connection counts as an answer, as it does for the probe: the
 //! refusal comes from the address itself. On Windows it hardly arises: after a
 //! refusal Windows tries twice more and reports it about 2 s later (measured
@@ -31,11 +37,14 @@ use crate::lighting::lighting_watched_bridge;
 use crate::lighting_sacn_output::{simulated_lights_requested, LIGHTS_SIMULATED_ENV};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use std::io::ErrorKind;
-use std::net::{Ipv4Addr, SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
+use studio_control_protocol::development::{
+    bridge_look_stall_address, development_build, BRIDGE_LOOK_STALLS_ENV,
+};
 
 /// The port the probe and the watch knock on: the bridge's web page.
 pub(crate) const BRIDGE_PORT: u16 = 80;
@@ -66,6 +75,34 @@ impl BridgeAnswer {
 /// One look at `address`: a connection, closed at once, and nothing sent.
 /// The probe and the watch both look this way.
 pub(crate) fn look_at_bridge(address: SocketAddr, timeout: Duration) -> BridgeAnswer {
+    look_at_bridge_or_stall(address, timeout, stalled_address())
+}
+
+/// The address a development build's looks stall at
+/// (`BRIDGE_LOOK_STALLS_ENV`), read once; `None` in a studio build.
+fn stalled_address() -> Option<Ipv4Addr> {
+    static STALLED: OnceLock<Option<Ipv4Addr>> = OnceLock::new();
+    *STALLED.get_or_init(|| {
+        if !development_build() {
+            return None;
+        }
+        std::env::var(BRIDGE_LOOK_STALLS_ENV)
+            .ok()
+            .and_then(|value| bridge_look_stall_address(&value))
+    })
+}
+
+/// `look_at_bridge` with the stalled address given: a look at it waits the
+/// whole timeout and finds silence, and no connection is made.
+fn look_at_bridge_or_stall(
+    address: SocketAddr,
+    timeout: Duration,
+    stalled: Option<Ipv4Addr>,
+) -> BridgeAnswer {
+    if stalled.is_some_and(|stalled| address.ip() == IpAddr::V4(stalled)) {
+        thread::sleep(timeout);
+        return BridgeAnswer::Silent;
+    }
     match TcpStream::connect_timeout(&address, timeout) {
         Ok(stream) => {
             let _ = stream.shutdown(std::net::Shutdown::Both);
@@ -297,6 +334,47 @@ mod tests {
         assert!(refused, "a port nobody listens on refuses");
         assert!(BridgeAnswer::Refused.answers());
         assert!(!BridgeAnswer::Silent.answers());
+    }
+
+    // 2026-10-09 (D46): the Setup/Support lane's stalled-request check asks
+    // the engine to stall at an address of no network instead of connecting
+    // to one, so the lane runs on the studio PC without a packet.
+    //
+    // The stalled address here is a loopback listener's, which would take the
+    // connection: a look that answers silence after the timeout made none (a
+    // broken stall would answer `Accepted`), and no packet leaves the host
+    // either way. A documentation address would prove nothing: a look that
+    // did connect would time out and answer silence too, and from this PC
+    // that packet could leave towards the lighting bridge (the review of
+    // #332).
+    #[test]
+    fn a_look_at_the_stalled_address_waits_the_whole_timeout_and_connects_nowhere() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a listener binds");
+        let open = listener.local_addr().expect("its address");
+        let timeout = Duration::from_millis(80);
+        let started = std::time::Instant::now();
+        assert_eq!(
+            look_at_bridge_or_stall(open, timeout, Some(Ipv4Addr::LOCALHOST)),
+            BridgeAnswer::Silent,
+            "the listener would accept: silence means no connection was made"
+        );
+        assert!(
+            started.elapsed() >= timeout,
+            "the look waits the whole timeout"
+        );
+
+        // Every other address is looked at as before: the same listener,
+        // with another address stalled, takes the connection.
+        assert_eq!(
+            look_at_bridge_or_stall(
+                open,
+                BRIDGE_LOOK_TIMEOUT,
+                Some(Ipv4Addr::new(203, 0, 113, 113))
+            ),
+            BridgeAnswer::Accepted
+        );
+        // Tests run with nothing set: the looks of this process stall nowhere.
+        assert_eq!(stalled_address(), None);
     }
 
     #[test]

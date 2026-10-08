@@ -6,7 +6,14 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
-import { DEV_CHECK_STEPS, devCheckSteps, failureReport, runSteps, toolCacheKey } from "./dev-check.mjs";
+import {
+  DEV_CHECK_STEPS,
+  devCheckSteps,
+  failureReport,
+  runSteps,
+  toolCacheKey,
+  untrackedFilesLine,
+} from "./dev-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const scripts = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).scripts;
@@ -116,6 +123,21 @@ test("a failed step's log is printed whole when short, else its failure lines an
   assert.match(report, /FAIL {2}src\/app\/App\.test\.tsx/, "an app failure far from the end is kept");
   assert.match(report, /after 99$/);
   assert.doesNotMatch(report, /line 10\n/);
+});
+
+test("the gate is the whole gate: npm run check runs it, the shell lanes and the page tests, in that order", () => {
+  assert.equal(scripts.check, "npm run dev:check && npm run lanes:shell && npm run frontend:playwright:test");
+  assert.equal(scripts["lanes:shell"], "npm run tauri:setup-support:qualify && npm run tauri:workspaces:qualify");
+  assert.equal(scripts["check:quick"], "npm run dev:check");
+});
+
+test("the gate's last line names the files git neither tracks nor ignores, and says nothing when there are none", () => {
+  assert.equal(untrackedFilesLine(""), null);
+  assert.equal(untrackedFilesLine("\r\n\n"), null);
+  assert.equal(
+    untrackedFilesLine("scripts/new.mjs\r\ndocs/new.md\n"),
+    "Not in git (add them, or the merge will lack them): scripts/new.mjs, docs/new.md"
+  );
 });
 
 test("the command line always runs: --list prints every step", () => {
