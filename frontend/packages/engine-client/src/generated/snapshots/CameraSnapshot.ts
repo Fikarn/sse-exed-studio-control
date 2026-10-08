@@ -34,8 +34,9 @@ export type CameraSnapshot = {
   tone: CameraTone;
   sentence: string;
   /**
-   * When the camera last answered; `null` when it never has since the
-   * start, or it is released.
+   * When the camera last answered, or the saved reading's time after a
+   * start (`valuesLastRead`); `null` when it never has and nothing was
+   * saved, or it is released.
    */
   readAt: string | null;
   /**
