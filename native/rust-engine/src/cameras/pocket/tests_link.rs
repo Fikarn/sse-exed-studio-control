@@ -97,12 +97,7 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         Ok(CameraReading::default()),
         "nothing read yet"
     );
-    assert!(
-        !state.settings_read(),
-        "no setting yet: the probe's case (D43)"
-    );
     assert_eq!(state.control(&iso(800)), Noticed::Changed);
-    assert!(state.settings_read());
     assert_eq!(
         state.control(&iso(800)),
         Noticed::Nothing,
@@ -130,18 +125,12 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         1,
         "a new connection notes it afresh"
     );
-    assert!(
-        !state.settings_read(),
-        "a report the model does not read is no setting"
-    );
     assert_eq!(
         state.timecode(&[0x10, 0x53, 0x12, 0x09]),
         Noticed::Nothing,
         "a timecode that moves is no change"
     );
-    assert!(!state.settings_read(), "a timecode is no setting either");
     assert_eq!(state.control(&iso(800)), Noticed::Changed);
-    assert!(state.settings_read());
     assert_eq!(
         state.read().expect("connected").timecode.as_deref(),
         Some("09:12:53:10")
@@ -191,10 +180,6 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         "connected again: the camera sends everything afresh"
     );
     assert!(!state.initial_payload_received());
-    assert!(
-        !state.settings_read(),
-        "and until it does, the probe's case"
-    );
 
     let off = LinkFailure::Bluetooth(String::from("Bluetooth is off on this PC."));
     assert_eq!(state.failed(off.clone()), Noticed::Changed);
@@ -422,14 +407,9 @@ fn nothing_writes_the_camera_status_characteristic() {
         code.contains("Writable::DeviceName"),
         "the controller's name goes through the same write"
     );
-    assert_eq!(
-        code.matches("probe_messages()").count(),
-        1,
-        "the settings probe's bytes come from protocol.rs, written once (D43)"
-    );
     assert!(
         !code.contains("OPERATION_OFFSET") && !code.contains("Message::"),
-        "winrt.rs frames no message of its own"
+        "winrt.rs frames no message of its own: a press's bytes come from protocol.rs"
     );
     assert!(!code.contains("PairAsync"), "pairing is winrt_pairing.rs's");
 }

@@ -253,13 +253,6 @@ impl LinkState {
             .is_some_and(|flags| flags & STATUS_INITIAL_PAYLOAD_RECEIVED != 0)
     }
 
-    /// The camera has reported at least one of its settings since it
-    /// connected; the timecode and the status flags are none. The settings
-    /// probe (D43) goes when it has not.
-    pub(crate) fn settings_read(&self) -> bool {
-        !self.reading.same_values(&CameraReading::default())
-    }
-
     /// What the runtime reads: the reading while connected; otherwise why
     /// not.
     pub(crate) fn read(&self) -> Result<CameraReading, LinkFailure> {

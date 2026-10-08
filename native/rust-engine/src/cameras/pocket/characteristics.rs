@@ -10,7 +10,7 @@
 pub(crate) const SERVICE: u128 = 0x291D567A_6D75_11E6_8B77_86F30CA893D3;
 /// Written: the camera control messages the operator's presses become.
 pub(crate) const OUTGOING_CAMERA_CONTROL: u128 = 0x5DD3465F_1AEE_4299_8493_D2ECA2F8E1BB;
-/// Indicated (never notified): the camera's settings, every one once after a connection that brought them (D43) and
+/// Indicated (never notified): the camera's settings, every one once after a connection that brings them (not one within minutes of the last controller) and
 /// then each change.
 pub(crate) const INCOMING_CAMERA_CONTROL: u128 = 0xB864E140_76A0_416A_BF30_5876504537D9;
 /// Notified: the timecode, twelve bytes, its four BCD bytes last (`timecode.rs`).

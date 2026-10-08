@@ -16,10 +16,10 @@
 //! characteristic is looked up first, and a lookup or the version read that
 //! fails (Windows has not connected yet) is tried again in silence: the
 //! version and the characteristics' kinds are logged once, when the
-//! connection stands. A camera that sent no setting within `PROBE_AFTER` of
-//! connecting is sent the settings probe (D43, `protocol::probe_messages`):
-//! five offsets of zero, which change nothing and which the camera answers
-//! with its values.
+//! connection stands. Nothing else is written to the camera at a
+//! connection: a camera that sends no settings (one back with its last
+//! controller within minutes) is left to report a setting when it changes
+//! (D43, tried and withdrawn).
 //!
 //! What it never does: write the Camera Status characteristic (a `0x00`
 //! there switches the camera off), pair (that is Setup's, `winrt_pairing.rs`),
@@ -28,7 +28,6 @@
 
 use crate::cameras::pocket::characteristics::{Notified, Writable, PROTOCOL_VERSION, SERVICE};
 use crate::cameras::pocket::link::{Event, Events, Inbox, Order, PocketLink, Shared};
-use crate::cameras::pocket::protocol::probe_messages;
 use crate::cameras::real_link::LinkFailure;
 use crate::diagnostics::{log_event, LogLevel};
 use std::sync::mpsc::RecvTimeoutError;
@@ -52,11 +51,6 @@ const RETRY: Duration = Duration::from_secs(5);
 
 /// The controller's name the camera shows (D41; up to 32 characters).
 const CONTROLLER_NAME: &str = "Studio Control";
-
-/// How long after a connection the link waits for the camera's settings
-/// before it asks for them (D43). A camera that sends them begins within
-/// about two seconds (the attended run, 2026-10-07).
-const PROBE_AFTER: Duration = Duration::from_secs(4);
 
 /// How a session ended.
 enum Ended {
@@ -241,9 +235,6 @@ fn serve(
         .map_err(text)?;
 
     let mut subscribed: Option<Subscribed> = None;
-    // When the settings probe (D43) is due; `None` once it went, or while
-    // the camera is not connected.
-    let mut probe_due: Option<Instant> = None;
     let outcome = loop {
         if subscribed.is_none() {
             // Asks Windows for the camera's service, which connects when
@@ -252,14 +243,10 @@ fn serve(
             // meanwhile.
             if let Ok(fresh) = subscribe(device, events) {
                 subscribed = Some(fresh);
-                probe_due = Some(Instant::now() + PROBE_AFTER);
                 shared.take(&Event::Connected(true));
             }
         }
-        let wait = probe_due.map_or(RETRY, |due| {
-            due.saturating_duration_since(Instant::now()).min(RETRY)
-        });
-        match inbox.recv_timeout(wait) {
+        match inbox.recv_timeout(RETRY) {
             Ok(Order::LetGo) | Err(RecvTimeoutError::Disconnected) => break Ok(()),
             Ok(Order::Send {
                 messages,
@@ -287,7 +274,6 @@ fn serve(
                 if let Some(gone) = subscribed.take() {
                     gone.end();
                 }
-                probe_due = None;
                 shared.take(&Event::Connected(false));
             }
             // Subscribed at the loop's top, when not already.
@@ -296,17 +282,7 @@ fn serve(
             Err(RecvTimeoutError::Timeout) => {}
         }
         // On every pass, not only a quiet one: a running camera's timecode
-        // keeps the inbox busy, and the probe and an abandoned link's end
-        // must not wait on a quiet one.
-        if probe_due.is_some_and(|due| Instant::now() >= due) {
-            probe_due = None;
-            if let Some(outgoing) = subscribed
-                .as_ref()
-                .and_then(|subscribed| subscribed.characteristic(Writable::OutgoingControl))
-            {
-                probe(shared, outgoing);
-            }
-        }
+        // keeps the inbox busy, and an abandoned link must still end.
         if PocketLink::abandoned(shared) {
             break Ok(());
         }
@@ -487,29 +463,6 @@ fn read_version(version: &GattCharacteristic) -> Result<String, String> {
         .filter(|letter| !letter.is_control())
         .collect();
     Ok(format!("\"{}\" ({})", shown.trim(), hex.join(" ")))
-}
-
-/// The settings probe (D43): a camera that reported no setting since it
-/// connected is asked for them with offsets of zero, once a connection, and
-/// the log says so. Written through the one write, to the one characteristic
-/// a press goes to.
-fn probe(shared: &Arc<Shared>, outgoing: &GattCharacteristic) {
-    if shared.settings_read() {
-        return;
-    }
-    match write_all(outgoing, &probe_messages()) {
-        Ok(()) => log_event(
-            LogLevel::Info,
-            &format!(
-                "CAM 1 sent no settings within {} s of connecting: asked for them with five offsets of zero, which change nothing.",
-                PROBE_AFTER.as_secs()
-            ),
-        ),
-        Err(sentence) => log_event(
-            LogLevel::Warn,
-            &format!("CAM 1 did not take the settings probe: {sentence}"),
-        ),
-    }
 }
 
 fn bytes_of(buffer: &IBuffer) -> windows::core::Result<Vec<u8>> {

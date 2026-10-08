@@ -249,12 +249,6 @@ impl Shared {
             )
         })
     }
-
-    /// Whether the camera has reported a setting since it connected: the
-    /// settings probe (D43) is sent when it has not.
-    pub(crate) fn settings_read(&self) -> bool {
-        self.with_state(|state| state.settings_read())
-    }
 }
 
 impl fmt::Debug for Shared {

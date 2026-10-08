@@ -15,8 +15,8 @@
 //! messages, written to the Outgoing Camera Control characteristic and
 //! indicated back on the Incoming one, the camera sending every setting
 //! after a connection that follows some minutes without a controller or a
-//! power-on (else asked for them, D43) and then each change; the timecode
-//! on a characteristic of its own.
+//! power-on (a controller back sooner gets a setting when it changes) and
+//! then each change; the timecode on a characteristic of its own.
 
 // Some of the protocol's record (its types, the status flags, the format's
 // flags, the characteristics the link does not write) is named for the
