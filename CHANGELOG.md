@@ -1,7 +1,7 @@
 # Changelog
 
 What changed in SSE ExEd Studio Control for the person at the desk, newest first.
-One bullet per change the operator can notice, two lines at most, in the operator's words, with the pull request number. Tests, CI and refactors get no entry.
+One bullet per change the operator can notice, two lines at most, in the operator's words, with the pull request number. Tests, tooling and refactors get no entry.
 The long text of the entries written before 2026-09-28 is in git history, at the tag `archive/records-2026-09`.
 
 ## [Unreleased]

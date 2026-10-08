@@ -17,7 +17,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
+import { BRIDGE_LOOK_STALLS_ENV, hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
 import { carriesLaunchNumber, launchNumberOf } from "./tauri-launch-number.mjs";
 import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
 import { shellStillRunning } from "./tauri-shell-running.mjs";
@@ -247,52 +247,27 @@ async function dispatchCommand(session, child, action, payload = {}) {
   };
 }
 
-// Addresses whose port-80 connect neither answers nor fails promptly: the
-// documentation ranges (RFC 5737) and a shared-address-space host (RFC 6598)
-// are not routed on the public internet and have no host on a studio LAN or
-// a CI network, so the engine's lighting probe sits in its 1.5 s connect
-// timeout — the stalled request finding F07 describes. The first candidate
-// that stalls for Node stalls for the engine too (same host, same stack).
-const UNROUTED_BRIDGE_CANDIDATES = ["203.0.113.113", "198.51.100.113", "192.0.2.113", "100.127.255.113"];
-const UNROUTED_PRECHECK_MS = 1_200;
+// Finding F07 (2026-09 production readiness, Slice 4): a request the engine
+// takes seconds to answer must not stall the shell. The lighting probe of
+// `STALLED_BRIDGE_IP` sits in the engine's 1.5 s look timeout; while it does,
+// the test bridge's 250 ms heartbeat must keep reaching the status file.
+// Every heartbeat is an IPC call the shell answers on its main thread, so a
+// main thread blocked on the engine's reply — the shell before this slice —
+// freezes the file for the whole stall.
+//
+// The stall is the engine's own (2026-10-09, D46): the first shell's
+// environment names the address in `SSE_BRIDGE_LOOK_STALLS`, and a
+// development build's look at it waits the whole timeout and answers
+// silence, with no connection made. Until then the lane connected to an
+// address of no network, a documentation address (RFC 5737), and the engine
+// did the same, which kept the lane off the studio PC: its second default
+// route could carry such a packet towards the lighting bridge
+// (docs/HARDWARE.md). Now nothing is sent. The address is still one of no
+// network, so a look that did go out would find silence as well.
+const STALLED_BRIDGE_IP = "203.0.113.113";
 const STALLED_REQUEST_MIN_PROBE_MS = 1_000;
 const STALLED_REQUEST_MAX_GAP_MS = 1_000;
 
-function connectStalls(host, port, timeoutMs) {
-  return new Promise((resolve) => {
-    const socket = net.connect({ host, port });
-    const timer = setTimeout(() => {
-      socket.destroy();
-      resolve(true);
-    }, timeoutMs);
-    const settle = () => {
-      clearTimeout(timer);
-      socket.destroy();
-      resolve(false);
-    };
-    socket.once("connect", settle);
-    socket.once("error", settle);
-  });
-}
-
-async function pickUnroutedBridgeAddress() {
-  for (const host of UNROUTED_BRIDGE_CANDIDATES) {
-    if (await connectStalls(host, 80, UNROUTED_PRECHECK_MS)) {
-      return host;
-    }
-  }
-  throw new Error(
-    `The stalled-request check needs an address whose port-80 connect neither answers nor fails within ${UNROUTED_PRECHECK_MS} ms; none of ${UNROUTED_BRIDGE_CANDIDATES.join(", ")} stalls on this host.`
-  );
-}
-
-// Finding F07 (2026-09 production readiness, Slice 4): a request the engine
-// takes seconds to answer must not stall the shell. The lighting probe
-// against an unrouted address sits in the engine's 1.5 s connect timeout;
-// while it does, the test bridge's 250 ms heartbeat must keep reaching the
-// status file. Every heartbeat is an IPC call the shell answers on its main
-// thread, so a main thread blocked on the engine's reply — the shell before
-// this slice — freezes the file for the whole stall.
 async function runStalledRequestCheck(session, child, bridgeIp) {
   commandCounter += 1;
   const id = `runCommissioningCheck-${commandCounter}`;
@@ -342,7 +317,7 @@ async function runStalledRequestCheck(session, child, bridgeIp) {
   );
   assert(
     probeMs >= STALLED_REQUEST_MIN_PROBE_MS,
-    `Expected the lighting probe against ${bridgeIp} to sit in the engine's 1.5 s connect timeout, but it answered in ${probeMs} ms, so the check cannot prove anything on this network.`
+    `Expected the lighting probe against ${bridgeIp} to sit in the engine's 1.5 s look timeout, but it answered in ${probeMs} ms: the engine did not stall, so ${BRIDGE_LOOK_STALLS_ENV} did not reach it, or the shell started no development build.`
   );
 
   const ticks = heartbeats.filter((tick) => tick.at > startedAt && tick.at < finishedAt);
@@ -496,6 +471,8 @@ async function runSetupSupportQualification() {
   const firstRun = await launchTauriShell({
     appDataDir: runtime.appDataDir,
     commandPath: firstSession.commandPath,
+    // The stalled-request check's stall (`runStalledRequestCheck`).
+    extraEnv: { [BRIDGE_LOOK_STALLS_ENV]: STALLED_BRIDGE_IP },
     logsDir: runtime.logsDir,
     statusPath: firstSession.statusPath,
   });
@@ -539,13 +516,12 @@ async function runSetupSupportQualification() {
 
     // Finding F07 (2026-09 production readiness, Slice 4): the shell stays
     // responsive while the engine sits in a stalled lighting probe.
-    const unroutedBridgeIp = await pickUnroutedBridgeAddress();
-    const stalledRequest = await runStalledRequestCheck(firstSession, firstRun, unroutedBridgeIp);
+    const stalledRequest = await runStalledRequestCheck(firstSession, firstRun, STALLED_BRIDGE_IP);
     evidence.recordCheck("shell-stays-responsive-during-stalled-request", {
-      bridgeIp: unroutedBridgeIp,
+      bridgeIp: STALLED_BRIDGE_IP,
       ...stalledRequest,
     });
-    // The probe persisted the unrouted address as the lighting bridge; point
+    // The probe persisted the stalled address as the lighting bridge; point
     // the bridge back at loopback so nothing streams off this host afterwards
     // (nothing listens on 127.0.0.1:80, and a refused connect counts as a
     // reachable host for the probe).

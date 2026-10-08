@@ -43,13 +43,16 @@ A change to the pages shows at once. After a change to the engine or the contrac
 
 ## Checking a change
 
-| Command                            | Runs                                                                                                            | Takes               |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests | about a minute      |
-| `npm run frontend:playwright:test` | Builds the pages and Storybook, then the page tests: behaviour, the layout measures, the captures               | about three minutes |
-| `npm run check`                    | Both                                                                                                            | about four minutes  |
+| Command                            | Runs                                                                                                                                       | Takes               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests                            | about a minute      |
+| `npm run lanes:shell`              | The two shell lanes: the real shell with the real engine, driven through Setup and Support, recovery, restart, restore and a second launch | about two minutes   |
+| `npm run frontend:playwright:test` | Builds the pages and Storybook, then the page tests: behaviour, the layout measures, the captures                                          | about three minutes |
+| `npm run check`                    | All three, in that order                                                                                                                   | about six minutes   |
 
-Each step of `check:quick` logs to `node_modules/.cache/dev-check/`. A step that fails on timing is re-run alone with `npm run dev:check:serial` before it is believed.
+Each step of `check:quick` logs to `node_modules/.cache/dev-check/`. A step that fails on timing is re-run alone with `npm run dev:check:serial` before it is believed. Its last line names any file git neither tracks nor ignores: the gate runs on the working tree, so a new file never added passes here and would be missing from the merge.
+
+There is no CI (D46, 2026-10-09). The program runs on this PC only, and the Linux jobs that GitHub ran compiled none of its Windows code and compared no capture; this gate is the whole gate.
 
 The layers, and what each is for:
 
@@ -59,12 +62,12 @@ The layers, and what each is for:
 - **The layout measures** (`ui-contract.spec.ts`): every page against `docs/DESIGN.md` section 10.
 - **Captures** (`visual-review.spec.ts`, `storybook.spec.ts`, `prompter-window.spec.ts`): screenshots at 2560×1440 (the prompter's window at the Prompter XL's 1920×1080), compared on Windows only.
 - **Lanes** (`native:acceptance`, `native:bridge`, `tauri:smoke`): the engine driven from outside, over its pipe and over its Stream Deck bridge, on scratch data with simulated devices. They are part of `check:quick`. `npm run release` runs the first two against the build it makes.
-- **The two shell lanes** (`tauri:setup-support:qualify`, `tauri:workspaces:qualify`) run in CI only. They open the app's window, and the Setup lane connects to addresses of no network, which on this PC leave by one of its two default routes.
+- **The two shell lanes** (`tauri:setup-support:qualify`, `tauri:workspaces:qualify`; together `npm run lanes:shell`): the real shell with the real engine, started as a development run and driven through the test bridge: Setup and Support, recovery, restart, restore, a second launch, held and armed light outputs. Each lane builds the engine, the pictures helper and the shell with its test bridge first (`native:shell:build`): the shell's `tauri dev` would otherwise compile it inside the lane's 40 s wait for the first state, and a cold build takes minutes. Their windows open on screen for a minute or two and close by themselves, and they need port `4174`, so a development run (`npm run app`) is closed first. The Setup lane's stalled-request check names an address of no network, `203.0.113.113`, and tells the engine to stall there (`SSE_BRIDGE_LOOK_STALLS`, a development build's switch): nothing is sent. Until 2026-10-09 the lanes ran in CI only, because that check connected to the address, and on this PC such a packet could leave towards the lighting bridge.
 - **Hardware tests** (`npm run native:test:hardware`): the engine tests marked `#[ignore]`, against the real console. Only when the owner asks and is present, with the studio app closed and `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1` set (`docs/HARDWARE.md`).
 
 ## Captures
 
-The committed captures are under `frontend/app/tests/__visual__/`. CI compares none of them, so the local run is the one that counts.
+The committed captures are under `frontend/app/tests/__visual__/`.
 
 A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (nine headers, five footers). A change to the header moves the strips and no page.
 
@@ -127,7 +130,7 @@ The engine:
 
 The shell:
 
-- **CI compiles no Windows code.** Its jobs run on Linux, so what stands under `cfg(windows)` (the display calls, WebView2's settings, the picture layer, the pictures helper's renderer and its NDI calls) is compiled and tested by the gate on this PC alone. The helper's rules for NDI (`vmix.rs`, `ndi_sdk.rs`) are pure and run on CI too; to see what CI's Linux compiles, read every `windows` in the helper's `cfg` attributes as false (its stubs then stand in) and run clippy.
+- **This PC is the only build machine.** Everything, the code under `cfg(windows)` included (the display calls, WebView2's settings, the picture layer, the pictures helper's renderer and its NDI calls), is compiled and tested by `npm run check` here and nowhere else. The stubs under `cfg(not(windows))`, the lanes' xvfb timeouts and skip switches, and `process.env.CI` in the page tests' configuration are leftovers of the Linux CI that went on 2026-10-09; they are removed in a change of their own.
 - **A timed wait on Windows is coarse.** `recv_timeout`, `Condvar::wait_timeout` and `park_timeout` can wake up to 16 ms late in a process that asked for no finer timer (read on this PC, 2026-10-01); `thread::sleep` and a wake from another thread come within a millisecond. The pictures helper's draw loop is woken by each frame of vMix's, and sleeps the last 20 ms of a timed wait in steps (`layer.rs`, `Inbox`).
 - **`unsafe` has a list.** The shell's crate and the pictures helper's deny `unsafe`, and lift it for the functions `SHELL_UNSAFE` and `PICTURES_UNSAFE` name in `scripts/check-no-shortcuts.test.mjs`, each with its reason and its number of blocks. A block says why it is sound in a `// SAFETY:` comment above it. A new block changes the list.
 - **A command of the shell is named by its module** in `main.rs`'s two handler lists (`shell_commands::engine_start`): the macro that registers it lives beside the command.

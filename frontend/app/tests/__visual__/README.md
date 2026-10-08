@@ -14,9 +14,7 @@ The `-win32` suffix is Node's `process.platform`, added by `snapshotPathTemplate
 
 ## Where they are compared
 
-On the studio workstation, by `npm run frontend:playwright:test` (part of `npm run check`).
-
-CI compares none of them: its runner is Linux, where `ignoreSnapshots` is on. Every other check in those specs runs there as everywhere.
+On the studio workstation, by `npm run frontend:playwright:test` (part of `npm run check`), and nowhere else: there is no CI.
 
 ## Refreshing
 

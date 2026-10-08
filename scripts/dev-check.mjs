@@ -19,7 +19,7 @@
 // keeps the CPU it needs (`DEV_CHECK_PRIORITY=normal` keeps the normal one).
 // The command line is `scripts/dev-check-cli.mjs`.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import os from "node:os";
@@ -55,17 +55,17 @@ export function devCheckSteps(cacheKey = toolCacheKey()) {
     { id: "protocol:check" },
     { id: "rust:clippy", after: ["protocol:check"] },
     { id: "native:test", after: ["rust:clippy"] },
-    // The engine driven from outside, as CI's `rust` job drives it: over its
-    // pipe, over its Stream Deck bridge, and at its start. Each starts engines
-    // on scratch data with simulated devices. The two shell lanes stay CI's:
-    // they open windows and connect to addresses of no network.
+    // The engine driven from outside: over its pipe, over its Stream Deck
+    // bridge, and at its start. Each starts engines on scratch data with
+    // simulated devices. The two shell lanes, which open the app's window,
+    // are `npm run check`'s, after this gate (`lanes:shell`).
     { id: "native:acceptance", after: ["native:test"] },
     { id: "native:bridge", after: ["native:acceptance"] },
     { id: "tauri:smoke", after: ["native:bridge"] },
     { id: "rust:fmt:check" },
-    // Local caches under node_modules/.cache/dev-check, keyed as above; CI
-    // runs the same scripts without them. Prettier deletes its default cache
-    // file whenever it runs without --cache, so this one has its own place.
+    // Local caches under node_modules/.cache/dev-check, keyed as above.
+    // Prettier deletes its default cache file whenever it runs without
+    // --cache, so this one has its own place.
     {
       id: "format:check",
       after: ["protocol:check"],
@@ -141,6 +141,29 @@ export function failureReport(text, { wholeUpTo = 250, matchesUpTo = 120, tailLi
     "...",
     ...lines.slice(-tailLines),
   ].join("\n");
+}
+
+/**
+ * The line that names the files git neither tracks nor ignores, or null when
+ * there are none. The gate runs on the working tree, so a new file that was
+ * never added passes here and is missing from the merge: the one thing a
+ * build from a clean clone would have caught (2026-10-09, D46).
+ */
+export function untrackedFilesLine(gitOutput) {
+  const files = gitOutput
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (files.length === 0) {
+    return null;
+  }
+  return `Not in git (add them, or the merge will lack them): ${files.join(", ")}`;
+}
+
+/** What git neither tracks nor ignores, one path a line; "" when git cannot say. */
+function gitUntracked() {
+  const result = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8" });
+  return result.status === 0 ? result.stdout : "";
 }
 
 function npmInvocation(script, args) {
@@ -221,5 +244,9 @@ export async function main(argv = []) {
   console.log(
     `\ndev:check ${failed.length === 0 ? "passed" : `FAILED (${failed.join(", ")})`}: ${status.size} steps in ${seconds(started)} s (logs in ${cacheRoot})`
   );
+  const untracked = untrackedFilesLine(gitUntracked());
+  if (untracked) {
+    console.log(untracked);
+  }
   return failed.length === 0 ? 0 : 1;
 }

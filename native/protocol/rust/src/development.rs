@@ -21,6 +21,7 @@
 
 use std::ffi::OsString;
 use std::fs;
+use std::net::Ipv4Addr;
 use std::path::{Component, Path, PathBuf};
 
 /// The studio's folder in the platform's app-data folder.
@@ -41,6 +42,27 @@ pub const CAMERA_BLUETOOTH_ENV: &str = "SSE_CAMERA_BLUETOOTH";
 /// switches are.
 pub fn camera_bluetooth_requested(value: &str) -> bool {
     value.trim() == "1"
+}
+
+/// The bridge look's stall switch (D46): `SSE_BRIDGE_LOOK_STALLS=<address>`
+/// makes a development build's every look at that address wait the look's
+/// whole timeout and answer silence, with no connection made. The
+/// Setup/Support lane sets it for its stalled-request check, which proves
+/// that the shell stays responsive while the hardware link sits in a
+/// stalled lighting probe (F07): the lane once connected to an address of no
+/// network for that, and so did the engine, which kept the lane off the
+/// studio PC, whose second default route could carry such a packet towards
+/// the lighting bridge. Only an address of the documentation ranges
+/// (RFC 5737) is taken, so the switch never names a real device; a studio
+/// build never reads it.
+pub const BRIDGE_LOOK_STALLS_ENV: &str = "SSE_BRIDGE_LOOK_STALLS";
+
+/// The address `BRIDGE_LOOK_STALLS_ENV` names, when it is one of the
+/// documentation ranges; the value is trimmed first.
+pub fn bridge_look_stall_address(value: &str) -> Option<Ipv4Addr> {
+    let address: Ipv4Addr = value.trim().parse().ok()?;
+    let [a, b, c, _] = address.octets();
+    matches!((a, b, c), (192, 0, 2) | (198, 51, 100) | (203, 0, 113)).then_some(address)
 }
 
 /// The commit a studio build was made from; `None` in a development build.
@@ -402,6 +424,33 @@ mod tests {
         match host_platform() {
             HostPlatform::Windows => "APPDATA",
             HostPlatform::Unix => "XDG_DATA_HOME",
+        }
+    }
+
+    // 2026-10-09 (D46): the lane's stalled-request check asks the engine to
+    // stall instead of connecting to an address of no network, and the switch
+    // takes only such an address.
+    #[test]
+    fn the_stall_switch_takes_only_a_documentation_address() {
+        assert_eq!(BRIDGE_LOOK_STALLS_ENV, "SSE_BRIDGE_LOOK_STALLS");
+        for (value, address) in [
+            ("203.0.113.113", Ipv4Addr::new(203, 0, 113, 113)),
+            (" 198.51.100.1 ", Ipv4Addr::new(198, 51, 100, 1)),
+            ("192.0.2.255\n", Ipv4Addr::new(192, 0, 2, 255)),
+        ] {
+            assert_eq!(bridge_look_stall_address(value), Some(address), "{value:?}");
+        }
+        for value in [
+            "",
+            "1",
+            "10.1.0.1",
+            "127.0.0.1",
+            "100.127.255.113",
+            "203.0.114.1",
+            "203.0.113.113:80",
+            "bridge",
+        ] {
+            assert_eq!(bridge_look_stall_address(value), None, "{value:?}");
         }
     }
 

@@ -33,8 +33,8 @@ Two rules hold the design together:
 
 1. **Agree.** Ask the owner what only the owner can decide, once, before building, each with a recommendation. Decide everything else and say what was decided.
 2. **Build** on a branch from `main`.
-3. **Check** with `npm run check`. It runs what CI runs but the two shell lanes, on this machine, in a few minutes.
-4. **Merge.** Push, open a pull request, merge when CI is green. No go-ahead is needed.
+3. **Check** with `npm run check`. It is the whole gate, on this machine: the checks and the unit tests, the engine's lanes, the two shell lanes, then the page tests. There is no other machine and no CI.
+4. **Merge.** Push, open a pull request, merge it at once. Nothing else is waited for, and no go-ahead is needed.
 5. **Record.** The pull request says what changed, why, and how it was checked. `CHANGELOG.md` gets a line or two when the operator would notice the change. `docs/ROADMAP.md` is ticked.
 6. **Show.** When the change is something the owner can see or the hardware does, start the app and let the owner try it.
 
@@ -50,7 +50,7 @@ Two rules hold the design together:
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.
 - **Saved data:** a schema upgrade writes a backup first. Backups are never deleted by a script. A newer build upgrades the saved data, and an older build then refuses it: going back means restoring the backup.
 - **Files that are not in git are not deleted by the assistant:** old builds, build folders, the owner's own folders. The owner gets the command.
-- **Dependencies:** never `npm audit fix`. Take the fixed version.
+- **Dependencies:** they move by hand, on the owner's word; there is no Dependabot. GitHub's security alerts stay on and are read. Never `npm audit fix`: take the fixed version. The shell's `windows` and `webview2-com` move only with a Tauri update, as one version each (a script test holds it).
 
 ## Product rules
 
@@ -63,16 +63,17 @@ Two rules hold the design together:
 
 ## Commands
 
-| Command                                | Does                                                                                                    |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `npm run check`                        | The whole gate: format, lint, types, unit tests, engine tests and lanes, then the page tests            |
-| `npm run check:quick`                  | The same without the page tests (under a minute)                                                        |
-| `npm run frontend:playwright:test`     | The page tests alone; it builds the pages first                                                         |
-| `npm run dev --workspace frontend/app` | The pages in a browser, against test data (add `?fixture=<name>&transport=fixture` to the address)      |
-| `npm run app`                          | The app as a development run: its own saved data, simulated devices. It can run beside the studio app   |
-| `npm run release`                      | A studio build of `main`, in `builds\`, tried on scratch data. `release:verified` makes it the studio's |
-| `npm run protocol:generate`            | Regenerate the contract's generated files                                                               |
-| `npm run format`                       | Format everything with Prettier                                                                         |
+| Command                                | Does                                                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                        | The whole gate: format, lint, types, unit tests, engine tests and lanes, the two shell lanes, then the page tests |
+| `npm run check:quick`                  | The same without the shell lanes and the page tests (under a minute)                                              |
+| `npm run lanes:shell`                  | The two shell lanes alone: the real shell and engine, driven through Setup, recovery, restart and restore         |
+| `npm run frontend:playwright:test`     | The page tests alone; it builds the pages first                                                                   |
+| `npm run dev --workspace frontend/app` | The pages in a browser, against test data (add `?fixture=<name>&transport=fixture` to the address)                |
+| `npm run app`                          | The app as a development run: its own saved data, simulated devices. It can run beside the studio app             |
+| `npm run release`                      | A studio build of `main`, in `builds\`, tried on scratch data. `release:verified` makes it the studio's           |
+| `npm run protocol:generate`            | Regenerate the contract's generated files                                                                         |
+| `npm run format`                       | Format everything with Prettier                                                                                   |
 
 A capture that a change moved is refreshed with `npx playwright test --update-snapshots=changed` from `frontend/app`, and looked at before it is committed.
 
