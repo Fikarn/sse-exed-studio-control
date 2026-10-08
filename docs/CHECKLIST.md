@@ -155,7 +155,7 @@ Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on 
 - [ ] A camera switched off reads `UNREACHABLE`, and nothing else changes.
 - [ ] CAM 1's Focus section shows no slider but the sentence about its EF lens; `Autofocus once` works, and the deck's focus dial (BANK on focus) is refused with the same sentence, its strip cell `--` (finding 15, fixed 2026-10-08).
 - [ ] CAM 1's `Display LUT` and `LUT` rows are locked with the sentence that the camera takes no change over Bluetooth, and the readout shows what the camera reports; a LUT changed in the camera's menu shows within about a second (finding 16, fixed 2026-10-08).
-- [ ] The plate's head reads `Battery` with the camera's own percentage, `on mains` with the power cable in and `charging` while it charges; under `REC`, `Card time left` reads what the camera's own display shows for its record time, within a minute. **If it reads 60 times too large or too small, the unit of the camera's 9.2 is not minutes: say so** (2026-10-08, the unit and the slots are not in the published protocol).
+- [ ] The plate's head reads `Battery` with the camera's own percentage, `on mains` with the power cable in and `charging` while it charges; under `REC`, `Card time left` reads what the camera's own display shows for its record time, within a minute. **If it reads 60 times too large or too small, the unit of the camera's 9.2 is not minutes; if it reads far above the display, a slot's number is not a time (every slot above 0 is summed; a development run's trace decodes 9.2's bytes): say so** (2026-10-08, the unit and the slots are not in the published protocol).
 
 ## Saved data and recovery
 

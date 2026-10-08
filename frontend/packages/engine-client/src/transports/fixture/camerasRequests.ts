@@ -423,7 +423,7 @@ function recordStopRequest(cameras: FixtureCameras, params: JsonObject, now: num
 }
 
 /**
- * `cameras.release { camera, confirm }`: hands the camera back to the iPad or LUMIX Tether.
+ * `cameras.release { camera, confirm }`: lets the camera go, to LUMIX Tether or to nobody.
  * The hardware link stops reading it and sends it nothing; its values are no longer shown.
  * A recording CAM 1 goes on recording. Kept in memory only (D13).
  */
@@ -709,7 +709,7 @@ export interface SimulatedCameraHooks {
   /** How many commands the camera has been sent (D12: only a press sends). */
   sent(camera: CameraNumber): number;
   /**
-   * A value the camera changed itself — on its body, or from the iPad: the camera wins
+   * A value the camera changed itself — on its body, or from another controller: the camera wins
    * (D12), and a held camera's change comes back as `cameras.changed { reason: "reported" }`.
    * `recording` starts or stops CAM 1's take.
    */

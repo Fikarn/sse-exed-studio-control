@@ -692,7 +692,7 @@ pub(super) fn record_request(
 // Release and Connect (D13)
 // ---------------------------------------------------------------------------
 
-/// `cameras.release { camera, confirm }`: hands the camera back to the iPad
+/// `cameras.release { camera, confirm }`: lets the camera go, to nobody
 /// or LUMIX Tether. Nothing is sent: the hardware link stops reading it, and
 /// a take CAM 1 is recording goes on.
 fn release_request(cameras: &mut Cameras, params: &Value) -> Handled {

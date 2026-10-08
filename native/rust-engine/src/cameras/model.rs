@@ -553,12 +553,10 @@ impl CameraModel {
         })
     }
 
-    /// Why it reports no record time: no medium it can record to.
+    /// The camera reported a record time of nothing (every slot 0): what is
+    /// known, no cause (the protocol gives none: no medium, or a full one).
     pub(crate) fn no_record_time_sentence(&self) -> String {
-        format!(
-            "{} reports no record time: no medium it can record to.",
-            self.tag
-        )
+        format!("{} reports no record time left.", self.tag)
     }
 
     // -----------------------------------------------------------------------

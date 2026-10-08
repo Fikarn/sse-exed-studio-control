@@ -342,7 +342,9 @@ export interface CameraBattery {
 
 /** `100 % · on mains`, `63 % · charging`, `11.3 V` when the camera shows the voltage (`CameraBattery::text`). */
 export function batteryText(battery: CameraBattery): string {
-  const level = battery.flags & 0b1_0000 ? `${(battery.millivolts / 1000).toFixed(1)} V` : `${battery.percent} %`;
+  // Tenths, half up, as `CameraBattery::text` rounds.
+  const level =
+    battery.flags & 0b1_0000 ? `${(Math.round(battery.millivolts / 100) / 10).toFixed(1)} V` : `${battery.percent} %`;
   if (battery.flags & 0b100) return `${level} · charging`;
   if (battery.flags & 0b10) return `${level} · on mains`;
   return level;
@@ -354,7 +356,7 @@ export function recordTimeText(minutes: number): string {
   return `${minutes} min`;
 }
 
-/** Why there is no record time though the camera was read: no medium it can record to. */
+/** The camera reported a record time of nothing: what is known, no cause (`no_record_time_sentence`). */
 export function noRecordTimeSentence(model: CameraModel): string {
-  return `${model.tag} reports no record time: no medium it can record to.`;
+  return `${model.tag} reports no record time left.`;
 }

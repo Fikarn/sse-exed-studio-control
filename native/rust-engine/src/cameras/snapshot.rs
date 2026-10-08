@@ -25,7 +25,7 @@ pub enum CameraLink {
 pub enum CameraState {
     /// Held and answering: `HELD`.
     Held,
-    /// Handed back to the iPad or LUMIX Tether: `RELEASED`.
+    /// Let go, to LUMIX Tether or to nobody: `RELEASED`.
     Released,
     /// Setup holds no address or pairing for it: `NOT SET UP`.
     NotSetUp,
@@ -218,8 +218,8 @@ pub struct CameraRecording {
     /// (`17 h 00 min`; the Pocket's 9.2, summed over its slots).
     #[serde(rename = "cardTimeLeft")]
     pub card_time_left: Option<String>,
-    /// Why there is none though the camera was read: it reports no medium
-    /// it can record to.
+    /// Why there is none though the camera was read: it reports no record
+    /// time left (no cause: no medium, or a full one).
     #[serde(rename = "cardTimeNotReported")]
     pub card_time_not_reported: Option<String>,
 }

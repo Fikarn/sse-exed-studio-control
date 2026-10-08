@@ -3,7 +3,7 @@
 //! every set-up camera that is not released held and read (D13) and CAM 1
 //! selected (D19). Setup's part is saved (`store.rs`), and so is a release
 //! (D41, 2026-10-06; a setting of its own, `cameras.released.<camera>`): a
-//! camera handed to the iPad or LUMIX Tether stays released across a start
+//! camera let go (to LUMIX Tether, or to nobody) stays released across a start
 //! until `Connect`, `Forget`, a new pairing or a new address. The selection
 //! and the dials' bank are kept in memory.
 //!
@@ -115,7 +115,7 @@ pub(crate) struct CameraRuntime {
     pub setup: StoredSetup,
     /// This build has a link to it (`real_link::has_link`).
     pub has_link: bool,
-    /// Handed back to the iPad or LUMIX Tether (D13); saved, so a start
+    /// Let go (to LUMIX Tether, or to nobody; D13); saved, so a start
     /// keeps it (D41).
     pub released: bool,
     /// What it last reported; `None` when it was never read since the start

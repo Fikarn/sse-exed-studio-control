@@ -119,7 +119,7 @@ export interface HeldCamera {
   /** CAM 1 is paired. */
   paired: boolean;
   vmixInput: number;
-  /** Handed back to the iPad or LUMIX Tether, in memory only. */
+  /** Let go (to LUMIX Tether, or to nobody), in memory only. */
   released: boolean;
   /** What it last reported, and when; `null` when never read since the start, or released. */
   read: CameraRead | null;

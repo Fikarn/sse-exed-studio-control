@@ -29,8 +29,8 @@ export type CameraRecording = {
    */
   cardTimeLeft: string | null;
   /**
-   * Why there is none though the camera was read: it reports no medium
-   * it can record to.
+   * Why there is none though the camera was read: it reports no record
+   * time left (no cause: no medium, or a full one).
    */
   cardTimeNotReported: string | null;
 };

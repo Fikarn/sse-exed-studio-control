@@ -68,7 +68,11 @@ impl CameraBattery {
     /// shows the voltage: the page's line.
     pub(crate) fn text(&self) -> String {
         let level = if self.flags & Self::SHOW_VOLTAGE != 0 {
-            format!("{:.1} V", f64::from(self.millivolts) / 1000.0)
+            // Tenths, half up: the fixture double prints the same.
+            format!(
+                "{:.1} V",
+                (f64::from(self.millivolts) / 100.0).round() / 10.0
+            )
         } else {
             format!("{} %", self.percent)
         };
@@ -383,7 +387,7 @@ impl SimulatedCameras {
         &self.camera(camera).sent
     }
 
-    /// The body: a value changed on the camera itself, or from the iPad
+    /// The body: a value changed on the camera itself, or from another controller
     /// (test hook).
     #[cfg(test)]
     pub(crate) fn body_sets(&mut self, camera: u8, setting: Setting, value: CameraValue) {
@@ -397,7 +401,7 @@ impl SimulatedCameras {
         self.camera_mut(camera).values.clear(setting);
     }
 
-    /// The body starts or stops a take (test hook): the iPad, or the
+    /// The body starts or stops a take (test hook): another controller, or the
     /// camera's own button.
     #[cfg(test)]
     pub(crate) fn body_records(&mut self, camera: u8, recording: bool) {
