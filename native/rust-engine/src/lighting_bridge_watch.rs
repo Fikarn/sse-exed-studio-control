@@ -339,29 +339,38 @@ mod tests {
     // 2026-10-09 (D46): the Setup/Support lane's stalled-request check asks
     // the engine to stall at an address of no network instead of connecting
     // to one, so the lane runs on the studio PC without a packet.
+    //
+    // The stalled address here is a loopback listener's, which would take the
+    // connection: a look that answers silence after the timeout made none (a
+    // broken stall would answer `Accepted`), and no packet leaves the host
+    // either way. A documentation address would prove nothing: a look that
+    // did connect would time out and answer silence too, and from this PC
+    // that packet could leave towards the lighting bridge (the review of
+    // #332).
     #[test]
     fn a_look_at_the_stalled_address_waits_the_whole_timeout_and_connects_nowhere() {
-        let stalled = Ipv4Addr::new(203, 0, 113, 113);
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a listener binds");
+        let open = listener.local_addr().expect("its address");
         let timeout = Duration::from_millis(80);
         let started = std::time::Instant::now();
         assert_eq!(
-            look_at_bridge_or_stall(
-                SocketAddr::from((stalled, BRIDGE_PORT)),
-                timeout,
-                Some(stalled)
-            ),
-            BridgeAnswer::Silent
+            look_at_bridge_or_stall(open, timeout, Some(Ipv4Addr::LOCALHOST)),
+            BridgeAnswer::Silent,
+            "the listener would accept: silence means no connection was made"
         );
         assert!(
             started.elapsed() >= timeout,
             "the look waits the whole timeout"
         );
 
-        // Every other address is looked at as before.
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a listener binds");
-        let open = listener.local_addr().expect("its address");
+        // Every other address is looked at as before: the same listener,
+        // with another address stalled, takes the connection.
         assert_eq!(
-            look_at_bridge_or_stall(open, BRIDGE_LOOK_TIMEOUT, Some(stalled)),
+            look_at_bridge_or_stall(
+                open,
+                BRIDGE_LOOK_TIMEOUT,
+                Some(Ipv4Addr::new(203, 0, 113, 113))
+            ),
             BridgeAnswer::Accepted
         );
         // Tests run with nothing set: the looks of this process stall nowhere.
