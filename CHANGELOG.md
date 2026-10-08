@@ -8,6 +8,9 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- CAM 1's Focus section says that its EF lens reports no position and takes none, with `Autofocus once` as its focus control, and its display LUT rows are locked with the sentence that the camera takes no change over Bluetooth (the cameras polish pull request of 2026-10-08).
+- Under `REC`, `Card time left` reads what CAM 1 reports (`17 h 00 min`), and the plate's head its battery (`Battery 100 % · on mains`); the card time is checked against the camera's display at the walk (the same pull request).
+- `Release CAM 1` leaves the Pocket alone: nothing on screen names the iPad any more (the same pull request).
 - The header is taller, 88 px where it was 80, so its lamps and words have more room (#329).
 - A light's plate sliders move the light while you drag them, not only when you let go (#329).
 - The prompter's glass keeps the same room left and right of the text at every margin, with paragraph numbers too (#329).

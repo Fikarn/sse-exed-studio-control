@@ -101,20 +101,20 @@ export interface CameraModel {
   /** The camera's make and model. */
   model: string;
   link: CameraLink;
-  /** Who a release hands it to: the iPad (CAM 1), LUMIX Tether (CAM 2, CAM 3). */
-  app: string;
+  /** Who a release hands it to: LUMIX Tether (CAM 2, CAM 3); `null` for CAM 1, which a release leaves alone. */
+  app: string | null;
   /** CAM 1 alone records (D10, D14). */
   records: boolean;
   choices: Record<ChoiceSetting, ChoiceModel | NotReported>;
   levels: Record<LevelSetting, LevelModel | NotReported>;
   displayLutOn: { start: boolean } | NotReported;
+  /** Why it takes no change to its display LUT though it reports it; `null` when it takes one (finding 16). */
+  displayLutLock: string | null;
   /** The one-shot autos it offers. */
   auto: CameraAutos;
   /** Focus moves nearer and farther without a reported position (the BGH1s). */
   focusSteps: boolean;
   timecodeReported: boolean;
-  /** Why it does not report its card time; `null` when it does not record here. */
-  cardTimeNotReported: string | null;
   /** The frame rates it does not allow at a resolution, with the reason. */
   unavailableFrameRates: Readonly<Record<string, readonly CameraUnavailable[]>>;
 }
@@ -180,7 +180,7 @@ const POCKET_6K_PRO: CameraModel = {
   tag: "CAM 1",
   model: "Blackmagic Pocket Cinema Camera 6K Pro",
   link: "bluetooth",
-  app: "the iPad",
+  app: null,
   records: true,
   choices: {
     iso: { options: SHARED_ISOS, start: "400" },
@@ -195,13 +195,17 @@ const POCKET_6K_PRO: CameraModel = {
   levels: {
     whiteBalance: { min: 2500, max: 10000, step: 50, unit: "K", start: 5600 },
     tint: { min: -50, max: 50, step: 1, unit: "", start: 2 },
-    focus: { min: 0, max: 1, step: 0.01, unit: "", start: 0.62 },
+    // The Pocket's EF lens reports no position and takes none (finding 15).
+    focus: {
+      notReported:
+        "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works.",
+    },
   },
   displayLutOn: { start: true },
+  displayLutLock: "CAM 1's display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.",
   auto: { focus: true, whiteBalance: true, iris: true },
   focusSteps: false,
   timecodeReported: true,
-  cardTimeNotReported: "CAM 1 does not report its card time over Bluetooth.",
   unavailableFrameRates: { "6K": [{ value: "60", reason: "not at 6K" }] },
 };
 
@@ -257,10 +261,10 @@ function bgh1(
       focus: { notReported: `${tag} does not report a focus position.` },
     },
     displayLutOn: displayLut,
+    displayLutLock: null,
     auto: { focus: true, whiteBalance: false, iris: false },
     focusSteps: true,
     timecodeReported: false,
-    cardTimeNotReported: null,
     unavailableFrameRates: {},
   };
 }
@@ -326,4 +330,31 @@ export function cameraAddress(value: string): string | null {
   if (octets.every((octet) => octet === 255)) return null;
   if (octets[0]! >= 224 && octets[0]! <= 239) return null;
   return octets.join(".");
+}
+
+/** The battery as the simulated CAM 1 reports it (the Pocket's 9.0: millivolts, percent, flags). */
+export interface CameraBattery {
+  millivolts: number;
+  percent: number;
+  /** Bit 0 a battery is in, bit 1 mains power, bit 2 charging, bit 3 an estimate, bit 4 the camera shows the voltage. */
+  flags: number;
+}
+
+/** `100 % · on mains`, `63 % · charging`, `11.3 V` when the camera shows the voltage (`CameraBattery::text`). */
+export function batteryText(battery: CameraBattery): string {
+  const level = battery.flags & 0b1_0000 ? `${(battery.millivolts / 1000).toFixed(1)} V` : `${battery.percent} %`;
+  if (battery.flags & 0b100) return `${level} · charging`;
+  if (battery.flags & 0b10) return `${level} · on mains`;
+  return level;
+}
+
+/** `17 h 00 min`, `45 min`: the record time left as the page prints it (`record_time_text`). */
+export function recordTimeText(minutes: number): string {
+  if (minutes >= 60) return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+  return `${minutes} min`;
+}
+
+/** Why there is no record time though the camera was read: no medium it can record to. */
+export function noRecordTimeSentence(model: CameraModel): string {
+  return `${model.tag} reports no record time: no medium it can record to.`;
 }

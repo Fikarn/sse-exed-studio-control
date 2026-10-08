@@ -48,13 +48,12 @@ describe("the fixture double's cameras: one press (set, step, auto)", () => {
     expect(await call("cameras.set", { camera: 1, setting: "whiteBalance", value: 4350 })).toMatchObject({
       value: 4350,
     });
-    expect(await call("cameras.set", { camera: 1, setting: "focus", value: 0.57 })).toMatchObject({ value: 0.57 });
     expect(await call("cameras.set", { camera: 1, setting: "tint", value: -50 })).toMatchObject({ value: -50 });
     expect(await call("cameras.set", { camera: 2, setting: "shutter", value: "1/100" })).toMatchObject({
       camera: 2,
       value: "1/100",
     });
-    expect(cameras.sent(1)).toBe(4);
+    expect(cameras.sent(1)).toBe(3);
     expect(cameras.sent(2)).toBe(1);
     expect((await rows()).length, "a press on a setting is not a Recent action").toBe(before);
   });
@@ -73,8 +72,13 @@ describe("the fixture double's cameras: one press (set, step, auto)", () => {
       [2, "whiteBalance", 5650, "CAMERA_VALUE_NOT_ALLOWED", "CAM 2 does not allow white balance 5650."],
       [1, "whiteBalance", 12000, "CAMERA_VALUE_NOT_ALLOWED", "CAM 1 does not allow white balance 12000."],
       [1, "tint", -51, "CAMERA_VALUE_NOT_ALLOWED", "CAM 1 does not allow tint -51."],
-      [1, "focus", 1.5, "CAMERA_VALUE_NOT_ALLOWED", "CAM 1 does not allow focus 1.5."],
-      [1, "focus", 0.625, "CAMERA_VALUE_NOT_ALLOWED", "CAM 1 does not allow focus 0.625."],
+      [
+        1,
+        "focus",
+        0.5,
+        "CAMERA_SETTING_UNSUPPORTED",
+        "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works.",
+      ],
     ];
     for (const [number, setting, value, code, sentence] of cases) {
       expect(await refused("cameras.set", { camera: number, setting, value }), `${setting} ${value}`).toEqual({
@@ -125,8 +129,6 @@ describe("the fixture double's cameras: one press (set, step, auto)", () => {
     expect((await step(1, "iso", -100)).value, "stops at the lowest").toBe("100");
     expect((await step(1, "shutter", 100)).value, "stops at the highest").toBe("360°");
     expect((await step(1, "whiteBalance", 3)).value).toBe(5750);
-    expect((await step(1, "focus", -1)).value).toBe(0.61);
-    expect((await step(1, "focus", 1000)).value).toBe(1);
     expect((await step(1, "tint", -5)).value).toBe(-3);
     expect((await step(2, "whiteBalance", -2)).value).toBe(5400);
     expect(await step(2, "focus", -3)).toEqual({ camera: 2, setting: "focus", value: null });
@@ -146,10 +148,11 @@ describe("the fixture double's cameras: one press (set, step, auto)", () => {
     await call("cameras.set", { camera: 1, setting: "whiteBalance", value: 3200 });
     await call("cameras.set", { camera: 1, setting: "iris", value: "f/8.0" });
     seen();
+    // Autofocus once works on CAM 1, whose EF lens reports no position back (finding 15).
     expect(await call("cameras.auto", { camera: 1, what: "focus" })).toEqual({
       camera: 1,
       setting: "focus",
-      value: 0.5,
+      value: null,
     });
     expect(await call("cameras.auto", { camera: 1, what: "whiteBalance" })).toEqual({
       camera: 1,
@@ -245,22 +248,27 @@ describe("the fixture double's cameras: armed changes (format, look)", () => {
   it("changes the look with a second press, each part of it in the sentence", async () => {
     const { call, refused, seen, rows } = held();
     expect(await refused("cameras.look.set", { camera: 1, dynamicRange: "Video" })).toEqual(NOT_CONFIRMED);
-    expect(
-      await call("cameras.look.set", { camera: 1, dynamicRange: "Video", displayLutOn: false, confirm: true })
-    ).toEqual({ camera: 1, sentence: "CAM 1: dynamic range Film → Video; display LUT off." });
+    expect(await call("cameras.look.set", { camera: 1, dynamicRange: "Video", confirm: true })).toEqual({
+      camera: 1,
+      sentence: "CAM 1: dynamic range Film → Video.",
+    });
     expect(seen()).toEqual([["cameras.changed", "look", 1]]);
-    expect((await call("cameras.look.set", { camera: 1, displayLut: "Custom", confirm: true })).sentence).toBe(
-      "CAM 1: display LUT Film → Ext. video → Custom."
-    );
-    expect((await call("cameras.look.set", { camera: 1, displayLutOn: true, confirm: true })).sentence).toBe(
-      "CAM 1: display LUT on."
-    );
+    // CAM 1's display LUT is read-only (finding 16): the lock, before the list.
+    const lutLock = "CAM 1's display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.";
+    expect(await refused("cameras.look.set", { camera: 1, displayLut: "Custom", confirm: true })).toEqual({
+      code: "CAMERA_VALUE_NOT_ALLOWED",
+      sentence: lutLock,
+    });
+    expect(await refused("cameras.look.set", { camera: 1, displayLutOn: true, confirm: true })).toEqual({
+      code: "CAMERA_VALUE_NOT_ALLOWED",
+      sentence: lutLock,
+    });
     expect((await rows())[0]).toMatchObject({
       source: "ui",
       domain: "cameras",
       action: "look-changed",
       target: "CAM 1",
-      detail: "CAM 1: display LUT on.",
+      detail: "CAM 1: dynamic range Film → Video.",
     });
     expect(await refused("cameras.look.set", { camera: 2, dynamicRange: "Video", confirm: true })).toEqual({
       code: "CAMERA_SETTING_UNSUPPORTED",
@@ -272,7 +280,7 @@ describe("the fixture double's cameras: armed changes (format, look)", () => {
     });
     expect(await refused("cameras.look.set", { camera: 1, displayLut: "Rec 709" })).toEqual({
       code: "CAMERA_VALUE_NOT_ALLOWED",
-      sentence: "CAM 1 does not allow display LUT Rec 709.",
+      sentence: lutLock,
     });
     expect(await refused("cameras.look.set", { camera: 1, confirm: true })).toEqual({
       code: "INVALID_PARAMS",
@@ -390,10 +398,10 @@ describe("the fixture double's cameras: who holds a camera (D13)", () => {
       sentence: "CAM 2 is already held.",
     });
     expect(await call("cameras.release", { camera: 1, confirm: true })).toMatchObject({
-      sentence: "CAM 1 released to the iPad.",
+      sentence: "CAM 1 released.",
     });
     expect((await rows()).slice(0, 3).map((row) => [row.action, row.target, row.detail])).toEqual([
-      ["released", "CAM 1", "CAM 1 released to the iPad."],
+      ["released", "CAM 1", "CAM 1 released."],
       ["held-again", "CAM 2", "CAM 2 held again."],
       ["released", "CAM 2", "CAM 2 released to LUMIX Tether."],
     ]);
@@ -749,7 +757,7 @@ describe("the fixture double's cameras: Setup", () => {
         noLink: null,
         pairing: {
           state: "finding",
-          sentence: "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.",
+          sentence: "Looking for CAM 1. Switch its Bluetooth on, with no other controller connected to it.",
         },
       },
     });
@@ -864,7 +872,7 @@ describe("the fixture double's cameras: nothing is sent by itself (D12)", () => 
     await call("cameras.step", { camera: 2, setting: "focus", step: 1 });
     await call("cameras.auto", { camera: 3, what: "focus" });
     await call("cameras.format.set", { camera: 1, frameRate: "24", confirm: true });
-    await call("cameras.look.set", { camera: 1, displayLutOn: false, confirm: true });
+    await call("cameras.look.set", { camera: 1, dynamicRange: "Video", confirm: true });
     await call("cameras.record.start");
     await call("cameras.record.stop", { confirm: true });
     expect(sent(), "each press sends once").toEqual([5, 1, 1]);

@@ -48,7 +48,7 @@ describe("a camera's menu", () => {
     expect(menu.destructive).toMatchObject({
       id: "release:1",
       label: "Release CAM 1…",
-      armedLabel: "Press again to release CAM 1 to the iPad",
+      armedLabel: "Press again to release CAM 1",
       testId: "menu-release",
     });
   });

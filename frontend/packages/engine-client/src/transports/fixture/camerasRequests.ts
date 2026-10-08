@@ -68,6 +68,7 @@ import {
   pairingNotWantedRefusal,
   PIN_INVALID_MESSAGE,
   PIN_REFUSED_SENTENCE,
+  readOnlyRefusal,
   releasedRefusal,
   releasedToSentence,
   SIMULATED_PIN,
@@ -366,6 +367,10 @@ function lookRequest(cameras: FixtureCameras, params: JsonObject, now: number): 
   if (displayLut !== null) reportedChoice(model, "displayLut");
   if (displayLutOn !== null && !isReported(model.displayLutOn)) {
     throw unsupportedRefusal(model.displayLutOn.notReported);
+  }
+  // CAM 1 reports its display LUT and takes no change to it (finding 16): the lock, before the list.
+  if ((displayLut !== null || displayLutOn !== null) && model.displayLutLock !== null) {
+    throw readOnlyRefusal(model.displayLutLock);
   }
   if (dynamicRange !== null) allowedChoice(model, "dynamicRange", dynamicRange);
   if (displayLut !== null) allowedChoice(model, "displayLut", displayLut);

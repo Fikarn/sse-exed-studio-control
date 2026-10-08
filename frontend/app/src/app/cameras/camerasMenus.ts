@@ -1,7 +1,7 @@
 import type { MenuContent, MenuDestructiveItem, MenuEntry } from "@sse/design-system";
 import type { CameraSnapshot } from "@sse/engine-client";
 
-import { cameraNumber, linkLabel, releasedTo } from "./camerasModel";
+import { cameraNumber, linkLabel, releaseLabel, releasedTo } from "./camerasModel";
 import { camerasMenuArmId } from "./useCamerasArming";
 
 // The visual overhaul's Cameras page (2026-10-05, DESIGN.md §9): one menu per
@@ -62,7 +62,7 @@ export function buildCameraMenu(options: CameraMenuOptions): CamerasMenu {
       items.push({
         id: "connect",
         label: `Connect ${tag}`,
-        value: `released to ${releasedTo(camera)}`,
+        value: releasedTo(camera) === null ? "released" : `released to ${releasedTo(camera)}`,
         onSelect: options.onConnect,
         testId: `${testIdPrefix}-connect`,
       });
@@ -94,7 +94,7 @@ export function buildCameraMenu(options: CameraMenuOptions): CamerasMenu {
     destructive = {
       id: camerasMenuArmId.release(cameraNumber(camera)),
       label: `Release ${tag}…`,
-      armedLabel: `Press again to release ${tag} to ${releasedTo(camera)}`,
+      armedLabel: `Press again to ${releaseLabel(camera).replace(/^Release/, "release")}`,
       onConfirm: options.onRelease,
       testId: `${testIdPrefix}-release`,
     };

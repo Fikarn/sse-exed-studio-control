@@ -47,7 +47,9 @@ export function lastReadSentence(model: CameraModel): string {
 }
 
 export function releasedSentence(model: CameraModel): string {
-  return `${model.tag} is released to ${model.app}. Connect it to control it here.`;
+  return model.app === null
+    ? `${model.tag} is released: Studio Control reads it no more and sends it nothing. Connect it to control it here.`
+    : `${model.tag} is released to ${model.app}. Connect it to control it here.`;
 }
 
 /** A camera that is not set up; in a build with no link to it, that there is none yet, not what to enter. */
@@ -116,7 +118,7 @@ export const SIMULATED_PIN = "123456";
 
 /** Each running step's sentence, as Setup shows it. */
 export const PAIRING_SENTENCES = {
-  finding: "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed.",
+  finding: "Looking for CAM 1. Switch its Bluetooth on, with no other controller connected to it.",
   pin: "CAM 1 shows a 6-digit PIN. Enter it here within 30 seconds.",
   pairing: "Pairing with CAM 1…",
 } as const;
@@ -137,6 +139,11 @@ export function pairingNotWantedRefusal(): EngineRequestError {
 /** A setting the camera does not report: its not-reported sentence. */
 export function unsupportedRefusal(sentence: string): EngineRequestError {
   return new EngineRequestError("CAMERA_SETTING_UNSUPPORTED", sentence);
+}
+
+/** A setting the camera reports and takes no change to (CAM 1's display LUT, finding 16): the lock's sentence. */
+export function readOnlyRefusal(sentence: string): EngineRequestError {
+  return new EngineRequestError("CAMERA_VALUE_NOT_ALLOWED", sentence);
 }
 
 const AUTO_WORDS: Record<AutoWhat, string> = {
@@ -229,7 +236,7 @@ export function lookSentence(model: CameraModel, parts: readonly string[]): stri
 
 /** The release's sentence: its answer and its Recent actions row. */
 export function releasedToSentence(model: CameraModel): string {
-  return `${model.tag} released to ${model.app}.`;
+  return model.app === null ? `${model.tag} released.` : `${model.tag} released to ${model.app}.`;
 }
 
 /** Connect's sentence when the camera is held again: its answer and its Recent actions row. */

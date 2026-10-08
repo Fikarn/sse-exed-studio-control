@@ -88,7 +88,9 @@ describe("the fixture double's camera words, as the operator reads them", () => 
     });
     expect(STATE_TONES).toEqual({ held: "ok", released: "attention", "not-set-up": "attention", unreachable: "error" });
     expect(heldSentence(CAM2)).toBe("CAM 2 is held: Studio Control reads it and sends only what you press.");
-    expect(releasedSentence(CAM1)).toBe("CAM 1 is released to the iPad. Connect it to control it here.");
+    expect(releasedSentence(CAM1)).toBe(
+      "CAM 1 is released: Studio Control reads it no more and sends it nothing. Connect it to control it here."
+    );
     expect(releasedSentence(CAM3)).toBe("CAM 3 is released to LUMIX Tether. Connect it to control it here.");
     expect(notSetUpSentence(CAM1)).toBe("CAM 1 is not paired. Pair it in Setup, with the camera beside you.");
     expect(notSetUpSentence(CAM2)).toBe("CAM 2 has no address. Enter it in Setup.");
@@ -159,7 +161,7 @@ describe("the fixture double's camera words, as the operator reads them", () => 
     expect(lookSentence(CAM1, [range, lookPart({ setting: "displayLutOn", on: false })])).toBe(
       "CAM 1: dynamic range Film → Video; display LUT off."
     );
-    expect(releasedToSentence(CAM1)).toBe("CAM 1 released to the iPad.");
+    expect(releasedToSentence(CAM1)).toBe("CAM 1 released.");
     expect(releasedToSentence(CAM2)).toBe("CAM 2 released to LUMIX Tether.");
     expect(heldAgainSentence(CAM2)).toBe("CAM 2 held again.");
     expect(addressesNotRestoredSentence([])).toBeNull();
@@ -222,14 +224,14 @@ const RUST_MODELS = (() => {
   const model = rustSource("cameras/model.rs");
   const models = [
     ...model.matchAll(
-      /camera: (\d),\s*tag: "([^"]+)",\s*model: "([^"]+)",\s*link: CameraLink::(\w+),\s*app: "([^"]+)",\s*bgh1: (true|false),/g
+      /camera: (\d),\s*tag: "([^"]+)",\s*model: "([^"]+)",\s*link: CameraLink::(\w+),\s*app: (None|Some\("([^"]+)"\)),\s*bgh1: (true|false),/g
     ),
-  ].map(([, camera, tag, make, link, app, bgh1]) => ({
+  ].map(([, camera, tag, make, link, app, appName, bgh1]) => ({
     camera: Number(camera),
     tag: tag!,
     model: make!,
     link: link!.toLowerCase(),
-    app: app!,
+    app: app === "None" ? null : appName!,
     bgh1: bgh1 === "true",
   }));
   if (models.length !== 3) throw new Error("model.rs's MODELS do not read as three cameras any more; update this test");
@@ -334,7 +336,7 @@ function everyDoubleSentence(): string[] {
     for (const entry of [...Object.values(model.choices), ...Object.values(model.levels), model.displayLutOn]) {
       if (!isReported(entry)) sentences.push(entry.notReported);
     }
-    if (model.cardTimeNotReported !== null) sentences.push(model.cardTimeNotReported);
+    if (model.displayLutLock !== null) sentences.push(model.displayLutLock);
   }
   sentences.push(
     unreachableSentence(CAM2, null),
@@ -482,7 +484,13 @@ describe("the fixture double's camera words: the hardware link's", () => {
         rust("{tag} is held: Studio Control reads it and sends only what you press.", [], tag)
       );
       expect(releasedSentence(model)).toBe(
-        rust("{tag} is released to {}. Connect it to control it here.", [rustModel.app], tag)
+        rustModel.app === null
+          ? rust(
+              "{tag} is released: Studio Control reads it no more and sends it nothing. Connect it to control it here.",
+              [],
+              tag
+            )
+          : rust("{tag} is released to {app}. Connect it to control it here.", [], { ...tag, app: rustModel.app })
       );
       expect(notSetUpSentence(model)).toBe(
         rustModel.bgh1
@@ -507,7 +515,11 @@ describe("the fixture double's camera words: the hardware link's", () => {
       );
       expect(releasedRefusal(model).message).toBe(rust("{} is released. Connect it to set it from here.", [model.tag]));
       expect(alreadyHeldRefusal(model).message).toBe(rust("{} is already held.", [model.tag]));
-      expect(releasedToSentence(model)).toBe(rust("{} released to {}.", [model.tag, rustModel.app]));
+      expect(releasedToSentence(model)).toBe(
+        rustModel.app === null
+          ? rust("{} released.", [model.tag])
+          : rust("{} released to {app}.", [model.tag], { app: rustModel.app })
+      );
       expect(heldAgainSentence(model)).toBe(rust("{} held again.", [model.tag]));
       expect(formatNotAllowedRefusal(model, "60", "6K").message).toBe(
         rust("{} does not allow {frame_rate}p at {resolution}.", [model.tag], { frame_rate: "60", resolution: "6K" })
@@ -521,7 +533,13 @@ describe("the fixture double's camera words: the hardware link's", () => {
       const notReported: Record<string, string> = {
         nd: "The BGH1 has no ND filter.",
         tint: rust("{tag} does not report tint.", [], tag),
-        focus: rust("{tag} does not report a focus position.", [], tag),
+        focus: rustModel.bgh1
+          ? rust("{tag} does not report a focus position.", [], tag)
+          : rust(
+              "{tag}'s EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works.",
+              [],
+              tag
+            ),
         dynamicRange: rust("{tag} does not report its dynamic range.", [], tag),
         displayLut: rust("{tag} does not report a display LUT.", [], tag),
       };
@@ -536,8 +554,13 @@ describe("the fixture double's camera words: the hardware link's", () => {
           if (key === "nd") expect(LITERALS).toContain(expected);
         }
       }
-      expect(model.cardTimeNotReported).toBe(
-        rustModel.bgh1 ? null : rust("{} does not report its card time over Bluetooth.", [model.tag])
+      // CAM 1's display LUT is read-only (finding 16).
+      expect(model.displayLutLock).toBe(
+        rustModel.bgh1
+          ? null
+          : rust("{}'s display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.", [
+              model.tag,
+            ])
       );
     }
     expect(NO_LINK_SENTENCE).toBe(rust(NO_LINK_SENTENCE));
@@ -652,10 +675,9 @@ describe("the fixture double's camera words: the hardware link's", () => {
         step: Number(bgh1 ? step![1] : step![2]),
         unit: whiteBalance[4],
       });
-      for (const [key, arm] of [
-        ["tint", "Tint, false"],
-        ["focus", "Focus, false"],
-      ] as const) {
+      // No camera reports a focus position: the Pocket's EF lens reports none (finding 15).
+      expect(isReported(camera.levels.focus), `CAM ${camera.camera} focus`).toBe(false);
+      for (const [key, arm] of [["tint", "Tint, false"]] as const) {
         const level = camera.levels[key];
         if (bgh1) {
           expect(isReported(level), `CAM ${camera.camera} ${key}`).toBe(false);

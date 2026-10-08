@@ -304,8 +304,14 @@ test.describe("the Cameras page", () => {
 
     await page.getByTestId("cameras-auto-iris").click();
     await expect(page.getByTestId("cameras-iris-value")).toContainText("f/4.0");
+    // CAM 1's battery stands in the plate's head (9.0, read since 2026-10-08).
+    await expect(page.getByTestId("cameras-battery")).toHaveText("Battery 100 % · on mains");
     await page.getByTestId("cameras-auto-focus").click();
-    await expect(page.getByTestId("cameras-focus-value")).toHaveText("0.50");
+    // CAM 1's EF lens reports no focus position (finding 15): the sentence, no slider.
+    await expect(page.getByTestId("cameras-focus-not-reported")).toHaveText(
+      "CAM 1's EF lens reports no focus position and takes none: it moves focus by offsets. Autofocus once works."
+    );
+    await expect(page.getByTestId("cameras-focus-slider")).toHaveCount(0);
 
     // A step at the end of the camera's own values is locked, with the reason.
     await page.getByTestId("cameras-iso-value").click();
@@ -430,9 +436,12 @@ test.describe("the Cameras page", () => {
     await expect(format).toHaveCount(0);
     await pressTwice(page, "cameras-dynamicRange-Video");
     await expect(page.getByTestId("cameras-dynamicRange-Video")).toHaveAttribute("aria-pressed", "true");
-    await pressTwice(page, "cameras-displayLutOn-off");
-    await expect(page.getByTestId("cameras-displayLutOn-off")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1: display LUT off.");
+    // CAM 1's display LUT is read-only (finding 16): its rows are locked with the sentence.
+    const lutLock = "CAM 1's display LUT is the camera's own menu's: it reports it and takes no change over Bluetooth.";
+    await expect(page.getByTestId("cameras-displayLutOn-off")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-displayLutOn-off")).toHaveAttribute("title", lutLock);
+    await expect(page.getByTestId("cameras-displayLut-lock")).toHaveText(lutLock);
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1: dynamic range Film → Video.");
 
     // The BGH1s report neither a profile nor a LUT, and say so. Selecting
     // another camera (a press outside the popover) closes the popover.
@@ -476,7 +485,7 @@ test.describe("the Cameras page", () => {
     await pausePageClock(page);
     await page.getByTestId("cameras-release").click();
     await expect(page.getByTestId("cameras-connection-note")).toHaveText(
-      "CAM 1 is recording: after Release, REC stops only on the camera or the iPad."
+      "CAM 1 is recording: after Release, REC stops only on the camera."
     );
     await page.clock.fastForward(PAST_THE_DWELL_MS);
     await page.getByTestId("cameras-release").click();
@@ -485,7 +494,7 @@ test.describe("the Cameras page", () => {
     const rec = page.getByTestId("cameras-rec");
     await expect(rec).toHaveAttribute("data-rec", "locked");
     await expect(rec).toHaveAttribute("aria-disabled", "true");
-    await expect(rec).toContainText("locked · CAM 1 is released to the iPad");
+    await expect(rec).toContainText("locked · CAM 1 is released");
     await expect(recChip(page)).toContainText("not read while released");
     await expect(recChip(page)).toHaveAttribute("data-tone", "attention");
     await expect(page.getByTestId("cameras-take-timecode")).toContainText("not read while released");
@@ -1040,20 +1049,27 @@ test.describe("the Cameras page", () => {
   test("the Recent list has room for its five rows at two lines each", async ({ page }) => {
     await page.clock.install();
     await openCameras(page);
-    // A look's sentence is the longest a row carries, and takes two lines.
+    // Five rows of the longest sentence a row carries now, the dynamic
+    // range's (CAM 1's LUT, whose sentence took two lines, is locked since
+    // 2026-10-08, finding 16). The room for two lines a row is measured from
+    // the rows' own geometry, so the list is proven to hold five such rows.
     await openLook(page);
-    for (const lut of ["Film → Video", "Film → Ext. video", "Film → Video", "Film → Ext. video", "Film → Video"]) {
-      await pressTwice(page, `cameras-displayLut-${lut}`);
-      await expect(page.getByTestId("cameras-recent-row").first()).toContainText(`→ ${lut}.`);
+    for (const range of ["Extended video", "Video", "Extended video", "Video", "Extended video"]) {
+      await pressTwice(page, `cameras-dynamicRange-${range}`);
+      await expect(page.getByTestId("cameras-recent-row").first()).toContainText(`→ ${range}.`);
     }
     const room = await page.evaluate(() => {
       const section = document.querySelector<HTMLElement>("[data-testid=cameras-recent]")!;
       const rows = [...section.querySelectorAll<HTMLElement>("[data-testid=cameras-recent-row]")];
+      const text = (row: HTMLElement) => row.children[1] as HTMLElement;
+      const lineHeight = parseFloat(getComputedStyle(text(rows[0]!)).lineHeight);
+      const rowChrome = rows[0]!.getBoundingClientRect().height - text(rows[0]!).getBoundingClientRect().height;
+      const gap = rows[1]!.getBoundingClientRect().top - rows[0]!.getBoundingClientRect().bottom;
       return {
-        lines: rows.map((row) => {
-          const text = row.children[1] as HTMLElement;
-          return Math.round(text.getBoundingClientRect().height / parseFloat(getComputedStyle(text).lineHeight));
-        }),
+        lines: rows.map((row) => Math.round(text(row).getBoundingClientRect().height / lineHeight)),
+        // Five rows at two lines each, with the rows' own chrome and gaps.
+        needed: 5 * (2 * lineHeight + rowChrome) + 4 * gap,
+        firstRowTop: rows[0]!.getBoundingClientRect().top,
         cut: section.scrollHeight > section.clientHeight + 1,
         lastRowBottom: rows.at(-1)!.getBoundingClientRect().bottom,
         sectionBottom: section.getBoundingClientRect().bottom,
@@ -1065,7 +1081,10 @@ test.describe("the Cameras page", () => {
         })(),
       };
     });
-    expect(room.lines).toEqual([2, 2, 2, 2, 2]);
+    expect(room.lines).toEqual([1, 1, 1, 1, 1]);
+    expect(room.clusterFoot - room.firstRowTop, "room for five rows at two lines").toBeGreaterThanOrEqual(
+      room.needed - 0.5
+    );
     expect(room.cut, "the list is not cut").toBe(false);
     expect(room.lastRowBottom).toBeLessThanOrEqual(room.sectionBottom + 0.5);
     expect(room.sectionBottom, "the list ends inside the cluster").toBeLessThanOrEqual(room.clusterFoot + 0.5);
@@ -1546,7 +1565,7 @@ test.describe("Setup / Support's camera section", () => {
     // The studio's build has CAM 1's link; the double has no Pocket for it to find.
     await page.getByTestId("setup-camera-1-pair").click();
     await expect(page.getByTestId("setup-camera-1-pairing")).toHaveText(
-      "Looking for CAM 1. Switch its Bluetooth on, with the iPad's app closed."
+      "Looking for CAM 1. Switch its Bluetooth on, with no other controller connected to it."
     );
     await expect(page.getByTestId("setup-camera-1-pair")).toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("setup-camera-1-pin")).toHaveCount(0);
