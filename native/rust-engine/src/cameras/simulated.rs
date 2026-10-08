@@ -20,7 +20,7 @@ pub(crate) const SIMULATED_PIN: &str = "123456";
 
 /// What a camera reports: each setting, or `None` when it does not report
 /// it (or, in the hardware link's view, has not been read).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct CameraReading {
     pub iso: Option<String>,
     pub shutter: Option<String>,
@@ -125,6 +125,18 @@ pub(crate) enum CameraValue {
     Switch(bool),
 }
 
+/// What a link answers when a camera is read: what the camera reported,
+/// and whether that is the last read rather than what it reports now: the
+/// link has brought no setting since it connected. The Pocket sends its
+/// settings afresh only to a controller that connects after some minutes
+/// without one or after a power-on; back within seconds it sends nothing
+/// until a setting changes (the attended run, 2026-10-07; finding 19).
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LinkReading {
+    pub reading: CameraReading,
+    pub last_read: bool,
+}
+
 /// What the hardware link sends a camera: only what the operator pressed
 /// (D11, D12).
 #[derive(Debug, Clone, PartialEq)]
@@ -151,6 +163,9 @@ pub(crate) struct SimulatedCamera {
     /// What it holds now: every value its model reports.
     values: CameraReading,
     answering: bool,
+    /// Reports its settings when read; `false` reads as a connection that
+    /// has brought no setting yet (a test hook, finding 19).
+    reporting: bool,
     /// Everything it was sent, oldest first.
     sent: Vec<CameraCommand>,
     /// The time of day its timecode reads; `None` runs it from this PC's
@@ -202,6 +217,7 @@ impl SimulatedCamera {
             camera,
             values,
             answering: true,
+            reporting: true,
             sent: Vec::new(),
             clock: None,
         }
@@ -286,8 +302,12 @@ impl SimulatedCameras {
     }
 
     /// What camera `camera` reports, or `None` when it does not answer.
-    pub(crate) fn read(&self, camera: u8) -> Option<CameraReading> {
-        self.camera(camera).read()
+    pub(crate) fn read(&self, camera: u8) -> Option<LinkReading> {
+        let camera = self.camera(camera);
+        camera.read().map(|reading| LinkReading {
+            reading,
+            last_read: !camera.reporting,
+        })
     }
 
     /// Sends the commands in order; `false` when the camera does not answer.
@@ -327,6 +347,14 @@ impl SimulatedCameras {
     #[cfg(test)]
     pub(crate) fn set_answering(&mut self, camera: u8, answering: bool) {
         self.camera_mut(camera).answering = answering;
+    }
+
+    /// The camera reports its settings when read (`true`), or its link has
+    /// brought no setting since it connected (`false`; finding 19). A test
+    /// hook.
+    #[cfg(test)]
+    pub(crate) fn set_reporting(&mut self, camera: u8, reporting: bool) {
+        self.camera_mut(camera).reporting = reporting;
     }
 
     /// Sets the time of day the camera's timecode reads (test hook).

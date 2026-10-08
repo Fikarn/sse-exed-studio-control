@@ -190,6 +190,14 @@ impl TestCameras {
         });
     }
 
+    /// The camera's link has brought no setting since it connected
+    /// (`false`), or the camera reports (`true`; finding 19).
+    pub(crate) fn reporting(&self, camera: u8, reporting: bool) {
+        runtime::with_bodies(&self.db_path, |bodies| {
+            bodies.set_reporting(camera, reporting);
+        });
+    }
+
     /// The time of day the camera's timecode reads.
     pub(crate) fn set_clock(&self, camera: u8, time_of_day: std::time::Duration) {
         runtime::with_bodies(&self.db_path, |bodies| {

@@ -709,6 +709,10 @@ export interface SimulatedCameraHooks {
   stopAnswering(camera: CameraNumber): void;
   /** It answers again: a held one is read at once. */
   answerAgain(camera: CameraNumber): void;
+  /** Its link has brought no setting since it connected: a held camera's values are the last read until it reports (finding 19). */
+  reportNothing(camera: CameraNumber): void;
+  /** It reports again: a held one is read at once. */
+  reportAgain(camera: CameraNumber): void;
   /**
    * The action log cannot be read, or can again: while it cannot, `cameras.snapshot`
    * answers `recent: null` and everything else as ever.
@@ -765,6 +769,14 @@ export function simulatedCameras(transport: EngineTransport): SimulatedCameraHoo
     answerAgain: (camera) =>
       onBody(() => {
         bodies()[camera].answering = true;
+      }),
+    reportNothing: (camera) =>
+      onBody(() => {
+        bodies()[camera].reporting = false;
+      }),
+    reportAgain: (camera) =>
+      onBody(() => {
+        bodies()[camera].reporting = true;
       }),
     actionLogUnreadable: (unreadable) => {
       fixtureCameras(context.state).recentUnreadable = unreadable;

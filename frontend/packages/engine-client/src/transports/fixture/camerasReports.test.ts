@@ -125,6 +125,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
       tone: "ok",
       sentence: "CAM 1 is held: Studio Control reads it and sends only what you press.",
       readAt: AT(NOW),
+      valuesLastRead: false,
       values: {
         iso: choice(ISO_CAM1, "400"),
         shutter: choice("45° 90° 120° 144° 172.8° 180° 216° 270° 360°".split(" "), "180°"),
@@ -183,6 +184,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
       tone: "ok",
       sentence: "CAM 2 is held: Studio Control reads it and sends only what you press.",
       readAt: AT(NOW),
+      valuesLastRead: false,
       values: {
         iso: choice(bgh1Iso, "800"),
         shutter: choice(shutter, "1/50"),

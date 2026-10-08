@@ -127,7 +127,9 @@ export function CamerasPlate({
   const number = cameraNumber(camera);
   const lock = controlsLock(camera);
   const held = lock === null;
-  const doubt = camera.state === "unreachable";
+  // Doubt: a camera that does not answer, or one whose link has brought no
+  // setting since it connected, so its values are the last read (finding 19).
+  const doubt = camera.state === "unreachable" || camera.valuesLastRead;
   const shown = camera.state === "held" || doubt;
   // A popover belongs to the camera it was opened for, while that camera is
   // held and, for a list or a typed value, reports the setting.
@@ -352,7 +354,9 @@ export function CamerasPlate({
     switch (camera.state) {
       case "held":
         return {
-          detail: linkLabel(camera),
+          detail: camera.valuesLastRead
+            ? `${linkLabel(camera)} · ${last ? `last read ${last}` : "last read"}`
+            : linkLabel(camera),
           key: (
             <ArmKey
               armed={releaseIsArmed}

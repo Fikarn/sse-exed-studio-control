@@ -142,6 +142,8 @@ The state display speaks of the camera that is worst off, and of the selected on
 
 While CAM 1 is `UNREACHABLE` after it reported recording, `REC` reads `last known 09:11 · STOP is locked until CAM 1 answers`: the take is left as it was. Stop it on the camera if it must end.
 
+A held camera whose link has brought nothing since it connected (CAM 1 back within minutes of its last controller: a restart of the app, `Connect` soon after `Release`) shows what it last reported in amber with `last read` and the time, also after a start, and the state display says so. Its keys work and a press is sent; the values are its own again once the camera reports a setting, which it does when one changes or after it is switched off and on.
+
 ## Stream Deck
 
 A control on the deck does what the same control does on screen, and the screen follows. Putting the profile on the deck is in [HARDWARE.md](HARDWARE.md).

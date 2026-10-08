@@ -75,8 +75,12 @@ pub(crate) fn status_words(flags: u8) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LinkState {
     pub connection: Connection,
-    /// What the camera has reported since it connected.
+    /// What the camera has reported: kept across a connection lost and made
+    /// again, and seeded at the start from what was saved (finding 19).
     pub reading: CameraReading,
+    /// The camera has reported a setting since it connected; until it has,
+    /// the reading is the last read.
+    pub reported_since_connection: bool,
     /// The camera status flags last notified.
     pub status: Option<u8>,
     /// Why the link stopped, in the operator's words; `None` while it runs
@@ -138,6 +142,7 @@ impl LinkState {
         Self {
             connection: Connection::Starting,
             reading: CameraReading::default(),
+            reported_since_connection: false,
             status: None,
             failure: None,
             unread: Vec::new(),
@@ -152,11 +157,23 @@ impl LinkState {
         std::mem::take(&mut self.unread)
     }
 
-    /// Connected and subscribed. The camera sends every setting afresh, so
-    /// what was read before is dropped rather than shown as today's.
+    /// The state at a start, with what the camera reported before, saved
+    /// (finding 19): the last read until the camera reports.
+    pub(crate) fn with_last(last: CameraReading) -> Self {
+        Self {
+            reading: last,
+            ..Self::new()
+        }
+    }
+
+    /// Connected and subscribed. The camera sends every setting afresh only
+    /// after some minutes without a controller or a power-on; back within
+    /// seconds it sends nothing until a setting changes (the attended run,
+    /// 2026-10-07). So what was read before stays, as the last read, until
+    /// the camera reports (finding 19).
     pub(crate) fn connected(&mut self) -> Noticed {
         self.connection = Connection::Connected;
-        self.reading = CameraReading::default();
+        self.reported_since_connection = false;
         self.noted_unread.clear();
         self.traced_control = 0;
         self.traced_timecode = 0;
@@ -197,6 +214,7 @@ impl LinkState {
         let before = self.reading.clone();
         for message in Message::decode_all(bytes) {
             if apply(&mut self.reading, &message) {
+                self.reported_since_connection = true;
                 continue;
             }
             let key = (message.parameter.0, message.parameter.1, message.data_type);
@@ -251,6 +269,12 @@ impl LinkState {
     pub(crate) fn initial_payload_received(&self) -> bool {
         self.status
             .is_some_and(|flags| flags & STATUS_INITIAL_PAYLOAD_RECEIVED != 0)
+    }
+
+    /// Connected, and the camera has reported no setting since: the reading
+    /// is the last read (finding 19).
+    pub(crate) fn last_read(&self) -> bool {
+        self.connection == Connection::Connected && !self.reported_since_connection
     }
 
     /// What the runtime reads: the reading while connected; otherwise why

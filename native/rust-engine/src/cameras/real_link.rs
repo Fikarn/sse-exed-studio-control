@@ -16,7 +16,7 @@ use crate::cameras::model::{model, RECORDING_CAMERA};
 use crate::cameras::pocket::link::PocketLink;
 use crate::cameras::pocket::pairing::{PairingStep, PocketPairing};
 use crate::cameras::runtime::notice;
-use crate::cameras::simulated::{CameraCommand, CameraReading};
+use crate::cameras::simulated::{CameraCommand, CameraReading, LinkReading};
 use crate::cameras::store::StoredSetup;
 use std::path::{Path, PathBuf};
 
@@ -227,7 +227,7 @@ impl RealLinks {
     /// without a Bluetooth address in its row (a pairing from before the
     /// link, restored whole) has no link to start, and a link that was
     /// running for another row is let go.
-    pub(crate) fn hold(&mut self, setup: &StoredSetup) {
+    pub(crate) fn hold(&mut self, setup: &StoredSetup, last: Option<CameraReading>) {
         self.note("hold", setup.camera);
         if setup.camera != RECORDING_CAMERA {
             return;
@@ -245,7 +245,11 @@ impl RealLinks {
         }
         self.let_go_pocket();
         let db_path = self.db_path.clone();
-        self.pocket = Some(PocketLink::start(address, move || notice(&db_path)));
+        self.pocket = Some(PocketLink::start(
+            address,
+            last.unwrap_or_default(),
+            move || notice(&db_path),
+        ));
     }
 
     /// Lets a camera go: its link disconnects and reads it no more.
@@ -262,10 +266,14 @@ impl RealLinks {
         }
     }
 
-    /// What the camera last reported, at once; or why it cannot be read.
-    pub(crate) fn read(&self, setup: &StoredSetup) -> Result<CameraReading, LinkFailure> {
+    /// What the camera last reported, at once, and whether that is the last
+    /// read (finding 19); or why it cannot be read.
+    pub(crate) fn read(&self, setup: &StoredSetup) -> Result<LinkReading, LinkFailure> {
         match (&self.pocket, setup.camera) {
-            (Some(pocket), RECORDING_CAMERA) => pocket.read(),
+            (Some(pocket), RECORDING_CAMERA) => pocket.read().map(|reading| LinkReading {
+                reading,
+                last_read: pocket.last_read(),
+            }),
             _ => Err(no_link_yet(setup)),
         }
     }

@@ -131,7 +131,7 @@ CAM 1's pairing, once, with the Pocket beside you (its Bluetooth on, the iPad's 
 
 - [ ] `Pair CAM 1` reads `Looking for CAM 1…`; then the camera shows a 6-digit PIN and Setup a `PIN` row. With the PIN typed and `Pair` pressed within 30 seconds, CAM 1 reads `paired` and `HELD` within a few seconds, and the camera's Bluetooth menu names `Studio Control`. The engine's log names the address the camera advertised (with its signal) and the one Windows holds, then the camera's protocol version (`"0.1.0"`), the three characteristics' kinds (`Control indicates`) and the camera's status word (`power on, connected`). Within a few seconds the page shows CAM 1's values: ISO, shutter, iris, ND, white balance and tint, format, dynamic range and display LUT.
 - [ ] A wrong PIN says so and saves nothing; `Pair CAM 1` again starts over.
-- [ ] After a close and a start, CAM 1 is held again with no pairing and no setting changed. A camera reconnected within minutes of its last controller sends no settings by itself: its values read `—` until one changes on the camera or the camera is switched off and on (a roadmap line, Found, to check 19).
+- [ ] After a close and a start, CAM 1 is held again with no pairing and no setting changed. Closed and started again within a minute: CAM 1 reads `HELD` with its values amber and `last read HH:MM` (when they were read before the close), the state display says it has reported nothing since it connected, and its keys work; change one setting on the camera, or switch it off and on: the values are its own again and the amber goes (until 2026-10-08 the values read `—` until one changed).
 
 Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on vMix's outputs:
 

@@ -98,6 +98,7 @@ const CAMERA_SEED_KEYS = [
   "vmixInput",
   "released",
   "unreachable",
+  "lastRead",
   "recording",
   "values",
 ] as const;
@@ -115,6 +116,7 @@ interface CheckedCamera {
   vmixInput: number;
   released: boolean;
   unreachable: boolean;
+  lastRead: boolean;
   recording: boolean | null;
   values: FixtureCameraValuesSeed;
 }
@@ -143,16 +145,19 @@ function checkedCamera(seed: FixtureCameraSeed, index: number, seen: Set<number>
   }
   const released = flag(seed.released, `${tag}'s released`);
   const unreachable = flag(seed.unreachable, `${tag}'s unreachable`);
+  const lastRead = flag(seed.lastRead, `${tag}'s lastRead`);
   const setUp = camera === 1 ? paired : address !== null;
   const setUpWith = camera === 1 ? "paired: true" : "an address";
   if (released && !setUp) throw mistake(`${tag} is released, so it must be set up: give it ${setUpWith}.`);
   if (unreachable && !setUp) throw mistake(`${tag} does not answer, so it must be set up: give it ${setUpWith}.`);
+  if (lastRead && !setUp)
+    throw mistake(`${tag}'s values are the last read, so it must be set up: give it ${setUpWith}.`);
   let recording: boolean | null = null;
   if (seed.recording !== undefined) {
     if (camera !== 1) throw mistake(`${tag} does not record here: only CAM 1 records.`);
     recording = flag(seed.recording, "CAM 1's recording");
   }
-  return { camera, address, paired, vmixInput, released, unreachable, recording, values: seed.values ?? {} };
+  return { camera, address, paired, vmixInput, released, unreachable, lastRead, recording, values: seed.values ?? {} };
 }
 
 /** Builds the scenario's cameras on the double, before its first read. */
@@ -190,6 +195,11 @@ export function seedFixtureCameras(state: MutableFixtureState, seed: FixtureCame
   for (const entry of checked) {
     if (entry.unreachable) {
       cameras.bodies[entry.camera].answering = false;
+      readCamera(cameras, entry.camera, now);
+    }
+    if (entry.lastRead) {
+      // Read once, then its link brings nothing: the values stand as the last read.
+      cameras.bodies[entry.camera].reporting = false;
       readCamera(cameras, entry.camera, now);
     }
     if (entry.released) {

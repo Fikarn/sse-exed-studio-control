@@ -294,6 +294,14 @@ pub struct CameraSnapshot {
     /// start, or it is released.
     #[serde(rename = "readAt")]
     pub read_at: Option<String>,
+    /// A held camera whose values are what it last reported, at `readAt`,
+    /// not what it reports now: its link has brought no setting since it
+    /// connected (a start, a quick reconnect, a Connect soon after a
+    /// Release), and the camera sends its settings again only after some
+    /// minutes without a controller or a power-on. The page shows the
+    /// values as doubt, `last read`, until the camera reports (finding 19).
+    #[serde(rename = "valuesLastRead")]
+    pub values_last_read: bool,
     pub values: CameraValues,
     pub auto: CameraAutos,
     /// Focus moves nearer and farther without a reported position.

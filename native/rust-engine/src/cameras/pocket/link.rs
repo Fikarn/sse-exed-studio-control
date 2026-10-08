@@ -275,13 +275,14 @@ impl PocketLink {
     /// hearing that something changed; it runs on the notifier thread.
     pub(crate) fn start(
         address: BluetoothAddress,
+        last: CameraReading,
         notify: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         let (orders, inbox) = channel::<Order>();
         let (notices, notice_queue) = channel::<()>();
         let shared = Arc::new(Shared {
             address,
-            state: Mutex::new(LinkState::new()),
+            state: Mutex::new(LinkState::with_last(last)),
             notices,
         });
         match guard_bluetooth() {
@@ -330,6 +331,12 @@ impl PocketLink {
     /// What the camera last reported, at once; or why it cannot be read.
     pub(crate) fn read(&self) -> Result<CameraReading, LinkFailure> {
         self.shared.with_state(|state| state.read())
+    }
+
+    /// Connected, and the camera has reported no setting since: what is
+    /// read is the last read (finding 19).
+    pub(crate) fn last_read(&self) -> bool {
+        self.shared.with_state(|state| state.last_read())
     }
 
     /// Sends a press: its messages are made from the commands and what the

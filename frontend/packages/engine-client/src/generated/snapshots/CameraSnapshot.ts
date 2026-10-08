@@ -38,6 +38,15 @@ export type CameraSnapshot = {
    * start, or it is released.
    */
   readAt: string | null;
+  /**
+   * A held camera whose values are what it last reported, at `readAt`,
+   * not what it reports now: its link has brought no setting since it
+   * connected (a start, a quick reconnect, a Connect soon after a
+   * Release), and the camera sends its settings again only after some
+   * minutes without a controller or a power-on. The page shows the
+   * values as doubt, `last read`, until the camera reports (finding 19).
+   */
+  valuesLastRead: boolean;
   values: CameraValues;
   auto: CameraAutos;
   /**

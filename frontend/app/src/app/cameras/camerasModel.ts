@@ -115,6 +115,10 @@ function metaLine(snapshot: CamerasSnapshot, spoken: CameraSnapshot): string {
     const last = clockTime(spoken.readAt);
     return last ? `Last answer ${last}` : "No answer since the start";
   }
+  if (spoken.state === "held" && spoken.valuesLastRead) {
+    const last = clockTime(spoken.readAt);
+    return last ? `Last read ${last}` : "Last read";
+  }
   const held = snapshot.cameras.filter((camera) => camera.state === "held").length;
   return `${held} of ${snapshot.cameras.length} held`;
 }
@@ -362,8 +366,12 @@ export function cameraKeyView(camera: CameraSnapshot, selected: number): CameraK
   let valuesKind: CameraKeyView["valuesKind"];
   let valuesTag: string | null = null;
   if (camera.state === "held") {
-    values = valuesLine(camera) || "nothing read yet";
-    valuesKind = values === "nothing read yet" ? "plain" : "values";
+    const line = valuesLine(camera);
+    values = line || "nothing read yet";
+    // The last read (finding 19): the line as doubt with the tag, as an
+    // unreachable camera's, until the camera reports.
+    valuesKind = !line ? "plain" : camera.valuesLastRead ? "doubt" : "values";
+    valuesTag = line && camera.valuesLastRead ? "last read" : null;
   } else if (camera.state === "unreachable") {
     // The key has room for the longest line a camera reports and the tag, and
     // not for when it was read: the state display and the plate say when.

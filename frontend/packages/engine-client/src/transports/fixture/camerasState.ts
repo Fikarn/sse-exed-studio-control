@@ -39,6 +39,7 @@ import {
   VMIX_NOT_SENDING_ADVICE,
   VMIX_OUTPUTS,
   heldSentence,
+  lastReadSentence,
   noLinkRefusalSentence,
   noLinkSentence,
   notSetUpSentence,
@@ -83,6 +84,8 @@ export interface CameraReport {
 export interface SimulatedCamera {
   report: CameraReport;
   answering: boolean;
+  /** Reports its settings when read; `false` reads as a link that has brought no setting since it connected (finding 19). */
+  reporting: boolean;
   /** How many commands it has been sent (D12: only a press sends). */
   sent: number;
 }
@@ -109,6 +112,8 @@ export interface HeldCamera {
   released: boolean;
   /** What it last reported, and when; `null` when never read since the start, or released. */
   read: CameraRead | null;
+  /** Its values are the last read, not what it reports now: its link has brought no setting since it connected (finding 19). */
+  lastRead: boolean;
   /** Why it did not answer the last time it was read; `null` while it answers. */
   failure: LinkFailure | null;
   /** When the hardware link saw the take start; `null` when it started before it looked. */
@@ -177,6 +182,7 @@ function notSetUp(camera: CameraNumber): HeldCamera {
     vmixInput: camera,
     released: false,
     read: null,
+    lastRead: false,
     failure: null,
     startedAt: null,
     pairing: null,
@@ -200,9 +206,9 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
       places: null,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
-        1: { report: startingReport(1), answering: true, sent: 0 },
-        2: { report: startingReport(2), answering: true, sent: 0 },
-        3: { report: startingReport(3), answering: true, sent: 0 },
+        1: { report: startingReport(1), answering: true, reporting: true, sent: 0 },
+        2: { report: startingReport(2), answering: true, reporting: true, sent: 0 },
+        3: { report: startingReport(3), answering: true, reporting: true, sent: 0 },
       },
     };
     doubles.set(state, cameras);
@@ -242,7 +248,9 @@ export function cameraSentence(cameras: FixtureCameras, camera: CameraNumber): s
   const model = cameraModel(camera);
   switch (cameraState(cameras, camera)) {
     case "held":
-      return heldSentence(model);
+      return cameras.held[camera].lastRead && cameras.held[camera].read !== null
+        ? lastReadSentence(model)
+        : heldSentence(model);
     case "released":
       return releasedSentence(model);
     case "not-set-up":
@@ -266,12 +274,18 @@ function sameValues(left: CameraReport, right: CameraReport): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+/** What a camera's link answers (`LinkReading`): what it reports, and whether that is the last read (finding 19). */
+interface LinkRead {
+  report: CameraReport;
+  lastRead: boolean;
+}
+
 /** What the camera's link answers: what it reports, or why it does not. */
-function linkRead(cameras: FixtureCameras, camera: CameraNumber): CameraReport | LinkFailure {
+function linkRead(cameras: FixtureCameras, camera: CameraNumber): LinkRead | LinkFailure {
   // The studio's build: CAM 1's link has no Pocket to reach here; the others have no link.
   if (!cameras.simulated) return camera === 1 ? "no-answer" : "no-link";
   const body = cameras.bodies[camera];
-  return body.answering ? cloneReport(body.report) : "no-answer";
+  return body.answering ? { report: cloneReport(body.report), lastRead: !body.reporting } : "no-answer";
 }
 
 /**
@@ -286,12 +300,16 @@ export function readCamera(cameras: FixtureCameras, camera: CameraNumber, now: n
   const held = cameras.held[camera];
   if (!isSetUp(cameras, camera) || held.released) return null;
   const wasUnreachable = held.failure !== null;
-  const read = linkRead(cameras, camera);
-  if (typeof read === "string") {
-    held.failure = read;
+  const link = linkRead(cameras, camera);
+  if (typeof link === "string") {
+    held.failure = link;
     return wasUnreachable ? null : "unreachable";
   }
   const last = held.read;
+  // A link that has brought no setting since it connected: what the camera last reported,
+  // and when, stays as the last read, the timecode alone following (finding 19).
+  const lastRead = link.lastRead && last !== null;
+  const read = link.lastRead && last !== null ? last.report : link.report;
   const changed = last !== null && !sameValues(last.report, read);
   const answeredBefore = last !== null && !wasUnreachable;
   const was = last?.report.recording ?? null;
@@ -301,7 +319,12 @@ export function readCamera(cameras: FixtureCameras, camera: CameraNumber, now: n
       : read.recording === true && answeredBefore && was === false
         ? now
         : null;
-  held.read = { report: read, timecode: cameraModel(camera).timecodeReported ? timecodeAt(now) : null, at: now };
+  held.read = {
+    report: read,
+    timecode: cameraModel(camera).timecodeReported ? timecodeAt(now) : null,
+    at: link.lastRead && last !== null ? last.at : now,
+  };
+  held.lastRead = lastRead;
   held.failure = null;
   return wasUnreachable ? "reachable" : changed ? "reported" : null;
 }
@@ -318,6 +341,7 @@ export function readHeldCameras(cameras: FixtureCameras, now: number): Array<[Ca
 export function forgetRead(cameras: FixtureCameras, camera: CameraNumber) {
   const held = cameras.held[camera];
   held.read = null;
+  held.lastRead = false;
   held.failure = null;
   held.startedAt = null;
 }
@@ -413,6 +437,7 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
     tone: STATE_TONES[state],
     sentence: cameraSentence(cameras, camera),
     readAt: iso(read?.at ?? null),
+    valuesLastRead: state === "held" && held.lastRead && read !== null,
     values: cameraValues(camera, read?.report ?? null),
     auto: { ...model.auto },
     focusSteps: model.focusSteps,

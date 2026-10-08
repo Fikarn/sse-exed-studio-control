@@ -130,7 +130,12 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         Noticed::Nothing,
         "a timecode that moves is no change"
     );
-    assert_eq!(state.control(&iso(800)), Noticed::Changed);
+    assert_eq!(
+        state.control(&iso(800)),
+        Noticed::Nothing,
+        "ISO 800 again: the reading is kept across the connection (finding 19)"
+    );
+    assert!(!state.last_read(), "the camera reported since it connected");
     assert_eq!(
         state.read().expect("connected").timecode.as_deref(),
         Some("09:12:53:10")
@@ -175,10 +180,15 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
     );
     assert_eq!(state.connected(), Noticed::Changed);
     assert_eq!(
-        state.read(),
-        Ok(CameraReading::default()),
-        "connected again: the camera sends everything afresh"
+        state.read().expect("connected").iso.as_deref(),
+        Some("1600"),
+        "connected again: what it reported stays as the last read until it reports (finding 19)"
     );
+    assert!(state.last_read(), "nothing reported since the connection");
+    assert_eq!(state.control(&iso(800)), Noticed::Changed);
+    assert!(!state.last_read(), "the camera reported");
+    assert_eq!(state.lost(), Noticed::Changed);
+    assert_eq!(state.connected(), Noticed::Changed);
     assert!(!state.initial_payload_received());
 
     let off = LinkFailure::Bluetooth(String::from("Bluetooth is off on this PC."));
@@ -217,7 +227,7 @@ fn the_guard_keeps_every_test_off_bluetooth() {
 
     let looked = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&looked);
-    let link = PocketLink::start(pocket_address(), move || {
+    let link = PocketLink::start(pocket_address(), CameraReading::default(), move || {
         counted.fetch_add(1, Ordering::SeqCst);
     });
     assert!(link.stopped());
