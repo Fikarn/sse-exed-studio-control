@@ -387,8 +387,6 @@ fn forget_stops_a_pairing_that_runs() {
 // The real pairing in a test build on Windows: Setup takes it (CAM 1 has
 // its link there), and the guard stops it before Bluetooth is opened, so it
 // fails at once with the guard's sentence and saves nothing (D15 rule 2).
-// Linux has no link to CAM 1: `CAMERA_NO_LINK` (`tests_link.rs`).
-#[cfg(windows)]
 #[test]
 fn a_test_build_s_real_pairing_is_stopped_by_the_guard() {
     let cameras = TestCameras::without_simulation("pair-guarded");
@@ -419,8 +417,7 @@ fn a_test_build_s_real_pairing_is_stopped_by_the_guard() {
 // holds no Bluetooth address): CAM 1 reads NOT SET UP with the link's
 // sentence, Setup offers `Pair CAM 1` again, a control is refused as not
 // set up, and the row is kept. Here the row without an address, which a
-// Windows test build reads as the link would.
-#[cfg(windows)]
+// test build reads as the link would.
 #[test]
 fn a_pairing_the_link_finds_gone_reads_not_set_up_and_keeps_the_row() {
     let cameras = TestCameras::without_simulation("pair-gone");

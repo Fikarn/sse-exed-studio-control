@@ -30,9 +30,8 @@ import { SAMPLES_CONTRAST, checkLimits, measureBoard, openBoard } from "./helper
 // each board had sixteen numbers of its own in `ui-contract.ratchets.json`,
 // for three themes: 81 boards, of which thirteen numbers never differed.
 //
-// New pages program, Slice SW (D22): the contrast is sampled on Windows only
-// (`SAMPLES_CONTRAST` in measure.mjs). On CI's Linux runner every other measure
-// is checked and the contrast is not.
+// New pages program, Slice SW (D22): the contrast is sampled from Windows'
+// pixels (`SAMPLES_CONTRAST` in measure.mjs), the one system the measures run on.
 
 interface ContrastFail {
   ratio: number;

@@ -17,7 +17,7 @@
 //   has removed anything, so it is never half done.
 // - `--dry-run` prints what would happen and removes nothing.
 import { spawnSync } from "node:child_process";
-import { readdirSync, readlinkSync, realpathSync, statSync } from "node:fs";
+import { readdirSync, realpathSync, statSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -83,10 +83,10 @@ function canonical(targetPath) {
   } catch {
     // Gone, or not readable: compare the path as written.
   }
-  return process.platform === "linux" ? resolved : resolved.toLowerCase();
+  return resolved.toLowerCase();
 }
 
-/** Whether `candidate` is `directory` or lies inside it (case-insensitive where the file system is). */
+/** Whether `candidate` is `directory` or lies inside it (without case, as Windows' file system). */
 export function isInside(candidate, directory) {
   const relative = path.relative(canonical(directory), canonical(candidate));
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -94,22 +94,6 @@ export function isInside(candidate, directory) {
 
 /** The executable paths of the running processes, or null when they cannot be listed. */
 export function listProcessPaths() {
-  if (process.platform === "linux") {
-    try {
-      return readdirSync("/proc")
-        .filter((name) => /^\d+$/.test(name))
-        .flatMap((pid) => {
-          try {
-            return [readlinkSync(`/proc/${pid}/exe`)];
-          } catch {
-            return []; // Another user's process, a kernel thread, or one that just ended.
-          }
-        });
-    } catch {
-      return null;
-    }
-  }
-
   const result = spawnSync(
     "powershell",
     [

@@ -150,7 +150,6 @@ async function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath }
   );
   const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
     cwd: rootDir,
-    detached: process.platform !== "win32",
     env,
     shell: needsCommandShell(npmCommand),
     stdio: ["ignore", "pipe", "pipe"],
@@ -168,24 +167,9 @@ async function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath }
   return child;
 }
 
-// Default waitForStatus deadline. `SSE_TAURI_QUALIFICATION_TIMEOUT_MS` lets
-// CI extend the window — the operator laptop completes each phase within
-// 40s, but ubuntu-latest hardware needs ~3 min for the engine's first
-// health snapshot to arrive after the WebKitGTK shell launches under xvfb
-// software rendering. The qualification CI job (plan PR 2b) sets this.
-const DEFAULT_WAIT_TIMEOUT_MS = Number(process.env.SSE_TAURI_QUALIFICATION_TIMEOUT_MS ?? 40_000);
-
-// Mirror of `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC` (added in plan PR 2 for
-// the native:acceptance lane): when set, the workspace qualification skips
-// the audio-mutation block + the post-restart audio-state assertions because
-// `audioSnapshot?.verified` only flipped true after real RME TotalMix OSC
-// packets arrived on the receive port, and stock GitHub runners have no
-// TotalMix. The lighting round-trips still execute. The CI
-// qualification job sets this. Since Slice 2b of the new pages program the
-// lane's shells run the simulated console, whose probe passes on any host, so
-// a run without the variable exercises the block against the simulation —
-// never against a real TotalMix.
-const SKIP_AUDIO_PROBE = process.env.SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE === "1";
+// Default waitForStatus deadline: the studio PC completes each phase within
+// 40 s (the shell is built before the lane starts, `native:shell:build`).
+const DEFAULT_WAIT_TIMEOUT_MS = 40_000;
 
 // New pages program, Slice 1: Planning has left the screen, and with it this
 // lane's Planning round-trips and the Planning page it restarted on. The page
@@ -393,9 +377,7 @@ async function runWorkspaceQualification() {
     // ready` while any probe is not `passed` (2026-09 audit Slice 8). The
     // deck's probe passes only when Companion has asked the bridge in the last
     // 5 s (2026-09-29), and no Companion asks a lane's bridge, so the explicit
-    // override is always sent; it used to be sent only when the audio block
-    // was skipped (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1, CI) or port 80
-    // was not bindable for the lighting probe server.
+    // override is always sent.
     await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
       request: {
         target: "control-surface",
@@ -485,14 +467,9 @@ async function runWorkspaceQualification() {
     assertWorkspaceReady(audioWorkspace.status, "audio");
     const audioSnapshot = audioWorkspace.status.shellState.audioSnapshot;
 
-    if (SKIP_AUDIO_PROBE) {
-      console.log(
-        "Skipping audio mutation block (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1); no RME TotalMix on this host."
-      );
-      evidence.recordCheck("audio-live-mutations-skipped", {
-        reason: "audio-probe-disabled",
-      });
-    } else {
+    // The audio block runs against the simulated console, whose probe passes
+    // on any host; until 2026-10-09 CI skipped it (no TotalMix there).
+    {
       assert(audioSnapshot?.verified === true, "Expected audio probe to make live audio snapshot verified.");
       const audioChannel =
         asArray(audioSnapshot?.channels).find((entry) => entry?.role === "front-preamp") ??
@@ -649,7 +626,7 @@ async function runWorkspaceQualification() {
       restartStatus.shellState.lightingSnapshot?.lastRecalledSceneId === lightingRecalledSceneId,
       "Expected restarted Tauri runtime to preserve the recalled lighting scene."
     );
-    if (!SKIP_AUDIO_PROBE) {
+    {
       assert(
         restartStatus.shellState.audioSnapshot?.selectedChannelId === audioChannelId,
         "Expected restarted Tauri runtime to preserve selected audio channel."

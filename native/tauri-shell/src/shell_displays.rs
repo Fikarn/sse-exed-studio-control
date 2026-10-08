@@ -58,9 +58,7 @@ fn refresh_rate(numerator: u32, denominator: u32) -> Option<f64> {
 /// Every screen that is on, as Windows' display configuration has them now.
 /// It reads, and changes nothing. A screen whose part of the desktop cannot
 /// be read fails the whole read, and says so: it could be a copy of any
-/// other. On another system than Windows there is nothing to read, and the
-/// list is empty.
-#[cfg(windows)]
+/// other.
 #[allow(unsafe_code)]
 pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
     use std::mem::size_of;
@@ -194,11 +192,6 @@ pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
     Err(String::from(
         "The screens kept changing while Windows' display configuration was read.",
     ))
-}
-
-#[cfg(not(windows))]
-pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
-    Ok(Vec::new())
 }
 
 /// The name Windows gives the Prompter XL: its EDID's.

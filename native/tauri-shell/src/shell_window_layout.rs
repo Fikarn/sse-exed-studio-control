@@ -399,16 +399,12 @@ const LOOK_ON_THE_MAIN_THREAD: Duration = Duration::from_secs(5);
 /// (the app is ending).
 ///
 /// Tauri answers the monitor calls on the main thread but turns what they
-/// found into its `Monitor`s on the caller's thread, and on Linux that asks
-/// GDK for the work area. GDK is not to be called from two threads: taken on
-/// the watch's own thread, the looks crashed the shell under CI's X server
-/// about once in five runs of the Setup/Support lane (heap corruption, or a
-/// failed assertion on GDK's error traps: the thread that aborted, the
-/// watch's in four cores of six and the main thread in two, was in
-/// `gdk_x11_display_error_trap_push`). Taken here, 16
-/// runs out of 16 passed where the old way crashed 6 times in 32
-/// (2026-09-29). Windows asks nothing that is not safe from any thread, and
-/// finds the same values here.
+/// found into its `Monitor`s on the caller's thread. Taken here, on the main
+/// thread, nothing is asked from two threads at once: on Linux's GDK, which
+/// the shell was built for until 2026-10-09, a look from the watch's own
+/// thread crashed the shell about once in five runs (#270, 2026-09-29).
+/// Windows asks nothing that is not safe from any thread, and finds the
+/// same values here.
 fn look_on_the_main_thread(window: &WebviewWindow, paths: &[DisplayPath]) -> Option<Seen> {
     let (answer, answered) = std::sync::mpsc::sync_channel(1);
     let (asked, paths) = (window.clone(), paths.to_vec());

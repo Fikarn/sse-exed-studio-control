@@ -5,8 +5,7 @@ import { openFixture } from "./helpers/openFixture";
 // 2026-09 audit remediation, Slice 10. The audit found Console captions at 8
 // and 8.5 px painted with the 22 %-alpha hairline colour. Nothing tested type
 // size or contrast; the captures pinned the broken renders. These checks read
-// the live DOM, so a regression fails here before it reaches a capture, and on
-// CI's Linux runner too, where no contrast is sampled from pixels.
+// the live DOM, so a regression fails here before it reaches a capture.
 
 const MICROTYPE_FLOOR_PX = 9.5;
 // Visual overhaul A, Slice 10: the system's own number. This spec was

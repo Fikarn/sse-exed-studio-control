@@ -1,6 +1,5 @@
 // A dependency-free PNG decoder for Playwright screenshots (8-bit RGB / RGBA,
-// non-interlaced), so the pixel-sampled contrast gate needs no native module
-// and runs the same on the studio workstation and on CI.
+// non-interlaced), so the pixel-sampled contrast gate needs no native module.
 import { inflateSync } from "node:zlib";
 
 const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

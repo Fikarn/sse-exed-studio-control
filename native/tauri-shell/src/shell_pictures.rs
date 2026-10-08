@@ -72,16 +72,6 @@ pub(crate) trait LayerSink: Send + Sync {
     fn detach(&self, number: u64);
 }
 
-/// The sink of a system without the layer: the helper gets no surface.
-#[cfg(not(windows))]
-pub(crate) struct NoLayer;
-
-#[cfg(not(windows))]
-impl LayerSink for NoLayer {
-    fn attach(&self, _number: u64, _pid: u32, _writer: TcpStream) {}
-    fn detach(&self, _number: u64) {}
-}
-
 /// The listener of one start of the hardware link. Dropped with that
 /// start's process, it stops listening, and its connection ends.
 pub(crate) struct PicturesLink {
@@ -355,10 +345,7 @@ fn log_refused(refused: &AtomicU64, closed: &AtomicBool, log: &PicturesLog) {
 #[tauri::command]
 pub(crate) fn pictures_place(place: PlaceReport) {
     let placed = placement(&place);
-    #[cfg(windows)]
     crate::shell_picture_layer::place(placed);
-    #[cfg(not(windows))]
-    drop(placed);
 }
 
 /// Says `secret` on a new connection to `address`: the helper's side, for

@@ -35,8 +35,7 @@ base64 = "0.22.1"
 # and GATT through the `windows` crate, the one the shell and the pictures
 # helper already lock (0.61); these are new features of it, and nothing new is
 # fetched. WinRT's calls are safe code, so the workspace's `forbid(unsafe_code)`
-# stands. The Linux CI builds do not see it: `cameras/pocket/stub.rs` stands
-# in for `winrt.rs` there.
+# stands.
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [
     "Devices_Bluetooth",

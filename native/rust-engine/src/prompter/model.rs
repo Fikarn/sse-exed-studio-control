@@ -384,8 +384,8 @@ mod tests {
     // character against every cue, which stalled an import for minutes. Both
     // counts are one pass now. The lines are 60 characters (600 until Slice
     // 6b's review): each quadratic pass would still be tens of billions of
-    // steps, while the linear ones stay far under the budget in CI's
-    // instrumented coverage build, where 600 took 5.2 s.
+    // steps, while the linear ones stay far under the budget (600 took
+    // 5.2 s in an instrumented coverage build, 2026-09).
     #[test]
     fn a_paragraph_of_many_cue_lines_counts_in_one_pass() {
         let line = format!("[{}]", "a".repeat(60));

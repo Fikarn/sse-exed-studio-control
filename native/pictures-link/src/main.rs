@@ -31,24 +31,14 @@
 //! library) makes it go silent (`watch.rs`), and the engine ends it and
 //! starts it again.
 
-// The aids' rules and numbers: the renderer's alone, and its tests', where
-// there is no Windows to draw on.
-#[cfg_attr(not(windows), allow(dead_code))]
+// The aids' rules and numbers: the renderer's, and its tests'.
 mod aids;
 mod card;
 mod layer;
-#[cfg(windows)]
-mod ndi_library;
-#[cfg(not(windows))]
-#[path = "ndi_library_none.rs"]
 mod ndi_library;
 mod ndi_sdk;
 mod picture;
 mod receive;
-#[cfg(windows)]
-mod renderer;
-#[cfg(not(windows))]
-#[path = "renderer_none.rs"]
 mod renderer;
 mod sha256;
 mod vmix;

@@ -56,7 +56,7 @@ test("a second click inside the dwell keeps the arm; after the dwell it loads th
   // Production readiness S13. Old: the second click followed the first in real
   // time and was expected inside the 350 ms dwell. New: the page's clock is
   // stopped for the two presses and moved past the dwell for the third.
-  // Reason: two Playwright clicks are over a second apart on a CI runner, so
+  // Reason: two Playwright clicks can be over a second apart on a slow runner, so
   // the press landed outside the dwell and applied — the case failed on every
   // run (helpers/pageClock.ts). What is checked is unchanged.
   await page.clock.install();

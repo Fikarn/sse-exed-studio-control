@@ -524,7 +524,6 @@ fn open(app: &AppHandle, place: Place) -> Result<(), String> {
     // after the page has begun to load: WebView2 then holds it only from the
     // next load. The window on the Prompter XL takes no keyboard, so only a
     // development build's ordinary window could be given a browser key.
-    #[cfg(windows)]
     crate::shell_browser_keys::switch_off_browser_keys(app, &window);
     give_the_keyboard_back(app, &window);
     let shown = match placed {

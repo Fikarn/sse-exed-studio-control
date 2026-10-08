@@ -26,7 +26,7 @@ studio-control-protocol = { path = "protocol/rust" }
 ts-rs = { version = "12", features = ["serde-compat"] }
 
 # Workspace-wide lints. The root `rust:clippy` npm lane denies warnings so
-# warning regressions fail the local and CI health gates.
+# warning regressions fail the gate.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

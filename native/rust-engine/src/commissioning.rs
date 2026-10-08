@@ -554,8 +554,8 @@ pub fn run_commissioning_check(
             if crate::audio::audio_metering_is_simulated(&app_settings) {
                 // Simulated input mode has no console to probe. Passing here is
                 // honest because every audio surface labels the console "test
-                // simulation" while this mode is active; it is how CI hosts
-                // without TotalMix reach the `ready` gate.
+                // simulation" while this mode is active; it is how a run
+                // without TotalMix reaches the `ready` gate.
                 (
                     AUDIO_CHECK_ID,
                     String::from("passed"),
@@ -1134,7 +1134,7 @@ mod tests {
     #[test]
     fn audio_probe_passes_in_simulated_input_mode() {
         // 2026-09 audit remediation, Slice 1: console writes are refused until
-        // the audio probe passes, and CI hosts have no TotalMix. Simulated
+        // the audio probe passes, and a test has no TotalMix. Simulated
         // input mode is the honest way through — every audio surface labels
         // the console "test simulation" while it is active — and it must open
         // the same gate the operator faces.

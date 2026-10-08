@@ -235,8 +235,6 @@ const SHELL_UNSAFE = [
     item: "fn set_browser_accelerator_keys_off(",
     blocks: 1,
     reason: "WebView2's settings are COM calls, which the windows bindings mark unsafe (decision 12).",
-    // The whole module is compiled on Windows alone.
-    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod shell_browser_keys;/.test(main),
   },
   {
     file: "src/shell_displays.rs",
@@ -244,12 +242,8 @@ const SHELL_UNSAFE = [
     blocks: 6,
     reason:
       "Windows' display configuration is read through calls of user32 that fill lists and unions (the Prompter XL's window).",
-    // The function is; another system has one of its own, which reads nothing.
-    onWindowsAlone: (source) =>
-      source.includes("#[cfg(windows)]\n#[allow(unsafe_code)]\npub(crate) fn read_display_paths(") &&
-      source.includes("#[cfg(not(windows))]\npub(crate) fn read_display_paths("),
   },
-  // The native picture layer (D30): the whole module is compiled on Windows alone.
+  // The native picture layer (D30).
   ...[
     [
       "fn create_layer(",
@@ -274,13 +268,11 @@ const SHELL_UNSAFE = [
     item,
     blocks: 1,
     reason,
-    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod shell_picture_layer;/.test(main),
   })),
 ];
 
 // Where the pictures helper may use `unsafe`: the renderer's Direct3D calls (D30) and NDI's
-// library's calls (D33), a function each, in modules compiled on Windows alone. The same rules
-// as the shell's list.
+// library's calls (D33), a function each. The same rules as the shell's list.
 const PICTURES_UNSAFE = [
   ...[
     [
@@ -317,7 +309,6 @@ const PICTURES_UNSAFE = [
     item,
     blocks: 1,
     reason,
-    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod renderer;/.test(main),
   })),
   ...[
     [
@@ -343,7 +334,6 @@ const PICTURES_UNSAFE = [
     item,
     blocks: 1,
     reason,
-    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod ndi_library;/.test(main),
   })),
 ];
 
@@ -374,7 +364,7 @@ const UNSAFE_ITEM = /\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b(?!\s*"[^"]*"\
  * files name the lint once for each, in any form (allow, expect, warn, a crate-wide #![…], a
  * list, cfg_attr), and hold the blocks the list says, each under a comment that says why it is sound.
  */
-function assertUnsafeOnlyWhereListed(sources, allowances, main) {
+function assertUnsafeOnlyWhereListed(sources, allowances) {
   const lintNames = (source) => (source.match(/\bunsafe_code\b/g) ?? []).length;
   const unsafeItems = (source) => (source.match(UNSAFE_ITEM) ?? []).length;
   for (const [name, source] of sources) {
@@ -391,7 +381,6 @@ function assertUnsafeOnlyWhereListed(sources, allowances, main) {
         source.includes(`#[allow(unsafe_code)]\n${allowance.item}`),
         `the #[allow(unsafe_code)] of ${name} sits on ${allowance.item}`
       );
-      assert.ok(allowance.onWindowsAlone(source, main), `${allowance.item} is compiled on Windows alone`);
     }
   }
   for (const allowance of allowances) {
@@ -432,21 +421,21 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
     /\.SetAreBrowserAcceleratorKeysEnabled\(false\)/.test(keys),
     "shell_browser_keys.rs sets the browser keys off"
   );
-  // The module is compiled on Windows alone, where WebView2 is.
-  assert.ok(/#\[cfg\(windows\)\]\s*\nmod shell_browser_keys;/.test(main), "main.rs has the module on Windows");
+  // The module is the shell's, unconditionally: the shell is built on Windows alone (D46).
+  assert.ok(/^mod shell_browser_keys;/m.test(main), "main.rs has the module");
   // Applied to the main window in the builder's setup, before anything else there.
   const setup = main.slice(main.indexOf(".setup(|app| {"));
   assert.ok(main.includes(".setup(|app| {"), "main.rs has a .setup(|app| { … }) block");
   const firstStatements = setup.slice(0, setup.indexOf("restore_or_route_initial_window"));
   assert.ok(
-    /#\[cfg\(windows\)\]\s*\n\s*switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
+    /\n\s*switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
     "setup switches the browser keys off before it routes the window"
   );
   // `unsafe` is lifted for the functions of `SHELL_UNSAFE`, and nowhere else in the shell.
   const shellSources = crateSources("tauri-shell");
   const everySource = shellSources.map(([, source]) => source).join("\n");
   assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(everySource), "the shell never sets them on");
-  assertUnsafeOnlyWhereListed(shellSources, SHELL_UNSAFE, main);
+  assertUnsafeOnlyWhereListed(shellSources, SHELL_UNSAFE);
   // The shell's crate takes the display calls and the picture layer's from the one windows crate,
   // by these features and no others.
   assert.deepEqual(
@@ -488,18 +477,7 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
 
 test("the pictures helper draws with Direct3D, receives with NDI, and uses unsafe where its list says (D30, D33)", () => {
   const sources = crateSources("pictures-link");
-  const main = sources.find(([name]) => name === "src/main.rs")?.[1] ?? "";
-  assertUnsafeOnlyWhereListed(sources, PICTURES_UNSAFE, main);
-  // A system without Direct3D has a renderer of its own, which draws nothing and uses no unsafe;
-  // a system without NDI a library of its own, which loads nothing.
-  assert.ok(
-    /#\[cfg\(not\(windows\)\)\]\s*\n#\[path = "renderer_none\.rs"\]\s*\nmod renderer;/.test(main),
-    "main.rs has the renderer of a system without Direct3D"
-  );
-  assert.ok(
-    /#\[cfg\(not\(windows\)\)\]\s*\n#\[path = "ndi_library_none\.rs"\]\s*\nmod ndi_library;/.test(main),
-    "main.rs has the library of a system without NDI"
-  );
+  assertUnsafeOnlyWhereListed(sources, PICTURES_UNSAFE);
   // The Direct3D and library-loading calls come from the one windows crate, by these features and
   // no others.
   assert.deepEqual(

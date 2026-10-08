@@ -7,7 +7,7 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 // A case that fails now and then has a cause: find it. There is no quarantine
 // list.
 //
-// One retry on the workstation, none on CI. On this PC Windows now and then
+// One retry. On this PC Windows now and then
 // refuses Chromium a socket (`net::ERR_NO_BUFFER_SPACE`, about one request in
 // ten thousand), and the page then draws without a stylesheet or a chunk. A
 // case that passed on its retry is reported as flaky, by name: read why its
@@ -15,11 +15,10 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
-  retries: process.env.CI ? 0 : 1,
+  retries: 1,
   // Eight workers on the studio workstation (32 threads), at below-normal
-  // priority (scripts/frontend/run-playwright.mjs); CI's four-core runner
-  // keeps 3.
-  workers: process.env.CI ? 3 : 8,
+  // priority (scripts/frontend/run-playwright.mjs).
+  workers: 8,
   use: {
     baseURL: "http://127.0.0.1:4173",
     viewport: { width: 2560, height: 1440 },
@@ -36,17 +35,15 @@ export default defineConfig({
     },
   },
   // Studio Control runs on Windows at 2560×1440 and nowhere else, so the
-  // committed captures are the win32 ones (`{platform}` names them) and only
-  // Windows compares them. CI's Linux runner runs every case but skips every
-  // screenshot expectation. See frontend/app/tests/__visual__/README.md.
-  ignoreSnapshots: process.platform !== "win32",
+  // committed captures are the win32 ones (`{platform}` names them). See
+  // frontend/app/tests/__visual__/README.md.
   snapshotPathTemplate: "{testDir}/__visual__/{testFilePath}-snapshots/{arg}-{platform}{ext}",
   reporter: [["html", { outputFolder: "playwright-report" }]],
   webServer: [
     {
       command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
       port: 4173,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 30_000,
     },
     {
@@ -55,7 +52,7 @@ export default defineConfig({
       // makes `storybook-static/` (chained into `frontend:playwright:test`).
       command: "npm run storybook:serve-static",
       port: 6007,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 30_000,
     },
   ],

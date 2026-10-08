@@ -29,8 +29,6 @@ pub(crate) mod link;
 pub(crate) mod pairing;
 pub(crate) mod protocol;
 pub(crate) mod state;
-#[cfg(not(windows))]
-mod stub;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -38,7 +36,5 @@ mod tests_link;
 #[cfg(test)]
 mod tests_pairing;
 pub(crate) mod timecode;
-#[cfg(windows)]
 mod winrt;
-#[cfg(windows)]
 mod winrt_pairing;

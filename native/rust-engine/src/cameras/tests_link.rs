@@ -474,30 +474,14 @@ fn the_health_check_names_the_worst_camera() {
 // The studio's build before Slice 13: without a link Setup takes no
 // address, so a BGH1 reads NOT SET UP and says why, and the whole status
 // stays as it is. The vMix input, taking an address away and Forget stay.
-// CAM 1's link is built on Windows (the Pocket's pairing, 2026-10-06): there
-// it reads NOT SET UP until it is paired; Linux, where only CI builds the
-// engine, has no link to it and takes no pairing either.
+// CAM 1's link is built (the Pocket's pairing, 2026-10-06): it reads NOT SET
+// UP until it is paired.
 #[test]
 fn without_a_link_setup_takes_no_pairing_and_no_address() {
     let cameras = TestCameras::without_simulation("no-link-setup");
-    let cannot_pair =
-        "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
     let cannot_take = "Studio Control cannot take CAM 2's address yet: its network link comes with a later version.";
-    let (cam1_sentence, cam1_cannot) = if cfg!(windows) {
-        (
-            "CAM 1 is not paired. Pair it in Setup, with the camera beside you.",
-            None,
-        )
-    } else {
-        assert_eq!(
-            cameras.refused("cameras.setup.pair", json!({ "camera": 1 })),
-            refusal("CAMERA_NO_LINK", cannot_pair)
-        );
-        (
-            "Studio Control has no link to CAM 1 yet: it comes with a later version.",
-            Some(cannot_pair),
-        )
-    };
+    let cam1_sentence = "CAM 1 is not paired. Pair it in Setup, with the camera beside you.";
+    let cam1_cannot: Option<&str> = None;
     assert_eq!(
         cameras.refused(
             "cameras.setup.update",

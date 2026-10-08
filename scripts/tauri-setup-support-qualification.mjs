@@ -171,9 +171,8 @@ async function launchTauriShell({ appDataDir, commandPath, envCheck = {}, extraE
   const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
     // Windows: npm is npm.cmd, and Node >= 18.20 refuses to spawn .cmd files
     // without a shell (EINVAL, CVE-2024-27980 hardening).
-    shell: process.platform === "win32",
+    shell: true,
     cwd: rootDir,
-    detached: process.platform !== "win32",
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -190,12 +189,9 @@ async function launchTauriShell({ appDataDir, commandPath, envCheck = {}, extraE
   return child;
 }
 
-// Default waitForStatus deadline. `SSE_TAURI_QUALIFICATION_TIMEOUT_MS` lets
-// CI extend the window — the operator laptop completes each phase within
-// 40s, but ubuntu-latest hardware needs ~3 min for the engine's first
-// health snapshot to arrive after the WebKitGTK shell launches under xvfb
-// software rendering. The qualification CI job (plan PR 2b) sets this.
-const DEFAULT_WAIT_TIMEOUT_MS = Number(process.env.SSE_TAURI_QUALIFICATION_TIMEOUT_MS ?? 40_000);
+// Default waitForStatus deadline: the studio PC completes each phase within
+// 40 s (the shell is built before the lane starts, `native:shell:build`).
+const DEFAULT_WAIT_TIMEOUT_MS = 40_000;
 
 async function waitForStatus({ child, label, predicate, statusPath, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS }) {
   const deadline = Date.now() + timeoutMs;
@@ -342,15 +338,9 @@ async function runStalledRequestCheck(session, child, bridgeIp) {
 // copy of the shell (`second-instance`, finding F19) must be refused within
 // five.
 const ENGINE_CRASH_DETECT_MS = 2_000;
-// On Windows the single-instance plugin refuses the second copy before its
-// window exists — within 5 s (113 ms on the workstation). On
-// Linux the second copy first goes through GTK's start-up, which under xvfb
-// waits about 30 s on the AT-SPI bus lookup before any Tauri plugin runs
-// (the first CI run of Slice 5 saw the refusal land after ~30 s), so its
-// bound is the lane's wait timeout; and a Linux session without a D-Bus
-// session bus refuses through the engine lock instead, which shows in the
-// second shell's own status file. Whichever refusal comes first counts.
-const SECOND_INSTANCE_EXIT_MS = process.platform === "linux" ? DEFAULT_WAIT_TIMEOUT_MS : 5_000;
+// The single-instance plugin refuses the second copy before its window
+// exists: within 5 s (113 ms on the studio PC).
+const SECOND_INSTANCE_EXIT_MS = 5_000;
 
 // Ends the engine process from outside the shell — what a crash looks like
 // to it. No tree kill: the engine's one child, the pictures helper, ends by
@@ -389,7 +379,6 @@ async function launchSecondShellInstance({ appDataDir, commandPath, logsDir, sta
   );
   const child = spawn(binaryPath, [], {
     cwd: rootDir,
-    detached: process.platform !== "win32",
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -414,48 +403,23 @@ function killWindowsProcessTree(pid) {
 }
 
 async function closeTauriShell(child) {
-  // Gone means the whole group on Linux, not the npm leader: a leader that
-  // has exited can leave vite or the shell behind, and they are signalled too.
   if (!shellStillRunning(child)) {
     return;
   }
 
-  try {
-    if (process.platform === "win32") {
-      // npm.cmd -> node -> tauri.js -> vite + cargo -> shell: killing only the
-      // npm parent leaves vite holding the dev port and the shell alive, and
-      // the next step's port preflight then fails. Kill the whole tree.
-      killWindowsProcessTree(child.pid);
-    } else if (child.pid) {
-      process.kill(-child.pid, "SIGTERM");
-    }
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") {
-      throw error;
-    }
-    return;
-  }
+  // npm.cmd -> node -> tauri.js -> vite + cargo -> shell: killing only the
+  // npm parent leaves vite holding the dev port and the shell alive, and
+  // the next step's port preflight then fails. Kill the whole tree.
+  killWindowsProcessTree(child.pid);
 
-  // Until the shell's whole process group has gone (`tauri-shell-running.mjs`):
-  // the leader's exitCode stays null after a signal, so waiting on it alone
-  // ran out the deadline on every close.
+  // Until the shell has gone (`tauri-shell-running.mjs`).
   const deadline = Date.now() + 5_000;
   while (shellStillRunning(child) && Date.now() < deadline) {
     await delay(100);
   }
 
   if (shellStillRunning(child)) {
-    try {
-      if (process.platform === "win32") {
-        killWindowsProcessTree(child.pid);
-      } else if (child.pid) {
-        process.kill(-child.pid, "SIGKILL");
-      }
-    } catch (error) {
-      if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") {
-        throw error;
-      }
-    }
+    killWindowsProcessTree(child.pid);
     await delay(200);
   }
 }
@@ -1097,13 +1061,11 @@ async function runSetupSupportQualification() {
     });
 
     // Scenario `second-instance` (Slice 5 — F19): a second copy of the shell
-    // launched while the first is up never gets a working engine. On Windows
-    // the shell's single-instance plugin hands the launch to the running
-    // shell and exits; on a Linux session without a D-Bus session
-    // bus the plugin cannot see the first shell, and the engine's lock on
-    // `<app-data>/engine.lock` refuses the second engine instead, so the
-    // second shell stops at ENGINE_ALREADY_RUNNING. Both are recorded; only
-    // the plugin's refusal is accepted on Windows.
+    // launched while the first is up never gets a working engine: the
+    // shell's single-instance plugin hands the launch to the running shell
+    // and exits. The engine's own lock on `<app-data>/engine.lock` stands
+    // behind it; a second shell that got as far as ENGINE_ALREADY_RUNNING
+    // would mean the plugin did not refuse it, and fails the check.
     console.log("Tauri Setup/Support qualification: step 6/8 a second copy of the shell is refused.");
     const secondSession = createSessionFiles("sse-tauri-second-instance-");
     const secondRun = await launchSecondShellInstance({
@@ -1131,24 +1093,15 @@ async function runSetupSupportQualification() {
           break;
         }
         const secondStatus = readJson(secondSession.statusPath);
-        if (secondStatus?.shellState?.startupFailure?.code === "ENGINE_ALREADY_RUNNING") {
-          assert(
-            process.platform === "linux",
-            `Expected the single-instance plugin to refuse the second shell on ${process.platform}, but it reached the recovery surface as ENGINE_ALREADY_RUNNING.`
-          );
-          refusal = {
-            exitCode: null,
-            refusalMs: Date.now() - launchedAt,
-            refusedBy: "engine-lock",
-            stage: secondStatus.shellState.startupFailure.stage,
-          };
-          break;
-        }
+        assert(
+          secondStatus?.shellState?.startupFailure?.code !== "ENGINE_ALREADY_RUNNING",
+          "Expected the single-instance plugin to refuse the second shell, but it reached the recovery surface as ENGINE_ALREADY_RUNNING."
+        );
         await delay(100);
       }
       assert(
         refusal !== null,
-        `Expected the second shell to be refused within ${SECOND_INSTANCE_EXIT_MS} ms on ${process.platform}; it is still running and reported no refusal.`
+        `Expected the second shell to be refused within ${SECOND_INSTANCE_EXIT_MS} ms; it is still running and reported no refusal.`
       );
 
       // The first shell is untouched: still ready, its engine the same, its

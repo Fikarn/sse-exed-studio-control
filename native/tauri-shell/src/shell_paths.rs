@@ -7,7 +7,6 @@ use crate::shell_commands::off_main_thread;
 use serde_json::Value;
 use std::fs::{canonicalize, create_dir_all, write};
 use std::path::{Path, PathBuf};
-#[cfg(windows)]
 use std::process::Command;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -66,25 +65,11 @@ pub(crate) async fn shell_open_path(path: String) -> Result<(), String> {
 /// than the canonical one: Explorer does not take the `\\?\` prefix
 /// `canonicalize` produces on Windows.
 fn open_path_with_system(target: &Path) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        Command::new("explorer")
-            .arg(target)
-            .spawn()
-            .map_err(|error| format!("Failed to open path {}: {error}", target.display()))?;
-        Ok(())
-    }
-
-    // New pages program, Slice SW (D22): Studio Control runs on Windows only.
-    // The Linux CI runners compile the shell, and none of their lanes opens a
-    // folder.
-    #[cfg(not(windows))]
-    {
-        Err(format!(
-            "{} was not opened: Studio Control opens folders on Windows only.",
-            target.display()
-        ))
-    }
+    Command::new("explorer")
+        .arg(target)
+        .spawn()
+        .map_err(|error| format!("Failed to open path {}: {error}", target.display()))?;
+    Ok(())
 }
 
 /// UTC wall-clock time as `YYYY-MM-DDTHH-MM-SS-mmmZ` — the shape the engine's
@@ -288,7 +273,6 @@ mod shell_path_policy_tests {
             );
         }
 
-        #[cfg(target_os = "windows")]
         {
             let windows = PathBuf::from(r"C:\Windows");
             if windows.exists() {

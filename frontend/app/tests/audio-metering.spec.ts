@@ -159,10 +159,8 @@ test("keeps the audio workspace stable during meter-only ticks", async ({ page }
   await expect(canvas).toBeVisible();
 
   const initialCounts = await page.evaluate(() => ({ ...window.__SSE_TEST_RENDER_COUNTS__ }));
-  // Plan PR 1 bumped this (and two sibling polls below) from 1_500 → 5_000:
-  // tight enough to flake on ubuntu-latest CI under 3-worker load. Plan PR 5
-  // (workstream D8) should root-cause why the first meter sample takes >1.5s
-  // on slower hardware.
+  // 5 s (and the two sibling polls below): 1.5 s was tight enough to flake
+  // under load on a slow runner (2026-09).
   await expect
     .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 5_000 })
     .toBeGreaterThan(0);

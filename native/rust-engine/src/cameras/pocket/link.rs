@@ -31,9 +31,6 @@ use studio_control_protocol::development::{
     camera_bluetooth_requested, development_build, CAMERA_BLUETOOTH_ENV,
 };
 
-#[cfg(not(windows))]
-use crate::cameras::pocket::stub as platform;
-#[cfg(windows)]
 use crate::cameras::pocket::winrt as platform;
 
 /// How long a press waits for the camera's answer before it reads as
