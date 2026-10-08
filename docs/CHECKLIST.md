@@ -29,13 +29,14 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] `CUT ALL` arms at the first press ("press again", a 3 s bar) and takes every light off at the second, as the deck's `ALL OFF`; let the bar run out once and nothing changes.
 - [ ] A `Highlight` on a fixture: the rig shows it at full, the scene's row still reads `ON RIG` and the state display does not read `UNSAVED`; `Off` in the latch slot ends it.
 - [ ] A `Highlight` on a fixture, then `CUT ALL`: the whole rig goes dark, the highlighted fixture too, and the latch slot reads `Nothing latched`. Then select every light and press `Find`; as soon as the first light has flashed, press `CUT ALL` twice: no light flashes after the cut (until 2026-10-05 the Find went on over the dark rig), and the Find key reads `Find` at once.
-- [ ] The INFINIMAT (Backline Wash) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
+- [ ] The INFINIMAT (`Key right`) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
 - [ ] Two scenes saved with `Save as a new scene` (press twice) come back after a restart, named `Scene N`; a scene deleted from its `⋯` (press twice) can be undone.
-- [ ] The plot draws each fixture where it hangs in the room: Key, Fill, Back and the wash read their real places on the rulers.
+- [ ] The plot draws each fixture where it hangs in the room: `Key Left`, `Key right` (the INFINIMAT), `Backlight Left`, `Backlight Right` and the four INFINIBAR PB12s (`Left Top`, `Left Bottom`, `Right Top`, `Right Bottom`) read their real places on the rulers.
+- [ ] An INFINIBAR PB12's `FX` and `Speed` are not touched until its DMX map is fixed (`docs/ROADMAP.md`, Found to check, 9): on the bars' profile our `Speed` is the strobe channel.
 
 ## Audio console
 
-- [ ] In TotalMix FX, remote 4 is `In Use` in `Global OSC` mode, port incoming 7004, port outgoing 9004, `Send changes` on, `Follow Submix` off.
+- [ ] In TotalMix FX, remote 4 is `In Use` in `Global OSC` mode, port incoming 7004, port outgoing 9004, `Send changes` on, `Lock Remote to submix` off.
 - [ ] After a start, with the Console last `VERIFIED` or `ASSUMED`, it reads `ASSUMED`, "Studio Control has not read the desk since it started.", and `engine.log` says `The Console reads assumed until a Sync`. After `Sync from TotalMix` it reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
 - [ ] A fader moved or a mute pressed in TotalMix shows on the Console within about a second.
 - [ ] `Sync from TotalMix` says how many values it read and moves nothing in TotalMix.
@@ -43,9 +44,9 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] Remote 4 off for about 30 s, a fader moved in TotalMix, remote 4 on again: the Console reads `ASSUMED` and says TotalMix was out of touch for about 30 s; `Sync from TotalMix` clears it, and the fader shows TotalMix's value. `engine.log` says when remote 4 went quiet (`TotalMix went quiet on remote 4`), when it was heard again and after how long, and how many control values TotalMix sent in the 3 s after.
 - [ ] A TotalMix fader at 0 dB and at −6 dB reads the same on the Console and on the Stream Deck (`+0.0 dB` at unity on both).
 - [ ] The Console's Snapshots are TotalMix's eight, under the names TotalMix shows (after TotalMix has been closed once since they were named); the one loaded reads `active`, and `changed` once a fader moves in TotalMix. `engine.log` names TotalMix's device (`TotalMix's device:`) and the names file it read (`TotalMix's names read from`).
-- [ ] A slot pressed, then pressed again once it reads `LOAD?` (a double-click only arms it), loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, the Console reads `VERIFIED`, and 48 V stays as it was. `engine.log`'s `Load of slot N` line says whether TotalMix reported the load itself.
+- [ ] A slot pressed, then pressed again once it reads `LOAD?` (a double-click only arms it), loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, and the Console reads `VERIFIED`. Check the preamps' 48 V and gain against TotalMix: a load may switch them (`Mix 1` switched SM7B 3's 48 V off and its gain to 50 dB on 2026-10-07). `engine.log`'s `Load of slot N` line says whether TotalMix reported the load itself.
 - [ ] An armed load moves nothing: the key reads `LOAD?` in dark red with its countdown, the state display shows the armed row, and Esc clears both.
-- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`, also with a letter beyond ASCII (`ö`), and that channel's mute still follows TotalMix. `engine.log` quotes each name the read-back carried, and has no line that a datagram from TotalMix could not be read in full. The Console has no Rename and no Capture.
+- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name within a second, with no Sync (it comes with TotalMix's own dump), also with a letter beyond ASCII (`ö`), and that channel's mute still follows TotalMix. `engine.log` quotes each name the read-back carried, and has no line that a datagram from TotalMix could not be read in full. The Console has no Rename and no Capture.
 - [ ] After a failed audio probe (one way: `Run audio probe` with TotalMix FX closed) every fader, mute and 48 V key is locked, dashed and dim from the chair, and says why; after a passed probe they return.
 - [ ] `DIM` lights yellow on the Stream Deck and on screen, pressed on either; the outputs block under it shows `MONO` and each output's key, level and fader. With `Phones 1` as the mix target, `DIM` still dims `Main Out`, and the phones' `⋯` menus have no `Dim` or `Mono`.
 - [ ] An output's fader in the left column moves that output in TotalMix, and its level reads the same as TotalMix's; `MAIN OUT` and `PHONES` on the deck light the same output key yellow on screen.
@@ -62,7 +63,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The deck draws `◂ Cue`, `Cue ▸` and the page keys' arrows, and on the strips `·` and `°`, as they are written here.
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen within a second.
 - [ ] `RECALL` reads `ON RIG` in green after a recall; `UNSAVED` in yellow after a light is changed; `scene` once the `SCENE` dial chose another scene; with the Lighting page's `Fade` at 2 s, a recall from the deck fades as one from the screen does.
-- [ ] On the INFINIMAT (Backline Wash) at 8000 K, a turn of the deck's `CCT` up reads `8200 K` and the light goes cooler (until 2026-10-05 it fell to 6500 K); a push reads `6000 K`, as the plate's Reset. On an Astra a push reads `4400 K`.
+- [ ] On the INFINIMAT (`Key right`) at 8000 K, a turn of the deck's `CCT` up reads `8200 K` and the light goes cooler (until 2026-10-05 it fell to 6500 K); a push reads `6000 K`, as the plate's Reset. On an Astra a push reads `4400 K`.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, `RECALL` reads `PREVIEW` in blue, the INTENSITY and CCT values are blue, and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
 - [ ] `ALL OFF` on the deck, in coral, reads `OFF?` and "press again" in dark red at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `ALL OFF` again within about a second. `REC` or `PLAY` pressed meanwhile does not end the question.
@@ -73,7 +74,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] With Companion closed, the header's Surface lamp reads `no deck`, amber, within about 5 s, and nothing locks; started again, it reads `ready`.
 - [ ] With the app closed, the deck's keys and cells turn grey and show no values within about 5 s; with the app started again they come back by themselves. Turned by its page key to another page than the app's before the app was closed, the deck stays on that page when it comes back: it turns only when the app's page changes.
 
-- [ ] In Setup's `Verify live echo`, a key of each of the four pages pulses on screen, and the screen turns to the key's page.
+- [ ] In Setup's `Verify live echo`, after `Continue to verify`, a key of each of the four pages pressed on the deck pulses on screen, and the screen turns to the key's page. Press a key that acts: a page key turns the deck inside Companion and reaches nothing on screen.
 
 The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 
@@ -102,7 +103,7 @@ The Prompter XL:
 - [ ] Unplugged while the text scrolls: the text pauses, the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", the deck's `PLAY` is grey and reads `NO XL` on every page, and no other screen shows the script, not for a moment.
 - [ ] Plugged back in: the script returns at the same place, paused.
 - [ ] Set to duplicate another screen in Windows' display settings: the page reads `DUPLICATED` and the Prompter XL shows the copy, not the script. Set back to extend: the script returns.
-- [ ] With the app closed the Prompter XL shows a black desktop, and Elgato Camera Hub's own prompter, if installed, is off.
+- [ ] With the app closed the Prompter XL shows the desktop (its wallpaper and taskbar, never the script), and Elgato Camera Hub's own prompter, if installed, is off.
 - [ ] The scroll is smooth at the speeds you use, also with the Cameras page open.
 
 ## Cameras
@@ -143,7 +144,7 @@ Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on 
 - [ ] The deck's dials step the selected camera's values in every bank, and the strip shows what the camera reports; a push of the first dial on focus runs the autofocus once.
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.
-- [ ] After `Release` the iPad reaches CAM 1 and LUMIX Tether reaches a BGH1; `Connect` takes the camera back.
+- [ ] After `Release` (press twice) CAM 1 reads `RELEASED` and Studio Control sends it nothing, so another controller could take it (the iPad is no longer used); LUMIX Tether reaches a released BGH1. `Connect` takes the camera back within a second; CAM 1's values return when the camera next reports (`docs/ROADMAP.md`, Found to check, 19).
 - [ ] Closing the app while CAM 1 records leaves it recording, and a restart changes no camera setting.
 - [ ] A camera released before the app is closed is still released after the start, and `Connect` takes it back.
 - [ ] A camera switched off reads `UNREACHABLE`, and nothing else changes.
