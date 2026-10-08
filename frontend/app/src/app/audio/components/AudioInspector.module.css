@@ -161,3 +161,12 @@
   flex-direction: column;
   gap: 16px;
 }
+
+/* A strip TotalMix hides (Setup's list, 2026-10-08): the sentence under the
+   plate's head, in the attention ink, wrapped whole. */
+.hiddenNote {
+  margin: 0;
+  color: var(--role-yellow-text);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  text-wrap: pretty;
+}

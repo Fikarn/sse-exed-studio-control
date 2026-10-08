@@ -3133,5 +3133,112 @@
         }
       ]
     }
+  },
+  "setup-console": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "setup",
+        "setup": {
+          "activeSection": "console"
+        }
+      },
+      "summary": "Setup / Support on the Console's setup, with the studio's hidden strips listed."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded",
+      "hiddenChannelIds": [
+        "audio-input-1",
+        "audio-input-2",
+        "audio-input-3",
+        "audio-input-4",
+        "audio-input-5",
+        "audio-input-6",
+        "audio-input-7",
+        "audio-input-8",
+        "audio-playback-9-10",
+        "audio-playback-11-12"
+      ]
+    },
+    "supportSnapshot": {
+      "recentEvents": []
+    }
+  },
+  "audio-hidden-strips": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "audio"
+      },
+      "summary": "Audio workspace active, with the strips TotalMix hides locked and one of them on the plate."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded",
+      "selectedChannelId": "audio-playback-9-10",
+      "hiddenChannelIds": [
+        "audio-input-1",
+        "audio-input-2",
+        "audio-input-3",
+        "audio-input-4",
+        "audio-input-5",
+        "audio-input-6",
+        "audio-input-7",
+        "audio-input-8",
+        "audio-playback-9-10",
+        "audio-playback-11-12"
+      ]
+    }
   }
 }

@@ -1,0 +1,36 @@
+/* Setup / Support's Console screen (2026-10-08): the desk's strips as keys,
+   the inputs then the playback pairs, each lit while TotalMix hides its
+   channel. The keys span the facts' two columns; nothing is a card. */
+
+.lists {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.groupLabel {
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.strips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.empty,
+.waiting {
+  margin: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+}

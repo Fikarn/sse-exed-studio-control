@@ -10,6 +10,7 @@ import { AudioPlateMixes } from "./inspector/AudioPlateMixes";
 import { AudioPlatePreamp } from "./inspector/AudioPlatePreamp";
 import { channelOrdinalLabel, channelTypeLabel, type AudioChannelUpdate } from "./inspector/audioInspectorHelpers";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
+import { AUDIO_HIDDEN_STRIP_MENU_LOCK, AUDIO_HIDDEN_STRIP_SENTENCE } from "../audioFormatting";
 import {
   audioChannelSupportsGain,
   audioGroupLabel,
@@ -99,6 +100,11 @@ function AudioChannelPlate({
   const [entry, setEntry] = useState<"level" | "gain" | null>(null);
   const menuLock = viewModel.actionsAllowed ? null : `desk ${viewModel.status.label}`;
   const lockedReason = viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined);
+  // A strip TotalMix hides (Setup's list, 2026-10-08): the plate's sections
+  // are locked with the sentence, whatever the desk's state.
+  const plateActionsAllowed = viewModel.actionsAllowed && !channel.hidden;
+  const plateMenuLock = channel.hidden ? AUDIO_HIDDEN_STRIP_MENU_LOCK : menuLock;
+  const plateLockedReason = channel.hidden ? AUDIO_HIDDEN_STRIP_SENTENCE : lockedReason;
 
   const gainDraftKey = `channel:${channel.id}:gain`;
   const gain = useAudioControlDraftValue(draftStore, gainDraftKey, getDraftValue(gainDraftKey, channel.gain));
@@ -121,6 +127,7 @@ function AudioChannelPlate({
     `${channelTypeLabel(channel.role)} ${channelOrdinalLabel(viewModel, channel)}`,
     channel.stereo ? "stereo" : "mono",
     `group ${audioGroupLabel(getAudioChannelGroup(channel))}`,
+    ...(channel.hidden ? [AUDIO_HIDDEN_STRIP_MENU_LOCK] : []),
   ].join(" · ");
 
   const menu = buildChannelMenu({
@@ -128,7 +135,7 @@ function AudioChannelPlate({
     gain,
     sendLevel,
     selectedMixTarget,
-    menuLock,
+    menuLock: plateMenuLock,
     onRequestLevel: () => setEntry("level"),
     onRequestGain: () => setEntry("gain"),
     onResetToUnity,
@@ -148,13 +155,19 @@ function AudioChannelPlate({
         testId="audio-plate-head"
       />
 
+      {channel.hidden ? (
+        <p className={styles.hiddenNote} data-testid="audio-plate-hidden">
+          {AUDIO_HIDDEN_STRIP_SENTENCE}
+        </p>
+      ) : null}
+
       {audioChannelSupportsGain(channel) ? (
         <AudioPlatePreamp
-          actionsAllowed={viewModel.actionsAllowed}
+          actionsAllowed={plateActionsAllowed}
           armedActionKey={armedActionKey}
           channel={channel}
           gain={gain}
-          lockedReason={lockedReason}
+          lockedReason={plateLockedReason}
           onCommitGain={commitGain}
           onPreviewGain={(next) => setDraftValue(gainDraftKey, next)}
           onTogglePhantom={onTogglePhantom}
@@ -163,7 +176,7 @@ function AudioChannelPlate({
       ) : null}
 
       <AudioPlateMixes
-        actionsAllowed={viewModel.actionsAllowed}
+        actionsAllowed={plateActionsAllowed}
         arm={arm}
         channel={channel}
         clearDraftValueLater={clearDraftValueLater}
@@ -171,7 +184,7 @@ function AudioChannelPlate({
         doubt={viewModel.valuesInDoubt}
         draftStore={draftStore}
         getDraftValue={getDraftValue}
-        menuLock={menuLock}
+        menuLock={plateMenuLock}
         mixTargets={viewModel.mixTargets}
         onSelectMixTarget={onSelectMixTarget}
         selectedMixTarget={selectedMixTarget}

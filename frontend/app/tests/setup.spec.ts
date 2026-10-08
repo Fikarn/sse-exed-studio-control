@@ -858,7 +858,7 @@ test.describe("Setup / Support after the visual overhaul", () => {
     await openSetupPage(page, "setup-ready");
     const cluster = page.getByTestId("setup-cluster");
     await expect(cluster.getByRole("tab", { selected: true })).toHaveAttribute("data-testid", "setup-step-publish");
-    for (const mode of ["support", "cameras"]) {
+    for (const mode of ["support", "cameras", "console"]) {
       await cluster.getByTestId(`setup-mode-${mode}`).click();
       await expect(cluster.getByTestId(`setup-mode-${mode}`)).toHaveAttribute("aria-pressed", "true");
       await expect(cluster.getByRole("tab", { selected: true })).toHaveCount(0);
@@ -921,4 +921,49 @@ test.describe("Setup / Support after the visual overhaul", () => {
     await expect(page.getByTestId("setup-feedback")).toContainText("CAM 2's address is forgotten.");
     await expect(page.getByTestId("setup-camera-2-state")).toHaveText("NOT SET UP");
   });
+});
+
+// The walk of 2026-10-07, finding 3 (2026-10-08): Setup's Console screen lists
+// the desk's strips, lit while TotalMix hides their channel. A press sends the
+// whole list in one request, the record names what the list holds, Recent
+// actions gets a row, and nothing scrolls or is cut.
+test("the Console screen lists the strips, and a press puts one on the list TotalMix hides", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
+  });
+  await openFixture(page, "setup-console");
+  await expectWorkspaceMounted(page, "setup");
+  await expect(page.getByTestId("setup-screen-console")).toBeVisible();
+  await expect(page.getByTestId("setup-mode-console")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("setup-console-inputs").getByRole("button")).toHaveCount(12);
+  await expect(page.getByTestId("setup-console-playback").getByRole("button")).toHaveCount(6);
+  // The studio's layout, as the fixture holds it: ten strips hidden.
+  await expect(page.getByTestId("setup-console-record-hidden")).toContainText("10 strips");
+  await expect(page.getByTestId("setup-console-strip-audio-playback-9-10")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("setup-console-strip-audio-input-9")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("setup-console-address")).toContainText("127.0.0.1:7001 · receive 9001");
+
+  const music = page.getByTestId("setup-console-strip-audio-playback-7-8");
+  await expect(music).toHaveAttribute("aria-pressed", "false");
+  await music.click();
+  await expect(music).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("setup-feedback")).toContainText("Music 7/8 is on the list");
+  await expect(page.getByTestId("setup-console-hidden-audio-playback-7-8")).toBeVisible();
+  await expect(page.getByTestId("setup-console-record-hidden")).toContainText("11 strips");
+  expect(
+    await page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.settings.update"] ?? 0),
+    "one request carries the whole list"
+  ).toBe(1);
+  // The change is a row in Recent actions, on the plate.
+  await expect(page.getByTestId("support-recent-actions")).toContainText("Strips TotalMix hides");
+
+  // Off the list again.
+  await music.click();
+  await expect(music).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("setup-feedback")).toContainText("Music 7/8 is off the list");
+  await expect(page.getByTestId("setup-console-hidden-audio-playback-7-8")).toHaveCount(0);
+
+  const room = await measureRoom(page);
+  expect(room.scrolls, "nothing scrolls").toEqual([]);
+  expect(room.cut, "no line is cut").toEqual([]);
 });

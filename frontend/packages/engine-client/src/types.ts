@@ -27,8 +27,8 @@ export type RecoveryState = "healthy" | "degraded" | "recovery";
 export type CommissioningStage = "setup-required" | "in-progress" | "ready";
 export type RunnerStage = "import" | "probe" | "map" | "verify" | "publish";
 export type CommissioningCheckTarget = "control-surface" | "lighting" | "audio";
-/** Setup / Support's sections: the runner, Support, and the cameras' setup. */
-export type SetupSection = "commissioning" | "support" | "cameras";
+/** Setup / Support's sections: the runner, Support, the cameras' setup and the Console's setup (2026-10-08). */
+export type SetupSection = "commissioning" | "support" | "cameras" | "console";
 
 export interface CommissioningCheckRequest {
   target: CommissioningCheckTarget;
@@ -72,6 +72,8 @@ export interface AudioSettingsUpdateRequest {
   expectedCompatibilityMode?: boolean;
   fadersPerBank?: number;
   viewMode?: "submix" | "master";
+  /** The whole list of the channels TotalMix hides, as Setup sends it (2026-10-08); `[]` hides none. */
+  hiddenChannelIds?: string[];
 }
 
 /** `audio.channel.update`. No `name`: the channels take TotalMix's names and are renamed in TotalMix (2026-10-01). */

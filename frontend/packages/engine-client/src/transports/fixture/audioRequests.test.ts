@@ -117,4 +117,41 @@ describe("the fixture double's TotalMix snapshots", () => {
     const channel = (snapshot.channels as JsonObject[]).find((entry) => entry.id === "audio-input-1");
     expect(channel?.name).toBe("Line 1");
   });
+
+  // The walk of 2026-10-07, finding 3 (2026-10-08): Setup's list of the strips
+  // TotalMix hides, as the hardware link takes it (`audio/settings.rs`,
+  // `audio/channels.rs`): the whole list, the strips read hidden, a change to
+  // one is refused, Clear all leaves a hidden solo, and the row says the list.
+  it("lists the strips TotalMix hides, locks them, and leaves a hidden solo at Clear all", async () => {
+    const transport = await verifiedConsole();
+    await transport.request("audio.channel.update", { channelId: "audio-playback-9-10", solo: true });
+    await transport.request("audio.channel.update", { channelId: "audio-playback-3-4", solo: true });
+    await transport.request("audio.settings.update", { hiddenChannelIds: ["audio-playback-9-10", "audio-input-1"] });
+    let snapshot = await audioSnapshot(transport);
+    const hidden = (snapshot.channels as JsonObject[])
+      .filter((entry) => entry.hidden === true)
+      .map((entry) => entry.id);
+    expect(hidden).toEqual(["audio-input-1", "audio-playback-9-10"]);
+    await expect(
+      transport.request("audio.channel.update", { channelId: "audio-playback-9-10", mute: true })
+    ).rejects.toMatchObject({ code: "AUDIO_CHANNEL_HIDDEN" });
+    await expect(
+      transport.request("audio.settings.update", { hiddenChannelIds: ["audio-input-99"] })
+    ).rejects.toMatchObject({ code: "AUDIO_CHANNEL_NOT_FOUND" });
+    const support = (await transport.request("support.snapshot", {})) as JsonObject;
+    expect((support.recentEvents as JsonObject[])[0]).toMatchObject({
+      domain: "audio",
+      action: "console-hidden-strips-set",
+      target: "TotalMix",
+      detail: "Strips TotalMix hides: Line 1, Playback 9/10",
+    });
+    await transport.request("audio.solo.clearAll", {});
+    snapshot = await audioSnapshot(transport);
+    const solo = (id: string) => (snapshot.channels as JsonObject[]).find((entry) => entry.id === id)?.solo;
+    expect(solo("audio-playback-3-4")).toBe(false);
+    expect(solo("audio-playback-9-10")).toBe(true);
+    await transport.request("audio.settings.update", { hiddenChannelIds: [] });
+    snapshot = await audioSnapshot(transport);
+    expect((snapshot.channels as JsonObject[]).every((entry) => entry.hidden === false)).toBe(true);
+  });
 });

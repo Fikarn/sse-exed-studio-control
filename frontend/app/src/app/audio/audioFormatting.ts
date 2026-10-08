@@ -221,6 +221,15 @@ export function audioLockNote(label: string): string {
   }
 }
 
+// The walk of 2026-10-07, finding 3: a strip TotalMix hides in its Channel
+// Layout (Setup's list, 2026-10-08) takes no change, since TotalMix drops the
+// write unanswered. The strip says so in a word, its keys and the plate in
+// the sentence, its menu's items in the short reason.
+export const AUDIO_HIDDEN_STRIP_SENTENCE =
+  "TotalMix hides this channel: unhide it there, or take it off the list in Setup.";
+/** The menu's short reason for a hidden strip's items, and the plate's word for it. */
+export const AUDIO_HIDDEN_STRIP_MENU_LOCK = "hidden in TotalMix";
+
 export function meterTone(value: number, clip = false) {
   const dbfs = normalizedToDbfs(value);
   const roundedDbfs = Number.isFinite(dbfs) ? Number(dbfs.toFixed(3)) : dbfs;

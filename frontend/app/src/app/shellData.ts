@@ -132,6 +132,8 @@ export interface AudioChannelEntry {
   clip: boolean;
   fader: number;
   gain: number;
+  /** TotalMix hides the channel in its Channel Layout (Setup's list, 2026-10-08): the strip is locked. */
+  hidden: boolean;
   id: string;
   instrument: boolean;
   meterLeft: number;
@@ -442,6 +444,7 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
     clip: c.clip,
     fader: c.fader,
     gain: c.gain,
+    hidden: c.hidden,
     id: c.id,
     instrument: c.instrument,
     meterLeft: c.meterLeft,
