@@ -22,10 +22,12 @@
 //! `reachable` — with `app.changed { reason: "health" }` after them when the
 //! health check changed — whoever noticed first.
 
-use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
+use crate::cameras::model::{model, Setting, CAMERA_NUMBERS, RECORDING_CAMERA};
 use crate::cameras::pocket::pairing::{PairingStep, PIN_REFUSED, STOPPED};
 use crate::cameras::real_link::{self, BluetoothAddress, LinkFailure, RealLinks};
-use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras, SIMULATED_PIN};
+use crate::cameras::simulated::{
+    CameraCommand, CameraReading, LinkReading, SimulatedCameras, SIMULATED_PIN,
+};
 use crate::cameras::snapshot::{CameraDialBank, CameraSetupSummary, CameraState};
 use crate::cameras::store::{read_setup, write_setup, StoredSetup};
 use crate::cameras::CameraError;
@@ -68,6 +70,45 @@ fn released_key(camera: u8) -> String {
     format!("{RELEASED_PREFIX}{camera}")
 }
 
+/// The setting that keeps what a camera last reported, and when, across a
+/// start (finding 19 of the walk of 2026-10-07, the owner's decision):
+/// `cameras.lastReading.<camera>`, the reading as JSON, written when the
+/// camera reports and taken away when it is forgotten or set up anew. Under
+/// its own prefix, like the release, so no archive carries it; a database
+/// backup restored whole brings it back.
+const LAST_READING_PREFIX: &str = "cameras.lastReading.";
+
+fn last_reading_key(camera: u8) -> String {
+    format!("{LAST_READING_PREFIX}{camera}")
+}
+
+/// How often a reading that does not change is saved again, for its time.
+const SAVE_READING_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// What the setting holds.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct SavedReading {
+    read_at: String,
+    reading: CameraReading,
+}
+
+/// A press that sets half a parameter: the other half goes with it as the
+/// camera reported it (`pocket/protocol.rs`), never a guess (D12). While a
+/// camera's values are the last read, that half is a kept value the camera
+/// has not reported in this connection, so the press is refused (the
+/// lesson of D43). `Some((what the camera has not reported, the press))`.
+fn half_parameter(setting: &Setting) -> Option<(&'static str, &'static str)> {
+    match setting {
+        Setting::WhiteBalance => Some(("its tint", "a white balance")),
+        Setting::Tint => Some(("its white balance", "a tint")),
+        Setting::Resolution => Some(("its recording format", "a resolution")),
+        Setting::FrameRate => Some(("its recording format", "a frame rate")),
+        Setting::DisplayLut => Some(("whether its display LUT is on", "a display LUT")),
+        Setting::DisplayLutOn => Some(("its display LUT", "the switch")),
+        _ => None,
+    }
+}
+
 /// One camera as the hardware link holds it.
 #[derive(Debug, Clone)]
 pub(crate) struct CameraRuntime {
@@ -78,10 +119,24 @@ pub(crate) struct CameraRuntime {
     /// keeps it (D41).
     pub released: bool,
     /// What it last reported; `None` when it was never read since the start
-    /// or it is released.
+    /// and nothing was saved. Kept while released, for a Connect soon after,
+    /// and loaded at a start from the saved reading (finding 19).
     pub reading: Option<CameraReading>,
     /// When it last answered.
     pub read_at: Option<String>,
+    /// Its values are what it last reported, at `read_at`, not what it
+    /// reports now: its link has brought no setting since it connected (a
+    /// start with the saved reading, a quick reconnect, a Connect soon
+    /// after a Release). The page shows them as doubt, `last read`, until
+    /// the camera reports (finding 19).
+    pub values_last_read: bool,
+    /// When its reading was last saved for a start; a reading that does not
+    /// change is saved again once a minute, so the time shown after a start
+    /// is near the last read, not the last change. In memory only.
+    pub last_saved_at: Option<SystemTime>,
+    /// The last save failed, said in the log once; said again when a save
+    /// goes through. In memory only.
+    pub save_failing: bool,
     /// Why it did not answer the last time it was read; `None` while it
     /// answers.
     pub failure: Option<LinkFailure>,
@@ -124,6 +179,9 @@ impl CameraRuntime {
             released: false,
             reading: None,
             read_at: None,
+            values_last_read: false,
+            last_saved_at: None,
+            save_failing: false,
             failure: None,
             started_at: None,
             pairing: None,
@@ -160,10 +218,14 @@ impl CameraRuntime {
         failure.sentence(self.camera(), self.setup.address.as_deref())
     }
 
-    /// The state's sentence; a lost pairing's own.
+    /// The state's sentence; a lost pairing's own; a held camera's whose
+    /// values are the last read.
     pub(crate) fn sentence(&self) -> String {
         if self.pairing_lost() {
             return self.unreachable_sentence();
+        }
+        if self.state() == CameraState::Held && self.values_last_read && self.reading.is_some() {
+            return model(self.camera()).last_read_sentence();
         }
         model(self.camera()).state_sentence(
             self.state(),
@@ -191,14 +253,27 @@ impl CameraRuntime {
     fn forget_reading(&mut self) {
         self.reading = None;
         self.read_at = None;
+        self.values_last_read = false;
         self.failure = None;
         self.started_at = None;
     }
 
-    /// Takes a reading. The take's start is the link's to see: a take that
-    /// was running at the first read after a start, a connect or an
-    /// unreachable spell started before it looked.
-    fn take_reading(&mut self, reading: CameraReading, now: SystemTime) {
+    /// Takes a reading. A link that has brought no setting since it
+    /// connected leaves what the camera last reported, and when, as the
+    /// last read, the timecode alone following, until the camera reports
+    /// (finding 19); with nothing read before there is nothing to keep. The
+    /// take's start is the link's to see: a take that was running at the
+    /// first read after a start, a connect or an unreachable spell started
+    /// before it looked.
+    fn take_reading(&mut self, link: LinkReading, now: SystemTime) {
+        let LinkReading { reading, last_read } = link;
+        let reading = match (&self.reading, last_read) {
+            (Some(last), true) => CameraReading {
+                timecode: reading.timecode.or_else(|| last.timecode.clone()),
+                ..last.clone()
+            },
+            _ => reading,
+        };
         let answered_before = self.reading.is_some() && self.failure.is_none();
         let was = self.reading.as_ref().and_then(|last| last.recording);
         self.started_at = match reading.recording {
@@ -206,8 +281,11 @@ impl CameraRuntime {
             Some(true) if answered_before && was == Some(false) => Some(now),
             _ => None,
         };
+        self.values_last_read = last_read && self.reading.is_some();
+        if !self.values_last_read {
+            self.read_at = Some(utc_text(now));
+        }
         self.reading = Some(reading);
-        self.read_at = Some(utc_text(now));
         self.failure = None;
     }
 }
@@ -274,6 +352,8 @@ impl Cameras {
         let setup = read_setup(&open_connection(db_path)?)?;
         let released = list_settings_by_prefix(db_path, RELEASED_PREFIX)
             .map_err(|error| CameraError::Storage(error.to_string()))?;
+        let last_readings = list_settings_by_prefix(db_path, LAST_READING_PREFIX)
+            .map_err(|error| CameraError::Storage(error.to_string()))?;
         let mut cameras = Self {
             db_path: db_path.to_path_buf(),
             simulated,
@@ -290,6 +370,19 @@ impl Cameras {
                     && released
                         .get(&released_key(runtime.camera()))
                         .is_some_and(|value| value.trim() == "1");
+                // What it last reported, as the last read until it reports
+                // (finding 19); a saved reading that cannot be read is
+                // nothing read.
+                if runtime.setup.set_up() {
+                    if let Some(saved) = last_readings
+                        .get(&last_reading_key(runtime.camera()))
+                        .and_then(|value| serde_json::from_str::<SavedReading>(value).ok())
+                    {
+                        runtime.reading = Some(saved.reading);
+                        runtime.read_at = Some(saved.read_at);
+                        runtime.values_last_read = true;
+                    }
+                }
                 runtime
             }),
         };
@@ -321,8 +414,69 @@ impl Cameras {
         }
     }
 
+    /// Saves what `camera` reported and when, for a start (finding 19). A
+    /// write that fails is one line in the log for as long as it fails, and
+    /// is tried again at the next change or a minute later, never at every
+    /// read; a start meanwhile shows what was saved before, or nothing read.
+    fn save_reading(&mut self, camera: u8, now: SystemTime) {
+        let runtime = self.camera(camera);
+        let (Some(reading), Some(read_at)) = (&runtime.reading, &runtime.read_at) else {
+            return;
+        };
+        let saved = SavedReading {
+            read_at: read_at.clone(),
+            reading: reading.clone(),
+        };
+        let written = serde_json::to_string(&saved)
+            .map_err(|error| error.to_string())
+            .and_then(|value| {
+                set_settings(&self.db_path, &[(&last_reading_key(camera), value)])
+                    .map_err(|error| error.to_string())
+            });
+        let runtime = self.camera_mut(camera);
+        runtime.last_saved_at = Some(now);
+        match written {
+            Ok(()) => {
+                if runtime.save_failing {
+                    runtime.save_failing = false;
+                    log_event(
+                        LogLevel::Info,
+                        &format!("{}'s reading is saved again.", model(camera).tag),
+                    );
+                }
+            }
+            Err(error) => {
+                if !runtime.save_failing {
+                    runtime.save_failing = true;
+                    log_event(
+                        LogLevel::Warn,
+                        &format!(
+                            "{}'s reading could not be saved, and is tried again at its next change or in a minute; a start meanwhile shows what was saved before, or nothing read: {error}",
+                            model(camera).tag
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    /// Takes the saved reading away: the camera is forgotten or set up
+    /// anew, so what it reported is another camera's.
+    fn drop_saved_reading(&self, camera: u8) {
+        if let Err(error) = apply_settings(&self.db_path, &[], &[&last_reading_key(camera)]) {
+            log_event(
+                LogLevel::Warn,
+                &format!(
+                    "{}'s saved reading could not be taken away: {error}",
+                    model(camera).tag
+                ),
+            );
+        }
+    }
+
     /// Tells the real links to hold `camera` as its setup now stands (set
-    /// up and not released) or to let it go; nothing with the simulated
+    /// up and not released) or to let it go, with what it last reported for
+    /// the link to start from (finding 19); nothing with the simulated
     /// cameras.
     fn tell_links(&mut self, camera: u8) {
         if self.simulated {
@@ -331,7 +485,8 @@ impl Cameras {
         let runtime = self.camera(camera);
         if runtime.setup.set_up() && !runtime.released {
             let setup = runtime.setup.clone();
-            self.links.hold(&setup);
+            let last = runtime.reading.clone();
+            self.links.hold(&setup, last);
         } else {
             self.links.let_go(camera);
         }
@@ -365,11 +520,7 @@ impl Cameras {
         }
     }
 
-    fn link_read(
-        &self,
-        camera: u8,
-        bodies: &SimulatedCameras,
-    ) -> Result<CameraReading, LinkFailure> {
+    fn link_read(&self, camera: u8, bodies: &SimulatedCameras) -> Result<LinkReading, LinkFailure> {
         if self.simulated {
             bodies.read(camera).ok_or(LinkFailure::NoAnswer)
         } else {
@@ -391,17 +542,29 @@ impl Cameras {
         let was_unreachable = runtime.failure.is_some();
         let last = runtime.reading.clone();
         match self.link_read(camera, bodies) {
-            Ok(reading) => {
-                let changed = last
-                    .as_ref()
-                    .is_some_and(|last| !last.same_values(&reading));
+            Ok(link) => {
+                let last_read = link.last_read;
+                self.camera_mut(camera).take_reading(link, now);
+                let reading = self.camera(camera).reading.clone();
+                let changed = match (&last, &reading) {
+                    (Some(last), Some(reading)) => !last.same_values(reading),
+                    _ => false,
+                };
                 if camera == RECORDING_CAMERA
                     && (was_unreachable
-                        || last.as_ref().and_then(|last| last.recording) != reading.recording)
+                        || last.as_ref().and_then(|last| last.recording)
+                            != reading.as_ref().and_then(|reading| reading.recording))
                 {
                     self.take_changes = self.take_changes.wrapping_add(1);
                 }
-                self.camera_mut(camera).take_reading(reading, now);
+                let saved_a_minute_ago = self
+                    .camera(camera)
+                    .last_saved_at
+                    .and_then(|saved| now.duration_since(saved).ok())
+                    .is_none_or(|since| since >= SAVE_READING_EVERY);
+                if !last_read && (changed || last.is_none() || saved_a_minute_ago) {
+                    self.save_reading(camera, now);
+                }
                 if was_unreachable {
                     Some(Transition::Reachable)
                 } else {
@@ -596,6 +759,27 @@ impl Cameras {
         bodies: &mut SimulatedCameras,
         commands: &[CameraCommand],
     ) -> Result<(), CameraError> {
+        // While its values are the last read, a press that sets half a
+        // parameter would carry the other half from the kept reading, which
+        // the camera has not reported in this connection: never a guess
+        // (D12, the lesson of D43). It is refused until the camera reports;
+        // a whole parameter, an auto and REC go. The halves are Blackmagic's
+        // protocol: CAM 1's; a BGH1's white balance is a whole value.
+        if camera == RECORDING_CAMERA && self.camera(camera).values_last_read {
+            for command in commands {
+                if let CameraCommand::Set(setting, _) = command {
+                    if let Some((what, press)) = half_parameter(setting) {
+                        return Err(CameraError::Refused(
+                            "CAMERA_VALUE_NOT_ALLOWED",
+                            format!(
+                                "{} has not reported {what} since it connected, so {press} cannot be sent with it.",
+                                model(camera).tag
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
         let failure = if !self.simulated {
             let runtime = self.camera(camera);
             let setup = runtime.setup.clone();
@@ -649,22 +833,28 @@ impl Cameras {
     pub(crate) fn release(&mut self, camera: u8) {
         let runtime = self.camera_mut(camera);
         runtime.released = true;
-        runtime.forget_reading();
+        // What it reported stays, unshown while released, for a Connect
+        // soon after: the camera then reports nothing until a setting
+        // changes, and the values show as the last read (finding 19). A
+        // take it records may end and another begin meanwhile: the deck's
+        // arm does not outlive the release.
+        runtime.values_last_read = runtime.reading.is_some();
+        runtime.failure = None;
+        runtime.started_at = None;
+        if camera == RECORDING_CAMERA {
+            self.take_changes = self.take_changes.wrapping_add(1);
+        }
         self.save_release(camera, true);
         self.tell_links(camera);
     }
 
-    /// Takes a camera back and reads it again; the saved release goes.
+    /// Takes a camera back and reads it again; the saved release goes. What
+    /// it last reported stays until it answers or reports (finding 19).
     pub(crate) fn connect(&mut self, camera: u8, bodies: &SimulatedCameras, now: SystemTime) {
         let runtime = self.camera_mut(camera);
         let was_released = runtime.released;
         runtime.released = false;
-        if runtime.failure.is_some() {
-            // Tried again below; what it last reported stays until it
-            // answers.
-        } else {
-            runtime.forget_reading();
-        }
+        runtime.values_last_read = runtime.reading.is_some();
         if was_released {
             self.save_release(camera, false);
         }
@@ -697,6 +887,7 @@ impl Cameras {
             if was_released {
                 self.save_release(camera, false);
             }
+            self.drop_saved_reading(camera);
             self.tell_links(camera);
             self.read(camera, bodies, now);
         }

@@ -406,6 +406,8 @@ export interface FixtureCameraSeed {
   vmixInput?: number;
   released?: boolean;
   unreachable?: boolean;
+  /** Its link has brought no setting since it connected: its values are the last read (finding 19). */
+  lastRead?: boolean;
   recording?: boolean;
   values?: FixtureCameraValuesSeed;
 }

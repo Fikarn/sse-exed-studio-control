@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- CAM 1 back within minutes of its last controller (a restart, `Connect` soon after `Release`) shows what it last reported, in amber with `last read` and the time, also after a start, until it reports a setting; before, it read `HELD` with nothing read (#327).
 - After a scene recall with a fade, a light the scene holds off keeps the scene's level, as it does without a fade: switched on later it comes up at that level, not at 0 % (#326).
 - A click on the Prompter XL's glass no longer takes the keyboard from the app: the app takes it back at once, so typing in the editor goes on, and `shell.log` says so (#325).
 - The prompter's speed number is the pace of a full line of running text: at 140 the text passes the reading line at 140 words a minute, where it read 22 to 29 % faster. The gaps between paragraphs and the cue lines pass at that speed, so a script takes a little longer than its words at the pace, and `Left` says so (#324).

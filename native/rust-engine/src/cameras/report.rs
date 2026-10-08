@@ -115,6 +115,9 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime, picture: CameraPicture) -
         tone: state.tone(),
         sentence: runtime.sentence(),
         read_at: runtime.read_at.clone().filter(|_| shown),
+        values_last_read: state == CameraState::Held
+            && runtime.values_last_read
+            && runtime.reading.is_some(),
         values: values(model, reading),
         auto: model.autos(),
         focus_steps: model.focus_steps(),

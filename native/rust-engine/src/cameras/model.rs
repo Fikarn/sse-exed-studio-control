@@ -580,6 +580,15 @@ impl CameraModel {
         }
     }
 
+    /// A held camera that has reported nothing since it connected: its
+    /// values are the last read (finding 19).
+    pub(crate) fn last_read_sentence(&self) -> String {
+        format!(
+            "{} is held and has reported nothing since it connected: its values are the last read, until it does.",
+            self.tag
+        )
+    }
+
     /// A held camera that does not answer.
     pub(crate) fn unreachable_sentence(&self, address: Option<&str>) -> String {
         let tag = self.tag;

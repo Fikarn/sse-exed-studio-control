@@ -41,6 +41,11 @@ export function heldSentence(model: CameraModel): string {
   return `${model.tag} is held: Studio Control reads it and sends only what you press.`;
 }
 
+/** A held camera that has reported nothing since it connected: its values are the last read (finding 19). */
+export function lastReadSentence(model: CameraModel): string {
+  return `${model.tag} is held and has reported nothing since it connected: its values are the last read, until it does.`;
+}
+
 export function releasedSentence(model: CameraModel): string {
   return `${model.tag} is released to ${model.app}. Connect it to control it here.`;
 }

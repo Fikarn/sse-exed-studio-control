@@ -127,7 +127,9 @@ export function CamerasPlate({
   const number = cameraNumber(camera);
   const lock = controlsLock(camera);
   const held = lock === null;
-  const doubt = camera.state === "unreachable";
+  // Doubt: a camera that does not answer, or one whose link has brought no
+  // setting since it connected, so its values are the last read (finding 19).
+  const doubt = camera.state === "unreachable" || camera.valuesLastRead;
   const shown = camera.state === "held" || doubt;
   // A popover belongs to the camera it was opened for, while that camera is
   // held and, for a list or a typed value, reports the setting.
@@ -222,12 +224,16 @@ export function CamerasPlate({
         data-open={isOpen ? "" : undefined}
         aria-haspopup="true"
         aria-expanded={isOpen}
-        aria-label={`${label} ${text}${unit ? `, as ${unit}` : ""}. Press for the values ${camera.tag} allows.`}
+        aria-label={`${label} ${text}${unit ? `, as ${unit}` : ""}${doubt ? ", the last read" : ""}. Press for the values ${camera.tag} allows.`}
+        // A held camera whose values are the last read (finding 19): the key
+        // stays a key, with the doubt's keyline and `last read` on it.
+        data-doubt={doubt ? "" : undefined}
         data-testid={`cameras-${setting}-value`}
         // The popover stands beside the whole row, over the bay, so the plate stays in view.
         onClick={(event) => onPress(event.currentTarget.parentElement ?? event.currentTarget, event.currentTarget)}
       >
-        <Readout value={text} unit={unit ?? undefined} className={styles.readout} />
+        <Readout value={text} unit={unit ?? undefined} doubt={doubt} className={styles.readout} />
+        {doubt ? <span className={styles.reportedNote}>last read</span> : null}
       </button>
     ) : (
       <Readout
@@ -352,7 +358,9 @@ export function CamerasPlate({
     switch (camera.state) {
       case "held":
         return {
-          detail: linkLabel(camera),
+          detail: camera.valuesLastRead
+            ? `${linkLabel(camera)} · ${last ? `last read ${last}` : "last read"}`
+            : linkLabel(camera),
           key: (
             <ArmKey
               armed={releaseIsArmed}

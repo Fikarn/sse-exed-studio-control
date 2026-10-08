@@ -527,6 +527,33 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-iso-value")).not.toHaveAttribute("data-doubt", "");
   });
 
+  // Finding 19 of the walk of 2026-10-07: after a quick reconnect the camera
+  // reports nothing until a setting changes; the page shows the last values
+  // as doubt, marked last read, with when they were read.
+  test("a camera whose link brought nothing since it connected shows its last values as doubt, marked last read", async ({
+    page,
+  }) => {
+    await openCameras(page);
+    await page.getByTestId("cameras-key-3").click();
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.reportNothing(3));
+    await expect(state(page)).toContainText("CAM 3 is held and has reported nothing since it connected", {
+      timeout: 3000,
+    });
+    await expect(state(page)).toContainText("HELD");
+    await expect(state(page)).toContainText("Last read");
+    await expect(page.getByTestId("cameras-iso-value")).toHaveAttribute("data-doubt", "");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("1600");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("last read");
+    await expect(page.getByTestId("cameras-key-3")).toContainText("last read");
+    // Held all the same: Release stands, and a press is sent.
+    await expect(page.getByTestId("cameras-release")).toHaveCount(1);
+
+    // It reports: the values are its own again.
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.reportAgain(3));
+    await expect(page.getByTestId("cameras-iso-value")).not.toHaveAttribute("data-doubt", "", { timeout: 3000 });
+    await expect(state(page)).not.toContainText("Last read");
+  });
+
   test("a value changed on the camera shows on the page, and the camera wins", async ({ page }) => {
     await openCameras(page);
     await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.changeOnBody(1, { iso: "3200", whiteBalance: 4300 }));

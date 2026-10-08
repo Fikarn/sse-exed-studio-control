@@ -794,3 +794,30 @@ fn a_key_the_page_does_not_have_is_refused() {
     }
     assert!(cameras.nothing_sent());
 }
+
+// Finding 19: the deck shows a camera whose values are the last read as the
+// page does: its dials as doubt, and a take its kept reading says is running
+// as last known.
+#[test]
+fn the_deck_shows_a_last_read_camera_s_values_as_doubt_and_its_take_as_last_known() {
+    let cameras = TestCameras::set_up("deck-last-read");
+    cameras.body_records(1, true);
+    assert_eq!(cameras.camera(1)["recording"]["recording"], true);
+    cameras.reporting(1, false);
+    assert_eq!(cameras.camera(1)["valuesLastRead"], true);
+    let texts = |cameras: &TestCameras| -> HashMap<&'static str, String> {
+        deck_texts_at(cameras.path(), cameras.simulated, Instant::now())
+            .expect("the displays read")
+            .into_iter()
+            .collect()
+    };
+    let shown = texts(&cameras);
+    assert_eq!(shown["camera_state_dials"], "doubt");
+    assert_eq!(shown["camera_state_rec"], "last-known");
+
+    cameras.reporting(1, true);
+    assert_eq!(cameras.camera(1)["valuesLastRead"], false);
+    let shown = texts(&cameras);
+    assert_eq!(shown["camera_state_dials"], "live");
+    assert_eq!(shown["camera_state_rec"], "recording");
+}

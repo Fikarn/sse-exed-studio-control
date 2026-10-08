@@ -352,6 +352,43 @@ describe("the three cameras' keys", () => {
     }
   });
 
+  // Finding 19 of the walk of 2026-10-07: a held camera whose link has
+  // brought no setting since it connected shows what it last reported as
+  // doubt, with the tag, until it reports.
+  it("shows a held camera's last-read values as doubt, with the tag, until it reports", async () => {
+    const { hooks, read } = openCameras({ cameras: [{ camera: 1, paired: true }] });
+    hooks.changeOnBody(1, { recording: true });
+    hooks.reportNothing(1);
+    let snapshot = await read();
+    expect(snapshot.cameras[0]!.valuesLastRead).toBe(true);
+    // A take the kept reading says is running: last known on the key and the
+    // REC key, the timecode as doubt; STOP stays live.
+    expect(cameraKeyView(snapshot.cameras[0]!, snapshot.selected).rec).toBe("last-known");
+    const rec = recKeyView(snapshot.cameras[0]!);
+    expect(rec.kind).toBe("recording");
+    expect(rec.hint).toMatch(/^last read/);
+    expect(takeReadouts(snapshot.cameras[0]!, Date.now()).find((row) => row.id === "timecode")).toMatchObject({
+      note: "last read",
+      doubt: true,
+    });
+    expect(snapshot.cameras[0]!.sentence).toBe(
+      "CAM 1 is held and has reported nothing since it connected: its values are the last read, until it does."
+    );
+    expect(cameraKeyView(snapshot.cameras[0]!, snapshot.selected)).toMatchObject({
+      word: "HELD",
+      values: "ISO 400 · 180° · f/2.8 · 5600 K",
+      valuesKind: "doubt",
+      valuesTag: "last read",
+    });
+    hooks.reportAgain(1);
+    snapshot = await read();
+    expect(snapshot.cameras[0]!.valuesLastRead).toBe(false);
+    expect(cameraKeyView(snapshot.cameras[0]!, snapshot.selected)).toMatchObject({
+      valuesKind: "values",
+      valuesTag: null,
+    });
+  });
+
   it("shows an unreachable camera's last values as doubt, and none for one not read", async () => {
     const { transport, hooks, read } = openCameras({
       cameras: [

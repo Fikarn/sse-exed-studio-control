@@ -93,6 +93,125 @@ fn a_value_the_camera_changed_itself_comes_back_as_reported() {
     );
 }
 
+// Finding 19 of the walk of 2026-10-07 (the owner's decision): a connection
+// that brings no setting shows what the camera last reported, and when, as
+// the last read until the camera reports; across a start too, from the
+// saved reading; and after a Connect soon after a Release.
+#[test]
+fn a_connection_that_brings_no_setting_shows_the_last_values_as_the_last_read() {
+    let cameras = TestCameras::set_up("last-read");
+    let before = cameras.camera(2);
+    assert_eq!(before["valuesLastRead"], false);
+    assert_eq!(
+        before["sentence"],
+        "CAM 2 is held: Studio Control reads it and sends only what you press."
+    );
+
+    // The camera connects again and reports nothing, while its body holds
+    // another ISO: the last values, as doubt, and when they were read.
+    cameras.reporting(2, false);
+    cameras.body_sets(2, Setting::Iso, CameraValue::Text(String::from("3200")));
+    let cam2 = cameras.camera(2);
+    assert_eq!(cam2["state"], "held");
+    assert_eq!(cam2["valuesLastRead"], true);
+    assert_eq!(
+        cam2["values"], before["values"],
+        "the last values, not the body's"
+    );
+    assert_eq!(cam2["readAt"], before["readAt"], "and when they were read");
+    assert_eq!(
+        cam2["sentence"],
+        "CAM 2 is held and has reported nothing since it connected: its values are the last read, until it does."
+    );
+    assert_eq!(announced_changes(), (Vec::new(), false), "nothing changed");
+
+    // Across a start: the saved reading, still the last read, with the time
+    // it was saved (a reading that does not change is saved again once a
+    // minute, so the time is near the last read).
+    cameras.restart();
+    let cam2 = cameras.camera(2);
+    assert_eq!(cam2["valuesLastRead"], true);
+    assert_eq!(cam2["values"], before["values"]);
+    assert!(cam2["readAt"].is_string(), "{:?}", cam2["readAt"]);
+    assert!(cam2["readAt"].as_str() <= before["readAt"].as_str());
+
+    // The camera reports: its values are its own again, read now.
+    cameras.reporting(2, true);
+    let cam2 = cameras.camera(2);
+    assert_eq!(cam2["valuesLastRead"], false);
+    assert_eq!(cam2["values"]["iso"]["value"], "3200");
+    assert_ne!(cam2["readAt"], before["readAt"]);
+    assert_eq!(cam2["sentence"], before["sentence"]);
+
+    // Released and connected soon after: the last values until it reports.
+    cameras.reporting(2, false);
+    cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
+    let released = cameras.camera(2);
+    assert_eq!(released["state"], "released");
+    assert_eq!(
+        released["valuesLastRead"], false,
+        "nothing is shown while released"
+    );
+    assert!(released["readAt"].is_null());
+    cameras.call("cameras.connect", json!({ "camera": 2 }));
+    let cam2 = cameras.camera(2);
+    assert_eq!(cam2["state"], "held");
+    assert_eq!(cam2["valuesLastRead"], true);
+    assert_eq!(cam2["values"]["iso"]["value"], "3200");
+
+    // CAM 1, the Pocket: while its values are the last read, a press that
+    // sets half a parameter is refused (the other half would be a guess,
+    // D12), a whole one goes, and the timecode follows the link.
+    cameras.reporting(1, false);
+    assert_eq!(cameras.camera(1)["valuesLastRead"], true);
+    assert_eq!(
+        cameras.refused(
+            "cameras.set",
+            json!({ "camera": 1, "setting": "whiteBalance", "value": 5600 })
+        ),
+        (
+            String::from("CAMERA_VALUE_NOT_ALLOWED"),
+            String::from(
+                "CAM 1 has not reported its tint since it connected, so a white balance cannot be sent with it."
+            )
+        )
+    );
+    let _ = cameras.reply(
+        "cameras.set",
+        json!({ "camera": 1, "setting": "iso", "value": "800" }),
+    );
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::Set(
+            Setting::Iso,
+            CameraValue::Text(String::from("800"))
+        )]
+    );
+    cameras.set_clock(1, std::time::Duration::from_secs(9 * 3600 + 12 * 60 + 53));
+    let timecode = cameras.camera(1)["recording"]["timecode"].clone();
+    assert!(
+        timecode
+            .as_str()
+            .is_some_and(|text| text.starts_with("09:12:53")),
+        "{timecode}"
+    );
+
+    // Forget takes the saved reading away (ISO 400, saved before the press):
+    // paired again and started, with its link bringing nothing, CAM 1 has
+    // nothing kept to show, so what the link brings is its own, not the
+    // last read.
+    cameras.call("cameras.setup.forget", json!({ "camera": 1 }));
+    cameras.pair_cam_1();
+    cameras.restart();
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "held");
+    assert_eq!(cam1["valuesLastRead"], false);
+    assert_eq!(
+        cam1["values"]["iso"]["value"], "800",
+        "the body's own value, not the dropped reading's"
+    );
+}
+
 // D19: a held camera that stops answering reads UNREACHABLE (error), keeps
 // the values it last reported and when, and comes back as `unreachable`
 // with the health follow-up; answering again is `reachable`.

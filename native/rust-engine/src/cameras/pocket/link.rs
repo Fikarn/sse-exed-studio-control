@@ -20,7 +20,7 @@ use crate::cameras::pocket::state::{
 };
 use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::real_link::{BluetoothAddress, LinkFailure};
-use crate::cameras::simulated::{CameraCommand, CameraReading};
+use crate::cameras::simulated::{CameraCommand, CameraReading, LinkReading};
 use crate::diagnostics::{log_event, LogLevel};
 use std::fmt;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
@@ -275,13 +275,14 @@ impl PocketLink {
     /// hearing that something changed; it runs on the notifier thread.
     pub(crate) fn start(
         address: BluetoothAddress,
+        last: CameraReading,
         notify: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         let (orders, inbox) = channel::<Order>();
         let (notices, notice_queue) = channel::<()>();
         let shared = Arc::new(Shared {
             address,
-            state: Mutex::new(LinkState::new()),
+            state: Mutex::new(LinkState::with_last(last)),
             notices,
         });
         match guard_bluetooth() {
@@ -330,6 +331,18 @@ impl PocketLink {
     /// What the camera last reported, at once; or why it cannot be read.
     pub(crate) fn read(&self) -> Result<CameraReading, LinkFailure> {
         self.shared.with_state(|state| state.read())
+    }
+
+    /// What the camera last reported and whether that is the last read
+    /// (finding 19), in one look at the state: a report between two looks
+    /// would pair the old reading with the new mark.
+    pub(crate) fn read_link(&self) -> Result<LinkReading, LinkFailure> {
+        self.shared.with_state(|state| {
+            state.read().map(|reading| LinkReading {
+                reading,
+                last_read: state.last_read(),
+            })
+        })
     }
 
     /// Sends a press: its messages are made from the commands and what the

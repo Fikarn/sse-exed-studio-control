@@ -30,6 +30,7 @@ fn board() -> CameraReading {
     SimulatedCameras::default()
         .read(1)
         .expect("the simulated CAM 1 answers")
+        .reading
 }
 
 fn one(command: CameraCommand, current: &CameraReading) -> Vec<u8> {

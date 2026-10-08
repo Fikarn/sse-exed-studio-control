@@ -34,10 +34,20 @@ export type CameraSnapshot = {
   tone: CameraTone;
   sentence: string;
   /**
-   * When the camera last answered; `null` when it never has since the
-   * start, or it is released.
+   * When the camera last answered, or the saved reading's time after a
+   * start (`valuesLastRead`); `null` when it never has and nothing was
+   * saved, or it is released.
    */
   readAt: string | null;
+  /**
+   * A held camera whose values are what it last reported, at `readAt`,
+   * not what it reports now: its link has brought no setting since it
+   * connected (a start, a quick reconnect, a Connect soon after a
+   * Release), and the camera sends its settings again only after some
+   * minutes without a controller or a power-on. The page shows the
+   * values as doubt, `last read`, until the camera reports (finding 19).
+   */
+  valuesLastRead: boolean;
   values: CameraValues;
   auto: CameraAutos;
   /**
