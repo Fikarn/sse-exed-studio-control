@@ -383,7 +383,18 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
       const camera = wholeNumber(result, ["camera"]);
       const detail = text(result, ["sentence"]);
       if ((camera !== 1 && camera !== 2 && camera !== 3) || detail === null) return [];
-      if (method === "cameras.connect" && text(result, ["state"]) !== "held") return [];
+      // A camera taken back that answers later: the press is a row all the same (finding 18).
+      if (method === "cameras.connect" && text(result, ["state"]) !== "held") {
+        const tag = cameraModel(camera).tag;
+        return [
+          {
+            domain: "cameras",
+            action: "connected",
+            target: tag,
+            detail: `${tag} taken back; it is held again when it answers.`,
+          },
+        ];
+      }
       return [{ domain: "cameras", action: CAMERA_ACTIONS[method], target: cameraModel(camera).tag, detail }];
     }
     default:

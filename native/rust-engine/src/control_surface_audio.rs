@@ -42,12 +42,21 @@ static AUDIO_DIAL_TURN_TIMES: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLo
 fn audio_fader_db_label(value: f64) -> String {
     let position = if value.is_finite() { value } else { 0.0 };
     let Some(db) = fader_lin_to_db(position) else {
-        return String::from("-\u{221e} dB");
+        return String::from("\u{2212}\u{221e} dB");
     };
-    // One decimal, and never "-0.0" at unity.
+    // One decimal, and never "-0.0" at unity; the real minus, as the
+    // Console prints it (the walk of 2026-10-07, finding 1).
     let rounded = (db * 10.0).round() / 10.0;
     let rounded = if rounded == 0.0 { 0.0 } else { rounded };
-    format!("{rounded:+.1} dB")
+    format!("{rounded:+.1} dB").replacen('-', "\u{2212}", 1)
+}
+
+/// A strip's name on the deck: upper case, cut to what one line of the
+/// cell holds. Cut to ten, `WINDOWS OUT` read `WINDOWS OU` on two lines on
+/// the walk of 2026-10-07 (finding 2): eight now, with no space left at the
+/// end, so a name stays on one line as DESIGN asks.
+fn strip_name(name: &str) -> String {
+    truncate(&name.to_uppercase(), 8).trim_end().to_string()
 }
 
 pub(crate) fn audio_deck_gate_label(snapshot: &AudioSnapshot) -> Option<&'static str> {
@@ -80,7 +89,7 @@ pub(crate) fn audio_strip_lcd_text(
     let bank = audio_deck_bank(app_settings);
     match resolve_audio_deck_strip(snapshot, &bank, strip_index) {
         Ok(AudioDeckStrip::Channel(channel)) => {
-            let name = truncate(&channel.name.to_uppercase(), 10);
+            let name = strip_name(&channel.name);
             let level = channel
                 .mix_levels
                 .get(&snapshot.selected_mix_target_id)
@@ -99,10 +108,7 @@ pub(crate) fn audio_strip_lcd_text(
             } else {
                 audio_fader_db_label(target.volume)
             };
-            format!(
-                "{}\\n{level_line}",
-                truncate(&target.name.to_uppercase(), 10)
-            )
+            format!("{}\\n{level_line}", strip_name(&target.name))
         }
         Err(_) => String::new(),
     }
@@ -1337,14 +1343,18 @@ mod tests {
     // Same anchors as the frontend (engine-client faderCurve.test.ts and
     // audioFormatting.test.ts): RME published fader curve, unity at 836/1023.
     fn audio_fader_db_label_prints_the_rme_fader_curve() {
-        assert_eq!(audio_fader_db_label(0.0), "-\u{221e} dB");
+        assert_eq!(audio_fader_db_label(0.0), "\u{2212}\u{221e} dB");
         assert_eq!(audio_fader_db_label(f64::NAN), audio_fader_db_label(0.0));
-        assert_eq!(audio_fader_db_label(0.35), "-23.0 dB");
-        assert_eq!(audio_fader_db_label(0.5), "-12.1 dB");
-        assert_eq!(audio_fader_db_label(649.0 / 1023.0), "-6.0 dB");
-        assert_eq!(audio_fader_db_label(0.7), "-3.8 dB");
-        assert_eq!(audio_fader_db_label(0.75), "-2.2 dB");
-        assert_eq!(audio_fader_db_label(0.8), "-0.6 dB");
+        assert_eq!(audio_fader_db_label(0.35), "\u{2212}23.0 dB");
+        assert_eq!(audio_fader_db_label(0.5), "\u{2212}12.1 dB");
+        assert_eq!(audio_fader_db_label(649.0 / 1023.0), "\u{2212}6.0 dB");
+        assert_eq!(audio_fader_db_label(0.7), "\u{2212}3.8 dB");
+        assert_eq!(audio_fader_db_label(0.75), "\u{2212}2.2 dB");
+        assert_eq!(audio_fader_db_label(0.8), "\u{2212}0.6 dB");
+        // The walk of 2026-10-07, finding 2: a name stays on one line.
+        assert_eq!(strip_name("Windows Out"), "WINDOWS");
+        assert_eq!(strip_name("SM7B 1"), "SM7B 1");
+        assert_eq!(strip_name("Backlight Left"), "BACKLIGH");
         assert_eq!(
             audio_fader_db_label(crate::audio::fader_curve::AUDIO_FADER_UNITY),
             "+0.0 dB"

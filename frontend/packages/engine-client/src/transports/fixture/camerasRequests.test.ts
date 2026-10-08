@@ -438,7 +438,12 @@ describe("the fixture double's cameras: who holds a camera (D13)", () => {
       state: "unreachable",
       sentence: `CAM 2 does not answer at ${CAM2_ADDRESS}. Check that it is on and on the network.`,
     });
-    expect((await rows()).length, "not held again, so no row").toBe(before);
+    // Finding 18: the press is a row, even when the camera does not answer yet.
+    expect((await rows()).length, "a connected row at the press").toBe(before + 1);
+    expect((await rows())[0]).toMatchObject({
+      action: "connected",
+      detail: "CAM 2 taken back; it is held again when it answers.",
+    });
     expect(await call("cameras.release", { camera: 2, confirm: true })).toMatchObject({ state: "released" });
     cameras.answerAgain(2);
     expect(await call("cameras.connect", { camera: 2 })).toMatchObject({

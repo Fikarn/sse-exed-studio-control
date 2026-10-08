@@ -292,7 +292,8 @@ describe("the fixture double's action log", () => {
         state: "unreachable",
         sentence: "CAM 2 does not answer at 10.0.0.2. Check that it is on and on the network.",
       },
-      [],
+      // Finding 18: the press is a row, even when the camera does not answer yet.
+      [row("cameras", "connected", "CAM 2", "CAM 2 taken back; it is held again when it answers.")],
     ],
     ["cameras.release", { camera: 4, confirm: true }, { camera: 4, sentence: "CAM 4 released." }, []],
   ];
