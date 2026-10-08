@@ -1,32 +1,35 @@
 //! CAM 1's pairing on Windows (the Pocket's link, part 5, 2026-10-06):
 //! Windows' own pairing through the `windows` crate (WinRT, safe code). The
-//! thread listens passively for the Pocket's advertisement (Blackmagic's
-//! camera service, or the camera's name), takes the device it heard, removes
-//! a pairing Windows still holds for it, and pairs with the PIN the camera
-//! shows, which Setup hands over (`ProvidePin`; a camera that asks only to
-//! confirm is accepted). Every wait has its deadline (`pairing.rs`). Nothing
-//! here is reached by a test or a plain development run: `guard_bluetooth`
-//! stands before this thread.
+//! thread listens actively for the Pocket (Blackmagic's camera service, which
+//! the camera names only in its scan reply: a passive listen never heard it,
+//! 2026-10-07, D42), takes the device it heard, removes a pairing Windows
+//! still holds for it, and pairs with the PIN the camera shows, which Setup
+//! hands over (`ProvidePin`; a camera that asks only to confirm is accepted).
+//! Every wait has its deadline (`pairing.rs`). Nothing here is reached by a
+//! test or a plain development run: `guard_bluetooth` stands before this
+//! thread.
 //!
-//! What it never does: scan actively, take a device whose advertisement is
-//! not the Pocket's, or write any of the camera's characteristics (that is
-//! the link's, `winrt.rs`, once the camera is paired).
+//! What it never does: connect to or pair with a device whose advertisement
+//! is not the Pocket's, or write any of the camera's characteristics (that
+//! is the link's, `winrt.rs`, once the camera is paired). An active listen
+//! sends only scan requests, which every device in range may answer.
 
 use crate::cameras::pocket::pairing::{
-    asked, is_pocket, pairing_result, Asked, PairingInbox, PairingOrder, PairingShared,
-    PairingStep, ANSWER_TIMEOUT, FIND_TIMEOUT, NOT_FOUND, NO_ANSWER, NO_PIN, OTHER_KIND,
-    PIN_TIMEOUT, STOPPED,
+    asked, heard_entry, heard_line, is_pocket, pairing_result, Asked, Heard, PairingInbox,
+    PairingOrder, PairingShared, PairingStep, ANSWER_TIMEOUT, FIND_TIMEOUT, NOT_FOUND, NO_ANSWER,
+    NO_PIN, OTHER_KIND, PIN_TIMEOUT, STOPPED,
 };
 use crate::cameras::real_link::BluetoothAddress;
 use crate::diagnostics::{log_event, LogLevel};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, TryRecvError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use windows::core::{Error as WinError, HSTRING};
 use windows::Devices::Bluetooth::Advertisement::{
-    BluetoothLEAdvertisementReceivedEventArgs, BluetoothLEAdvertisementWatcher,
-    BluetoothLEAdvertisementWatcherStatus, BluetoothLEScanningMode,
+    BluetoothLEAdvertisementReceivedEventArgs, BluetoothLEAdvertisementType,
+    BluetoothLEAdvertisementWatcher, BluetoothLEAdvertisementWatcherStatus,
+    BluetoothLEScanningMode,
 };
 use windows::Devices::Bluetooth::{BluetoothAddressType, BluetoothLEDevice};
 use windows::Devices::Enumeration::{
@@ -75,16 +78,18 @@ pub(crate) fn pair(shared: &Arc<PairingShared>, inbox: &PairingInbox, notify: &d
     notify();
 }
 
-/// Listens passively for the Pocket's advertisement, a minute at most; the
-/// address of the first heard.
+/// Listens actively for the Pocket's advertisement and scan reply, a minute
+/// at most; the address of the first heard.
 fn find(inbox: &PairingInbox) -> Result<BluetoothAddress, Stop> {
     let watcher = BluetoothLEAdvertisementWatcher::new().map_err(|error| windows_failed(&error))?;
     watcher
-        .SetScanningMode(BluetoothLEScanningMode::Passive)
+        .SetScanningMode(BluetoothLEScanningMode::Active)
         .map_err(|error| windows_failed(&error))?;
-    let (found, heard_from) = channel::<BluetoothAddress>();
+    let (found, heard_from) = channel::<Found>();
     let heard = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&heard);
+    let others = Arc::new(Mutex::new(Heard::default()));
+    let noted = Arc::clone(&others);
     let token = watcher
         .Received(&TypedEventHandler::<
             BluetoothLEAdvertisementWatcher,
@@ -106,14 +111,48 @@ fn find(inbox: &PairingInbox) -> Result<BluetoothAddress, Stop> {
                             .collect()
                     })
                     .unwrap_or_default();
-                if is_pocket(&services, &name) {
-                    let random = args
+                let address = BluetoothAddress {
+                    address: args.BluetoothAddress()?,
+                    random: args
                         .BluetoothAddressType()
-                        .is_ok_and(|kind| kind == BluetoothAddressType::Random);
-                    let _ = found.send(BluetoothAddress {
-                        address: args.BluetoothAddress()?,
-                        random,
+                        .is_ok_and(|kind| kind == BluetoothAddressType::Random),
+                };
+                let dbm = args.RawSignalStrengthInDBm().unwrap_or(i16::MIN);
+                if is_pocket(&services) {
+                    let scan_reply = args
+                        .AdvertisementType()
+                        .is_ok_and(|kind| kind == BluetoothLEAdvertisementType::ScanResponse);
+                    let _ = found.send(Found {
+                        address,
+                        dbm,
+                        scan_reply,
                     });
+                } else {
+                    // Read before the lock is taken: the handlers may run
+                    // at once on Windows' thread pool, and none waits on
+                    // another's reads.
+                    let makers: Vec<u16> = advertisement
+                        .ManufacturerData()
+                        .map(|list| {
+                            (0..list.Size().unwrap_or(0))
+                                .filter_map(|index| list.GetAt(index).ok())
+                                .filter_map(|data| data.CompanyId().ok())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let sections: Vec<u8> = advertisement
+                        .DataSections()
+                        .map(|list| {
+                            (0..list.Size().unwrap_or(0))
+                                .filter_map(|index| list.GetAt(index).ok())
+                                .filter_map(|section| section.DataType().ok())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let entry = heard_entry(address, &name, &services, &makers, &sections);
+                    if let Ok(mut kept) = noted.lock() {
+                        kept.note(entry, dbm);
+                    }
                 }
             }
             Ok(())
@@ -123,27 +162,35 @@ fn find(inbox: &PairingInbox) -> Result<BluetoothAddress, Stop> {
     let _ = watcher.Stop();
     let _ = watcher.RemoveReceived(token);
     match &outcome {
-        Ok(address) => log_event(
+        Ok(found) => log_event(
             LogLevel::Info,
-            &format!("CAM 1 was heard at {}.", address.text()),
+            &heard_line(found.address, found.dbm, found.scan_reply),
         ),
-        Err(Stop::Failed(_)) => log_event(
-            LogLevel::Info,
-            &format!(
-                "CAM 1 was not heard: {} advertisements in all, none the Pocket's.",
-                heard.load(Ordering::Relaxed)
-            ),
-        ),
+        Err(Stop::Failed(_)) => {
+            let advertisements = heard.load(Ordering::Relaxed);
+            let line = others.lock().map_or_else(
+                |_| Heard::default().line(advertisements),
+                |kept| kept.line(advertisements),
+            );
+            log_event(LogLevel::Info, &line);
+        }
         Err(Stop::LetGo) => {}
     }
-    outcome
+    outcome.map(|found| found.address)
+}
+
+/// The Pocket as the listen heard it.
+struct Found {
+    address: BluetoothAddress,
+    dbm: i16,
+    scan_reply: bool,
 }
 
 fn listen(
     watcher: &BluetoothLEAdvertisementWatcher,
     inbox: &PairingInbox,
-    heard_from: &Receiver<BluetoothAddress>,
-) -> Result<BluetoothAddress, Stop> {
+    heard_from: &Receiver<Found>,
+) -> Result<Found, Stop> {
     watcher.Start().map_err(|error| {
         Stop::Failed(format!(
             "Windows could not listen for CAM 1: {}. Check that Bluetooth is on.",
@@ -152,8 +199,8 @@ fn listen(
     })?;
     let until = Instant::now() + FIND_TIMEOUT;
     while Instant::now() < until {
-        if let Ok(address) = heard_from.try_recv() {
-            return Ok(address);
+        if let Ok(found) = heard_from.try_recv() {
+            return Ok(found);
         }
         if watcher.Status().ok() == Some(BluetoothLEAdvertisementWatcherStatus::Aborted) {
             return Err(failed(

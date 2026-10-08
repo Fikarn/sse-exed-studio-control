@@ -8,6 +8,7 @@ use crate::cameras::pocket::protocol::{apply, Message};
 use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::real_link::LinkFailure;
 use crate::cameras::simulated::CameraReading;
+use std::collections::BTreeSet;
 
 /// Where the link stands with the camera.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +45,33 @@ pub(crate) const STATUS_VERSIONS_VERIFIED: u8 = 0x08;
 pub(crate) const STATUS_INITIAL_PAYLOAD_RECEIVED: u8 = 0x10;
 pub(crate) const STATUS_CAMERA_READY: u8 = 0x20;
 
+/// The status flags in words, for the log: `power on, connected, paired`;
+/// `none` for no flag; an unknown bit as its hex.
+pub(crate) fn status_words(flags: u8) -> String {
+    const NAMED: [(u8, &str); 6] = [
+        (STATUS_POWER_ON, "power on"),
+        (STATUS_CONNECTED, "connected"),
+        (STATUS_PAIRED, "paired"),
+        (STATUS_VERSIONS_VERIFIED, "versions verified"),
+        (STATUS_INITIAL_PAYLOAD_RECEIVED, "initial payload sent"),
+        (STATUS_CAMERA_READY, "camera ready"),
+    ];
+    let mut words: Vec<String> = NAMED
+        .iter()
+        .filter(|(bit, _)| flags & bit != 0)
+        .map(|(_, word)| String::from(*word))
+        .collect();
+    let unknown = flags & !NAMED.iter().fold(0, |all, (bit, _)| all | bit);
+    if unknown != 0 {
+        words.push(format!("0x{unknown:02X}"));
+    }
+    if words.is_empty() {
+        String::from("none")
+    } else {
+        words.join(", ")
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LinkState {
     pub connection: Connection,
@@ -54,6 +82,55 @@ pub(crate) struct LinkState {
     /// Why the link stopped, in the operator's words; `None` while it runs
     /// or was let go.
     pub failure: Option<LinkFailure>,
+    /// Reports the camera sent that `apply` does not read, each kind once
+    /// per connection, for the log (the attended run, 2026-10-07).
+    unread: Vec<String>,
+    noted_unread: BTreeSet<(u8, u8, u8)>,
+    /// How many notifications of each kind came since the connection, for
+    /// the development run's trace.
+    pub traced_control: usize,
+    pub traced_timecode: usize,
+}
+
+/// How many control indications a development run traces each connection.
+pub(crate) const TRACE_CONTROL: usize = 400;
+/// The first timecode notifications a development run traces, and then one
+/// in this many.
+pub(crate) const TRACE_TIMECODE_FIRST: usize = 3;
+pub(crate) const TRACE_TIMECODE_EVERY: usize = 150;
+
+/// Bytes as the log writes them: `FF 08 00 00`.
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    let pairs: Vec<String> = bytes.iter().map(|byte| format!("{byte:02X}")).collect();
+    pairs.join(" ")
+}
+
+/// Every message in a notification, as the trace writes them:
+/// `10.1 (type 1, operation 2, data 02 00 01)`; the raw bytes when nothing
+/// in them reads as a message.
+pub(crate) fn describe(bytes: &[u8]) -> String {
+    let messages = Message::decode_all(bytes);
+    if messages.is_empty() {
+        return format!("raw {}", hex(bytes));
+    }
+    let described: Vec<String> = messages
+        .iter()
+        .map(|message| {
+            format!(
+                "{}.{} (type {}, operation {}, data {})",
+                message.parameter.0,
+                message.parameter.1,
+                message.data_type,
+                message.operation,
+                if message.data.is_empty() {
+                    String::from("none")
+                } else {
+                    hex(&message.data)
+                }
+            )
+        })
+        .collect();
+    described.join("; ")
 }
 
 impl LinkState {
@@ -63,7 +140,16 @@ impl LinkState {
             reading: CameraReading::default(),
             status: None,
             failure: None,
+            unread: Vec::new(),
+            noted_unread: BTreeSet::new(),
+            traced_control: 0,
+            traced_timecode: 0,
         }
+    }
+
+    /// The reports not read since the last call, as the log names them.
+    pub(crate) fn take_unread(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.unread)
     }
 
     /// Connected and subscribed. The camera sends every setting afresh, so
@@ -71,6 +157,9 @@ impl LinkState {
     pub(crate) fn connected(&mut self) -> Noticed {
         self.connection = Connection::Connected;
         self.reading = CameraReading::default();
+        self.noted_unread.clear();
+        self.traced_control = 0;
+        self.traced_timecode = 0;
         self.status = None;
         Noticed::Changed
     }
@@ -107,7 +196,29 @@ impl LinkState {
     pub(crate) fn control(&mut self, bytes: &[u8]) -> Noticed {
         let before = self.reading.clone();
         for message in Message::decode_all(bytes) {
-            apply(&mut self.reading, &message);
+            if apply(&mut self.reading, &message) {
+                continue;
+            }
+            let key = (message.parameter.0, message.parameter.1, message.data_type);
+            if self.noted_unread.insert(key) {
+                let data: Vec<String> = message
+                    .data
+                    .iter()
+                    .map(|byte| format!("{byte:02X}"))
+                    .collect();
+                self.unread.push(format!(
+                    "{}.{} (type {}, operation {}, data {})",
+                    message.parameter.0,
+                    message.parameter.1,
+                    message.data_type,
+                    message.operation,
+                    if data.is_empty() {
+                        String::from("none")
+                    } else {
+                        data.join(" ")
+                    }
+                ));
+            }
         }
         if before.same_values(&self.reading) {
             Noticed::Nothing
@@ -125,12 +236,15 @@ impl LinkState {
         Noticed::Nothing
     }
 
-    /// Bytes from the Camera Status characteristic: the flags.
-    pub(crate) fn status_flags(&mut self, bytes: &[u8]) -> Noticed {
-        if let Some(flags) = bytes.first() {
-            self.status = Some(*flags);
+    /// Bytes from the Camera Status characteristic: the flags. `Some` with
+    /// the new flags when they differ from the last, for the log.
+    pub(crate) fn status_flags(&mut self, bytes: &[u8]) -> Option<u8> {
+        let flags = *bytes.first()?;
+        if self.status == Some(flags) {
+            return None;
         }
-        Noticed::Nothing
+        self.status = Some(flags);
+        Some(flags)
     }
 
     /// The camera has sent every setting once since it connected.

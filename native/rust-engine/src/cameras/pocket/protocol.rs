@@ -1,9 +1,9 @@
 //! Blackmagic's SDI camera control protocol as the Pocket speaks it over
 //! Bluetooth: the messages the camera notifies (read into a `CameraReading`)
 //! and the messages a press sends (written from a `CameraCommand`). Read on
-//! the web on 2026-10-06 from Blackmagic's Developer Information; nothing
-//! here has met the camera yet, and the attended check settles what it
-//! reports (`docs/ROADMAP.md`, the Pocket's part).
+//! the web on 2026-10-06 from Blackmagic's Developer Information, and tried
+//! on the camera in the attended run of 2026-10-07: what it reports is in
+//! `docs/HARDWARE.md` (Cameras) and `docs/ROADMAP.md` (the Pocket's part).
 //!
 //! A message is a four-byte header — the destination (255, every camera),
 //! the length of what follows without padding, the command (0, change a
@@ -11,7 +11,11 @@
 //! a data type, an operation, and the data; the whole padded with zeros to a
 //! multiple of four bytes, 64 bytes at most. The data types: 0 a void or a
 //! boolean, 1 int8, 2 int16, 3 int32, 4 int64, 5 a UTF-8 string, 128 a 5.11
-//! fixed-point number (the value × 2048). The operation: 0 assign, 1 offset.
+//! fixed-point number (the value × 2048). The operation: 0 assign, 1 offset
+//! (the data added to the value the camera holds, says the protocol; the
+//! Pocket took an offset of zero to its shutter angle and its aperture as an
+//! assignment of zero, 2026-10-08, so none is ever sent); the camera's own
+//! reports carry 2.
 //!
 //! The parameters CAM 1 reports and takes here: focus 0.0 (0.0 near to 1.0
 //! far) and the autofocus 0.1; the aperture 0.2 as an aperture value (the
@@ -356,6 +360,12 @@ fn display_lut_of(word: &str) -> Option<i8> {
 /// message was one of them; anything else is read past, and a value that
 /// cannot be read leaves the reading as it was.
 pub(crate) fn apply(reading: &mut CameraReading, message: &Message) -> bool {
+    // An offset is a change to a value, never the value itself: it is not
+    // read (nothing sends one; the camera's reports carry their own
+    // operation code, 2, and are read).
+    if message.operation == OPERATION_OFFSET {
+        return false;
+    }
     match (message.parameter, message.data_type) {
         (LENS_FOCUS, TYPE_FIXED16) => {
             if let Some(position) = message.fixed16s().first() {

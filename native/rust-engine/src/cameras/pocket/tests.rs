@@ -7,9 +7,10 @@ use crate::cameras::model::{AutoKind, Setting};
 use crate::cameras::pocket::format::RecordingFormat;
 use crate::cameras::pocket::protocol::{
     aperture_value_of, apply, encode_commands, f_number_text, fixed16_from, fixed16_to, Message,
-    Parameter, LENS_AUTOFOCUS, LENS_FOCUS, MEDIA_TRANSPORT_MODE, TYPE_FIXED16, TYPE_INT16,
-    TYPE_INT32, TYPE_INT8, VIDEO_DISPLAY_LUT, VIDEO_DYNAMIC_RANGE, VIDEO_ISO, VIDEO_ND_FILTER,
-    VIDEO_RECORDING_FORMAT, VIDEO_SHUTTER_ANGLE, VIDEO_SHUTTER_SPEED, VIDEO_WHITE_BALANCE,
+    Parameter, LENS_AUTOFOCUS, LENS_FOCUS, MEDIA_TRANSPORT_MODE, OPERATION_ASSIGN,
+    OPERATION_OFFSET, TYPE_FIXED16, TYPE_INT16, TYPE_INT32, TYPE_INT8, VIDEO_DISPLAY_LUT,
+    VIDEO_DYNAMIC_RANGE, VIDEO_ISO, VIDEO_ND_FILTER, VIDEO_RECORDING_FORMAT, VIDEO_SHUTTER_ANGLE,
+    VIDEO_SHUTTER_SPEED, VIDEO_WHITE_BALANCE,
 };
 use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
@@ -558,7 +559,7 @@ fn what_cannot_be_read_is_read_past() {
 }
 
 #[test]
-fn the_timecode_is_four_bcd_bytes() {
+fn the_timecode_is_the_last_four_bcd_bytes() {
     assert_eq!(
         timecode_text(&[0x10, 0x53, 0x12, 0x09]).as_deref(),
         Some("09:12:53:10")
@@ -570,6 +571,57 @@ fn the_timecode_is_four_bcd_bytes() {
     );
     assert_eq!(timecode_text(&[0x10, 0x53, 0x12]), None);
     assert_eq!(timecode_text(&[0x10, 0x53, 0x12, 0x09, 0x00]), None);
+    // The camera notifies twelve bytes: the timecode is the last four.
+    assert_eq!(
+        timecode_text(&[255, 8, 0, 0, 9, 4, 3, 0, 0x10, 0x53, 0x12, 0x09]).as_deref(),
+        Some("09:12:53:10")
+    );
+    assert_eq!(timecode_text(&[0; 11]), None);
+    assert_eq!(timecode_text(&[0; 13]), None);
+}
+
+// An offset (operation 1) is a change to a value, never the value itself,
+// so one met in a notification is not read; the camera's own reports carry
+// operation 2 and are, as an assignment is. Nothing sends an offset: the
+// Pocket took an offset of zero as an assignment of zero (2026-10-08).
+#[test]
+fn an_offset_is_not_read_as_a_value() {
+    let mut reading = board();
+    let offset = Message {
+        parameter: VIDEO_ISO,
+        data_type: TYPE_INT32,
+        operation: OPERATION_OFFSET,
+        data: 800i32.to_le_bytes().to_vec(),
+    };
+    assert!(!apply(&mut reading, &offset));
+    assert_eq!(reading.iso, board().iso);
+    let report = Message {
+        operation: 2,
+        data: 1600i32.to_le_bytes().to_vec(),
+        ..offset.clone()
+    };
+    assert!(apply(&mut reading, &report));
+    assert_eq!(reading.iso.as_deref(), Some("1600"));
+    let assigned = Message {
+        operation: OPERATION_ASSIGN,
+        ..offset
+    };
+    assert!(apply(&mut reading, &assigned));
+    assert_eq!(reading.iso.as_deref(), Some("800"));
+    // Nothing a press sends is an offset.
+    for bytes in encode_commands(
+        &[
+            set(Setting::Iso, text("400")),
+            set(Setting::Shutter, text("180°")),
+            set(Setting::Iris, text("f/4.0")),
+            CameraCommand::RecordStart,
+        ],
+        &board(),
+    )
+    .expect("they encode")
+    {
+        assert_eq!(bytes[7], OPERATION_ASSIGN, "{bytes:?}");
+    }
 }
 
 // What the Pocket does not take is refused before anything is sent.

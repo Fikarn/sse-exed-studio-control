@@ -10,7 +10,8 @@ use crate::cameras::pocket::characteristics::{Notified, Writable, CAMERA_STATUS}
 use crate::cameras::pocket::link::{guard_bluetooth, guard_bluetooth_for, PocketLink};
 use crate::cameras::pocket::protocol::{Message, Parameter, TYPE_INT32, VIDEO_ISO};
 use crate::cameras::pocket::state::{
-    Connection, LinkState, Noticed, STATUS_CAMERA_READY, STATUS_INITIAL_PAYLOAD_RECEIVED,
+    status_words, Connection, LinkState, Noticed, STATUS_CAMERA_READY,
+    STATUS_INITIAL_PAYLOAD_RECEIVED,
 };
 use crate::cameras::real_link::{parse_bluetooth_address, BluetoothAddress, LinkFailure};
 use crate::cameras::runtime;
@@ -103,20 +104,48 @@ fn the_link_s_state_follows_the_connection_and_the_camera_s_messages() {
         "the same value again"
     );
     assert_eq!(state.read().expect("connected").iso.as_deref(), Some("800"));
+    // A report the model does not read is kept for the log, each kind once
+    // per connection, with its bytes.
+    assert!(state.take_unread().is_empty(), "ISO is read");
+    let unknown = [255, 6, 0, 0, 9, 9, 1, 0, 0x07, 0x02, 0, 0];
+    assert_eq!(state.control(&unknown), Noticed::Nothing);
+    assert_eq!(
+        state.take_unread(),
+        vec![String::from("9.9 (type 1, operation 0, data 07 02)")]
+    );
+    assert_eq!(state.control(&unknown), Noticed::Nothing);
+    assert!(
+        state.take_unread().is_empty(),
+        "the same kind again is not repeated"
+    );
+    state.connected();
+    assert_eq!(state.control(&unknown), Noticed::Nothing);
+    assert_eq!(
+        state.take_unread().len(),
+        1,
+        "a new connection notes it afresh"
+    );
     assert_eq!(
         state.timecode(&[0x10, 0x53, 0x12, 0x09]),
         Noticed::Nothing,
         "a timecode that moves is no change"
     );
+    assert_eq!(state.control(&iso(800)), Noticed::Changed);
     assert_eq!(
         state.read().expect("connected").timecode.as_deref(),
         Some("09:12:53:10")
     );
-    assert_eq!(
-        state.status_flags(&[STATUS_CAMERA_READY | STATUS_INITIAL_PAYLOAD_RECEIVED]),
-        Noticed::Nothing
-    );
+    let ready = STATUS_CAMERA_READY | STATUS_INITIAL_PAYLOAD_RECEIVED;
+    assert_eq!(state.status_flags(&[ready]), Some(ready), "new flags");
+    assert_eq!(state.status_flags(&[ready]), None, "the same flags again");
+    assert_eq!(state.status_flags(&[]), None, "no bytes");
     assert!(state.initial_payload_received());
+    assert_eq!(status_words(ready), "initial payload sent, camera ready");
+    assert_eq!(status_words(0), "none");
+    assert_eq!(
+        status_words(0x3F | 0x40),
+        "power on, connected, paired, versions verified, initial payload sent, camera ready, 0x40"
+    );
     // Two messages in one notification, one of them nobody's.
     let mut two = iso(1600);
     two.extend(
@@ -378,6 +407,10 @@ fn nothing_writes_the_camera_status_characteristic() {
         code.contains("Writable::DeviceName"),
         "the controller's name goes through the same write"
     );
+    assert!(
+        !code.contains("OPERATION_OFFSET") && !code.contains("Message::"),
+        "winrt.rs frames no message of its own: a press's bytes come from protocol.rs"
+    );
     assert!(!code.contains("PairAsync"), "pairing is winrt_pairing.rs's");
 }
 
@@ -391,8 +424,8 @@ fn code_of(source: &str) -> String {
 }
 
 // The pairing (part 5) writes none of the camera's characteristics, listens
-// passively and never scans actively, takes only the Pocket's advertisement,
-// and removes no pairing but the one of the camera it found.
+// actively (scan requests only, D42) in one place, takes only the Pocket's
+// advertisement, and removes no pairing but the one of the camera it found.
 #[test]
 fn the_pairing_writes_nothing_and_only_listens() {
     let code = code_of(include_str!("winrt_pairing.rs"));
@@ -401,7 +434,7 @@ fn the_pairing_writes_nothing_and_only_listens() {
         "WriteClientCharacteristic",
         "GattSession",
         "GetGattServices",
-        "BluetoothLEScanningMode::Active",
+        "BluetoothLEScanningMode::Passive",
         "BluetoothLEScanningMode(",
         "CAMERA_STATUS",
         "DeviceWatcher",
@@ -412,7 +445,7 @@ fn the_pairing_writes_nothing_and_only_listens() {
             "winrt_pairing.rs names {forbidden}"
         );
     }
-    assert_eq!(code.matches("BluetoothLEScanningMode::Passive").count(), 1);
+    assert_eq!(code.matches("BluetoothLEScanningMode::Active").count(), 1);
     assert_eq!(code.matches("is_pocket(").count(), 1);
     assert_eq!(code.matches("UnpairAsync").count(), 1);
 }

@@ -8,8 +8,8 @@
 //! Windows), behind the link's own guard: no test and no plain development
 //! run starts it.
 //!
-//! The steps: `Finding` (a passive listen for the Pocket's advertisement, a
-//! minute at most), `Pin` (Windows asked for the PIN the camera shows; thirty
+//! The steps: `Finding` (an active listen for the Pocket's advertisement and
+//! scan reply, a minute at most), `Pin` (Windows asked for the PIN the camera shows; thirty
 //! seconds at most, as Bluetooth's pairing allows), `Pairing` (the PIN handed over), then `Paired` with the
 //! camera's address, which the runtime saves and holds, or `Failed` with the
 //! sentence. A pairing is always made afresh: a pairing Windows still holds
@@ -23,6 +23,7 @@ use crate::cameras::pocket::link::guard_bluetooth;
 use crate::cameras::real_link::BluetoothAddress;
 use crate::cameras::snapshot::{CameraPairing, CameraPairingState};
 use crate::diagnostics::{log_event, LogLevel};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -111,13 +112,125 @@ pub(crate) fn parse_pin(text: &str) -> Option<String> {
     (pin.len() == 6 && pin.bytes().all(|byte| byte.is_ascii_digit())).then(|| pin.to_string())
 }
 
-/// How the camera's name begins as it advertises it.
-const NAME_START: &str = "pocket cinema camera";
+/// Whether an advertisement (or a scan reply) is the Pocket's: it names
+/// Blackmagic's camera service. The camera's name tells nothing: it is the
+/// camera's own ID (`A:F901D868` on the studio's Pocket, 2026-10-07). The
+/// pairing takes no other device.
+pub(crate) fn is_pocket(services: &[u128]) -> bool {
+    services.contains(&SERVICE)
+}
 
-/// Whether an advertisement is the Pocket's: it names Blackmagic's camera
-/// service, or the camera's own name. The pairing takes no other device.
-pub(crate) fn is_pocket(services: &[u128], name: &str) -> bool {
-    services.contains(&SERVICE) || name.trim().to_lowercase().starts_with(NAME_START)
+/// How many devices a listen that did not hear the Pocket keeps for the log.
+pub(crate) const HEARD_KEPT: usize = 32;
+
+/// A service as Windows writes it, `291D567A-6D75-11E6-8B77-86F30CA893D3`.
+fn service_text(uuid: u128) -> String {
+    let hex = format!("{uuid:032X}");
+    let parts: Vec<&str> = [(0, 8), (8, 12), (12, 16), (16, 20), (20, 32)]
+        .iter()
+        .filter_map(|&(from, to)| hex.get(from..to))
+        .collect();
+    parts.join("-")
+}
+
+/// One advertisement as a listen that did not hear the Pocket names it in
+/// the log: the address, the name, the services, the makers' IDs and the
+/// kinds of data it carried (`sections`, the advertisement's data types).
+pub(crate) fn heard_entry(
+    address: BluetoothAddress,
+    name: &str,
+    services: &[u128],
+    makers: &[u16],
+    sections: &[u8],
+) -> String {
+    let name = name.trim();
+    let mut entry = address.text();
+    if !name.is_empty() {
+        entry.push_str(&format!(" \"{name}\""));
+    }
+    if !services.is_empty() {
+        let listed: Vec<String> = services.iter().map(|&uuid| service_text(uuid)).collect();
+        entry.push_str(&format!(" [{}]", listed.join(", ")));
+    }
+    if !makers.is_empty() {
+        let listed: Vec<String> = makers.iter().map(|id| format!("{id:04X}")).collect();
+        entry.push_str(&format!(" maker {}", listed.join(", ")));
+    }
+    if !sections.is_empty() {
+        let listed: Vec<String> = sections.iter().map(|kind| format!("{kind:02X}")).collect();
+        entry.push_str(&format!(" sections {}", listed.join(" ")));
+    }
+    entry
+}
+
+/// How often one entry was heard, and at its strongest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Seen {
+    strongest_dbm: i16,
+    count: usize,
+}
+
+/// What a listen heard, for the log's line when it did not hear the Pocket:
+/// each distinct advertisement with its count and strongest signal,
+/// `HEARD_KEPT` distinct ones at most.
+#[derive(Debug, Default)]
+pub(crate) struct Heard {
+    entries: BTreeMap<String, Seen>,
+    more: bool,
+}
+
+impl Heard {
+    pub(crate) fn note(&mut self, entry: String, dbm: i16) {
+        if let Some(seen) = self.entries.get_mut(&entry) {
+            seen.count += 1;
+            seen.strongest_dbm = seen.strongest_dbm.max(dbm);
+            return;
+        }
+        if self.entries.len() < HEARD_KEPT {
+            self.entries.insert(
+                entry,
+                Seen {
+                    strongest_dbm: dbm,
+                    count: 1,
+                },
+            );
+        } else {
+            self.more = true;
+        }
+    }
+
+    /// The log's line: how many advertisements came, and what they were.
+    pub(crate) fn line(&self, advertisements: usize) -> String {
+        let mut line = format!(
+            "CAM 1 was not heard: {advertisements} advertisements in all, none the Pocket's."
+        );
+        if !self.entries.is_empty() {
+            let listed: Vec<String> = self
+                .entries
+                .iter()
+                .map(|(entry, seen)| {
+                    format!("{entry} ({} dBm, {}×)", seen.strongest_dbm, seen.count)
+                })
+                .collect();
+            line.push_str(&format!(" Heard: {}", listed.join("; ")));
+            line.push_str(if self.more { "; and more." } else { "." });
+        }
+        line
+    }
+}
+
+/// The log's line when the Pocket was heard: where, how strongly, and in
+/// which packet (its scan reply answers only an active listen).
+pub(crate) fn heard_line(address: BluetoothAddress, dbm: i16, scan_reply: bool) -> String {
+    format!(
+        "CAM 1 was heard at {} ({dbm} dBm, in its {}).",
+        address.text(),
+        if scan_reply {
+            "scan reply"
+        } else {
+            "advertisement"
+        }
+    )
 }
 
 /// What Windows asked for when it began to pair (`DevicePairingKinds`, by
