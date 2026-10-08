@@ -390,6 +390,17 @@ fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), 
                         .copied()
                         .unwrap_or(0),
                 ),
+                // The INFINIBAR's G/M runs Aputure's banded table; the
+                // INFINIMAT's channel keeps its straight line below.
+                "green-magenta" if channel.value_type == "aputure-gm" => {
+                    aputure_green_magenta_to_dmx(
+                        fixture
+                            .control_values
+                            .get("green-magenta")
+                            .copied()
+                            .unwrap_or(0),
+                    )
+                }
                 "green-magenta" => {
                     let value = fixture
                         .control_values
@@ -398,6 +409,25 @@ fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), 
                         .unwrap_or(0)
                         .clamp(-100, 100);
                     (((value + 100) as f64 / 200.0) * 255.0).round() as i64
+                }
+                // The INFINIBAR's crossfade from its CCT light to its RGB
+                // colour has no control: the bar shows a colour while one is
+                // set and its CCT light otherwise (the owner, 2026-10-08).
+                "cct-rgb-crossfade" => {
+                    let colour_set = ["red", "green", "blue"].iter().any(|control| {
+                        fixture
+                            .control_values
+                            .get(*control)
+                            .copied()
+                            .unwrap_or(0)
+                            .clamp(0, 255)
+                            > 0
+                    });
+                    if colour_set {
+                        255
+                    } else {
+                        0
+                    }
                 }
                 "reserved" => 0,
                 _ if channel.value_type == "fine" => 0,

@@ -183,6 +183,19 @@ export function cctToDmx(kelvin: number, min: number, max: number) {
   return Math.round(((clamped - min) / (max - min)) * 255);
 }
 
+/**
+ * Aputure's banded green/magenta channel (the INFINIBAR's profile 1), as the
+ * engine renders it: 0-10 and 120-145 neutral, 11-20 full minus green, 21-119
+ * -99 % to -1 %, 146-244 +1 % to +99 %, 245-255 full plus green.
+ */
+export function aputureGreenMagentaToDmx(value: number) {
+  const clamped = Math.round(clampNumber(value, -100, 100));
+  if (clamped === 0) return 132;
+  if (clamped === -100) return 15;
+  if (clamped === 100) return 250;
+  return clamped < 0 ? 120 + clamped : 145 + clamped;
+}
+
 export function asNumberRecord(value: unknown): Record<string, number> {
   const record = asRecord(value);
   if (!record) return {};
@@ -237,7 +250,12 @@ export function dmxValueForControl(
       return cctToDmx(controlValues.cct ?? defaultLightingFixtureCct(fixture), range.min, range.max);
     }
     case "green-magenta":
+      if (valueType === "aputure-gm") return aputureGreenMagentaToDmx(controlValues["green-magenta"] ?? 0);
       return (Math.round(clampNumber(controlValues["green-magenta"] ?? 0, -100, 100) + 100) * 255) / 200;
+    // The INFINIBAR's crossfade from CCT light to RGB colour has no control:
+    // 255 while a colour is set, 0 otherwise, as the engine renders it.
+    case "cct-rgb-crossfade":
+      return ["red", "green", "blue"].some((id) => (controlValues[id] ?? 0) > 0) ? 255 : 0;
     default:
       if (valueType === "fine") return 0;
       return clampNumber(Math.round(controlValues[controlId] ?? asNumber(profile.defaults[controlId], 0)), 0, 255);

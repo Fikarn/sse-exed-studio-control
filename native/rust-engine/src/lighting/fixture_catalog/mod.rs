@@ -591,40 +591,51 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
             "INFINIBAR PB12",
             "verified",
             "https://help.aputure.com/en/infinibar/dmx-profiles-settings",
-            "INFINIBAR DMX Profiles v1.0",
-            "2026-05-03",
+            "INFINIBAR DMX Profile Specification V2.0",
+            "2026-10-07",
             "practical",
             DEFAULT_MODE_ID,
             vec![
                 mode(
                     DEFAULT_MODE_ID,
-                    "8 ch basic RGBWW",
+                    "CCT & RGB (profile 1)",
                     "8-bit",
-                    vec!["intensity", "cct", "rgb", "fx"],
+                    vec!["intensity", "cct", "green-magenta", "rgb"],
+                    // Aputure's profile 1, which the studio's bars run (the
+                    // walk of 2026-10-07, finding 9). Channel 3 is Aputure's
+                    // banded green/magenta table. Channel 4 crosses the bar
+                    // from its CCT light to its RGB colour: the render sends
+                    // it at 255 while any of Red, Green or Blue is above 0
+                    // and at 0 otherwise (the owner, 2026-10-08), so the
+                    // plate has no control for it. Channel 8 is the strobe,
+                    // always sent at 0 with no control, as the INFINIMAT's
+                    // (D37). Until 2026-10-08 the map was another profile's
+                    // (3 Mix, 4 Red, 5 Green, 6 Blue, 7 FX, 8 Speed), so a
+                    // saved mix, fx or speed is read past.
                     vec![
                         ch(1, "Dimmer", "intensity", "percent", 0),
                         ch(2, "CCT", "cct", "kelvin", 102),
-                        ch(3, "Mix", "mix", "percent", 0),
-                        ch(4, "Red", "red", "percent", 0),
-                        ch(5, "Green", "green", "percent", 0),
-                        ch(6, "Blue", "blue", "percent", 0),
-                        ch(7, "FX", "fx", "range", 0),
-                        ch(8, "Speed", "speed", "range", 0),
+                        ch(3, "G/M", "green-magenta", "aputure-gm", 132),
+                        ch(4, "CCT/RGB Crossfade", "cct-rgb-crossfade", "derived", 0),
+                        ch(5, "Red", "red", "percent", 0),
+                        ch(6, "Green", "green", "percent", 0),
+                        ch(7, "Blue", "blue", "percent", 0),
+                        ch(8, "Strobe", "strobe", "range", 0),
                     ],
                     vec![
                         slider("intensity", "Intensity", 0, 100, 1, 100, Some("%")),
                         slider("cct", "CCT", 2000, 10000, 100, 5600, Some("K")),
+                        slider("green-magenta", "Green/Magenta", -100, 100, 1, 0, None),
                         slider("red", "Red", 0, 255, 1, 0, None),
                         slider("green", "Green", 0, 255, 1, 0, None),
                         slider("blue", "Blue", 0, 255, 1, 0, None),
-                        slider("fx", "FX", 0, 255, 1, 0, None),
-                        slider("speed", "Speed", 0, 255, 1, 0, None),
                     ],
                     defaults(&[
                         ("intensity", 100),
                         ("cct", 5600),
                         ("cctMin", 2000),
                         ("cctMax", 10000),
+                        ("green-magenta", 0),
                     ]),
                 ),
                 mode(

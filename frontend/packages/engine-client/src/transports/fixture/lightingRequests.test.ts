@@ -312,6 +312,53 @@ describe("the fixture double's rig actions", () => {
   // waiting ones too), the highlight and the solo in the same write, outside
   // Preview, as `fixtures.rs` does. All on leaves them, and so does a cut in
   // Preview, which edits the preview only.
+  // The INFINIBAR PB12's map (2026-10-08, finding 9 of the walk): Aputure's
+  // profile 1. The crossfade channel follows the colour and the strobe stays
+  // at 0, as the engine renders them; a speed saved under the old map reaches
+  // nothing.
+  it("lighting.dmxMonitor.snapshot renders the INFINIBAR's crossfade from its colour", async () => {
+    const { request } = openDouble();
+    const bar = async () => {
+      const monitor = await request("lighting.dmxMonitor.snapshot");
+      return (monitor.channels as JsonObject[])
+        .filter((channel) => channel.lightName === "Back")
+        .map((channel) => [channel.label, channel.value]);
+    };
+    await request("lighting.fixture.update", {
+      fixtureId: "fixture-back",
+      on: true,
+      intensity: 100,
+      cct: 3200,
+      controlValues: { "green-magenta": -50 },
+    });
+    expect(await bar()).toEqual([
+      ["Dimmer", 255],
+      ["CCT", 38],
+      ["G/M", 70],
+      ["CCT/RGB Crossfade", 0],
+      ["Red", 0],
+      ["Green", 0],
+      ["Blue", 0],
+      ["Strobe", 0],
+    ]);
+    await request("lighting.fixture.update", {
+      fixtureId: "fixture-back",
+      controlValues: { red: 255, green: 12, speed: 200 },
+    });
+    expect(await bar()).toEqual([
+      ["Dimmer", 255],
+      ["CCT", 38],
+      ["G/M", 70],
+      ["CCT/RGB Crossfade", 255],
+      ["Red", 255],
+      ["Green", 12],
+      ["Blue", 0],
+      ["Strobe", 0],
+    ]);
+    await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { red: 0, green: 0 } });
+    expect((await bar())[3]).toEqual(["CCT/RGB Crossfade", 0]);
+  });
+
   it("lighting.power.all off ends the overlays outside Preview, and leaves them in it", async () => {
     const { request, snapshot, fixture } = openDouble();
     await request("lighting.fixture.highlight", { fixtureIds: ["fixture-key"], mode: "highlight" });

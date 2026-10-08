@@ -66,6 +66,20 @@ pub(super) fn cct_to_dmx(kelvin: i64, min: i64, max: i64) -> i64 {
     (((clamped - min) as f64 / (max - min) as f64) * 255.0).round() as i64
 }
 
+/// Aputure's green/magenta channel as the INFINIBAR's DMX table gives it
+/// (profile 1, channel 3): 0-10 and 120-145 neutral, 11-20 full minus green,
+/// 21-119 -99 % to -1 %, 146-244 +1 % to +99 %, 245-255 full plus green. The
+/// control runs -100 to 100; 0 lands in the middle of the neutral band.
+pub(super) fn aputure_green_magenta_to_dmx(value: i64) -> i64 {
+    match clamp_i64(value, -100, 100) {
+        0 => 132,
+        -100 => 15,
+        100 => 250,
+        minus if minus < 0 => 120 + minus,
+        plus => 145 + plus,
+    }
+}
+
 pub(super) fn default_fixture_cct_for_type(fixture_type: &str) -> i64 {
     fixture_default_cct(&resolve_fixture_profile(
         None,
