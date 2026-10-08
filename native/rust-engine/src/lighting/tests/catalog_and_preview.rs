@@ -106,6 +106,13 @@ fn lighting_fixture_catalog_offers_no_control_that_never_reaches_the_light() {
         ["intensity", "cct", "green-magenta"]
     );
     assert_eq!(controls("aputure-ls-600d-pro"), ["intensity"]);
+    // The INFINIBAR PB12 (2026-10-08, finding 9 of the walk): its crossfade
+    // and strobe channels have no control, and a mix, fx or speed saved under
+    // the old map is read past.
+    assert_eq!(
+        controls("aputure-infinibar-pb12"),
+        ["intensity", "cct", "green-magenta", "red", "green", "blue"]
+    );
 
     let profile = resolve_fixture_profile(
         Some("aputure-infinimat-generic"),
@@ -122,6 +129,32 @@ fn lighting_fixture_catalog_offers_no_control_that_never_reaches_the_light() {
         ]),
     );
     assert_eq!(read, HashMap::from([(String::from("green-magenta"), 10)]));
+
+    let bar = resolve_fixture_profile(
+        Some("aputure-infinibar-pb12"),
+        None,
+        None,
+        None,
+        "fixture-2",
+    );
+    let read = normalize_fixture_control_values(
+        &bar,
+        &HashMap::from([
+            (String::from("mix"), 0),
+            (String::from("fx"), 40),
+            (String::from("speed"), 200),
+            (String::from("red"), 255),
+        ]),
+    );
+    assert_eq!(
+        read,
+        HashMap::from([
+            (String::from("green-magenta"), 0),
+            (String::from("red"), 255),
+            (String::from("green"), 0),
+            (String::from("blue"), 0),
+        ])
+    );
 }
 
 #[test]
@@ -375,10 +408,17 @@ fn lighting_catalog_control_values_drive_dmx_and_scene_capture() {
     let red_channel = monitor
         .channels
         .iter()
-        .find(|channel| channel.universe == 1 && channel.channel == 12)
+        .find(|channel| channel.universe == 1 && channel.channel == 13)
         .expect("red channel should be present");
     assert_eq!(red_channel.label, "Red");
     assert_eq!(red_channel.value, 255);
+    let crossfade = monitor
+        .channels
+        .iter()
+        .find(|channel| channel.universe == 1 && channel.channel == 12)
+        .expect("crossfade channel should be present");
+    assert_eq!(crossfade.label, "CCT/RGB Crossfade");
+    assert_eq!(crossfade.value, 255);
 
     let scene = create_lighting_scene(
         test_dir.db_path().as_path(),
@@ -397,6 +437,132 @@ fn lighting_catalog_control_values_drive_dmx_and_scene_capture() {
         .expect("captured scene should include practicals");
     assert_eq!(practical_state.control_values.get("red"), Some(&255));
     assert_eq!(practical_state.control_values.get("green"), Some(&12));
+}
+
+// The walk of 2026-10-07 (finding 9): the studio's INFINIBAR PB12s run
+// Aputure's profile 1, CCT & RGB, and the map sent was another profile's, so
+// Red swung the bar to a black RGB and Speed was its strobe. The map is the
+// table's now (the owner, 2026-10-08): the crossfade follows the colour and
+// the strobe stays at 0.
+#[test]
+fn lighting_infinibar_pb12_sends_aputure_profile_1() {
+    use super::super::helpers::aputure_green_magenta_to_dmx;
+
+    let test_dir = initialize_ready_lighting("infinibar-profile-1");
+    let set = |controls: HashMap<String, i64>, cct: Option<i64>| {
+        update_lighting_fixture(
+            test_dir.db_path().as_path(),
+            &LightingFixtureUpdateRequest {
+                fixture_id: String::from("fixture-house-practicals"),
+                name: None,
+                fixture_type: None,
+                definition_id: None,
+                mode_id: None,
+                universe: None,
+                dmx_start_address: None,
+                effect: None,
+                on: Some(true),
+                intensity: Some(100),
+                cct,
+                control_values: Some(controls),
+                group_id: None,
+                spatial_x: None,
+                spatial_y: None,
+                spatial_rotation: None,
+                rig_z: None,
+                beam_angle_degrees: None,
+            },
+        )
+        .expect("the bar's controls update");
+    };
+    // The bar's eight channels on the wire (House Practicals is at DMX 9).
+    let frame = || -> Vec<u8> {
+        let output = read_lighting_sacn_output_state(&load_test_app_settings(&test_dir))
+            .expect("a commissioned rig renders frames");
+        let universe = output
+            .frames
+            .iter()
+            .find(|frame| frame.universe == 1)
+            .expect("universe 1 is rendered");
+        universe.slots[8..16].to_vec()
+    };
+
+    // White light at 3200 K with some magenta: the crossfade stays at CCT.
+    set(
+        HashMap::from([(String::from("green-magenta"), -50)]),
+        Some(3200),
+    );
+    assert_eq!(frame(), [255, 38, 70, 0, 0, 0, 0, 0]);
+
+    // A colour: the crossfade goes to RGB; a speed saved under the old map
+    // reaches nothing, and the strobe stays at 0.
+    set(
+        HashMap::from([
+            (String::from("red"), 255),
+            (String::from("green"), 12),
+            (String::from("speed"), 200),
+        ]),
+        None,
+    );
+    assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
+
+    // A highlight shows the bar in white light at 4500 K, its colour and
+    // the crossfade at 0 (the review of #323: a bar at 100 % in a colour
+    // would not flash otherwise); Off brings the colour back untouched.
+    let highlight = |mode: FixtureHighlightMode| {
+        set_lighting_fixture_highlight(
+            test_dir.db_path().as_path(),
+            &LightingFixtureHighlightRequest {
+                fixture_ids: vec![String::from("fixture-house-practicals")],
+                mode,
+            },
+        )
+        .expect("the highlight is set");
+    };
+    highlight(FixtureHighlightMode::Highlight);
+    assert_eq!(frame(), [255, 80, 70, 0, 0, 0, 0, 0]);
+    highlight(FixtureHighlightMode::Off);
+    assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
+
+    // An identify flash shows the bar in white light at the top of its
+    // range, its colour and the crossfade at 0 as well; the colour is back
+    // when the flash ends.
+    identify_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyRequest {
+            fixture_id: String::from("fixture-house-practicals"),
+            duration_ms: Some(2000),
+        },
+    )
+    .expect("the flash starts");
+    assert_eq!(frame(), [255, 255, 70, 0, 0, 0, 0, 0]);
+    clear_lighting_identify_bursts(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyClearAllRequest,
+    )
+    .expect("the flash ends");
+    assert_eq!(frame(), [255, 38, 70, 255, 255, 12, 0, 0]);
+
+    // The colour taken away: the bar is back on its CCT light.
+    set(
+        HashMap::from([
+            (String::from("red"), 0),
+            (String::from("green"), 0),
+            (String::from("blue"), 0),
+        ]),
+        None,
+    );
+    assert_eq!(frame(), [255, 38, 70, 0, 0, 0, 0, 0]);
+
+    // Aputure's banded green/magenta table, each band's edge.
+    assert_eq!(aputure_green_magenta_to_dmx(-100), 15);
+    assert_eq!(aputure_green_magenta_to_dmx(-99), 21);
+    assert_eq!(aputure_green_magenta_to_dmx(-1), 119);
+    assert_eq!(aputure_green_magenta_to_dmx(0), 132);
+    assert_eq!(aputure_green_magenta_to_dmx(1), 146);
+    assert_eq!(aputure_green_magenta_to_dmx(99), 244);
+    assert_eq!(aputure_green_magenta_to_dmx(100), 250);
+    assert_eq!(aputure_green_magenta_to_dmx(300), 250);
 }
 
 fn palette_snapshot<'a>(
@@ -473,7 +639,7 @@ fn lighting_dmx_monitor_matches_legacy_channel_shape() {
     assert!(monitor
         .channels
         .iter()
-        .any(|channel| channel.light_name == "House Practicals" && channel.label == "FX"));
+        .any(|channel| channel.light_name == "House Practicals" && channel.label == "Strobe"));
 }
 
 #[test]

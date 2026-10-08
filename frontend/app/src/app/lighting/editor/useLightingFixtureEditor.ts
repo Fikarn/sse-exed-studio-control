@@ -840,8 +840,8 @@ export function useLightingFixtureEditor({
                 rigZ: snapshot.rigZ ?? null,
                 beamAngleDegrees: snapshot.beamAngleDegrees ?? null,
                 // The catalog controls too (2026-10-05): without them an
-                // INFINIBAR came back with its Red, Green, Blue, FX and Speed
-                // at their defaults.
+                // INFINIBAR came back with its Green/Magenta, Red, Green and
+                // Blue at their defaults.
                 controlValues: { ...snapshot.controlValues },
               });
             }

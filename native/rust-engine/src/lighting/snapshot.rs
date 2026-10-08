@@ -68,11 +68,13 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
                 fixture.intensity = 100;
                 fixture.on = true;
                 fixture.cct = max_cct;
+                show_white_light_under_overlay(&mut fixture);
             } else if overrides.highlight_ids.contains(&fixture.id) {
                 let (min_cct, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
                 fixture.intensity = 100;
                 fixture.on = true;
                 fixture.cct = NEUTRAL_HIGHLIGHT_CCT.clamp(min_cct, max_cct);
+                show_white_light_under_overlay(&mut fixture);
             } else if solo_active && !overrides.solo_ids.contains(&fixture.id) {
                 fixture.intensity = 0;
                 fixture.on = false;
@@ -346,6 +348,27 @@ pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> Lighti
     }
 }
 
+/// A bar whose colour crosses over its CCT light (the INFINIBAR PB12, D44)
+/// shows the overlay's white light: the flash and the highlight promise
+/// 100 % at a CCT, and a bar at 100 % in a colour would otherwise not flash
+/// at all (the review of #323). The stored colour is untouched: the overlay
+/// is drawn at read time and the colour is back when it ends.
+fn show_white_light_under_overlay(fixture: &mut LightingFixtureSnapshot) {
+    let profile = fixture_profile_for_snapshot(fixture);
+    let definition =
+        resolve_fixture_definition(Some(profile.definition_id.as_str()), None, None, "");
+    let mode = resolve_fixture_mode(&definition, Some(profile.mode_id.as_str()));
+    if mode
+        .channels
+        .iter()
+        .any(|channel| channel.control_id == "cct-rgb-crossfade")
+    {
+        for control in ["red", "green", "blue"] {
+            fixture.control_values.insert(String::from(control), 0);
+        }
+    }
+}
+
 fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), i64> {
     let mut channel_data = HashMap::new();
     let grand_master = (snapshot.grand_master as f64 / 100.0).clamp(0.0, 1.0);
@@ -390,6 +413,17 @@ fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), 
                         .copied()
                         .unwrap_or(0),
                 ),
+                // The INFINIBAR's G/M runs Aputure's banded table; the
+                // INFINIMAT's channel keeps its straight line below.
+                "green-magenta" if channel.value_type == "aputure-gm" => {
+                    aputure_green_magenta_to_dmx(
+                        fixture
+                            .control_values
+                            .get("green-magenta")
+                            .copied()
+                            .unwrap_or(0),
+                    )
+                }
                 "green-magenta" => {
                     let value = fixture
                         .control_values
@@ -398,6 +432,25 @@ fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), 
                         .unwrap_or(0)
                         .clamp(-100, 100);
                     (((value + 100) as f64 / 200.0) * 255.0).round() as i64
+                }
+                // The INFINIBAR's crossfade from its CCT light to its RGB
+                // colour has no control: the bar shows a colour while one is
+                // set and its CCT light otherwise (the owner, 2026-10-08).
+                "cct-rgb-crossfade" => {
+                    let colour_set = ["red", "green", "blue"].iter().any(|control| {
+                        fixture
+                            .control_values
+                            .get(*control)
+                            .copied()
+                            .unwrap_or(0)
+                            .clamp(0, 255)
+                            > 0
+                    });
+                    if colour_set {
+                        255
+                    } else {
+                        0
+                    }
                 }
                 "reserved" => 0,
                 _ if channel.value_type == "fine" => 0,

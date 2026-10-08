@@ -32,7 +32,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The INFINIMAT (`Key right`) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
 - [ ] Two scenes saved with `Save as a new scene` (press twice) come back after a restart, named `Scene N`; a scene deleted from its `⋯` (press twice) can be undone.
 - [ ] The plot draws each fixture where it hangs in the room: `Key Left`, `Key right` (the INFINIMAT), `Backlight Left`, `Backlight Right` and the four INFINIBAR PB12s (`Left Top`, `Left Bottom`, `Right Top`, `Right Bottom`) read their real places on the rulers.
-- [ ] An INFINIBAR PB12's `FX` and `Speed` are not touched until its DMX map is fixed (`docs/ROADMAP.md`, Found to check, 9): on the bars' profile our `Speed` is the strobe channel.
+- [ ] **One INFINIBAR PB12 (`Left Top`), you at the bar, first in the walk** (its DMX map is Aputure's profile 1 since 2026-10-08, D44): at 3200 K its intensity dims the bar; `Green/Magenta` at −50 tints it magenta (minus green) and 0 clears it; `Red` at 255 turns it red; `Highlight` on the bar while it is red shows white light at 100 %, and `Off` brings the red back; `Red` back to 0 brings the white light at 3200 K back; nothing strobes at any time, and the plate offers no `FX`, `Speed` or `Mix`. Then recall each saved scene once: the four bars show white light, or the colour you meant (a colour saved under the old map carries over with the table's meaning, so a bar that was green then is blue now).
 
 ## Audio console
 

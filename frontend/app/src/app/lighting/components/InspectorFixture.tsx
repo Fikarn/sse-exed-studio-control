@@ -365,7 +365,12 @@ export function InspectorFixture({
                 onCommit={(next) => {
                   const rounded = Math.round(control.min + next * span);
                   setControlDrafts((current) => ({ ...current, [control.id]: rounded }));
-                  onControlValuesCommit?.(fixture.id, { ...fixture.controlValues, [control.id]: rounded });
+                  // Only the changed control: the hardware link lays it over the
+                  // stored map (since 2026-10-05), and `fixture` here is the
+                  // snapshot with the overlays drawn in, so the map whole would
+                  // write a highlight's zeros into a bar's stored colour (the
+                  // review of #323).
+                  onControlValuesCommit?.(fixture.id, { [control.id]: rounded });
                 }}
                 onRequestTypedEntry={() => setNumberDialog({ kind: "control", controlId: control.id })}
               />
@@ -487,7 +492,8 @@ export function InspectorFixture({
           onConfirm={(value) => {
             const rounded = Math.round(value);
             setControlDrafts((draft) => ({ ...draft, [numberDialogControl.id]: rounded }));
-            onControlValuesCommit?.(fixture.id, { ...fixture.controlValues, [numberDialogControl.id]: rounded });
+            // Only the changed control, as the slider's commit above.
+            onControlValuesCommit?.(fixture.id, { [numberDialogControl.id]: rounded });
             setNumberDialog(null);
           }}
           onCancel={() => setNumberDialog(null)}

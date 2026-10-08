@@ -365,28 +365,31 @@ export function buildDefaultLightingFixtureCatalogSnapshot(): JsonObject {
       [
         fixtureMode(
           "default",
-          "8 ch basic RGBWW",
+          "CCT & RGB (profile 1)",
+          // Aputure's profile 1, as the engine's catalog has it since
+          // 2026-10-08: channel 3 is the banded green/magenta table, channel
+          // 4 crosses from CCT light to RGB colour and has no control (sent
+          // at 255 while a colour is set), channel 8 is the strobe, always 0.
           [
             fixtureChannel(1, "Dimmer", "intensity"),
             fixtureChannel(2, "CCT", "cct", "kelvin", 102),
-            fixtureChannel(3, "Mix", "mix"),
-            fixtureChannel(4, "Red", "red"),
-            fixtureChannel(5, "Green", "green"),
-            fixtureChannel(6, "Blue", "blue"),
-            fixtureChannel(7, "FX", "fx", "range"),
-            fixtureChannel(8, "Speed", "speed", "range"),
+            fixtureChannel(3, "G/M", "green-magenta", "aputure-gm", 132),
+            fixtureChannel(4, "CCT/RGB Crossfade", "cct-rgb-crossfade", "derived"),
+            fixtureChannel(5, "Red", "red"),
+            fixtureChannel(6, "Green", "green"),
+            fixtureChannel(7, "Blue", "blue"),
+            fixtureChannel(8, "Strobe", "strobe", "range"),
           ],
           [
             fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
             fixtureControl("cct", "CCT", 2000, 10000, 5600, "K"),
+            fixtureControl("green-magenta", "Green/Magenta", -100, 100, 0),
             fixtureControl("red", "Red", 0, 255, 0),
             fixtureControl("green", "Green", 0, 255, 0),
             fixtureControl("blue", "Blue", 0, 255, 0),
-            fixtureControl("fx", "FX", 0, 255, 0),
-            fixtureControl("speed", "Speed", 0, 255, 0),
           ],
-          ["intensity", "cct", "rgb", "fx"],
-          cctDefaults(2000, 10000, 5600)
+          ["intensity", "cct", "green-magenta", "rgb"],
+          { ...cctDefaults(2000, 10000, 5600), "green-magenta": 0 }
         ),
         fixtureMode(
           "pixel-rgb-48",
