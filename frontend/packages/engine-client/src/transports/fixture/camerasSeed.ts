@@ -152,6 +152,9 @@ function checkedCamera(seed: FixtureCameraSeed, index: number, seen: Set<number>
   if (unreachable && !setUp) throw mistake(`${tag} does not answer, so it must be set up: give it ${setUpWith}.`);
   if (lastRead && !setUp)
     throw mistake(`${tag}'s values are the last read, so it must be set up: give it ${setUpWith}.`);
+  if (lastRead && (released || unreachable)) {
+    throw mistake(`${tag}'s values cannot be the last read while it is released or does not answer.`);
+  }
   let recording: boolean | null = null;
   if (seed.recording !== undefined) {
     if (camera !== 1) throw mistake(`${tag} does not record here: only CAM 1 records.`);

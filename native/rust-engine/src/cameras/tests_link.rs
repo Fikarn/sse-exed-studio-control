@@ -158,6 +158,58 @@ fn a_connection_that_brings_no_setting_shows_the_last_values_as_the_last_read() 
     assert_eq!(cam2["state"], "held");
     assert_eq!(cam2["valuesLastRead"], true);
     assert_eq!(cam2["values"]["iso"]["value"], "3200");
+
+    // CAM 1, the Pocket: while its values are the last read, a press that
+    // sets half a parameter is refused (the other half would be a guess,
+    // D12), a whole one goes, and the timecode follows the link.
+    cameras.reporting(1, false);
+    assert_eq!(cameras.camera(1)["valuesLastRead"], true);
+    assert_eq!(
+        cameras.refused(
+            "cameras.set",
+            json!({ "camera": 1, "setting": "whiteBalance", "value": 5600 })
+        ),
+        (
+            String::from("CAMERA_VALUE_NOT_ALLOWED"),
+            String::from(
+                "CAM 1 has not reported its tint since it connected, so a white balance cannot be sent with it."
+            )
+        )
+    );
+    let _ = cameras.reply(
+        "cameras.set",
+        json!({ "camera": 1, "setting": "iso", "value": "800" }),
+    );
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::Set(
+            Setting::Iso,
+            CameraValue::Text(String::from("800"))
+        )]
+    );
+    cameras.set_clock(1, std::time::Duration::from_secs(9 * 3600 + 12 * 60 + 53));
+    let timecode = cameras.camera(1)["recording"]["timecode"].clone();
+    assert!(
+        timecode
+            .as_str()
+            .is_some_and(|text| text.starts_with("09:12:53")),
+        "{timecode}"
+    );
+
+    // Forget takes the saved reading away (ISO 400, saved before the press):
+    // paired again and started, with its link bringing nothing, CAM 1 has
+    // nothing kept to show, so what the link brings is its own, not the
+    // last read.
+    cameras.call("cameras.setup.forget", json!({ "camera": 1 }));
+    cameras.pair_cam_1();
+    cameras.restart();
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "held");
+    assert_eq!(cam1["valuesLastRead"], false);
+    assert_eq!(
+        cam1["values"]["iso"]["value"], "800",
+        "the body's own value, not the dropped reading's"
+    );
 }
 
 // D19: a held camera that stops answering reads UNREACHABLE (error), keeps

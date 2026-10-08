@@ -270,10 +270,7 @@ impl RealLinks {
     /// read (finding 19); or why it cannot be read.
     pub(crate) fn read(&self, setup: &StoredSetup) -> Result<LinkReading, LinkFailure> {
         match (&self.pocket, setup.camera) {
-            (Some(pocket), RECORDING_CAMERA) => pocket.read().map(|reading| LinkReading {
-                reading,
-                last_read: pocket.last_read(),
-            }),
+            (Some(pocket), RECORDING_CAMERA) => pocket.read_link(),
             _ => Err(no_link_yet(setup)),
         }
     }

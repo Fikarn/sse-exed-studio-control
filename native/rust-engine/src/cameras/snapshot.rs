@@ -290,8 +290,9 @@ pub struct CameraSnapshot {
     pub word: String,
     pub tone: CameraTone,
     pub sentence: String,
-    /// When the camera last answered; `null` when it never has since the
-    /// start, or it is released.
+    /// When the camera last answered, or the saved reading's time after a
+    /// start (`valuesLastRead`); `null` when it never has and nothing was
+    /// saved, or it is released.
     #[serde(rename = "readAt")]
     pub read_at: Option<String>,
     /// A held camera whose values are what it last reported, at `readAt`,

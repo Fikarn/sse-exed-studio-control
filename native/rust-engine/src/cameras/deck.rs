@@ -348,6 +348,9 @@ fn texts(cameras: &Cameras, at: Instant, now: SystemTime) -> DeckTexts {
     let recording = main.reading.as_ref().and_then(|reading| reading.recording) == Some(true);
     let rec_state = match main.state() {
         CameraState::Held if recording && stop_armed(cameras, at) => "armed",
+        // A take the kept reading says is running, not reported in this
+        // connection (finding 19): as the page shows it.
+        CameraState::Held if recording && main.values_last_read => "last-known",
         CameraState::Held if recording => "recording",
         CameraState::Held => "ready",
         CameraState::Unreachable if recording => "last-known",
@@ -389,6 +392,9 @@ fn texts(cameras: &Cameras, at: Instant, now: SystemTime) -> DeckTexts {
     texts.push((
         "camera_state_dials",
         String::from(match state {
+            // The values are the last read, not reported in this connection
+            // (finding 19): as the page shows them.
+            CameraState::Held if selected.values_last_read => "doubt",
             CameraState::Held => "live",
             CameraState::Unreachable => "doubt",
             CameraState::Released | CameraState::NotSetUp => "locked",

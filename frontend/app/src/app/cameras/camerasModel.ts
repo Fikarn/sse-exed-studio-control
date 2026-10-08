@@ -191,10 +191,19 @@ export function recKeyView(main: CameraSnapshot | null): RecKeyView {
     return { kind: "locked", hint: "locked · CAM 1 is not read yet", reason: "CAM 1 has not been read yet." };
   }
   switch (main.state) {
-    case "held":
-      return main.recording.recording === true
-        ? { kind: "recording", hint: "CAM 1 reports recording · press twice to stop" }
-        : { kind: "start", hint: "CAM 1 · one press starts" };
+    case "held": {
+      if (main.recording.recording !== true) return { kind: "start", hint: "CAM 1 · one press starts" };
+      // A take the kept reading says is running, not reported since the camera
+      // connected (finding 19): said so. STOP stays live: a stop sent to a
+      // camera not recording changes nothing.
+      const last = main.valuesLastRead ? clockTime(main.readAt) : null;
+      return {
+        kind: "recording",
+        hint: main.valuesLastRead
+          ? `last read${last ? ` ${last}` : ""} · reports recording · press twice to stop`
+          : "CAM 1 reports recording · press twice to stop",
+      };
+    }
     case "unreachable": {
       if (main.recording.recording === true) {
         const last = clockTime(main.readAt);
@@ -286,7 +295,9 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
   } else if (!recording.timecode) {
     timecode = { value: null, note: unreachable ? "CAM 1 does not answer" : "not read yet", doubt: false };
   } else {
-    timecode = { value: recording.timecode, note: unreachable ? "last read" : "", doubt: unreachable };
+    // The last read (finding 19) is doubt, as an unreachable camera's is.
+    const lastRead = unreachable || main?.valuesLastRead === true;
+    timecode = { value: recording.timecode, note: lastRead ? "last read" : "", doubt: lastRead };
   }
 
   // The hardware link's sentence for a card time it cannot read is the row's
@@ -397,7 +408,7 @@ export function cameraKeyView(camera: CameraSnapshot, selected: number): CameraK
     values,
     valuesKind,
     valuesTag,
-    rec: !recording ? null : camera.state === "unreachable" ? "last-known" : "recording",
+    rec: !recording ? null : camera.state === "unreachable" || camera.valuesLastRead ? "last-known" : "recording",
     selected: camera.camera === selected,
   };
 }

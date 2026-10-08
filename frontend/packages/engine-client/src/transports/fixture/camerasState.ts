@@ -424,7 +424,8 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
   const model = cameraModel(camera);
   const state = cameraState(cameras, camera);
   const held = cameras.held[camera];
-  const read = held.read;
+  // A released or not-set-up camera shows no value (`report.rs`): its reading waits for Connect.
+  const read = state === "held" || state === "unreachable" ? held.read : null;
   const recording = model.records ? (read?.report.recording ?? null) : null;
   return {
     camera,
@@ -572,7 +573,9 @@ export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAct
 
 /** CAM 1 reports recording: a held one now, an unreachable one as it last did (doubt). */
 export function cam1Recording(cameras: FixtureCameras): boolean {
-  return lastReport(cameras, 1)?.recording === true;
+  // A released camera's kept reading is not shown (`report.rs`), so it does not count.
+  const state = cameraState(cameras, 1);
+  return (state === "held" || state === "unreachable") && lastReport(cameras, 1)?.recording === true;
 }
 
 function healthEntry(cameras: FixtureCameras, camera: CameraNumber): CameraHealthEntry {

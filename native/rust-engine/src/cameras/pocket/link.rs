@@ -20,7 +20,7 @@ use crate::cameras::pocket::state::{
 };
 use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::real_link::{BluetoothAddress, LinkFailure};
-use crate::cameras::simulated::{CameraCommand, CameraReading};
+use crate::cameras::simulated::{CameraCommand, CameraReading, LinkReading};
 use crate::diagnostics::{log_event, LogLevel};
 use std::fmt;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
@@ -333,10 +333,16 @@ impl PocketLink {
         self.shared.with_state(|state| state.read())
     }
 
-    /// Connected, and the camera has reported no setting since: what is
-    /// read is the last read (finding 19).
-    pub(crate) fn last_read(&self) -> bool {
-        self.shared.with_state(|state| state.last_read())
+    /// What the camera last reported and whether that is the last read
+    /// (finding 19), in one look at the state: a report between two looks
+    /// would pair the old reading with the new mark.
+    pub(crate) fn read_link(&self) -> Result<LinkReading, LinkFailure> {
+        self.shared.with_state(|state| {
+            state.read().map(|reading| LinkReading {
+                reading,
+                last_read: state.last_read(),
+            })
+        })
     }
 
     /// Sends a press: its messages are made from the commands and what the

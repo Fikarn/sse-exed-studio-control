@@ -429,8 +429,12 @@ function releaseRequest(cameras: FixtureCameras, params: JsonObject): Answer {
   if (!isSetUp(cameras, camera)) throw notSetUpRefusal(model, hasLink(cameras, camera));
   if (cameras.held[camera].released) throw releasedRefusal(model);
   if (!confirm) throw notConfirmedRefusal();
-  cameras.held[camera].released = true;
-  forgetRead(cameras, camera);
+  const held = cameras.held[camera];
+  held.released = true;
+  // What it reported stays, unshown while released, for a Connect soon after (finding 19).
+  held.lastRead = held.read !== null;
+  held.failure = null;
+  held.startedAt = null;
   return answer(
     { camera, state: cameraState(cameras, camera), sentence: releasedToSentence(model) },
     "release",
@@ -450,8 +454,8 @@ function connectRequest(cameras: FixtureCameras, params: JsonObject, now: number
   if (cameraState(cameras, camera) === "held") throw alreadyHeldRefusal(model);
   const held = cameras.held[camera];
   held.released = false;
-  // An unreachable camera keeps what it last reported until it answers; a released one has none.
-  if (held.failure === null) forgetRead(cameras, camera);
+  // What it last reported stays until it answers or reports (finding 19).
+  held.lastRead = held.read !== null;
   readCamera(cameras, camera, now);
   const state = cameraState(cameras, camera);
   const sentence = state === "held" ? heldAgainSentence(model) : cameraSentence(cameras, camera);

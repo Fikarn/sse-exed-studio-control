@@ -22,7 +22,7 @@
 //! `reachable` — with `app.changed { reason: "health" }` after them when the
 //! health check changed — whoever noticed first.
 
-use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
+use crate::cameras::model::{model, Setting, CAMERA_NUMBERS, RECORDING_CAMERA};
 use crate::cameras::pocket::pairing::{PairingStep, PIN_REFUSED, STOPPED};
 use crate::cameras::real_link::{self, BluetoothAddress, LinkFailure, RealLinks};
 use crate::cameras::simulated::{
@@ -92,6 +92,23 @@ struct SavedReading {
     reading: CameraReading,
 }
 
+/// A press that sets half a parameter: the other half goes with it as the
+/// camera reported it (`pocket/protocol.rs`), never a guess (D12). While a
+/// camera's values are the last read, that half is a kept value the camera
+/// has not reported in this connection, so the press is refused (the
+/// lesson of D43). `Some((what the camera has not reported, the press))`.
+fn half_parameter(setting: &Setting) -> Option<(&'static str, &'static str)> {
+    match setting {
+        Setting::WhiteBalance => Some(("its tint", "a white balance")),
+        Setting::Tint => Some(("its white balance", "a tint")),
+        Setting::Resolution => Some(("its recording format", "a resolution")),
+        Setting::FrameRate => Some(("its recording format", "a frame rate")),
+        Setting::DisplayLut => Some(("whether its display LUT is on", "a display LUT")),
+        Setting::DisplayLutOn => Some(("its display LUT", "the switch")),
+        _ => None,
+    }
+}
+
 /// One camera as the hardware link holds it.
 #[derive(Debug, Clone)]
 pub(crate) struct CameraRuntime {
@@ -102,7 +119,8 @@ pub(crate) struct CameraRuntime {
     /// keeps it (D41).
     pub released: bool,
     /// What it last reported; `None` when it was never read since the start
-    /// or it is released.
+    /// and nothing was saved. Kept while released, for a Connect soon after,
+    /// and loaded at a start from the saved reading (finding 19).
     pub reading: Option<CameraReading>,
     /// When it last answered.
     pub read_at: Option<String>,
@@ -116,6 +134,9 @@ pub(crate) struct CameraRuntime {
     /// change is saved again once a minute, so the time shown after a start
     /// is near the last read, not the last change. In memory only.
     pub last_saved_at: Option<SystemTime>,
+    /// The last save failed, said in the log once; said again when a save
+    /// goes through. In memory only.
+    pub save_failing: bool,
     /// Why it did not answer the last time it was read; `None` while it
     /// answers.
     pub failure: Option<LinkFailure>,
@@ -160,6 +181,7 @@ impl CameraRuntime {
             read_at: None,
             values_last_read: false,
             last_saved_at: None,
+            save_failing: false,
             failure: None,
             started_at: None,
             pairing: None,
@@ -393,8 +415,9 @@ impl Cameras {
     }
 
     /// Saves what `camera` reported and when, for a start (finding 19). A
-    /// write that fails is a line in the log, and the next start shows
-    /// nothing read until the camera reports.
+    /// write that fails is one line in the log for as long as it fails, and
+    /// is tried again at the next change or a minute later, never at every
+    /// read; a start meanwhile shows what was saved before, or nothing read.
     fn save_reading(&mut self, camera: u8, now: SystemTime) {
         let runtime = self.camera(camera);
         let (Some(reading), Some(read_at)) = (&runtime.reading, &runtime.read_at) else {
@@ -410,15 +433,30 @@ impl Cameras {
                 set_settings(&self.db_path, &[(&last_reading_key(camera), value)])
                     .map_err(|error| error.to_string())
             });
+        let runtime = self.camera_mut(camera);
+        runtime.last_saved_at = Some(now);
         match written {
-            Ok(()) => self.camera_mut(camera).last_saved_at = Some(now),
-            Err(error) => log_event(
-                LogLevel::Warn,
-                &format!(
-                    "{}'s reading could not be saved; the next start shows nothing read until it reports: {error}",
-                    model(camera).tag
-                ),
-            ),
+            Ok(()) => {
+                if runtime.save_failing {
+                    runtime.save_failing = false;
+                    log_event(
+                        LogLevel::Info,
+                        &format!("{}'s reading is saved again.", model(camera).tag),
+                    );
+                }
+            }
+            Err(error) => {
+                if !runtime.save_failing {
+                    runtime.save_failing = true;
+                    log_event(
+                        LogLevel::Warn,
+                        &format!(
+                            "{}'s reading could not be saved, and is tried again at its next change or in a minute; a start meanwhile shows what was saved before, or nothing read: {error}",
+                            model(camera).tag
+                        ),
+                    );
+                }
+            }
         }
     }
 
@@ -721,6 +759,26 @@ impl Cameras {
         bodies: &mut SimulatedCameras,
         commands: &[CameraCommand],
     ) -> Result<(), CameraError> {
+        // While its values are the last read, a press that sets half a
+        // parameter would carry the other half from the kept reading, which
+        // the camera has not reported in this connection: never a guess
+        // (D12, the lesson of D43). It is refused until the camera reports;
+        // a whole parameter, an auto and REC go.
+        if self.camera(camera).values_last_read {
+            for command in commands {
+                if let CameraCommand::Set(setting, _) = command {
+                    if let Some((what, press)) = half_parameter(setting) {
+                        return Err(CameraError::Refused(
+                            "CAMERA_VALUE_NOT_ALLOWED",
+                            format!(
+                                "{} has not reported {what} since it connected, so {press} cannot be sent with it.",
+                                model(camera).tag
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
         let failure = if !self.simulated {
             let runtime = self.camera(camera);
             let setup = runtime.setup.clone();

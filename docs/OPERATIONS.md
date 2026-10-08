@@ -142,7 +142,7 @@ The state display speaks of the camera that is worst off, and of the selected on
 
 While CAM 1 is `UNREACHABLE` after it reported recording, `REC` reads `last known 09:11 · STOP is locked until CAM 1 answers`: the take is left as it was. Stop it on the camera if it must end.
 
-A held camera whose link has brought nothing since it connected (CAM 1 back within minutes of its last controller: a restart of the app, `Connect` soon after `Release`) shows what it last reported in amber with `last read` and the time, also after a start, and the state display says so. Its keys work and a press is sent; the values are its own again once the camera reports a setting, which it does when one changes or after it is switched off and on.
+A held camera whose link has brought nothing since it connected (CAM 1 back within minutes of its last controller: a restart of the app, `Connect` soon after `Release`) shows what it last reported in amber with `last read` and the time, also after a start, and the state display says so. Its keys work and a press is sent, but a press that sets a white balance, a tint, a resolution, a frame rate or the display LUT is refused and says why until the camera reports (the other half of the pair would be a guess). A setting the camera reports is its own again, and every value is once the camera has sent all its settings, after it is switched off and on or some minutes alone. `REC` says `last read` while the kept reading says a take is running, and `STOP` stays live; the deck shows the same.
 
 ## Stream Deck
 

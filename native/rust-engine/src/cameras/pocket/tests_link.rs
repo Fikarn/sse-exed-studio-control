@@ -491,3 +491,23 @@ fn only_the_windows_module_names_bluetooth() {
     assert!(include_str!("winrt.rs").contains("windows::Devices::Bluetooth"));
     assert!(include_str!("winrt_pairing.rs").contains("windows::Devices::Bluetooth"));
 }
+
+// Finding 19: the link starts from what was saved, as the last read until
+// the camera reports.
+#[test]
+fn the_link_starts_from_the_saved_reading_as_the_last_read() {
+    let mut state = LinkState::with_last(CameraReading {
+        iso: Some(String::from("1600")),
+        ..CameraReading::default()
+    });
+    assert_eq!(state.read(), Err(LinkFailure::NoAnswer));
+    assert_eq!(state.connected(), Noticed::Changed);
+    assert_eq!(
+        state.read().expect("connected").iso.as_deref(),
+        Some("1600")
+    );
+    assert!(state.last_read(), "the saved reading, nothing reported yet");
+    assert_eq!(state.control(&iso(800)), Noticed::Changed);
+    assert!(!state.last_read());
+    assert_eq!(state.read().expect("connected").iso.as_deref(), Some("800"));
+}
