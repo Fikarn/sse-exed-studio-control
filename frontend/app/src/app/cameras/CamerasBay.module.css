@@ -2,9 +2,10 @@
    at exactly 1680 × 945, and a row of two small pictures and the loupe under
    it. The pictures' sizes are the board's: they are the picture's own pixels
    at a whole share, so nothing here is a token. The shell (overhaul 3): the
-   bay is 1680 × 1320 and draws no margin, so the pictures stand edge to edge
-   between the cluster's hairline and the plate's. The stack is 1309 px high:
-   5 px over it and 6 under, whole pixels, so a press on the picture maps to
+   bay is 1680 × 1312 (the header 88 since 2026-10-08, finding 6 of the walk)
+   and draws no margin, so the pictures stand edge to edge between the
+   cluster's hairline and the plate's. The stack is 1309 px high: 1 px over
+   it and 2 under, whole pixels, so a press on the picture maps to
    the picture's own pixels exactly. */
 
 .bay {
@@ -14,7 +15,7 @@
   gap: 12px;
   height: 100%;
   min-height: 0;
-  padding: 5px 0 6px;
+  padding: 1px 0 2px;
   overflow: hidden;
 }
 

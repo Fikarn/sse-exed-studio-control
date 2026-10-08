@@ -22,6 +22,35 @@ import {
   type LightingWorkspaceSurfaceProps,
 } from "../lightingWorkspaceModel";
 import type { LightingRig } from "./useLightingRig";
+
+/** A slider's values while it is dragged, as `lighting.fixture.update` takes them. */
+export interface LiveFixtureValues {
+  intensity?: number;
+  cct?: number;
+  controlValues?: Record<string, number>;
+}
+
+/** The live sends of one fixture: what waits, what is in flight, when the last went. */
+interface LiveSend {
+  pending: LiveFixtureValues | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  inFlight: boolean;
+  sentAt: number;
+}
+
+/** A live send at most this often while a slider is dragged (about twelve a second). */
+export const LIVE_SEND_MS = 80;
+
+/** The later values over the earlier, the controls' maps merged; no key is sent empty. */
+export function mergeLiveValues(earlier: LiveFixtureValues | null, later: LiveFixtureValues): LiveFixtureValues {
+  const merged: LiveFixtureValues = { ...earlier };
+  if (later.intensity !== undefined) merged.intensity = later.intensity;
+  if (later.cct !== undefined) merged.cct = later.cct;
+  if (later.controlValues !== undefined) {
+    merged.controlValues = { ...earlier?.controlValues, ...later.controlValues };
+  }
+  return merged;
+}
 import type { LightingSession } from "./useLightingSession";
 import type { LightingSceneEditor } from "./useLightingSceneEditor";
 
@@ -505,6 +534,65 @@ export function useLightingFixtureEditor({
     }
   );
 
+  // Finding 8 of the walk of 2026-10-07: a plate slider reaches the rig while
+  // it is dragged, not only when let go. What is under the hand goes to the
+  // hardware link at most every LIVE_SEND_MS, one request at a time, the
+  // latest values last; the release drops what still waits and sends the
+  // commit as before, so the committed value lands last. A failed live send
+  // says nothing: the commit reports. None of it is an undo step (a slider's
+  // value is not one; fixtures and scenes made and deleted are).
+  const liveSends = useRef(new Map<string, LiveSend>());
+  useEffect(
+    () => () => {
+      for (const entry of liveSends.current.values()) {
+        if (entry.timer !== null) clearTimeout(entry.timer);
+      }
+    },
+    []
+  );
+  const flushLiveValues = useLiveCallback((fixtureId: string) => {
+    const entry = liveSends.current.get(fixtureId);
+    if (!entry || entry.pending === null || entry.inFlight || entry.timer !== null) return;
+    const wait = LIVE_SEND_MS - (Date.now() - entry.sentAt);
+    if (wait > 0) {
+      entry.timer = setTimeout(() => {
+        entry.timer = null;
+        flushLiveValues(fixtureId);
+      }, wait);
+      return;
+    }
+    const patch = entry.pending;
+    entry.pending = null;
+    entry.inFlight = true;
+    entry.sentAt = Date.now();
+    void store
+      .updateLightingFixture({ fixtureId, ...patch })
+      .catch(() => undefined)
+      .finally(() => {
+        entry.inFlight = false;
+        flushLiveValues(fixtureId);
+      });
+  });
+  const sendLiveValues = useLiveCallback(
+    (fixtureId: string, patch: LiveFixtureValues, phase: FixtureValuePreviewPhase) => {
+      let entry = liveSends.current.get(fixtureId);
+      if (!entry) {
+        entry = { pending: null, timer: null, inFlight: false, sentAt: 0 };
+        liveSends.current.set(fixtureId, entry);
+      }
+      if (phase === "committing") {
+        entry.pending = null;
+        if (entry.timer !== null) {
+          clearTimeout(entry.timer);
+          entry.timer = null;
+        }
+        return;
+      }
+      entry.pending = mergeLiveValues(entry.pending, patch);
+      flushLiveValues(fixtureId);
+    }
+  );
+
   const handlePatchCommit = useLiveCallback(async (fixtureId: string, dmxStartAddress: number) => {
     const busyKey = `fixture-patch:${fixtureId}`;
     startBusy(busyKey);
@@ -979,6 +1067,7 @@ export function useLightingFixtureEditor({
     handleIntensityCommit,
     handleCctCommit,
     handleControlValuesCommit,
+    sendLiveValues,
     handlePatchCommit,
     handleIdentifyBurst,
     handleToggleHighlight,

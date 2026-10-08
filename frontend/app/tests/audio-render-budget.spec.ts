@@ -95,7 +95,7 @@ test("scrolling the plate between its sections does not re-render the audio insp
   // The visual overhaul's Console pull request. Old: the plate was scrolled to
   // each section in turn. New: every section is in view at once, the plate
   // does not scroll, and reading each costs no render. Reason: the plate fits
-  // its 1320 px (FX 3/4 is a playback pair: it has no preamp section).
+  // its 1312 px (FX 3/4 is a playback pair: it has no preamp section).
   await openSettledConsole(page, "audio-selected-channel");
 
   const baseline = await getInspectorRenderCount(page);

@@ -173,7 +173,6 @@ function metricVariables(metrics: GlassMetrics): CSSProperties {
     "--glass-line": `${metrics.lineHeight}px`,
     "--glass-gap": `${metrics.paragraphGap}px`,
     "--glass-end-gap": `${metrics.endGap - metrics.paragraphGap}px`,
-    "--glass-margin": `${metrics.marginPx}px`,
     "--glass-column-left": `${metrics.columnLeft}px`,
     "--glass-reading": `${metrics.readingY}px`,
     // The line across sits under the reading line's baseline, where it can meet the descenders (the proposal §4.1).

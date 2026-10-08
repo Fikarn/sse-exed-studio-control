@@ -351,7 +351,7 @@ test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
   await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
   const header = page.locator('[data-region="header"]');
   const headerBox = await header.boundingBox();
-  expect(Math.abs((headerBox?.height ?? 0) - 80), "header height within 2 px of section 2").toBeLessThanOrEqual(2);
+  expect(Math.abs((headerBox?.height ?? 0) - 88), "header height within 2 px of section 2").toBeLessThanOrEqual(2);
   await nav.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
 });

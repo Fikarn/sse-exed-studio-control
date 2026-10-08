@@ -34,7 +34,7 @@ describe("AppShellFrame.module.css", () => {
     expect(css).toContain("var(--chrome-studio-plate)");
   });
 
-  // The shell (overhaul 3): the header is 80 px, the frame's margin is a
+  // The shell (overhaul 3): the header is 88 px (80 until 2026-10-08), the frame's margin is a
   // token, and the bay draws no margin of its own (the page's picture decides
   // it). The eyebrow went with the lockup: the logotype stands alone at the
   // right.

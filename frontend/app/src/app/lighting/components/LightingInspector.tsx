@@ -81,6 +81,11 @@ export interface LightingInspectorProps {
   onCctCommit: (fixtureId: string, cct: number) => void;
   onCctPreview?: (fixtureId: string, cct: number, phase: FixtureValuePreviewPhase) => void;
   onControlValuesCommit?: (fixtureId: string, controlValues: Record<string, number>) => void;
+  onControlValuesPreview?: (
+    fixtureId: string,
+    controlValues: Record<string, number>,
+    phase: FixtureValuePreviewPhase
+  ) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onPatchCommit: (fixtureId: string, nextStartAddress: number) => void;
   onToggleGroupPower: (groupId: string, on: boolean) => void;
@@ -288,6 +293,7 @@ export function LightingInspector(props: LightingInspectorProps) {
           onCctCommit={props.onCctCommit}
           onCctPreview={props.onCctPreview}
           onControlValuesCommit={props.onControlValuesCommit}
+          onControlValuesPreview={props.onControlValuesPreview}
           onIdentifyBurst={props.onIdentifyBurst}
           onSpatialCommit={props.onSpatialCommit}
           onRenameFixture={props.onRenameFixture}

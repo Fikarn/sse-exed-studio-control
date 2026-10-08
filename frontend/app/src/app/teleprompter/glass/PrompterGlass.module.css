@@ -45,7 +45,7 @@
 .column {
   position: absolute;
   left: var(--glass-column-left);
-  right: var(--glass-margin);
+  right: var(--glass-column-left);
   top: 0;
   color: var(--prompter-glass-text);
   font-family: var(--font-family-glass);
@@ -157,7 +157,7 @@
 .across {
   position: absolute;
   left: var(--glass-column-left);
-  right: var(--glass-margin);
+  right: var(--glass-column-left);
   top: var(--glass-across);
   height: 2px;
   margin-top: -1px;

@@ -79,6 +79,11 @@ export interface InspectorFixtureProps {
   onCctCommit: (fixtureId: string, cct: number) => void;
   onCctPreview?: (fixtureId: string, cct: number, phase: FixtureValuePreviewPhase) => void;
   onControlValuesCommit?: (fixtureId: string, controlValues: Record<string, number>) => void;
+  onControlValuesPreview?: (
+    fixtureId: string,
+    controlValues: Record<string, number>,
+    phase: FixtureValuePreviewPhase
+  ) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   /** Absent in preview: a fixture's place is not staged. */
   onSpatialCommit?: (fixtureId: string, partial: SpatialPartial) => void;
@@ -132,6 +137,7 @@ export function InspectorFixture({
   onCctCommit,
   onCctPreview,
   onControlValuesCommit,
+  onControlValuesPreview,
   onIdentifyBurst,
   onSpatialCommit,
   onRenameFixture,
@@ -157,9 +163,20 @@ export function InspectorFixture({
   const placementRef = useRef<HTMLDivElement | null>(null);
   const [placementOpen, setPlacementOpen] = useState(false);
 
-  useEffect(() => setIntensityDraft(fixture.intensity), [fixture.id, fixture.intensity]);
-  useEffect(() => setCctDraft(fixture.cct), [fixture.id, fixture.cct]);
-  useEffect(() => setControlDrafts(fixture.controlValues), [fixture.id, fixture.controlValues]);
+  // The sliders under the hand (finding 8 of the walk of 2026-10-07): a
+  // slider's values reach the rig while it is dragged, so the snapshot
+  // comes back with values the hand has already left. A draft holds while
+  // its slider is down, and follows the snapshot again when it is let go.
+  const dragging = useRef(new Set<string>());
+  useEffect(() => {
+    if (!dragging.current.has("intensity")) setIntensityDraft(fixture.intensity);
+  }, [fixture.id, fixture.intensity]);
+  useEffect(() => {
+    if (!dragging.current.has("cct")) setCctDraft(fixture.cct);
+  }, [fixture.id, fixture.cct]);
+  useEffect(() => {
+    if (![...dragging.current].some((key) => key.startsWith("control:"))) setControlDrafts(fixture.controlValues);
+  }, [fixture.id, fixture.controlValues]);
   useEffect(() => setPlacementOpen(false), [fixture.id]);
   useEffect(() => {
     if (pendingInlineRenameNonce === null) return;
@@ -176,21 +193,25 @@ export function InspectorFixture({
 
   const handleIntensityChange = (next: number) => {
     const target = Math.max(0, Math.min(100, Math.round(next)));
+    dragging.current.add("intensity");
     setIntensityDraft(target);
     onIntensityPreview?.(fixture.id, target, "editing");
   };
   const commitIntensity = (next?: number) => {
     const target = Math.max(0, Math.min(100, Math.round(next ?? intensityDraft)));
+    dragging.current.delete("intensity");
     onIntensityPreview?.(fixture.id, target, "committing");
     if (target !== fixture.intensity) onIntensityCommit(fixture.id, target);
   };
   const handleCctChange = (next: number) => {
     const target = Math.max(cctRange.min, Math.min(cctRange.max, Math.round(next / 100) * 100));
+    dragging.current.add("cct");
     setCctDraft(target);
     onCctPreview?.(fixture.id, target, "editing");
   };
   const commitCct = (next?: number) => {
     const target = Math.max(cctRange.min, Math.min(cctRange.max, Math.round(next ?? cctDraft)));
+    dragging.current.delete("cct");
     onCctPreview?.(fixture.id, target, "committing");
     if (target !== fixture.cct) onCctCommit(fixture.id, target);
   };
@@ -359,12 +380,17 @@ export function InspectorFixture({
                       ]
                     : []
                 }
-                onChange={(next) =>
-                  setControlDrafts((current) => ({ ...current, [control.id]: Math.round(control.min + next * span) }))
-                }
+                onChange={(next) => {
+                  const rounded = Math.round(control.min + next * span);
+                  dragging.current.add(`control:${control.id}`);
+                  setControlDrafts((current) => ({ ...current, [control.id]: rounded }));
+                  onControlValuesPreview?.(fixture.id, { [control.id]: rounded }, "editing");
+                }}
                 onCommit={(next) => {
                   const rounded = Math.round(control.min + next * span);
+                  dragging.current.delete(`control:${control.id}`);
                   setControlDrafts((current) => ({ ...current, [control.id]: rounded }));
+                  onControlValuesPreview?.(fixture.id, { [control.id]: rounded }, "committing");
                   // Only the changed control: the hardware link lays it over the
                   // stored map (since 2026-10-05), and `fixture` here is the
                   // snapshot with the overlays drawn in, so the map whole would

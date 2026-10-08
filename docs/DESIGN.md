@@ -10,11 +10,11 @@ From the operator's chair, in one glance and without reading a sentence: is it s
 
 ## 2. The skeleton
 
-Every page is one grid: **header · cluster · bay · plate · footer**, 80 · 440 | 1680 | 440 · 40. There is no page top bar; the cluster's first element is the state. The one surface is 2560×1440, fullscreen.
+Every page is one grid: **header · cluster · bay · plate · footer**, 88 · 440 | 1680 | 440 · 40 (the header 80 until 2026-10-08, when the walk asked for more room). There is no page top bar; the cluster's first element is the state. The one surface is 2560×1440, fullscreen.
 
 | Region        | What it is                                                                                                                                                     | Size (px) |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------: |
-| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                                |   80 high |
+| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                                |   88 high |
 | Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                                          |  440 wide |
 | State display | a black display, fixed height: lamp and word, the page's ⋯ at its top right, the hardware link's sentence (two lines), the way-out key; nothing below it moves |  180 high |
 | Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched"                       |   56 high |

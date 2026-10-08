@@ -13,7 +13,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The tabs are Setup / Support, Lighting, Audio, Cameras and Teleprompter, and nothing says Planning.
 - [ ] Setup's `⋯` › `Back to the Console` opens the Console.
 - [ ] `Studio fullscreen` and `Reset the window layout`, in Setup / Support › Workstation, each put the window back fullscreen.
-- [ ] From the chair, the header is one row and every lamp can be read, in Setup too.
+- [ ] From the chair, the header is one row, taller than in the last build (88 px, 80 before; finding 6 of the walk of 2026-10-07), and every lamp can be read, in Setup too. The Console's plate and the cameras' pictures still fit under it.
 - [ ] Hovering moves nothing, and on an idle screen only the meters move.
 
 ## Lighting
@@ -30,6 +30,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] A `Highlight` on a fixture: the rig shows it at full, the scene's row still reads `ON RIG` and the state display does not read `UNSAVED`; `Off` in the latch slot ends it.
 - [ ] A `Highlight` on a fixture, then `CUT ALL`: the whole rig goes dark, the highlighted fixture too, and the latch slot reads `Nothing latched`. Then select every light and press `Find`; as soon as the first light has flashed, press `CUT ALL` twice: no light flashes after the cut (until 2026-10-05 the Find went on over the dark rig), and the Find key reads `Find` at once.
 - [ ] The INFINIMAT (`Key right`) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
+- [ ] A plate slider dragged (intensity, colour temperature, a bar's colour) moves the light while the hand is down, and the release leaves it where the hand let go; the slider does not jump back while it is dragged (finding 8, fixed 2026-10-08).
 - [ ] Two scenes saved with `Save as a new scene` (press twice) come back after a restart, named `Scene N`; a scene deleted from its `⋯` (press twice) can be undone.
 - [ ] A scene recalled with a 2 s `Fade` that holds some lights off: when the fade ends, such a light's plate reads the scene's level, not 0 % (until 2026-10-08 the fade wrote 0 %), and `Light` on brings it up at that level.
 - [ ] The plot draws each fixture where it hangs in the room: `Key Left`, `Key right` (the INFINIMAT), `Backlight Left`, `Backlight Right` and the four INFINIBAR PB12s (`Left Top`, `Left Bottom`, `Right Top`, `Right Bottom`) read their real places on the rulers.
@@ -98,6 +99,7 @@ The Prompter XL:
 
 - [ ] Plugged in, the header's `Prompter` lamp is green within a few seconds, and `shell.log` says `The prompter's window opened on the Prompter XL`, `The prompter's page draws` and `The hardware link has the Prompter XL as CONNECTED`.
 - [ ] The script reads correctly in the glass, not mirrored, and fills the Prompter XL's screen: no taskbar, no frame, no pointer.
+- [ ] With the margins at 0 % and at 10 % (`Change…` under the look), and with paragraph numbers on, the text stands centred on the glass: the same room left and right of it (finding 11, fixed 2026-10-08).
 - [ ] No other screen shows the script but the page's own copy. The page's copy and the glass break every line alike.
 - [ ] While the window opens, and after it, typing in `Edit script` goes on: the window takes no keyboard. A click on the Prompter XL's screen while you type: the typing goes on in the editor (since 2026-10-08 the app takes the keyboard back at once; before, the click gave it to the glass), and `shell.log` has `The prompter's window took the keyboard: given back to the studio window.` No beep, and no pointer on the glass.
 - [ ] With the Prompter XL at another scale than the studio display in Windows' display settings (100 % and 125 %), the script still fills its screen.

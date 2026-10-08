@@ -880,6 +880,30 @@ test("opens lighting intensity typed entry via a bare double-click", async ({ pa
   await expect(page.getByRole("dialog", { name: /Set Fixture intensity/i })).toBeVisible();
 });
 
+// The walk of 2026-10-07, finding 8: a plate slider reaches the rig while it
+// is dragged, not only when let go. The ▲ under the slider marks what the
+// scene holds and turns to the attention tone when the rig drifts from it;
+// it reads the rig, not the hand, so it is the proof that the light moved
+// before the slider was let go.
+test("a dragged intensity slider moves the light before it is let go", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const intensity = page.getByRole("slider", { name: "Fixture intensity" });
+  const mark = page.getByTestId("lighting-saved-intensity");
+  await expect(mark).toBeAttached();
+  await expect(mark).not.toHaveAttribute("data-tone", "attention");
+  const box = await intensity.boundingBox();
+  if (!box) throw new Error("the intensity slider has no box");
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width * 0.5, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.9, y, { steps: 8 });
+  await expect(mark, "the rig moved while the hand is still down").toHaveAttribute("data-tone", "attention");
+  await expect(intensity).toHaveAttribute("aria-valuenow", /^(8[5-9]|9\d|100)$/);
+  await page.mouse.up();
+  await expect(intensity).toHaveAttribute("aria-valuenow", /^(8[5-9]|9\d|100)$/);
+});
+
 // New pages program, Slice 3 (decision 8): Backspace or Delete on a focused
 // fixture slider, and Alt+double-click, reset it to its default. They went with
 // the keys held and the shortcuts; the typed entry offers "Reset to 100 %"
