@@ -401,6 +401,17 @@ describe("the double's clock", () => {
     expect(layout.pxPerReadWord).toBeCloseTo(textHeight / 40, 9);
   });
 
+  // The hardware link's `the_pace_comes_from_the_full_lines_of_running_text`
+  // (the walk of 2026-10-07, finding 13): the pace's pixels per read word come
+  // from the full lines of running text, not from the whole height.
+  it("paces by the full lines of running text", () => {
+    const paragraphs = [...script(2, 7), plainParagraph("[CUE]")];
+    // Three words a line (3, 3, 1): four full lines of three read words at 100 px.
+    expect(laidOut(paragraphs, "k", 3, 100).pxPerReadWord).toBeCloseTo(100 / 3, 9);
+    // No line wraps: the lines that hold a read word, without the gaps.
+    expect(laidOut(script(3, 2), "k", 5, 100).pxPerReadWord).toBeCloseTo(50, 9);
+  });
+
   // Review of 2026-09-27: a cue at the reading line is not "the next cue" nor the one
   // before; it takes more than 0.02 of a word.
   it("tells a cue from the reading line by more than a fiftieth of a word", () => {

@@ -127,6 +127,67 @@ pub(crate) struct Layout {
     pub paragraph_words: Vec<u32>,
 }
 
+/// The pace's pixels per read word, from the full lines of running text: a
+/// line another line of its paragraph follows (so it wrapped), holding a
+/// read word; their heights over their read words. A full line then passes
+/// the reading line in its words' time at the pace, and the paragraph gaps,
+/// the cue lines and a paragraph's short last line pass at that speed too,
+/// so a script takes a little longer than its words at the pace and the time
+/// left, from the pixels to `END`, says so. Until 2026-10-08 the whole height
+/// was spread over the read words, and running text read 22 to 29 % faster
+/// than the number (the walk of 2026-10-07, finding 13; the owner's choice).
+/// Without a full line, the lines that hold a read word serve; a script of
+/// cues alone is paced by all its words over the whole height (review of
+/// 2026-09-27), so it does not run through in one word's time. The front
+/// end's copy is `pacePixels` in `@sse/engine-client`.
+///
+/// `word_counts` are each paragraph's words, cues included, and
+/// `read_flags` say for each of them whether the presenter reads it; the
+/// lines were checked against both.
+fn pace_pixels(
+    lines: &[PrompterLayoutLine],
+    word_counts: &[u32],
+    read_flags: &[Vec<bool>],
+    text_height: f64,
+) -> f64 {
+    let read_words_on = |index: usize| -> usize {
+        let line = lines[index];
+        let until = match lines.get(index + 1) {
+            Some(next) if next.paragraph == line.paragraph => next.word,
+            _ => word_counts[line.paragraph as usize],
+        };
+        read_flags[line.paragraph as usize]
+            .iter()
+            .skip(line.word as usize)
+            .take(until.saturating_sub(line.word) as usize)
+            .filter(|read| **read)
+            .count()
+    };
+    let wraps = |index: usize| {
+        lines
+            .get(index + 1)
+            .is_some_and(|next| next.paragraph == lines[index].paragraph)
+    };
+    let sum = |full_only: bool| {
+        (0..lines.len())
+            .filter(|index| !full_only || wraps(*index))
+            .map(|index| (lines[index].height, read_words_on(index)))
+            .filter(|(_, words)| *words > 0)
+            .fold((0.0, 0usize), |(height, words), (line_height, read)| {
+                (height + line_height, words + read)
+            })
+    };
+    let (height, words) = match sum(true) {
+        (_, 0) => sum(false),
+        full => full,
+    };
+    if words > 0 {
+        return height / words as f64;
+    }
+    let all_words: usize = word_counts.iter().map(|words| *words as usize).sum();
+    text_height / all_words.max(1) as f64
+}
+
 impl Layout {
     /// Checks a report against the text on the glass: at least one line;
     /// lines in order, each with a height, each paragraph's first line at its
@@ -207,22 +268,9 @@ impl Layout {
                 "The layout's END must stand below its last line.",
             ));
         }
-        let read_words: usize = paragraphs
-            .iter()
-            .map(|paragraph| read_flags(paragraph).iter().filter(|read| **read).count())
-            .sum();
-        // A script of cues alone has no read word: it is paced by all its
-        // words, so it does not run through in one word's time (review of
-        // 2026-09-27).
-        let pace_words = if read_words > 0 {
-            read_words
-        } else {
-            word_counts
-                .iter()
-                .map(|words| *words as usize)
-                .sum::<usize>()
-        };
-        let px_per_read_word = (text_bottom - first.top) / pace_words.max(1) as f64;
+        let read_flags: Vec<Vec<bool>> = paragraphs.iter().map(read_flags).collect();
+        let px_per_read_word =
+            pace_pixels(&lines, &word_counts, &read_flags, text_bottom - first.top);
         Ok(Self {
             key,
             lines,

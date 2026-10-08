@@ -12,6 +12,7 @@ export {
   faderLinToDb,
 } from "./audio/faderCurve";
 export { positionAt, speedAt, wordsAdvanced } from "./prompter/motion";
+export { pacePixels } from "./prompter/pace";
 export { anchorOrder, type AnchorOrder } from "./prompter/anchorOrder";
 export { anchorArrival, noteAnchorArrival } from "./prompter/anchorArrival";
 export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";

@@ -88,6 +88,7 @@ The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 - [ ] `− 4`, `+ 4` and `Standard` beside the speed change the text size on the glass, also with nothing on the prompter. `Change…` under the look opens it beside the plate; a slider changes the glass when it is let go, also while the text scrolls.
 - [ ] A removed script's `⋯` (the Scripts `⋯`, Removed): `Delete for good…` turns dark red with "press again" in the menu, and the second press deletes it.
 - [ ] After a restart the script and the place are still there, paused.
+- [ ] With running text on the prompter at 140, count the words that pass the reading line in 30 s of a long paragraph: about 70 (since 2026-10-08 the number is a full line's pace; before, running text read 22 to 29 % faster). `Left` runs a little longer than the words at the pace, since the paragraph gaps and the cue lines pass at that speed.
 - [ ] With the Prompter XL plugged in, and again with it unplugged, the app is fullscreen on the studio display within a few seconds, and `shell.log` names the Prompter XL among the screens and says `connected`.
 - [ ] With the studio display switched off and on again, the app is back on it, fullscreen, within a few seconds.
 - [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page, and the strip follows: `SPEED` over the words a minute, `LINE` over the share read, `PARAGRAPH` over `8 / 18` (`END` at the end), `SIZE` over `88 px`; `PLAY` shows the time left. With nothing on the prompter every control is grey.
