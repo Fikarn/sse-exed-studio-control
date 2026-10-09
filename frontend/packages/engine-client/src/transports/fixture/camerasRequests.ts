@@ -27,6 +27,7 @@ import {
 import { applyBodyValues } from "./camerasSeed";
 import {
   buildCamerasArchive,
+  cam1Recording,
   cameraDials,
   cameraSentence,
   cameraState,
@@ -42,6 +43,7 @@ import {
   readHeldCameras,
   recentCameraActions,
   setupSummary,
+  takesToday,
   type ArchivedCamera,
   type CameraReport,
   type FixtureCameras,
@@ -580,7 +582,13 @@ function answerRequest(
 ): Answer {
   switch (method) {
     case "cameras.snapshot":
-      return answer(camerasSnapshot(cameras, recentCameraActions(context.state)) as unknown as JsonValue);
+      return answer(
+        camerasSnapshot(
+          cameras,
+          recentCameraActions(context.state),
+          takesToday(context.state, cam1Recording(cameras), now)
+        ) as unknown as JsonValue
+      );
     case "cameras.select": {
       // In memory; a camera not set up can be selected (D19). Not a Recent action.
       const camera = cameraParam(params);

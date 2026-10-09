@@ -15,6 +15,7 @@ import type { CameraValues } from "../../generated/snapshots/CameraValues";
 import type { CamerasHealthCheck } from "../../generated/snapshots/CamerasHealthCheck";
 import type { CamerasPictures } from "../../generated/snapshots/CamerasPictures";
 import type { CamerasSnapshot } from "../../generated/snapshots/CamerasSnapshot";
+import type { TakesToday } from "../../generated/snapshots/TakesToday";
 import type { PicturePlaces } from "../picturesLink";
 import {
   CAMERA_NUMBERS,
@@ -602,19 +603,65 @@ export function recentCameraActions(state: MutableFixtureState): CameraRecentAct
   return recent;
 }
 
+/**
+ * CAM 1's takes since local midnight (`action_log::takes_today`, the Overview's footer, D47),
+ * from the double's action log, oldest first: a start opens a take and the next stop closes
+ * it, adding its length; a start while a take is open counts the open one and adds no seconds
+ * (its end is not in the log); a stop with no take open is left out; a take still open counts,
+ * with its seconds so far while CAM 1 reports recording. `null` while a test holds the log
+ * unreadable, as `recent` is.
+ */
+export function takesToday(state: MutableFixtureState, recordingNow: boolean, now: number): TakesToday | null {
+  if (fixtureCameras(state).recentUnreadable) return null;
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  const rows = (Array.isArray(state.supportSnapshot.recentEvents) ? state.supportSnapshot.recentEvents : [])
+    .map((row) => (row !== null && typeof row === "object" && !Array.isArray(row) ? row : null))
+    .filter((row) => row !== null && row.domain === "cameras" && row.target === cameraModel(1).tag)
+    .map((row) => ({ at: Date.parse(String(row!.at)), action: row!.action }))
+    .filter((row) => Number.isFinite(row.at) && row.at >= midnight.getTime())
+    .reverse();
+  let count = 0;
+  let recordedMs = 0;
+  let open: number | null = null;
+  for (const row of rows) {
+    if (row.action === "recording-started") {
+      if (open !== null) count += 1;
+      open = row.at;
+    } else if (row.action === "recording-stopped" && open !== null) {
+      count += 1;
+      recordedMs += Math.max(0, row.at - open);
+      open = null;
+    }
+  }
+  if (open !== null) {
+    count += 1;
+    if (recordingNow) recordedMs += Math.max(0, now - open);
+  }
+  return { count, recordedSeconds: Math.floor(recordedMs / 1000) };
+}
+
 /** What the deck's dials set, as `cameras.snapshot` and `cameras.bank.set` say it (`Cameras::dials`). */
 export function cameraDials(cameras: FixtureCameras): CameraDials {
   return { bank: cameras.bank, sets: [...DIAL_BANK_SETS[cameras.bank]] };
 }
 
-/** `cameras.snapshot`: the selection, the dials, the three cameras and their newest Recent actions. */
-export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAction[] | null): CamerasSnapshot {
+/**
+ * `cameras.snapshot`: the selection, the dials, the three cameras, their newest Recent actions
+ * and CAM 1's takes of the day.
+ */
+export function camerasSnapshot(
+  cameras: FixtureCameras,
+  recent: CameraRecentAction[] | null,
+  takes: TakesToday | null
+): CamerasSnapshot {
   return {
     selected: cameras.selected,
     dials: cameraDials(cameras),
     cameras: CAMERA_NUMBERS.map((camera) => cameraSnapshot(cameras, camera)),
     pictures: camerasPictures(cameras),
     recent,
+    takesToday: takes,
   };
 }
 

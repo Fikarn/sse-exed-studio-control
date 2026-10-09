@@ -488,9 +488,10 @@ describe("the fixture double's prompter: the take", () => {
     // From the last paragraph there is no next one (review of 2026-09-27).
     expect((await refused("prompter.jump", { to: "nextParagraph" })).code).toBe("PROMPTER_NO_PARAGRAPH");
     expect(await at()).toEqual({ paragraph: 4, word: 0 });
+    // Not laid out: the cues have no time ahead (D47).
     expect((await glass()).cues).toEqual([
-      { paragraph: 0, word: 0, text: "INTRO" },
-      { paragraph: 2, word: 0, text: "GUEST" },
+      { paragraph: 0, word: 0, text: "INTRO", secondsAhead: null },
+      { paragraph: 2, word: 0, text: "GUEST", secondsAhead: null },
     ]);
     expect(await refused("prompter.jump", { to: "paragraph", paragraph: 5 })).toEqual({
       code: "INVALID_PARAMS",
@@ -500,6 +501,30 @@ describe("the fixture double's prompter: the take", () => {
       "to must be top, back, nextLine, previousLine, nextParagraph, previousParagraph, nextCue, previousCue, paragraph or place, not sideways."
     );
     expect((await refused("prompter.jump", { to: "paragraph" })).sentence).toBe("paragraph must be a whole number.");
+  });
+
+  // D47, the Overview's cues ahead: once laid out, each cue says its seconds from the reading
+  // line at the pace, as `GlassClock::seconds_to` does: none for the cue at the reading line,
+  // below zero once passed, fewer at a faster pace.
+  it("says each cue's seconds ahead once laid out", async () => {
+    const { call, script, glass, layOut } = openPrompterDouble();
+    await call("prompter.putOn", {
+      scriptId: await script("Talk", ["[INTRO]", "one two three four", "[GUEST]", "five six seven eight"]),
+    });
+    // Three words a line of 100 px, half a line between paragraphs: GUEST's line stands
+    // 400 px down, twelve words of 100/3 px.
+    await layOut(3, 100);
+    const ahead = async () => ((await glass()).cues as JsonObject[]).map((cue) => cue.secondsAhead as number);
+    const pace = (await glass()).speedWpm as number;
+    const [atIntro, toGuest] = await ahead();
+    expect(atIntro).toBeCloseTo(0, 6);
+    expect(toGuest).toBeCloseTo((12 * 60) / pace, 6);
+
+    await call("prompter.speed", { wpm: pace + 5 });
+    expect((await ahead())[1]).toBeCloseTo((12 * 60) / (pace + 5), 6);
+
+    await call("prompter.jump", { to: "paragraph", paragraph: 3 });
+    expect((await ahead())[1]).toBeLessThan(0);
   });
 
   // The hardware link's `there_is_no_paragraph_after_the_last` (review of 2026-09-27, L3):

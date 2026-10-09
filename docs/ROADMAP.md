@@ -12,6 +12,7 @@ Built so far: the Teleprompter page and its editor, the prompter and the cameras
 - [x] The Prompter XL's window (#249, #250, #251)
 - [x] The camera pictures (#274 to #279; walked in a studio build on 2026-10-01)
 - [ ] The Pocket 6K Pro over Bluetooth
+- [ ] The Overview (D47, D48, D49; below)
 - [ ] The BGH1s over the network (waits on the owner)
 - [ ] The close-out
 - [ ] The visual overhaul (below; it runs beside the cameras' work)
@@ -253,6 +254,17 @@ Asked and answered on 2026-10-06 (D41): a start takes a released camera back wit
 
 Built, in parts, on 2026-10-06: the step rule (#312); the seam to the real links (#313); the protocol, pure (#314); the link over Windows' Bluetooth with the watch off the request loop and the guards (#315, one review and a second look). Then the attended run's switch (D41, #317) and the kept release (D41, #318: saved as `cameras.released.<camera>`, ended by `Connect`, `Forget`, a new pairing or address). Then pairing (part 5): two steps of `cameras.setup.pair` (the PIN typed in Setup, `CAMERA_PAIRING_NOT_WANTED` when none is wanted), `setup.pairing` in the snapshot and `cameras.changed { reason: "pairing" }`, CAM 1's link on Windows (`has_link`; Linux keeps `CAMERA_NO_LINK`), the simulated link's PIN `123456`, Setup's PIN row, the controller's name written at each connection (D41). Merged as #319 (reviewed, with a second look). The close-out followed: `docs/HARDWARE.md`, `docs/OPERATIONS.md` and `docs/CHECKLIST.md` take the pairing, and HARDWARE's "Not built yet" is the BGH1s'. The attended run followed on 2026-10-07 (above: D42, the indications, the twelve-byte timecode, the connection's order, the settings probe D43 tried and withdrawn, the lines a studio build's log does without). Left: the two "Find out first" answers recorded here, with the walk's records. The plan in detail is `camera-links-plan-2026-10-06.md` in the owner's plans folder.
 
+### The Overview (2026-10-09)
+
+A new page and the landing page: every page's key facts at once, in four rooms with four jobs (act, watch, read, listen), so a take can be watched (the picture, the script, the levels) while the deck's dials are turned. The design is board 3 (`docs/design/boards/overview-3.html`, its note `docs/design/overview-3.md`); what the page shows and does is in `docs/design/overview-2.md`. The owner took every recommendation on 2026-10-09 (D47, D48, D49). Four pull requests, in this order:
+
+- [x] The hardware link (#334): `overview` is a page the hardware link accepts and keeps (new saved data still opens on the Console until the page is built); the deck's profile turns the deck to PROMPTER on it; `cameras.snapshot` carries CAM 1's takes since local midnight (`takesToday`), and each cue of the glass its seconds ahead at the pace (`secondsAhead`).
+- [ ] The header and the footer, on every page: the skylight (D48).
+- [ ] The page: the rooms, the status card, the take, the pictures, the script, the sound; the landing page (D1 amended); the test data, the page tests and the captures.
+- [ ] The pictures' rounded corners, in the pictures helper (optional).
+
+Then, on the owner's word: `npm run release`, the owner's export of the deck's profile and Full Reset & Import in Companion, the walk with the page's CHECKLIST lines, `release:verified`.
+
 ### The BGH1s over the network (was Slice 13)
 
 It starts once the owner has read the SDK's licence (under "Waiting on the owner").
@@ -429,7 +441,7 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D2** Schema 8 removed Planning's saved data behind the pre-migration backup. Upgrades are one-way: going back means restoring that backup.
 - **D3** Backups from before Planning left still restore, with their Planning part skipped. The `db.json` import is retired.
 - **D4** Tabs: Setup / Support · Lighting · Audio · Cameras · Teleprompter.
-- **D5** Deck pages: LIGHTS · AUDIO · CAMERAS · PROMPTER, chained by the page keys. The deck follows the app's page, and its page keys move the deck alone.
+- **D5** Deck pages: LIGHTS · AUDIO · CAMERAS · PROMPTER, chained by the page keys. The deck follows the app's page, and its page keys move the deck alone. (Amended 2026-10-09, D49: the Overview, which has no deck page, turns the deck to PROMPTER.)
 - **D6** No keyboard shortcuts, key hints or command palette. Tab, Enter or Space on the focused control, typing, the arrow keys on a focused slider or list, and Esc stay.
 - **D7** Superseded by D26 (2026-09-28). It took out talkback's `T` key and left its button and the deck's `TALK`.
 - **D8** Lighting: F2 is gone. A scene is renamed by double-clicking its name or from its right-click menu.
@@ -471,3 +483,4 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D36** (2026-10-04) Only a report confirms a change on the Console, on the owner's decision. A channel read-back confirms nothing by absence, and a status line closes only a submix read-back, its end-of-burst marker. Before, a change that TotalMix's answer left out, or that got no answer before any status line arrived, counted as confirmed. A submix read-back still confirms an off fader and a solo off by their absence, as `/sendsubmix 2` lists no node at or below −65 dB.
 - **D39** (2026-10-05) The visual overhaul's polish, on the owner's word, each the recommendation. The state display's sentence keeps two lines: every state sentence, the hardware link's and the pages', is written to fit them, the meta fits beside the way-out key, and a sentence or meta ever cut says itself whole on hover. The Console's plate keeps its empty room under the meter for F3. Lighting's eight colour tags are quiet tints from the brand (Clay, Ochre, Sand, Olive, Slate, Mist, Plum, Heather), never a status colour; each saved choice keeps its slot. The plot draws no camera until the owner gives CAM 1 to CAM 3's places.
 - **D46** (2026-10-09) No CI, on the owner's word (the recommendation). The gate is `npm run check` on the studio PC, the two shell lanes included: the program runs on this PC only, CI's Linux jobs compiled none of its Windows code and compared no capture, and in the ten days since the lean workflow their 200 runs found no Windows fault and cost a wait on every pull request. A pull request is merged as soon as the gate has passed; it stays the record. Dependabot's version updates and security-update pull requests and CodeQL are off; the security alerts stay, and a dependency moves by hand on the owner's word. The Setup lane's stalled-request check asks the engine to stall at an address of no network (`SSE_BRIDGE_LOOK_STALLS`, a development build's switch) instead of connecting to one, so the lanes run here without a packet. The Linux leftovers (the stubs under `cfg(not(windows))`, the lanes' xvfb timeouts and skip switches, `process.env.CI`) went in the pull request after it.
+- **D49** (2026-10-09) The deck turns to PROMPTER while the Overview is open, on the owner's word (the recommendation), amending D5: the Overview has no deck page, and during a take the dial turned is PROMPTER's `SPEED`. One more page-follow trigger in the Companion profile, on the page word `overview`; it takes effect after the owner's next export and Full Reset & Import. Not taken: the deck staying where it was, as on Setup; a fifth deck page for the take. D47 (the Overview, the landing page) and D48 (the skylight header) are written by the pull requests that build them.

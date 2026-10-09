@@ -10,4 +10,11 @@ export type PrompterCue = {
    * The cue's words, brackets taken off.
    */
   text: string;
+  /**
+   * On the glass: the seconds until the reading line reaches the cue at
+   * the pace, from the layout as the time left is, below zero once it has
+   * passed it (the Overview's cues ahead, D47). `null` without a layout,
+   * and in a script's own read.
+   */
+  secondsAhead: number | null;
 };

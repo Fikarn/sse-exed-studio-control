@@ -69,8 +69,8 @@ describe("the double's script model", () => {
 
   it("takes only a cue on a line of its own as a jump target", () => {
     expect(cueTargets(text(["[ Intro ]", "Hello [smile] there.\n[PAUSE]\nAgain."]))).toEqual([
-      { paragraph: 0, word: 0, text: "Intro" },
-      { paragraph: 1, word: 3, text: "PAUSE" },
+      { paragraph: 0, word: 0, text: "Intro", secondsAhead: null },
+      { paragraph: 1, word: 3, text: "PAUSE", secondsAhead: null },
     ]);
   });
 
