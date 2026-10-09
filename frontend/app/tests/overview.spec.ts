@@ -80,7 +80,7 @@ test.describe("the state display: the worst page", () => {
 test("the latch slot holds every page's latches: a held clip, cleared from here", async ({ page }) => {
   await openOverview(page, "overview-fault");
   const clip = page.getByTestId("overview-latch-audio-clip");
-  await expect(clip).toContainText("CLIP");
+  await expect(clip).toContainText("Clip");
   await expect(clip).toContainText("1 over 0 dBFS · Guest 1");
   await expect(page.getByTestId("overview-status-card")).toHaveAttribute("data-latched", "");
   await page.getByTestId("overview-latch-audio-clip-clear").click();
