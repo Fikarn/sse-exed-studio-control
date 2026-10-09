@@ -5,7 +5,6 @@ import type {
   JsonObject,
   JsonValue,
   PrompterGlassSnapshot,
-  PrompterHealthCheck,
   PrompterScriptSummary,
   PrompterSnapshot,
   ShellStore,
@@ -23,7 +22,15 @@ import { TeleprompterCluster } from "./TeleprompterCluster";
 import { TeleprompterEditView } from "./TeleprompterEditView";
 import { TeleprompterFooter } from "./TeleprompterFooter";
 import { TeleprompterPlate } from "./TeleprompterPlate";
-import { backParagraph, cutGlassText, glassTextOf, prompterStateView, type ReportedLines } from "./teleprompterModel";
+import {
+  backParagraph,
+  cutGlassText,
+  glassTextOf,
+  prompterCheckOf,
+  prompterStateView,
+  type ReportedLines,
+} from "./teleprompterModel";
+import { usePrompterFollow } from "./usePrompterFollow";
 import {
   armName,
   armStillStands,
@@ -68,14 +75,6 @@ function sentenceOf(result: JsonValue): string | null {
   return result && typeof result === "object" && !Array.isArray(result) && typeof result.sentence === "string"
     ? result.sentence
     : null;
-}
-
-/** `checks.prompter` from the health snapshot; `null` while it is absent or could not be read. */
-function prompterCheckOf(healthSnapshot: JsonObject | null): PrompterHealthCheck | null {
-  const checks = healthSnapshot?.checks;
-  if (!checks || typeof checks !== "object" || Array.isArray(checks)) return null;
-  const check = (checks as JsonObject).prompter;
-  return check && typeof check === "object" && !Array.isArray(check) ? (check as unknown as PrompterHealthCheck) : null;
 }
 
 export function TeleprompterWorkspace({
@@ -145,23 +144,8 @@ export function TeleprompterWorkspace({
     });
   });
 
-  // While the text scrolls the hardware link moves the place about once a
-  // second and says nothing (it saves it; a take has no event a second), so
-  // the page reads the prompter's state once a second to follow it: the place,
-  // the paragraph at the reading line, the time left. It reads as often while
-  // it waits: for the prompter's state when the start could not read it, and
-  // while the text is not laid out, so a read of the glass's text that failed
-  // is tried again (the store reads the text whenever its key has moved).
-  const following = (glass?.playing ?? false) || !prompterSnapshot || (glass !== null && !glass.laidOut);
-  useEffect(() => {
-    if (!following) return undefined;
-    const id = window.setInterval(() => {
-      store
-        .refreshPrompterSnapshot()
-        .catch((error: unknown) => store.reportBackgroundFailure(error, "the prompter's place"));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [following, store]);
+  // The page follows the place once a second while the text scrolls (`usePrompterFollow`).
+  usePrompterFollow(store, prompterSnapshot);
 
   /**
    * Sends one request; a refusal or a failure is the hardware link's

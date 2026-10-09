@@ -382,7 +382,8 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             summary: if commissioning.has_completed_setup {
                 String::from("Startup is routed directly into the dashboard surface and the publish backup can be restored.")
             } else {
-                String::from("Commit setup, export a support backup, and return to the Console.")
+                // D47: Publish opens the Overview, the page the app opens on.
+                String::from("Commit setup, export a support backup, and open the Overview.")
             },
         },
     ];

@@ -44,8 +44,10 @@ export type ShellEnvironment = Awaited<ReturnType<typeof createShellEnvironment>
 // workspaces. They print no key hint — Studio Control binds no key of its own.
 // The skylight (D48): Setup / Support is the system's own page, so its tab
 // stands on the system's platter at the header's right, beside the deck's
-// lamp, the backup and the latches.
+// lamp, the backup and the latches. The Overview (D47) is the first page: the
+// app opens on it, and it shows every page's key facts at once.
 const WORKSPACES = [
+  { id: "overview", label: "Overview" },
   { id: "setup", label: "Setup / Support", system: true },
   { id: "lighting", label: "Lighting" },
   { id: "audio", label: "Audio" },
@@ -267,23 +269,23 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
     String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
   const tabsDisabled = shellExperience !== "ready";
   const disabledWorkspaces =
-    !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "cameras", "teleprompter"] : [];
+    !tabsDisabled && !operatorModeUnlocked ? ["overview", "lighting", "audio", "cameras", "teleprompter"] : [];
+  // The lamps, the chips and the latches: what the header shows, and what the
+  // Overview ranks to find the worst page (D47), so the two never disagree.
+  const monitorItems = buildMonitorItems(
+    shellState.healthSnapshot,
+    // The prompter's latch counts down, so it shows only while the hardware
+    // link answers: after it stops, the prompter comes back paused.
+    { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
+    shellExperience === "ready" ? workspaceTones : undefined,
+    now.getTime(),
+    // Before ready a check never read is quiet: `pending` while the app
+    // starts, `not read` after a failed start (the recovery plate's word).
+    shellExperience === "ready" ? undefined : shellState.startupFailure ? "not read" : "pending"
+  );
   // The shell (overhaul 3): the page's own latches stay off the header while
   // it is open, and the REC tally has its own slot (`headerItems`).
-  const header = headerItems(
-    buildMonitorItems(
-      shellState.healthSnapshot,
-      // The prompter's latch counts down, so it shows only while the hardware
-      // link answers: after it stops, the prompter comes back paused.
-      { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
-      shellExperience === "ready" ? workspaceTones : undefined,
-      now.getTime(),
-      // Before ready a check never read is quiet: `pending` while the app
-      // starts, `not read` after a failed start (the recovery plate's word).
-      shellExperience === "ready" ? undefined : shellState.startupFailure ? "not read" : "pending"
-    ),
-    shellExperience === "ready" ? activeWorkspace : ""
-  );
+  const header = headerItems(monitorItems, shellExperience === "ready" ? activeWorkspace : "");
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
   // footer regions. The shell (overhaul 3): one plate for every page — the
@@ -302,6 +304,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         ? "Recovery"
         : "Startup";
 
+  const OverviewSurface = workspaceChunks.overview.Surface;
   const SetupSurface = workspaceChunks.setup.Surface;
   const LightingSurface = workspaceChunks.lighting.Surface;
   const AudioSurface = workspaceChunks.audio.Surface;
@@ -340,6 +343,22 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         supportSnapshot={deferredSupportSnapshot}
       />
     );
+  } else if (activeWorkspace === "overview") {
+    surface = (
+      <OverviewSurface
+        appSnapshot={shellState.appSnapshot}
+        audioSnapshot={deferredAudioSnapshot}
+        camerasSnapshot={shellState.camerasSnapshot}
+        healthSnapshot={shellState.healthSnapshot}
+        lamps={monitorItems}
+        lightingSnapshot={deferredLightingSnapshot}
+        pictures={environment.pictures}
+        prompterGlassSnapshot={shellState.prompterGlassSnapshot}
+        prompterSnapshot={shellState.prompterSnapshot}
+        store={environment.store}
+        supportSnapshot={deferredSupportSnapshot}
+      />
+    );
   } else if (activeWorkspace === "lighting") {
     surface = (
       <LightingSurface
@@ -368,8 +387,8 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       />
     );
   } else {
-    // The Console. Setup is drawn above in every shell state, and Lighting, the
-    // Cameras and the Teleprompter just above, so Audio is the one workspace left to reach
+    // The Console. Setup is drawn above in every shell state, and the Overview,
+    // Lighting, the Cameras and the Teleprompter just above, so Audio is the one workspace left to reach
     // this branch (new pages program, D1: a page saved while Planning was open
     // reads as the Console).
     surface = (
@@ -389,6 +408,8 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         activeWorkspace={shellExperience === "ready" ? activeWorkspace : ""}
         clock={clock}
         cluster={workspaceRegions}
+        // The Overview's rooms part its columns (D47).
+        columns={shellExperience === "ready" && activeWorkspace === "overview" ? "quiet" : undefined}
         plate={workspaceRegions}
         footer={footerRegion}
         disabledWorkspaces={disabledWorkspaces}

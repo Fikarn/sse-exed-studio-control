@@ -1,0 +1,3346 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Overview · board 2 (rooms)</title>
+    <!-- The glass copy is the presenter's picture and keeps the glass's own face, Inter (DESIGN.md §3). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,500;0,600;1,500&display=block"
+    />
+    <style>
+      /* =====================================================================================
+   THE OVERVIEW · board 2, the rooms · 2026-10-09
+   The landing page and the page watched during a take, drawn at 2560×1440 in the system
+   as built (docs/DESIGN.md) with one new idea from the SSE brand: the Room. The page is
+   four rooms with four jobs (act · watch · read · listen), each a one-point-perspective
+   space with a back wall and four bevelled planes, tinted with the dark member of a brand
+   colour pair, its name carved in the lintel, its door to its own page at the right.
+   The flat version before the rooms: overview-2-flat.html (not kept in git).
+
+   Live: the meters move, the script scrolls at its speed, the take counts. The wheel over
+   the speed instrument (or ↑ ↓) turns the SPEED dial; Space plays. The corner panel:
+     ?state=take (default) · landing · fault      ?notes=1 numbered notes (overview-2.md)
+     ?ui=0 hides the corner   ?still=1 a still frame   ?fit=0 keeps 1:1   ?deck=1 the drawn deck
+   ===================================================================================== */
+      @font-face {
+        font-family: "SSE Adelia";
+        font-weight: 700;
+        src: local("SSE Adelia Bold"), local("SSEAdelia-Bold");
+      }
+      @font-face {
+        font-family: "PT Sans";
+        font-weight: 400;
+        src: local("PT Sans"), local("PTSans-Regular");
+      }
+      @font-face {
+        font-family: "PT Sans";
+        font-weight: 700;
+        src: local("PT Sans Bold"), local("PTSans-Bold");
+      }
+      @font-face {
+        font-family: "PT Serif";
+        font-weight: 400;
+        font-style: italic;
+        src: local("PT Serif Italic"), local("PTSerif-Italic");
+      }
+
+      :root {
+        --sse-green: #99ba92;
+        --sse-dark-green: #004932;
+        --sse-beige: #edebd1;
+        --sse-beige-light: #f6f5e8;
+        --sse-yellow: #f2de6f;
+        --sse-coral: #ff7d55;
+        --sse-burgundy: #671919;
+        --sse-blue: #3a87e5;
+        --material-bg: #0b1311;
+        --material-key: #111a17;
+        --material-well: #040706;
+        --material-line: #212d28;
+        --material-line2: #36453e;
+        --text: #f6f5e8;
+        --text2: #c5c7b9;
+        --text3: #8d9389;
+        --text4: #59625c;
+        --accent: var(--sse-beige);
+        --glass-text: #ffffff;
+        --glass-cue: #8ec9ff;
+        --glass-arrow: rgba(255, 255, 255, 0.6);
+        --glass-read: rgba(0, 0, 0, 0.55);
+        --ease-mech: cubic-bezier(0.2, 0.8, 0.2, 1);
+        /* inside a room these follow the room's own tones (set on .in-*) */
+        --key: var(--material-key);
+        --line: var(--material-line);
+        --line2: var(--material-line2);
+      }
+      /* The rooms' tones: the dark member of four brand pairs, pulled down to the page's depth.
+   Wall (the back wall, where everything sits), lintel (the top plane, the name), side,
+   floor; a key face and the hairlines one and two steps up from the wall. */
+      .in-stone {
+        --wall: #1a1c17;
+        --lintel: #121410;
+        --side: #161813;
+        --floor: #0f110d;
+        --key: #23261f;
+        --line: #2c3029;
+        --line2: #3d4238;
+      }
+      .in-green {
+        --wall: #10291f;
+        --lintel: #0a1e16;
+        --side: #0d231a;
+        --floor: #091812;
+        --key: #173528;
+        --line: #1f3f32;
+        --line2: #2b5444;
+      }
+      .in-slate {
+        --wall: #111d27;
+        --lintel: #0b151d;
+        --side: #0e1922;
+        --floor: #0a1219;
+        --key: #182836;
+        --line: #213343;
+        --line2: #2e4557;
+      }
+      .in-umber {
+        --wall: #211910;
+        --lintel: #17110a;
+        --side: #1c150d;
+        --floor: #140f08;
+        --key: #2d2316;
+        --line: #382c1e;
+        --line2: #4b3c29;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        background: var(--material-bg);
+        color: var(--text);
+        font:
+          400 16px/1.25 "PT Sans",
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
+      }
+      p {
+        margin: 0;
+      }
+      .abs {
+        position: absolute;
+      }
+      .sp {
+        flex: 1;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      .q2 {
+        color: var(--text2);
+      }
+      .q3 {
+        color: var(--text3);
+      }
+      .t-yellow {
+        color: var(--sse-yellow);
+      }
+      .adelia {
+        font-family: "SSE Adelia", "PT Serif", serif;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        line-height: 1;
+      }
+
+      /* ---------- lamps and words ---------- */
+      .lamp {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        flex: none;
+      }
+      .lamp.hollow {
+        background: none;
+        border: 1px solid currentColor;
+      }
+      .lw {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        color: var(--text2);
+      }
+      .lw .cap {
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .lw.ok .cap,
+      .lw.ok .lamp {
+        color: var(--sse-green);
+      }
+      .lw.att .cap,
+      .lw.att .lamp {
+        color: var(--sse-yellow);
+      }
+      .lw.err .cap,
+      .lw.err .lamp {
+        color: var(--sse-coral);
+      }
+      .lw.off .cap,
+      .lw.off .lamp {
+        color: var(--text3);
+      }
+
+      /* ---------- keys (Key.module.css), on the room's own face ---------- */
+      .key {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 4px;
+        background: var(--key);
+        border: 1px solid var(--line2);
+        color: var(--text);
+        font: 700 16px/1 "PT Sans";
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+        flex: none;
+        transition: border-color 100ms var(--ease-mech);
+      }
+      .key:hover:not(.live, .engaged, .primary, .armed, .selected) {
+        border-color: var(--text4);
+      }
+      .key.small {
+        min-height: 28px;
+        padding: 0 10px;
+        font-size: 14px;
+      }
+      .key.large {
+        min-height: 48px;
+      }
+      .key.tall {
+        min-height: 64px;
+      }
+      .key.stack {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .key .cap {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.live {
+        background: var(--sse-green);
+        border-color: var(--sse-green);
+        color: #000;
+      }
+      .key.live .hint {
+        color: #000;
+      }
+      .key.engaged {
+        background: var(--sse-yellow);
+        border-color: var(--sse-yellow);
+        color: #000;
+      }
+      .key.primary {
+        background: var(--sse-beige-light);
+        border-color: var(--sse-beige-light);
+        color: #000;
+      }
+      .key.selected {
+        border-color: var(--accent);
+        outline: 1px solid var(--accent);
+        outline-offset: -2px;
+      }
+      .key.hazard-rec {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-content: center;
+        column-gap: 8px;
+        row-gap: 6px;
+      }
+      .key.hazard-rec .cap {
+        color: var(--sse-coral);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .key.hazard-rec .hint {
+        flex-basis: 100%;
+        justify-content: center;
+      }
+      .key.doubt {
+        border: 1px dashed var(--sse-yellow);
+        background: var(--material-well);
+        color: var(--sse-yellow);
+      }
+      .key.doubt .hint {
+        color: var(--sse-yellow);
+      }
+      .key.armed {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 4px;
+        padding: 9px 14px 15px;
+        background: var(--sse-burgundy);
+        border-color: var(--sse-burgundy);
+        color: var(--sse-beige);
+        overflow: hidden;
+      }
+      .key.armed .tag {
+        font: 700 14px/1 "PT Sans";
+      }
+      .key.armed .lbl {
+        font: 700 16px/1 "PT Sans";
+      }
+      .key.armed .bar {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 100%;
+        background: var(--sse-beige);
+        transform-origin: left;
+        animation: countdown 3000ms linear forwards;
+      }
+      @keyframes countdown {
+        from {
+          transform: scaleX(1);
+        }
+        to {
+          transform: scaleX(0);
+        }
+      }
+      .key.ico {
+        width: 36px;
+        padding: 0;
+      }
+      .key.ico.small {
+        width: 28px;
+      }
+      .dots {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line2);
+        border-radius: 4px;
+        background: var(--key);
+      }
+      .seg .key {
+        min-height: 26px;
+        border: 0;
+        border-left: 1px solid var(--line2);
+        border-radius: 0;
+        background: transparent;
+        color: var(--text2);
+      }
+      .seg .key:first-child {
+        border-left: 0;
+        border-radius: 4px 0 0 4px;
+      }
+      .seg .key:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+      .seg .key.selected {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+        color: var(--text);
+        border-color: var(--line2);
+      }
+      /* a door: the room's way to its own page, quiet until pointed at */
+      .door {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--line2);
+        border-radius: 4px;
+        font: 700 14px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .door .ar {
+        font: 700 16px/1 "SSE Adelia";
+      }
+      .door:hover {
+        color: var(--text);
+        border-color: var(--text4);
+      }
+
+      /* ---------- wells, rows ---------- */
+      .well {
+        background: var(--material-well);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+      .shead {
+        display: flex;
+        align-items: last baseline;
+        gap: 12px;
+        height: 28px;
+        padding-bottom: 4px;
+        border-bottom: 2px solid var(--line2);
+      }
+      .shead .t {
+        font: 700 18px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .shead .d {
+        font: 400 14px/1.2 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .ro {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        height: 27px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .ro .v {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        color: var(--text);
+      }
+      .ro .v .n {
+        font-size: 14px;
+        color: var(--text2);
+      }
+      .doubtv {
+        color: var(--sse-yellow) !important;
+        outline: 1px dashed var(--sse-yellow);
+        outline-offset: 2px;
+      }
+      .kick {
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--text3);
+        white-space: nowrap;
+      }
+
+      /* ================================ THE ROOMS ================================ */
+      .room {
+        position: absolute;
+        display: block;
+        overflow: visible;
+      }
+      /* the lintel: the room's name carved in Adelia, what it holds now, its door */
+      .lintel {
+        position: absolute;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 16px;
+        white-space: nowrap;
+      }
+      .lintel .name {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text);
+      }
+      .lintel .job {
+        font:
+          italic 400 16px/1 "PT Serif",
+          serif;
+        color: var(--text3);
+        margin-right: 6px;
+      }
+      .lintel .f {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .lintel .nm {
+        font: 700 16px/1 "PT Sans";
+      }
+      /* the room whose page needs you carries the state display's own keyline: coral for an error, yellow for attention */
+      .alert {
+        position: absolute;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .alert.err {
+        border: 2px solid var(--sse-coral);
+      }
+      .alert.att {
+        border: 2px solid var(--sse-yellow);
+      }
+
+      /* ================================ THE FRAME ================================ */
+      .ftr {
+        left: 0;
+        top: 1400px;
+        width: 2560px;
+        height: 40px;
+        border-top: 1px solid var(--material-line);
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        padding: 0 32px;
+        font: 400 14px/1.35 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .ftr .item {
+        display: inline-flex;
+        gap: 10px;
+      }
+      .ftr .v {
+        color: var(--text2);
+      }
+      .ftr .colophon {
+        margin-left: auto;
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+
+      /* ================================ THE HEADER ================================
+   One row, 88 high. Four ways to draw it, chosen with ?header= (the corner panel too):
+   today  · as built: the product's name at the left, the logotype at the right, on the page's own surface
+   facade · the recommendation: a Dark Green band (the library's copper roof), the logotype at the left, every
+            tab, the deck and REC in a black window, so every state word keeps its contrast
+   panel  · a black band, darker than the page, closed by a Dark Green rule
+   doors  · a Dark Green tile for the logotype, then each page's tab in its room's own tone */
+      .hdr {
+        left: 0;
+        top: 0;
+        width: 2560px;
+        height: 88px;
+        display: flex;
+        align-items: center;
+        padding: 0 32px;
+        gap: 4px;
+        white-space: nowrap;
+      }
+      .hdr .logo {
+        height: 40px;
+        display: block;
+        flex: none;
+      }
+      .hdr .rule {
+        width: 1px;
+        height: 40px;
+        margin: 0 20px 0 20px;
+        flex: none;
+      }
+      .hdr .sp {
+        flex: 1;
+        min-width: 16px;
+      }
+      .tab {
+        position: relative;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        flex: none;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        color: var(--text3);
+        font: 400 16px/1 "PT Sans";
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .tab .nmb {
+        position: relative;
+      }
+      .tab .st {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 4px;
+      }
+      .tab .w {
+        font: 700 16px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .tab .ok {
+        color: var(--sse-green);
+      }
+      .tab .att {
+        color: var(--sse-yellow);
+      }
+      .tab .err {
+        color: var(--sse-coral);
+      }
+      .tab.on {
+        color: var(--text);
+        font-weight: 700;
+      }
+      .tab.on::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border: 2px solid var(--accent);
+        border-radius: 4px;
+      }
+      .tab.home {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--text);
+        padding: 0 12px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 10px;
+        color: var(--text3);
+        white-space: nowrap;
+        flex: none;
+        border-radius: 4px;
+        border: 1px solid transparent;
+      }
+      .chip .w {
+        font: 700 16px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .tally {
+        width: 272px;
+        height: 40px;
+        display: flex;
+        flex: none;
+        margin-left: 4px;
+      }
+      .tally > div {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        height: 100%;
+        padding: 0 14px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .tally .nm {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .tally .rec {
+        border-color: var(--sse-coral);
+        color: var(--sse-coral);
+      }
+      .tally .rec .det {
+        font-weight: 700;
+      }
+      .tally .lastknown {
+        border: 1px dashed var(--sse-yellow);
+        color: var(--sse-yellow);
+      }
+      .clock {
+        font: 700 20px/1 "PT Sans";
+        color: var(--text);
+        margin-left: 16px;
+        flex: none;
+      }
+      .hdr .sysgap {
+        width: 12px;
+        flex: none;
+      }
+
+      /* today: as built */
+      .hdr.v-today {
+        background: var(--material-bg);
+        border-bottom: 1px solid var(--material-line);
+        padding-left: 20px;
+      }
+      .hdr.v-today .tabs-first {
+        margin-left: 28px;
+      }
+      .hdr.v-today .logo {
+        margin-left: 20px;
+      }
+
+      /* facade: the Dark Green band, every state in a black window */
+      .hdr.v-facade {
+        background: var(--sse-dark-green);
+        box-shadow: inset 0 -1px 0 #00301f;
+      }
+      .hdr.v-facade::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.07;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='88'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 -.4'/%3E%3C/filter%3E%3Crect width='240' height='88' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      .hdr.v-facade .rule {
+        background: rgba(246, 245, 232, 0.28);
+      }
+      /* two black windows set into the band: the studio's pages, and the system's own things; REC in its own */
+      .hdr.v-facade .hstrip {
+        display: inline-flex;
+        align-items: center;
+        height: 44px;
+        padding: 2px;
+        border-radius: 6px;
+        flex: none;
+        background: rgba(0, 0, 0, 0.66);
+        box-shadow:
+          inset 0 0 0 1px rgba(246, 245, 232, 0.1),
+          inset 0 1px 0 rgba(0, 0, 0, 0.5);
+      }
+      .hdr.v-facade .hstrip .tab,
+      .hdr.v-facade .hstrip .chip {
+        border-radius: 4px;
+      }
+      .hdr.v-facade .hstrip > * + *::before {
+        content: "";
+        position: absolute;
+        left: -1px;
+        top: 10px;
+        bottom: 10px;
+        width: 1px;
+        background: rgba(246, 245, 232, 0.1);
+      }
+      .hdr.v-facade .hstrip > .on + *::before,
+      .hdr.v-facade .hstrip > .on::before {
+        display: none;
+      }
+      .hdr.v-facade .hstrip .chip {
+        position: relative;
+      }
+      .hdr.v-facade .tab {
+        color: var(--text2);
+      }
+      .hdr.v-facade .tab.on {
+        color: var(--text);
+        background: rgba(0, 0, 0, 0.55);
+      }
+      .hdr.v-facade .tally > div {
+        background: rgba(0, 0, 0, 0.66);
+        box-shadow: inset 0 0 0 1px rgba(246, 245, 232, 0.1);
+        height: 44px;
+        border-radius: 6px;
+      }
+      .hdr.v-facade .tally {
+        height: 44px;
+      }
+      .hdr.v-facade .tally .rec {
+        border-color: var(--sse-coral);
+      }
+      .hdr.v-facade .tally .lastknown {
+        border: 1px dashed var(--sse-yellow);
+      }
+      .hdr.v-facade .clock {
+        color: var(--sse-beige-light);
+      }
+
+      /* skylight: Apple's toolbar thinking with the SSE brand. The bar is a quiet raised surface (the atrium's glass
+   roof), closed by a crisp divider; nothing on it is decoration. Hierarchy comes from grouping: the pages share
+   one platter, the system's own things another, REC its own; the logotype and the clock stand on the bar itself.
+   Shapes are concentric (platter 12, segment 8, 4 px between). Tint is kept for focus: the open page is the one
+   Dark Green segment, the brand's selection plate. Elevation is a lighter tone and a one-pixel light edge, no shadow. */
+      .hdr.v-skylight {
+        background: linear-gradient(#18221f, #141e1b);
+        box-shadow:
+          inset 0 -1px 0 #33433d,
+          0 1px 0 rgba(0, 0, 0, 0.6);
+      }
+      .hdr.v-skylight .rule {
+        background: rgba(246, 245, 232, 0.12);
+      }
+      .hdr.v-skylight .hstrip {
+        display: inline-flex;
+        align-items: center;
+        height: 48px;
+        padding: 4px;
+        gap: 2px;
+        border-radius: 12px;
+        flex: none;
+        background: #222e29;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.08),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.05),
+          0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .hdr.v-skylight .hstrip .tab,
+      .hdr.v-skylight .hstrip .chip {
+        border-radius: 8px;
+        border: 0;
+      }
+      .hdr.v-skylight .tab {
+        color: var(--text2);
+        font-weight: 700;
+      }
+      .hdr.v-skylight .tab:not(.on):hover,
+      .hdr.v-skylight .chip:hover {
+        background: #2c3a34;
+      }
+      .hdr.v-skylight .hstrip > * + *::before {
+        content: "";
+        position: absolute;
+        left: -2px;
+        top: 11px;
+        bottom: 11px;
+        width: 1px;
+        background: rgba(246, 245, 232, 0.09);
+      }
+      .hdr.v-skylight .hstrip > .on::before,
+      .hdr.v-skylight .hstrip > .on + *::before {
+        display: none;
+      }
+      .hdr.v-skylight .hstrip .chip {
+        position: relative;
+      }
+      .hdr.v-skylight .tab.on {
+        background: var(--sse-dark-green);
+        color: var(--sse-beige-light);
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.14),
+          inset 0 0 0 1px rgba(153, 186, 146, 0.22);
+      }
+      .hdr.v-skylight .tab.on::after {
+        display: none;
+      }
+      .hdr.v-skylight .tally {
+        height: 48px;
+      }
+      .hdr.v-skylight .tally > div {
+        height: 48px;
+        border-radius: 12px;
+        background: #222e29;
+        border: 0;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.07),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.05),
+          0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .hdr.v-skylight .tally .rec {
+        background: #2a1c16;
+        box-shadow:
+          inset 0 0 0 1px var(--sse-coral),
+          inset 0 1px 0 rgba(255, 125, 85, 0.25);
+      }
+      .hdr.v-skylight .tally .lastknown {
+        box-shadow: none;
+        border: 1px dashed var(--sse-yellow);
+      }
+      .hdr.v-skylight .clock {
+        margin-left: 24px;
+      }
+      /* the footer takes the same surface, so the page is held between two bars */
+      body.skylight .ftr {
+        background: linear-gradient(#141e1b, #18221f);
+        border-top: 0;
+        box-shadow: inset 0 1px 0 #33433d;
+      }
+
+      /* panel: a black band, a Dark Green rule under it */
+      .hdr.v-panel {
+        background: var(--material-well);
+        box-shadow: inset 0 -4px 0 var(--sse-dark-green);
+      }
+      .hdr.v-panel .rule {
+        background: var(--material-line2);
+      }
+
+      /* doors: a Dark Green tile for the logotype, each page's tab in its room's tone */
+      .hdr.v-doors {
+        background: #070b0a;
+        box-shadow: inset 0 -1px 0 var(--material-line);
+        padding-left: 0;
+      }
+      .hdr.v-doors .tile {
+        height: 88px;
+        display: flex;
+        align-items: center;
+        padding: 0 20px 0 32px;
+        background: var(--sse-dark-green);
+        flex: none;
+        margin-right: 16px;
+      }
+      .hdr.v-doors .tab,
+      .hdr.v-doors .chip {
+        background: var(--wall, var(--material-key));
+        border-color: var(--line2, var(--material-line2));
+      }
+      .hdr.v-doors .tab {
+        color: var(--text2);
+      }
+      .hdr.v-doors .tab.on {
+        color: var(--text);
+      }
+      .in-wine {
+        --wall: #231312;
+        --lintel: #180c0b;
+        --side: #1e100f;
+        --floor: #150a09;
+        --key: #2e1a18;
+        --line: #3a2321;
+        --line2: #4e302c;
+      }
+
+      /* ================================ CLUSTER ================================ */
+      .col {
+        left: 16px;
+        width: 408px;
+      }
+      .sd {
+        top: 104px;
+        height: 180px;
+        padding: 18px 18px 18px 24px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+      .sd.error {
+        border: 2px solid var(--sse-coral);
+        padding: 17px 17px 17px 23px;
+      }
+      .sd .top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: 40px;
+        margin-bottom: 12px;
+      }
+      .sd .top .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .sd .word {
+        font: 700 40px/1 "SSE Adelia";
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .sd .menu {
+        margin-left: auto;
+      }
+      .sd .sentence {
+        font:
+          italic 400 20px/26px "PT Serif",
+          serif;
+        color: var(--text);
+      }
+      .sd .foot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .sd .meta {
+        font: 400 14px/1.35 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+        flex: 1;
+      }
+      .latch {
+        top: 300px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 8px 0 16px;
+        border-radius: 4px;
+      }
+      .latch.rest {
+        color: var(--text3);
+      }
+      .latch.rest .lamp {
+        width: 10px;
+        height: 10px;
+      }
+      .latch.on {
+        border: 1px solid var(--sse-yellow);
+        color: var(--text2);
+      }
+      .latch.on .lamp {
+        width: 10px;
+        height: 10px;
+        color: var(--sse-yellow);
+      }
+      .latch .who {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--sse-yellow);
+      }
+      .latch .act {
+        margin-left: auto;
+      }
+
+      .take-keys {
+        display: grid;
+        grid-template-columns: 200px 144px;
+        grid-template-rows: 46px 46px;
+        gap: 8px;
+      }
+      .take-keys .play {
+        grid-row: 1 / span 2;
+        min-height: 100px;
+      }
+      .take-keys .key {
+        min-height: 46px;
+      }
+      .row4 {
+        display: grid;
+        grid-template-columns: repeat(4, 82px);
+        gap: 8px;
+      }
+
+      /* the rest of the studio: outside the rooms, a quiet board of what each page has set */
+      .studio .r {
+        display: grid;
+        grid-template-columns: 104px minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 12px;
+        height: 44px;
+        border-bottom: 1px solid var(--material-line);
+      }
+      .studio .lab {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .studio .val {
+        font: 700 16px/1 "PT Sans";
+        white-space: nowrap;
+      }
+
+      /* ================================ THE PICTURE ================================ */
+      .cap-row {
+        height: 28px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        white-space: nowrap;
+      }
+      .cap-row .nm {
+        font: 700 16px/1 "PT Sans";
+      }
+      .cap-row .f {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .pic {
+        overflow: hidden;
+        background: #000;
+      }
+      .pic svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* ================================ THE SCRIPT ================================ */
+      .speed {
+        overflow: hidden;
+      }
+      .speed .hd {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        top: 14px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .tape {
+        position: absolute;
+        left: 180px;
+        right: 1px;
+        top: 44px;
+        height: 220px;
+        overflow: hidden;
+      }
+      .tape .strip {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        transition: transform 160ms var(--ease-mech);
+      }
+      .tape .tk {
+        position: absolute;
+        left: 0;
+        height: 1px;
+        background: var(--text4);
+      }
+      .tape .tk.major {
+        background: var(--text3);
+      }
+      .tape .lbl {
+        position: absolute;
+        left: 34px;
+        font: 400 13px/16px "PT Sans";
+        color: var(--text3);
+      }
+      .tape .range {
+        position: absolute;
+        width: 3px;
+        background: var(--text2);
+        transition:
+          top 160ms var(--ease-mech),
+          height 160ms var(--ease-mech);
+      }
+      .pointer {
+        position: absolute;
+        left: 16px;
+        top: 106px;
+        width: 156px;
+        height: 96px;
+        padding: 14px 16px;
+        border-radius: 4px;
+        background: var(--key);
+        border: 1px solid var(--line2);
+      }
+      .pointer::after {
+        content: "";
+        position: absolute;
+        right: -9px;
+        top: 39px;
+        width: 16px;
+        height: 16px;
+        background: var(--key);
+        border-right: 1px solid var(--line2);
+        border-top: 1px solid var(--line2);
+        transform: rotate(45deg);
+      }
+      .pointer .num {
+        font: 700 40px/1 "PT Sans";
+        display: block;
+      }
+      .pointer .u {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+        display: block;
+        margin-top: 10px;
+      }
+      .pointer.turned {
+        border-color: var(--accent);
+        outline: 1px solid var(--accent);
+        outline-offset: -2px;
+      }
+      .pointer.turned::after {
+        border-color: var(--accent);
+      }
+      .centre-line {
+        position: absolute;
+        left: 180px;
+        right: 1px;
+        top: 154px;
+        height: 1px;
+        background: var(--accent);
+        opacity: 0.7;
+      }
+      .speed .from {
+        position: absolute;
+        left: 16px;
+        top: 210px;
+        font: 400 14px/1.2 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .speed .from.on {
+        color: var(--sse-beige);
+      }
+      .dialmap {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 14px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+      .dialmap .d {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        font: 400 13px/1 "PT Sans";
+        color: var(--text4);
+      }
+      .dialmap .d i {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid var(--line2);
+        display: block;
+        position: relative;
+      }
+      .dialmap .d i::after {
+        content: "";
+        position: absolute;
+        left: 13px;
+        top: 3px;
+        width: 1px;
+        height: 8px;
+        background: var(--text4);
+      }
+      .dialmap .d.on {
+        color: var(--text2);
+      }
+      .dialmap .d.on i {
+        border-color: var(--text2);
+      }
+      .dialmap .d.on i::after {
+        background: var(--text);
+      }
+
+      .band {
+        overflow: hidden;
+        background: #000;
+        border-radius: 4px;
+      }
+      .screen {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        transform-origin: 0 0;
+        background: #000;
+      }
+      .gcol {
+        position: absolute;
+        top: 0;
+        color: var(--glass-text);
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        font-weight: 500;
+        text-align: left;
+        will-change: transform;
+        overflow-wrap: anywhere;
+      }
+      .gcol p {
+        position: relative;
+        margin: 0;
+      }
+      .gcol b {
+        font-weight: 600;
+      }
+      .gcol i,
+      .gcol .cueLine {
+        font-style: italic;
+      }
+      .gcol .cueLine {
+        color: var(--glass-cue);
+        vertical-align: top;
+      }
+      .gcol .end {
+        color: var(--glass-cue);
+        letter-spacing: 0.1em;
+      }
+      .gread {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        background: var(--glass-read);
+        pointer-events: none;
+      }
+      .garrow {
+        position: absolute;
+        width: 0;
+        height: 0;
+        margin-top: -30px;
+        border-top: 30px solid transparent;
+        border-bottom: 30px solid transparent;
+        border-left: 46px solid var(--glass-arrow);
+      }
+
+      .cells {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .cell {
+        height: 72px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .cell .val {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        font: 700 20px/1 "PT Sans";
+        white-space: nowrap;
+      }
+      .cell .val .s {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .cues .c {
+        display: grid;
+        grid-template-columns: 60px minmax(0, 1fr) auto;
+        align-items: baseline;
+        column-gap: 12px;
+        height: 48px;
+        padding-top: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .cues .c .in {
+        font: 700 20px/1 "PT Sans";
+      }
+      .cues .c .tx {
+        font: italic 400 16px/1 "PT Sans";
+        color: #6fa8ee;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .cues .c .pn {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .cues .c.later .in {
+        color: var(--text2);
+        font-weight: 400;
+      }
+
+      /* the whole script, laid along the room's floor */
+      .timeline {
+        display: flex;
+        gap: 2px;
+      }
+      .timeline .seg2 {
+        position: relative;
+        height: 36px;
+        background: var(--key);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        font: 400 13px/1 "PT Sans";
+        color: var(--text3);
+        padding: 5px 0 0 6px;
+        overflow: hidden;
+      }
+      .timeline .seg2.read {
+        background: transparent;
+        color: var(--text4);
+      }
+      .timeline .cue {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 36px;
+        background: var(--sse-blue);
+      }
+      .timeline .place {
+        position: absolute;
+        top: -4px;
+        width: 2px;
+        height: 44px;
+        background: var(--accent);
+      }
+
+      /* ================================ THE SOUND ================================ */
+      .mainrow {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 36px;
+      }
+      .mainrow .lvl {
+        font: 400 28px/1 "PT Sans";
+        white-space: nowrap;
+      }
+      .mainrow .lvl .u {
+        font-size: 14px;
+        color: var(--text3);
+        margin-left: 4px;
+      }
+      .hbar {
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        height: 9px;
+        background: var(--material-bg);
+        overflow: hidden;
+      }
+      .hbar .ramp {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to right,
+          var(--sse-green) 0 70%,
+          var(--sse-yellow) 70% 95%,
+          var(--sse-coral) 95% 100%
+        );
+      }
+      .hbar .mask {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        background: var(--material-bg);
+      }
+      .hbar .pk {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--text2);
+      }
+      .hnom {
+        position: absolute;
+        top: 2px;
+        bottom: 2px;
+        width: 1px;
+        background: var(--text4);
+      }
+      .strip {
+        position: absolute;
+        text-align: center;
+      }
+      .strip .nm {
+        height: 24px;
+        font: 700 20px/24px "PT Sans";
+        white-space: nowrap;
+      }
+      .strip .lv {
+        margin-top: 6px;
+        height: 20px;
+        font: 400 16px/20px "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .strip .lv .u {
+        font-size: 13px;
+        color: var(--text3);
+      }
+      .strip .lv .muted {
+        font: 700 14px/20px "SSE Adelia";
+        letter-spacing: 0.03em;
+        color: var(--sse-yellow);
+      }
+      .strip .mk {
+        margin-top: 8px;
+        display: flex;
+        justify-content: center;
+      }
+      .strip .mk .key {
+        width: 52px;
+        padding: 0;
+        font: 700 20px/1 "SSE Adelia";
+      }
+      .sline {
+        position: absolute;
+        left: 34px;
+        right: 8px;
+        height: 1px;
+        background: var(--material-line);
+      }
+      .sline.nom {
+        background: var(--material-line2);
+      }
+      .scale {
+        position: absolute;
+        left: 4px;
+        width: 24px;
+        text-align: right;
+        font: 400 13px/16px "PT Sans";
+        color: var(--text3);
+      }
+      .mslot {
+        position: absolute;
+        background: var(--material-bg);
+        overflow: hidden;
+        border-radius: 1px;
+      }
+      .mslot.clip {
+        outline: 1px solid var(--sse-coral);
+        outline-offset: 2px;
+      }
+      .mslot .tint {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 125, 85, 0.18);
+        display: none;
+        z-index: 2;
+      }
+      .mslot.clip .tint {
+        display: block;
+      }
+      .mslot .ramp {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to top,
+          var(--sse-green) 0 70%,
+          var(--sse-yellow) 70% 95%,
+          var(--sse-coral) 95% 100%
+        );
+      }
+      .mslot .mask {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        background: var(--material-bg);
+      }
+      .mslot .pk {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--text2);
+      }
+      .floorline {
+        display: flex;
+        justify-content: space-between;
+        font: 400 14px/24px "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .floorline b {
+        font-weight: 400;
+        color: var(--text2);
+      }
+
+      /* ================================ THE BOARD'S OWN CORNER (not the design) ================================ */
+      .board {
+        position: absolute;
+        right: 16px;
+        bottom: 52px;
+        z-index: 50;
+        font: 400 14px/1.3 "PT Sans";
+        color: #000;
+        background: rgba(237, 235, 209, 0.97);
+        border-radius: 6px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        padding: 10px 12px;
+        width: 340px;
+      }
+      .board .r1 {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .board b {
+        font-weight: 700;
+        margin-right: 4px;
+      }
+      .board button {
+        font: 700 13px/1 "PT Sans";
+        padding: 6px 9px;
+        border: 1px solid #00000040;
+        border-radius: 4px;
+        background: #fff;
+        color: #000;
+        cursor: pointer;
+      }
+      .board button.on {
+        background: #000;
+        color: #edebd1;
+      }
+      .board .hint {
+        margin-top: 6px;
+        color: #333;
+        font-size: 12.5px;
+      }
+      .deck {
+        margin-top: 10px;
+        background: #111;
+        border-radius: 10px;
+        padding: 12px;
+        display: none;
+      }
+      .deck.open {
+        display: block;
+      }
+      .deck .keys {
+        display: grid;
+        grid-template-columns: repeat(4, 66px);
+        gap: 8px;
+        justify-content: center;
+      }
+      .deck .k {
+        height: 66px;
+        border-radius: 6px;
+        background: #1d1f1e;
+        color: #edebd1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font: 700 13px/1.1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        cursor: pointer;
+        text-align: center;
+        border: 1px solid #333;
+      }
+      .deck .k small {
+        font: 400 11px/1.2 "PT Sans";
+        letter-spacing: 0;
+        color: #c5c7b9;
+        margin-top: 4px;
+      }
+      .deck .k.page {
+        background: var(--sse-dark-green);
+      }
+      .deck .k.green {
+        background: var(--sse-green);
+        color: #000;
+      }
+      .deck .k.green small {
+        color: #000;
+      }
+      .deck .k.red {
+        color: var(--sse-coral);
+        border-color: var(--sse-coral);
+      }
+      .deck .k.arm {
+        background: var(--sse-burgundy);
+        color: var(--sse-beige);
+      }
+      .deck .k.dark {
+        background: #0b0b0b;
+        cursor: default;
+      }
+      .deck .lcd {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        margin: 10px 4px 0;
+        background: #050505;
+        border-radius: 4px;
+        border: 1px solid #333;
+      }
+      .deck .lcd div {
+        height: 50px;
+        color: #edebd1;
+        font: 700 12px/1.25 "PT Sans";
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-left: 1px solid #222;
+      }
+      .deck .lcd div:first-child {
+        border-left: 0;
+      }
+      .deck .lcd div span {
+        font: 700 18px/1 "PT Sans";
+      }
+      .deck .dls {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        margin-top: 10px;
+        justify-items: center;
+      }
+      .deck .dl {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 40% 35%, #444, #151515 70%);
+        border: 1px solid #555;
+        cursor: ns-resize;
+        position: relative;
+      }
+      .deck .dl::after {
+        content: "";
+        position: absolute;
+        left: 22px;
+        top: 4px;
+        width: 2px;
+        height: 10px;
+        background: #ddd;
+        border-radius: 1px;
+      }
+      .deck .cap2 {
+        color: #8d9389;
+        font-size: 11.5px;
+        text-align: center;
+        margin-top: 8px;
+      }
+
+      /* ================================ NOTES (?notes=1) ================================ */
+      .pin {
+        position: absolute;
+        z-index: 40;
+        width: 30px;
+        height: 30px;
+        margin: -15px 0 0 -15px;
+        border-radius: 50%;
+        background: var(--sse-beige);
+        color: #000;
+        font: 700 15px/30px "PT Sans";
+        text-align: center;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.65);
+        cursor: help;
+      }
+      .note {
+        position: absolute;
+        z-index: 45;
+        max-width: 380px;
+        background: var(--sse-beige);
+        color: #000;
+        font: 400 14px/1.35 "PT Sans";
+        padding: 10px 12px;
+        border-radius: 4px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        display: none;
+      }
+      .note b {
+        display: block;
+        margin-bottom: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- the rooms' planes are drawn first, under everything; the alert keyline over the room in trouble -->
+    <div id="rooms"></div>
+    <div id="alerts"></div>
+
+    <!-- ======================================== HEADER ======================================== -->
+    <header class="abs hdr" id="hdr"></header>
+
+    <!-- ======================================== CLUSTER: the state, then THE TAKE ======================================== -->
+    <div class="abs col well sd" id="sd">
+      <div class="top">
+        <span class="lamp" id="sdLamp"></span><span class="word" id="sdWord"></span>
+        <span
+          class="key ico menu"
+          title="Overview ⋯ — Sync from TotalMix · Read all cameras again · Clear clips · Setup / Support"
+          ><svg class="dots" viewBox="0 0 20 20">
+            <circle cx="4" cy="10" r="1.8" fill="currentColor" />
+            <circle cx="10" cy="10" r="1.8" fill="currentColor" />
+            <circle cx="16" cy="10" r="1.8" fill="currentColor" /></svg
+        ></span>
+      </div>
+      <p class="sentence" id="sdSentence"></p>
+      <div class="foot"><span class="meta" id="sdMeta"></span><span id="sdWay"></span></div>
+    </div>
+    <div class="abs col latch" id="latch"></div>
+
+    <!-- THE TAKE (stone): what you press during a take. REC is CAM 1's; the transport is the prompter's. -->
+    <div class="in-stone">
+      <div class="abs lintel" style="left: 28px; top: 372px; width: 384px" id="takeLintel"></div>
+      <div class="abs" style="left: 44px; top: 432px; width: 352px">
+        <div class="key tall" id="rec" style="width: 352px"></div>
+        <div style="margin-top: 12px" id="takeRows"></div>
+        <div style="margin-top: 16px" class="take-keys">
+          <div class="key stack play" id="play"></div>
+          <div class="key stack" id="back">
+            <span class="cap" style="font-size: 16px">Back</span
+            ><span class="hint" id="backHint">to the start of ¶ 8</span>
+          </div>
+          <div class="key stack" id="top">
+            <span class="cap" style="font-size: 16px">Top</span><span class="hint">pauses · to ¶ 1</span>
+          </div>
+        </div>
+        <div class="row4" style="margin-top: 12px">
+          <div class="key large" id="slower">− 5</div>
+          <div class="key large" id="faster">+ 5</div>
+          <div class="key large" id="cuePrev">◂ Cue</div>
+          <div class="key large" id="cueNext">Cue ▸</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- the rest of the studio, outside the rooms -->
+    <section class="abs col studio" style="top: 844px">
+      <div class="shead"><span class="t">The studio</span><span class="d">what each page has set</span></div>
+      <div id="studio"></div>
+    </section>
+
+    <!-- ======================================== THE PICTURE (green): watch ======================================== -->
+    <div class="in-green">
+      <div class="abs lintel" style="left: 468px; top: 104px; width: 1624px" id="picLintel"></div>
+      <div class="abs pic" style="left: 484px; top: 164px; width: 1236px; height: 695px" data-picture id="cam1"></div>
+      <div class="abs cap-row" style="left: 1736px; top: 164px; width: 340px" id="cam2cap"></div>
+      <div class="abs pic" style="left: 1736px; top: 196px; width: 340px; height: 191px" data-picture id="cam2"></div>
+      <div class="abs cap-row" style="left: 1736px; top: 400px; width: 340px" id="cam3cap"></div>
+      <div class="abs pic" style="left: 1736px; top: 432px; width: 340px; height: 191px" data-picture id="cam3"></div>
+      <div class="abs cap-row" style="left: 1736px; top: 636px; width: 340px">
+        <span class="nm">Loupe</span><span class="f">CAM 1</span><span class="sp"></span>
+        <span class="seg"><span class="key small selected">2:1</span><span class="key small">4:1</span></span>
+      </div>
+      <div class="abs pic" style="left: 1736px; top: 668px; width: 340px; height: 191px" data-picture id="loupe"></div>
+    </div>
+
+    <!-- ======================================== THE SCRIPT (slate): read ======================================== -->
+    <div class="in-slate">
+      <div class="abs lintel" style="left: 468px; top: 904px; width: 1624px" id="scriptLintel"></div>
+      <div class="abs well speed" style="left: 484px; top: 964px; width: 300px; height: 344px" id="speed">
+        <div class="hd">
+          <span class="kick">Speed</span><span class="q3" style="font-size: 14px">words a minute</span>
+        </div>
+        <div class="tape"><div class="strip" id="tape"></div></div>
+        <div class="centre-line"></div>
+        <div class="pointer" id="pointer">
+          <span class="num" id="speedNum">140</span><span class="u">words/min</span>
+        </div>
+        <div class="from" id="speedFrom"></div>
+        <div class="dialmap">
+          <div class="d on"><i></i>Speed</div>
+          <div class="d"><i></i>Line</div>
+          <div class="d"><i></i>Paragraph</div>
+          <div class="d"><i></i>Size</div>
+        </div>
+      </div>
+      <div class="abs band" style="left: 800px; top: 964px; width: 880px; height: 344px" data-picture id="band">
+        <div class="screen" id="screen">
+          <div class="gcol" id="gcol"></div>
+          <div class="gread" id="gread"></div>
+          <i class="garrow" id="garrow"></i>
+        </div>
+      </div>
+      <div class="abs" style="left: 1696px; top: 964px; width: 380px; height: 344px">
+        <div class="cells">
+          <div class="well cell">
+            <span class="kick">Place</span
+            ><span class="val"><span id="placeP">¶ 8 of 18</span><span class="s" id="placeS">43 %</span></span>
+          </div>
+          <div class="well cell">
+            <span class="kick">Left</span
+            ><span class="val"><span id="leftT">2:31</span><span class="s" id="leftS">ends 10:46</span></span>
+          </div>
+        </div>
+        <div class="shead" style="margin-top: 20px">
+          <span class="t">Cues ahead</span><span class="d" id="cuesAt">at 140 words/min</span>
+        </div>
+        <div class="cues" id="cues"></div>
+      </div>
+      <div class="abs timeline" style="left: 484px; top: 1336px; width: 1592px" id="timeline"></div>
+    </div>
+
+    <!-- ======================================== THE SOUND (umber): listen ======================================== -->
+    <div class="in-umber">
+      <div class="abs lintel" style="left: 2148px; top: 104px; width: 384px" id="soundLintel"></div>
+      <div class="abs mainrow" style="left: 2164px; top: 164px; width: 352px">
+        <span class="kick" style="color: var(--text2)">Main Out</span>
+        <span class="lvl" id="mainLvl">−1.2<span class="u">dB</span></span>
+        <span class="q3 nowrap" style="font-size: 14px">dim off · mono off</span><span class="sp"></span>
+        <span class="key" id="m-main" style="width: 52px; padding: 0; font: 700 20px/1 &quot;SSE Adelia&quot;">M</span>
+      </div>
+      <div class="abs well" style="left: 2164px; top: 212px; width: 352px; height: 28px" id="hwell"></div>
+      <div class="abs shead" style="left: 2164px; top: 260px; width: 352px">
+        <span class="t">Inputs</span><span class="d">as TotalMix shows them</span>
+      </div>
+      <div id="meters"></div>
+      <div class="abs floorline" style="left: 2164px; top: 1348px; width: 352px">
+        <span>Phones 1 <b>−9.0 dB</b></span
+        ><span>Phones 2 <b>−17.4 dB</b></span
+        ><span>peak hold 1.5 s</span>
+      </div>
+    </div>
+
+    <!-- ======================================== FOOTER ======================================== -->
+    <footer class="abs ftr" id="footer"></footer>
+
+    <!-- ======================================== THE BOARD'S CORNER ======================================== -->
+    <div class="board" id="board">
+      <div class="r1">
+        <b>Board 2</b> <button data-state="take">Take</button><button data-state="landing">Landing</button
+        ><button data-state="fault">Fault</button> <button id="bNotes">Notes</button><button id="bDeck">Deck</button>
+      </div>
+      <div class="r1" style="margin-top: 6px">
+        <b>Header</b> <button data-header="today">Today</button><button data-header="skylight">Skylight</button
+        ><button data-header="facade">Façade</button><button data-header="panel">Panel</button
+        ><button data-header="doors">Doors</button>
+      </div>
+      <div class="hint">Wheel over SPEED (or ↑ ↓) turns the dial · Space plays · the keys work.</div>
+      <div class="deck" id="deck">
+        <div class="keys" id="deckKeys"></div>
+        <div class="lcd" id="deckLcd"></div>
+        <div class="dls" id="deckDials">
+          <div class="dl" data-dial="speed" title="SPEED: turn ±5, push plays"></div>
+          <div class="dl" data-dial="line" title="LINE: turn jumps a line"></div>
+          <div class="dl" data-dial="para" title="PARAGRAPH: turn jumps a paragraph"></div>
+          <div class="dl" data-dial="size" title="SIZE"></div>
+        </div>
+        <div class="cap2">
+          The deck's PROMPTER page, as the Overview turns it (question 3). Wheel over a dial; press a key.
+        </div>
+      </div>
+    </div>
+    <div id="notes"></div>
+
+    <!-- ======================================== THE PICTURES (drawn once, used four times) ======================================== -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="blur40" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40" /></filter>
+        <filter id="blur18" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18" /></filter>
+        <filter id="blur6" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6" /></filter>
+        <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6" /></filter>
+        <filter id="grain">
+          <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" />
+          <feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .07 0" />
+        </filter>
+        <!-- the rooms' plaster: a rendered wall's grain (the brand's Grain texture, kept faint) -->
+        <filter id="plaster" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="3" seed="11" />
+          <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 -.38" />
+        </filter>
+        <radialGradient id="bgA" cx=".68" cy=".34" r=".85">
+          <stop offset="0" stop-color="#3f5c54" />
+          <stop offset=".45" stop-color="#1c2b27" />
+          <stop offset="1" stop-color="#090e0d" />
+        </radialGradient>
+        <radialGradient id="bgB" cx=".3" cy=".3" r=".9">
+          <stop offset="0" stop-color="#4a4036" />
+          <stop offset=".5" stop-color="#211d19" />
+          <stop offset="1" stop-color="#0c0b0a" />
+        </radialGradient>
+        <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3a332c" />
+          <stop offset=".08" stop-color="#2a251f" />
+          <stop offset="1" stop-color="#110f0d" />
+        </linearGradient>
+        <linearGradient id="keyL" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#fff2e2" stop-opacity=".30" />
+          <stop offset=".45" stop-color="#fff2e2" stop-opacity=".05" />
+          <stop offset=".7" stop-color="#000" stop-opacity=".12" />
+          <stop offset="1" stop-color="#000" stop-opacity=".55" />
+        </linearGradient>
+        <radialGradient id="faceL" cx=".36" cy=".38" r=".7">
+          <stop offset="0" stop-color="#fff4ea" stop-opacity=".34" />
+          <stop offset=".5" stop-color="#fff4ea" stop-opacity="0" />
+          <stop offset=".85" stop-color="#000" stop-opacity=".18" />
+          <stop offset="1" stop-color="#000" stop-opacity=".42" />
+        </radialGradient>
+        <radialGradient id="pool" cx=".5" cy="0" r="1">
+          <stop offset="0" stop-color="#fff" stop-opacity=".05" />
+          <stop offset=".6" stop-color="#fff" stop-opacity=".012" />
+          <stop offset="1" stop-color="#fff" stop-opacity="0" />
+        </radialGradient>
+
+        <g id="person">
+          <path
+            d="M 455 1080 C 470 935, 590 822, 790 790 L 880 778 L 1040 778 L 1130 790 C 1330 822, 1450 935, 1465 1080 Z"
+            fill="var(--jacket)"
+          />
+          <path
+            d="M 455 1080 C 470 935, 590 822, 790 790 L 880 778 L 1040 778 L 1130 790 C 1330 822, 1450 935, 1465 1080 Z"
+            fill="url(#keyL)"
+          />
+          <path d="M 884 778 L 960 908 L 1036 778 Z" fill="var(--shirt)" />
+          <path d="M 884 778 L 960 908 L 1036 778 Z" fill="url(#keyL)" />
+          <path d="M 884 778 L 960 908 L 925 1080 L 850 1080 L 838 806 Z" fill="var(--lapel)" />
+          <path d="M 1036 778 L 960 908 L 995 1080 L 1072 1080 L 1084 806 Z" fill="var(--lapel)" opacity=".85" />
+          <path
+            d="M 906 600 C 906 690, 902 740, 886 792 C 930 816, 992 816, 1036 792 C 1020 740, 1015 690, 1015 600 Z"
+            fill="var(--skin2)"
+          />
+          <path
+            d="M 906 690 C 930 720, 990 720, 1015 690 L 1018 740 C 990 760, 932 760, 902 740 Z"
+            fill="#000"
+            opacity=".22"
+          />
+          <ellipse cx="837" cy="528" rx="19" ry="36" fill="var(--skin2)" />
+          <ellipse cx="1083" cy="528" rx="19" ry="36" fill="var(--skin2)" />
+          <ellipse cx="960" cy="505" rx="125" ry="156" fill="var(--skin)" />
+          <ellipse cx="960" cy="505" rx="125" ry="156" fill="url(#faceL)" />
+          <g filter="url(#soft)">
+            <path
+              d="M 888 482 Q 916 469 946 480"
+              stroke="var(--hair)"
+              stroke-width="8"
+              fill="none"
+              stroke-linecap="round"
+              opacity=".85"
+            />
+            <path
+              d="M 974 480 Q 1004 469 1032 482"
+              stroke="var(--hair)"
+              stroke-width="8"
+              fill="none"
+              stroke-linecap="round"
+              opacity=".85"
+            />
+            <ellipse cx="917" cy="508" rx="16" ry="8" fill="#26170f" opacity=".85" />
+            <ellipse cx="1003" cy="508" rx="16" ry="8" fill="#26170f" opacity=".85" />
+            <circle cx="920" cy="506" r="2.4" fill="#fff" opacity=".7" />
+            <circle cx="1006" cy="506" r="2.4" fill="#fff" opacity=".6" />
+            <path
+              d="M 972 520 Q 982 548 984 566"
+              stroke="#5a2f22"
+              stroke-opacity=".22"
+              stroke-width="10"
+              fill="none"
+              stroke-linecap="round"
+            />
+            <path
+              d="M 946 574 Q 962 583 980 574"
+              stroke="#5a2f22"
+              stroke-opacity=".32"
+              stroke-width="5"
+              fill="none"
+              stroke-linecap="round"
+            />
+            <path
+              d="M 926 612 Q 961 626 996 612"
+              stroke="#7a4032"
+              stroke-width="6"
+              fill="none"
+              stroke-linecap="round"
+              opacity=".8"
+            />
+          </g>
+          <path
+            d="M 835 520 C 820 398, 880 342, 963 341 C 1050 341, 1102 398, 1087 520 C 1079 455, 1052 425, 1012 414 C 968 432, 902 428, 872 436 C 852 455, 842 488, 835 520 Z"
+            fill="var(--hair)"
+          />
+          <path
+            d="M 1072 420 C 1094 470, 1090 560, 1070 610"
+            stroke="#ffe9cf"
+            stroke-opacity=".38"
+            stroke-width="7"
+            fill="none"
+            filter="url(#blur6)"
+          />
+          <path
+            d="M 1150 796 C 1300 830, 1420 920, 1450 1060"
+            stroke="#ffe9cf"
+            stroke-opacity=".22"
+            stroke-width="9"
+            fill="none"
+            filter="url(#blur6)"
+          />
+        </g>
+        <g id="scene1">
+          <rect width="1920" height="1080" fill="url(#bgA)" />
+          <rect x="150" y="-40" width="170" height="1160" fill="#35524a" opacity=".55" filter="url(#blur40)" />
+          <g filter="url(#blur18)">
+            <circle cx="1480" cy="250" r="64" fill="#f6d7a0" opacity=".32" />
+            <circle cx="1612" cy="380" r="40" fill="#f6d7a0" opacity=".26" />
+            <circle cx="1390" cy="160" r="30" fill="#d7eee8" opacity=".22" />
+            <circle cx="1720" cy="210" r="52" fill="#f2c48f" opacity=".18" />
+            <circle cx="300" cy="250" r="70" fill="#a7cdc5" opacity=".16" />
+            <circle cx="220" cy="560" r="44" fill="#f2c48f" opacity=".16" />
+            <circle cx="430" cy="140" r="26" fill="#f6d7a0" opacity=".2" />
+          </g>
+          <rect x="1520" y="520" width="300" height="420" rx="8" fill="#14201d" opacity=".7" filter="url(#blur18)" />
+          <ellipse cx="1010" cy="760" rx="560" ry="430" fill="#000" opacity=".38" filter="url(#blur40)" />
+          <use
+            href="#person"
+            style="
+              --jacket: #1f2834;
+              --lapel: #161d27;
+              --shirt: #e3ddd2;
+              --skin: #d29a7c;
+              --skin2: #a8705a;
+              --hair: #2c211b;
+            "
+          />
+          <path d="M 0 985 L 1920 955 L 1920 1080 L 0 1080 Z" fill="url(#desk)" />
+          <path d="M 0 985 L 1920 955" stroke="#7a6a58" stroke-opacity=".55" stroke-width="2" />
+          <g transform="translate(1390 905) rotate(-14)">
+            <rect x="0" y="0" width="210" height="88" rx="40" fill="#0e0f10" />
+            <rect x="0" y="0" width="92" height="88" rx="40" fill="#1b1c1d" />
+            <rect x="150" y="30" width="120" height="26" rx="6" fill="#0a0a0a" />
+            <path d="M 40 6 L 200 6" stroke="#ffffff" stroke-opacity=".12" stroke-width="3" />
+          </g>
+          <rect width="1920" height="1080" filter="url(#grain)" opacity=".9" />
+        </g>
+        <g id="scene2">
+          <rect width="1920" height="1080" fill="url(#bgA)" />
+          <g filter="url(#blur18)">
+            <circle cx="400" cy="200" r="40" fill="#f6d7a0" opacity=".25" />
+            <circle cx="1500" cy="180" r="50" fill="#f6d7a0" opacity=".22" />
+            <circle cx="980" cy="120" r="30" fill="#d7eee8" opacity=".2" />
+          </g>
+          <rect x="0" y="0" width="1920" height="70" fill="#050807" />
+          <g fill="#0b0d0c">
+            <rect x="300" y="60" width="60" height="44" rx="6" />
+            <rect x="900" y="60" width="60" height="44" rx="6" />
+            <rect x="1500" y="60" width="60" height="44" rx="6" />
+          </g>
+          <rect x="140" y="250" width="1640" height="560" rx="6" fill="#1a2925" opacity=".8" />
+          <use
+            href="#person"
+            transform="translate(150 380) scale(.44)"
+            style="
+              --jacket: #1f2834;
+              --lapel: #161d27;
+              --shirt: #e3ddd2;
+              --skin: #d29a7c;
+              --skin2: #a8705a;
+              --hair: #2c211b;
+            "
+          />
+          <use
+            href="#person"
+            transform="translate(1000 392) scale(.42)"
+            style="
+              --jacket: #6d5a48;
+              --lapel: #5a4a3b;
+              --shirt: #2a2a2c;
+              --skin: #e3b597;
+              --skin2: #b98366;
+              --hair: #7a5434;
+            "
+          />
+          <path d="M 120 840 L 1800 820 L 1860 900 L 60 925 Z" fill="#2b261f" />
+          <path d="M 60 925 L 1860 900 L 1860 960 L 60 990 Z" fill="#14120f" />
+          <path d="M 120 840 L 1800 820" stroke="#7a6a58" stroke-opacity=".5" stroke-width="3" />
+          <rect y="990" width="1920" height="90" fill="#0b0d0c" />
+          <rect width="1920" height="1080" filter="url(#grain)" opacity=".9" />
+        </g>
+        <g id="scene3">
+          <rect width="1920" height="1080" fill="url(#bgB)" />
+          <g filter="url(#blur18)">
+            <circle cx="420" cy="280" r="70" fill="#f6d7a0" opacity=".26" />
+            <circle cx="300" cy="460" r="40" fill="#f2c48f" opacity=".2" />
+            <circle cx="1650" cy="240" r="46" fill="#a7cdc5" opacity=".16" />
+          </g>
+          <use
+            href="#person"
+            transform="translate(150 40)"
+            style="
+              --jacket: #6d5a48;
+              --lapel: #5a4a3b;
+              --shirt: #2a2a2c;
+              --skin: #e3b597;
+              --skin2: #b98366;
+              --hair: #7a5434;
+            "
+          />
+          <path d="M 0 990 L 1920 1000 L 1920 1080 L 0 1080 Z" fill="url(#desk)" />
+          <rect width="1920" height="1080" filter="url(#grain)" opacity=".9" />
+        </g>
+      </defs>
+    </svg>
+
+    <script>
+      (() => {
+        "use strict";
+        const q = new URLSearchParams(location.search);
+        let STATE = q.get("state") || "take";
+        let HEADER = ["today", "facade", "skylight", "panel", "doors"].includes(q.get("header"))
+          ? q.get("header")
+          : "skylight";
+        const STILL = q.get("still") === "1";
+        const $ = (id) => document.getElementById(id);
+        const MINUS = "−";
+        const fmt = (s) => {
+          s = Math.max(0, Math.round(s));
+          return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        };
+        const hhmm = (t) => {
+          const d = new Date(t);
+          return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        };
+        const lw = (tone, word) =>
+          `<span class="lw ${tone}"><span class="lamp${tone === "off" ? " hollow" : ""}"></span><span class="cap">${word}</span></span>`;
+        const door = (page) =>
+          `<span class="door" title="Open the ${page} page">${page}<span class="ar">→</span></span>`;
+
+        if (q.get("fit") !== "0") {
+          const f = () => {
+            document.documentElement.style.zoom = Math.min(1, innerWidth / 2560);
+          };
+          f();
+          addEventListener("resize", f);
+        }
+        if (q.get("ui") === "0") $("board").style.display = "none";
+
+        /* ------------------------------------------------------------------ the rooms ------------------------------------------------------------------ */
+        // A room: a back wall and four planes, its seams meeting at the corners (one-point perspective, the
+        // brand's "full box"). The lintel (top) is deep and carries the name; the floor of THE SCRIPT is deep
+        // and carries the whole script; the planes carry the brand's grain, the walls stay smooth for text.
+        const ROOMS = [
+          { id: "take", tone: "in-stone", x: 16, y: 372, w: 408, h: 448, top: 44, side: 12, floor: 12 },
+          { id: "picture", tone: "in-green", x: 456, y: 104, w: 1648, h: 784, top: 44, side: 12, floor: 12 },
+          { id: "script", tone: "in-slate", x: 456, y: 904, w: 1648, h: 480, top: 44, side: 12, floor: 60 },
+          { id: "sound", tone: "in-umber", x: 2136, y: 104, w: 408, h: 1280, top: 44, side: 12, floor: 48 },
+        ];
+        function drawRooms() {
+          $("rooms").innerHTML = ROOMS.map((r) => {
+            const { w, h, top: t, side: s, floor: f } = r;
+            const bands = `M0 0 L${w} 0 L${w - s} ${t} L${s} ${t} Z M0 0 L${s} ${t} L${s} ${h - f} L0 ${h} Z M${w} 0 L${w} ${h} L${w - s} ${h - f} L${w - s} ${t} Z M0 ${h} L${s} ${h - f} L${w - s} ${h - f} L${w} ${h} Z`;
+            return `<svg class="room ${r.tone}" style="left:${r.x}px;top:${r.y}px" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <defs><clipPath id="cp-${r.id}"><path d="${bands}"/></clipPath></defs>
+      <path d="M0 0 L${w} 0 L${w - s} ${t} L${s} ${t} Z" fill="var(--lintel)"/>
+      <path d="M0 0 L${s} ${t} L${s} ${h - f} L0 ${h} Z M${w} 0 L${w} ${h} L${w - s} ${h - f} L${w - s} ${t} Z" fill="var(--side)"/>
+      <path d="M0 ${h} L${s} ${h - f} L${w - s} ${h - f} L${w} ${h} Z" fill="var(--floor)"/>
+      <rect x="${s}" y="${t}" width="${w - 2 * s}" height="${h - t - f}" fill="var(--wall)"/>
+      <rect x="${s}" y="${t}" width="${w - 2 * s}" height="${h - t - f}" fill="url(#pool)"/>
+      <rect width="${w}" height="${h}" filter="url(#plaster)" opacity=".05" clip-path="url(#cp-${r.id})"/>
+      <path d="M0.5 0.5 L${s} ${t} M${w - 0.5} 0.5 L${w - s} ${t} M0.5 ${h - 0.5} L${s} ${h - f} M${w - 0.5} ${h - 0.5} L${w - s} ${h - f}" stroke="#fff" stroke-opacity=".06"/>
+      <rect x="${s + 0.5}" y="${t + 0.5}" width="${w - 2 * s - 1}" height="${h - t - f - 1}" fill="none" stroke="#fff" stroke-opacity=".05"/>
+      <rect x=".5" y=".5" width="${w - 1}" height="${h - 1}" fill="none" stroke="#000" stroke-opacity=".5"/>
+    </svg>`;
+          }).join("");
+        }
+
+        /* ------------------------------------------------------------------ the states ------------------------------------------------------------------ */
+        const STATES = {
+          take: {
+            clock: [10, 42, 6],
+            recording: true,
+            recSince: 252,
+            playing: true,
+            startPara: 8,
+            speed: 140,
+            turned: true,
+            sd: {
+              tone: "ok",
+              word: "Ready",
+              sentence: "Every link answers. Nothing on any page needs you.",
+              meta: "8 of 8 links answer",
+              way: "",
+            },
+            tabs: {
+              lighting: ["ok", "ready"],
+              audio: ["ok", "ready"],
+              cameras: ["ok", "ready"],
+              prompter: ["ok", "playing", true],
+            },
+            latch: null,
+            cam1: "held",
+            talk: true,
+          },
+          landing: {
+            clock: [9, 14, 2],
+            recording: false,
+            playing: false,
+            startPara: 1,
+            speed: 140,
+            turned: false,
+            sd: {
+              tone: "att",
+              word: "Assumed",
+              sentence: "Console: the strips may not match TotalMix since the start.",
+              meta: "since 09:05",
+              way: "Sync from TotalMix",
+            },
+            tabs: {
+              lighting: ["ok", "ready"],
+              audio: ["att", "assumed"],
+              cameras: ["ok", "ready"],
+              prompter: ["ok", "ready"],
+            },
+            latch: null,
+            cam1: "held",
+            talk: false,
+            gated: true,
+          },
+          fault: {
+            clock: [10, 44, 21],
+            recording: true,
+            recSince: 362,
+            playing: true,
+            startPara: 11,
+            speed: 145,
+            turned: false,
+            sd: {
+              tone: "err",
+              word: "Unreachable",
+              sentence: "Cameras: CAM 1 does not answer. The recording was left as it was.",
+              meta: "last answer 10:43",
+              way: "Open Cameras",
+            },
+            tabs: {
+              lighting: ["ok", "ready"],
+              audio: ["ok", "ready"],
+              cameras: ["err", "unreachable"],
+              prompter: ["ok", "playing", true],
+            },
+            latch: { who: "Clip", text: "1 over 0 dBFS · SM7B 1", act: "Clear" },
+            cam1: "unreachable",
+            talk: true,
+            clip: "sm7b1",
+          },
+        };
+        const SYNCED = {
+          tone: "ok",
+          word: "Ready",
+          sentence: "Every link answers. Nothing on any page needs you.",
+          meta: "8 of 8 links answer · synced 09:14",
+          way: "",
+        };
+
+        /* ------------------------------------------------------------------ the script (the fixture's "02 Interview intro") ------------------------------------------------------------------ */
+        const SCRIPT = [
+          "Welcome to <i>Leading Through Change</i>, a series from SSE Executive Education about the decisions that shape an organisation when the ground moves under it.",
+          "Every episode starts with one question: what did you have to <b>unlearn</b>? It sounds simple. In our experience it is the hardest question a leader can be asked, because the honest answer is rarely the one on the slides.",
+          "Today we look at a company that had to unlearn almost everything at once: a supplier to the car industry, with three plants, two thousand people and customers who changed their minds about what a car runs on in less than five years.",
+          "When the orders for its oldest product line fell by a third in a single year, the board had two options on the table. Close the plant that made it, or turn it into something nobody in the company had built before.",
+          "They chose the second. What follows is the story of that choice, told by the person who had to carry it out, and who admits she was not sure it would work.",
+          "Before we meet her, a word on how this conversation works. There is no script for the guest. The questions are mine, the answers are hers, and nothing has been rehearsed beyond a cup of coffee this morning.",
+          "We will talk for about twenty minutes. Afterwards you will find the reading list, the case material and the exercises for your own team in the programme portal.",
+          "So let us begin where every change begins: with a morning when the numbers on the screen <i>no longer</i> matched the story everyone was telling.",
+          "[turn to the guest]Welcome to the studio. You were head of operations when the orders fell. Take us back to that morning. What did you see <u>first</u>, and who was the first person you called?",
+          "Many leaders describe that moment as a kind of silence. The plan still exists, the meetings still happen, but nobody quite believes the numbers any more. Was it like that for you?",
+          "You went to the plant floor before you went to the board. Why that order? And what did the people on the line already know that the spreadsheets did not?",
+          "[Part 2 · The pilot]Let us talk about the pilot. Six months, one line, twelve volunteers and a product that did not exist yet. Where did the idea come from, and how did you protect it while it was fragile?",
+          "Some of those twelve had worked on the old line for twenty years. What did you ask of them, and what did you promise in return? Which of those promises was the hardest to keep?",
+          "[slide 3]On the screen you can see the first year in numbers. Output fell before it rose. Quality complaints doubled in the second quarter. And yet the board extended the pilot. What convinced them?",
+          "If someone in this programme is facing their own version of that year right now, what is the one thing you would tell them to do on Monday morning, and the one thing to stop?",
+          "Thank you. That is a good place to pause. After the break we look at the people who did not join the pilot, and why theirs turned out to be the more important story.",
+          "For those of you following along, the case material for this part is in module three of the portal. The exercise asks you to map your own organisation's old line and new one.",
+          "Stay with us. We will be back in a moment.",
+        ];
+        const LOOK = { size: 88, line: 1.4, margin: 0.12, reading: 0.35 };
+        const G = {
+          colLeft: 1920 * LOOK.margin,
+          colW: 1920 * (1 - 2 * LOOK.margin),
+          line: LOOK.size * LOOK.line,
+          readY: 1080 * LOOK.reading,
+        };
+        G.gap = G.line / 2;
+        const BAND = { w: 880, h: 344 };
+        G.cropX = G.colLeft - 120;
+        G.s = BAND.w / (G.colW + 150);
+        G.cropY = G.readY - (BAND.h * LOOK.reading) / G.s;
+
+        function buildGlass() {
+          const col = $("gcol");
+          col.style.left = G.colLeft + "px";
+          col.style.width = G.colW + "px";
+          col.style.fontSize = LOOK.size + "px";
+          col.style.lineHeight = G.line + "px";
+          const words = (html) =>
+            html
+              .replace(/<[^>]+>/g, "")
+              .split(/\s+/)
+              .filter(Boolean).length;
+          col.innerHTML =
+            SCRIPT.map((p, i) => {
+              let cue = "",
+                body = p;
+              const m = p.match(/^\[([^\]]+)\](.*)$/);
+              if (m) {
+                cue = `<span class="cueLine" style="font-size:${LOOK.size * 0.7}px">[${m[1]}]</span><br>`;
+                body = m[2];
+              }
+              return `<p data-p="${i + 1}" style="padding-bottom:${G.gap}px">${cue}${body}</p>`;
+            }).join("") +
+            `<div class="end" style="font-size:${LOOK.size * 0.7}px;margin-top:${1080 * 0.4}px">END</div>`;
+          $("screen").style.transform = `scale(${G.s}) translate(${-G.cropX}px, ${-G.cropY}px)`;
+          const ar = $("garrow");
+          ar.style.left = G.colLeft - 96 + "px";
+          ar.style.top = G.readY + "px";
+          const ps = [...col.querySelectorAll("p")];
+          G.paras = ps.map((el, i) => {
+            const m = SCRIPT[i].match(/^\[([^\]]+)\]/);
+            return {
+              top: el.offsetTop,
+              h: el.offsetHeight,
+              words: words(SCRIPT[i].replace(/^\[[^\]]+\]/, "")),
+              cue: m ? m[1] : null,
+            };
+          });
+          G.end = ps[ps.length - 1].offsetTop + ps[ps.length - 1].offsetHeight;
+          G.total = G.paras.reduce((a, p) => a + p.words, 0);
+          const probe = document.createElement("p");
+          probe.style.cssText = "position:absolute;visibility:hidden;margin:0";
+          probe.innerHTML = SCRIPT[2];
+          col.appendChild(probe);
+          const lines = Math.round(probe.offsetHeight / G.line);
+          col.removeChild(probe);
+          G.pxPerWord = G.line / (G.paras[2].words / Math.max(1, lines - 0.5));
+          buildTimeline();
+        }
+        const pps = (wpm) => (wpm / 60) * G.pxPerWord;
+
+        /* ------------------------------------------------------------------ the take's model ------------------------------------------------------------------ */
+        const M = {};
+        function load(state) {
+          STATE = state;
+          const S = STATES[state];
+          const d = new Date();
+          d.setHours(S.clock[0], S.clock[1], S.clock[2], 0);
+          M.t0 = d.getTime();
+          M.real0 = Date.now();
+          M.recording = S.recording;
+          M.recStart = S.recording ? M.t0 - S.recSince * 1000 : null;
+          M.playing = S.playing;
+          M.speed = S.speed;
+          M.range = state === "landing" ? [S.speed, S.speed] : [S.speed - 5, S.speed + 5];
+          M.armed = null;
+          M.turnedUntil = S.turned ? Infinity : 0;
+          M.mutes = { boom: false, sm7b1: false, sm7b2: false, sm7b3: true };
+          M.clip = S.clip || null;
+          M.synced = !S.gated;
+          const p = G.paras[S.startPara - 1];
+          M.pos = p.top + G.line * { take: 1.5, fault: 2.5, landing: 0.5 }[state];
+          render(true);
+        }
+        const clockNow = () => M.t0 + (STILL ? 0 : Date.now() - M.real0);
+        function view() {
+          const S = STATES[STATE];
+          return S.gated && M.synced ? { ...S, sd: SYNCED, tabs: { ...S.tabs, audio: ["ok", "ready"] } } : S;
+        }
+        function paraAt(pos) {
+          let i = 0;
+          for (let k = 0; k < G.paras.length; k++) if (G.paras[k].top <= pos) i = k;
+          return i;
+        }
+        function shareAt(pos) {
+          const i = paraAt(pos);
+          const p = G.paras[i];
+          const within = Math.max(0, Math.min(1, (pos - p.top) / Math.max(1, p.h - G.gap)));
+          return (G.paras.slice(0, i).reduce((a, x) => a + x.words, 0) + p.words * within) / G.total;
+        }
+
+        /* ------------------------------------------------------------------ the header ------------------------------------------------------------------ */
+        // ?worst=1 fills the header with every word at its longest and every chip at once (the fullest row, measured)
+        const WORST = q.get("worst") === "1";
+        function renderHeader() {
+          const S = view(),
+            v = HEADER;
+          const left = (G.end - M.pos) / pps(M.speed);
+          const tones = { lighting: "in-wine", audio: "in-umber", cameras: "in-green", teleprompter: "in-slate" };
+          const tab = (name, st, opts = {}) => {
+            const tone = v === "doors" && opts.room ? tones[opts.room] : "";
+            const cls = `tab ${tone} ${opts.on ? "on" : ""} ${opts.home ? "home" : ""}`;
+            if (!st) return `<span class="${cls}"><span class="nmb">${name}</span></span>`;
+            const [t, word, withLeft] = st;
+            const val =
+              withLeft && (M.playing || WORST) ? `<span class="${t}">${WORST ? "12:34" : fmt(left)} left</span>` : "";
+            return `<span class="${cls}"><span class="nmb">${name}</span><span class="st"><span class="lamp ${t}"></span><span class="w ${t}">${word === "playing" && !M.playing && !WORST ? "ready" : word}</span>${val}</span></span>`;
+          };
+          const tb = WORST
+            ? {
+                lighting: ["att", "not answering"],
+                audio: ["err", "disconnected"],
+                cameras: ["att", "picture missing"],
+                prompter: ["ok", "playing", true],
+              }
+            : S.tabs;
+          const chip = (label, tone, word) =>
+            `<span class="chip ${v === "doors" ? "" : ""}">${label ? `${label}` : ""}<span class="lamp" style="color:var(--${tone})"></span><span class="w" style="color:var(--${tone})">${word}</span></span>`;
+          const chips = WORST
+            ? chip("Surface", "sse-yellow", "unavailable") +
+              chip("Backup", "sse-yellow", "overdue") +
+              chip("", "sse-yellow", "solo") +
+              chip("", "sse-yellow", "scene drift")
+            : chip("Surface", "sse-green", "ready");
+          let t;
+          if (M.recording && S.cam1 === "unreachable")
+            t = `<div class="lastknown"><span class="lamp"></span><span class="nm">Rec</span><span>last known</span></div>`;
+          else if (M.recording)
+            t = `<div class="rec"><span class="lamp"></span><span class="nm">Rec</span><span class="det">CAM 1</span></div>`;
+          else t = `<div><span class="lamp hollow"></span><span class="nm">Rec</span></div>`;
+          const tally = `<div class="tally" id="tally">${t}</div>`,
+            clock = `<span class="clock" id="clock">${hhmm(clockNow())}</span>`;
+          const logo = `<img class="logo" id="logo" src="sse-exed-horizontal-white.png" alt="SSE Executive Education">`;
+          const pages =
+            tab("Lighting", tb.lighting, { room: "lighting" }) +
+            tab("Audio", tb.audio, { room: "audio" }) +
+            tab("Cameras", tb.cameras, { room: "cameras" }) +
+            tab("Teleprompter", tb.prompter, { room: "teleprompter" });
+          const H = $("hdr");
+          // the logotype is drawn once per variant; only the row's words are redrawn as they change
+          if (hdrV !== v) {
+            hdrV = v;
+            hdrDyn = "";
+            H.className = `abs hdr v-${v}`;
+            document.body.classList.toggle("skylight", v === "skylight");
+            const brand = v === "doors" ? `<span class="tile">${logo}</span>` : `${logo}<span class="rule"></span>`;
+            H.innerHTML =
+              v === "today"
+                ? `<span id="hDyn" style="display:contents"></span>${logo}`
+                : `${brand}<span id="hDyn" style="display:contents"></span>`;
+          }
+          const dyn =
+            v === "today"
+              ? // as built: the product's name (here the Overview's tab, question 1) at the left, Setup first, the logotype at the right
+                tab("Studio Control", null, { on: true, home: true }) +
+                `<span class="tabs-first"></span>` +
+                tab("Setup / Support") +
+                pages +
+                `<span class="sp"></span>${chips}${tally}${clock}`
+              : // the logotype in the top-left corner with its clear space; Overview first; the studio's pages; then the system's
+                // own things at the right: Setup / Support, the deck, the backup, the latches; then REC and the clock
+                v === "facade" || v === "skylight"
+                ? `<span class="hstrip">${tab("Overview", null, { on: true }) + pages}</span><span class="sp"></span><span class="hstrip">${tab("Setup / Support") + chips}</span>` +
+                  tally +
+                  clock
+                : tab("Overview", null, { on: true }) +
+                  pages +
+                  `<span class="sp"></span>` +
+                  tab("Setup / Support") +
+                  `<span class="sysgap"></span>` +
+                  chips +
+                  tally +
+                  clock;
+          if (dyn !== hdrDyn) {
+            $("hDyn").innerHTML = dyn;
+            hdrDyn = dyn;
+          }
+        }
+        let hdrV = null,
+          hdrDyn = "";
+
+        /* ------------------------------------------------------------------ the cluster ------------------------------------------------------------------ */
+        function renderCluster() {
+          const S = view();
+          $("sd").className = "abs col well sd" + (S.sd.tone === "err" ? " error" : "");
+          const c = { ok: "var(--sse-green)", att: "var(--sse-yellow)", err: "var(--sse-coral)" }[S.sd.tone];
+          $("sdLamp").style.background = c;
+          $("sdWord").style.color = c;
+          $("sdWord").textContent = S.sd.word;
+          $("sdSentence").textContent = S.sd.sentence;
+          $("sdMeta").textContent = S.sd.meta;
+          $("sdWay").innerHTML = S.sd.way ? `<span class="key primary" id="way">${S.sd.way}</span>` : "";
+          const way = $("way");
+          if (way && STATES[STATE].gated)
+            way.addEventListener("click", () => {
+              M.synced = true;
+              render(true);
+            });
+          const L = $("latch");
+          if (S.latch && M.clip) {
+            L.className = "abs col latch on";
+            L.innerHTML = `<span class="lamp"></span><span class="who">${S.latch.who}</span><span class="nowrap">${S.latch.text}</span><span class="key small act" id="clearClip">${S.latch.act}</span>`;
+          } else {
+            L.className = "abs col latch rest";
+            L.innerHTML = `<span class="lamp hollow"></span><span>Nothing latched</span>`;
+          }
+          renderRec();
+          renderStudio();
+        }
+        function renderRec() {
+          const S = STATES[STATE];
+          const R = $("rec");
+          const lost = S.cam1 === "unreachable";
+          if (M.armed === "rec") {
+            R.className = "key tall armed";
+            R.innerHTML = `<span class="tag">STOP?</span><span class="lbl">Press again to stop CAM 1</span><i class="bar"></i>`;
+          } else if (M.recording && lost) {
+            R.className = "key tall stack doubt";
+            R.innerHTML = `<span class="cap" style="display:inline-flex;align-items:center;gap:8px"><span class="lamp"></span>Rec</span><span class="hint">last known 10:43 · STOP waits for CAM 1</span>`;
+          } else if (M.recording) {
+            R.className = "key tall hazard-rec";
+            R.innerHTML = `<span class="cap"><span class="lamp"></span>Rec</span><span class="hint">CAM 1 reports recording · press twice to stop</span>`;
+          } else {
+            R.className = "key tall stack";
+            R.innerHTML = `<span class="cap">Rec</span><span class="hint">CAM 1 · one press starts</span>`;
+          }
+          renderTakeRows();
+        }
+        function renderTakeRows() {
+          const S = STATES[STATE];
+          const lost = S.cam1 === "unreachable";
+          const now = clockNow();
+          const row = (k, v, n = "", doubt = false) =>
+            `<div class="ro"><span>${k}</span><span class="v"><span class="${doubt ? "doubtv" : ""}">${v}</span>${n ? `<span class="n">${n}</span>` : ""}</span></div>`;
+          const tc = new Date(now),
+            two = (x) => String(x).padStart(2, "0");
+          let h = "";
+          if (M.recording) {
+            h += row("Take length", fmt((now - M.recStart) / 1000).padStart(5, "0"), "counted here", lost);
+            h += row(
+              "Timecode",
+              `${two(tc.getHours())}:${two(tc.getMinutes())}:${two(tc.getSeconds())}:${two(lost ? 17 : Math.floor((now % 1000) / 40))}`,
+              lost ? "last read" : "",
+              lost
+            );
+          } else {
+            h += row("Last take", "12:48", "Wed 16:27 to 16:40");
+            h += row("Timecode", `${two(tc.getHours())}:${two(tc.getMinutes())}:${two(tc.getSeconds())}:00`);
+          }
+          h += row(
+            "Card time left",
+            M.recording ? (lost ? "46 min" : "48 min") : "52 min",
+            lost ? "last read" : "",
+            lost
+          );
+          h += row("Battery", "100 %", "on mains", lost);
+          $("takeRows").innerHTML = h;
+        }
+        function renderStudio() {
+          const assumed = !M.synced;
+          const r = (lab, val, word, doubt = false) =>
+            `<div class="r"><span class="lab">${lab}</span><span class="val"><span class="${doubt ? "doubtv" : ""}">${val}</span></span>${word}</div>`;
+          $("studio").innerHTML =
+            r("Lighting", "Warm wash · 3 of 4 lit", lw("ok", "on rig")) +
+            r("Console", "Mix 1", assumed ? lw("att", "assumed") : lw("ok", "active"), assumed) +
+            r("Prompter XL", "1920×1080 · 60 Hz", lw("ok", "on screen")) +
+            r("Pictures", "NDI from vMix · 3 of 3", lw("ok", "live")) +
+            r("Deck", "the PROMPTER page", lw("ok", "ready"));
+        }
+
+        /* ------------------------------------------------------------------ the rooms' lintels ------------------------------------------------------------------ */
+        function renderAlerts() {
+          // the page in the state display is the room with the keyline: Cameras → THE PICTURE, the Console → THE SOUND
+          const S = view(),
+            alerts = {};
+          if (S.cam1 === "unreachable") alerts.picture = "err";
+          if (!M.synced) alerts.sound = "att";
+          $("alerts").innerHTML = ROOMS.filter((r) => alerts[r.id])
+            .map(
+              (r) =>
+                `<div class="alert ${alerts[r.id]}" style="left:${r.x - 1}px;top:${r.y - 1}px;width:${r.w + 2}px;height:${r.h + 2}px"></div>`
+            )
+            .join("");
+        }
+        function renderLintels() {
+          const S = view();
+          const lost = S.cam1 === "unreachable";
+          renderAlerts();
+          const rec = M.recording ? (lost ? lw("att", "last known rec") : lw("err", "rec")) : "";
+          $("takeLintel").innerHTML = `<span class="name">The take</span><span class="job">act</span>`;
+          $("picLintel").innerHTML =
+            `<span class="name">The picture</span><span class="job">watch</span>` +
+            `<span class="nm">CAM 1</span>${lost ? lw("err", "unreachable") : lw("ok", "held")}${rec}` +
+            `<span class="f">${lost ? "the picture still comes from vMix · values last read 10:43" : "ISO 400 · 180° · f/2.8 · ND 2 · 5600 K"}</span><span class="sp"></span>` +
+            `<span class="seg"><span class="key small">Guides</span><span class="key small">Zebras</span></span>${door("Cameras")}`;
+          $("cam2cap").innerHTML = `<span class="nm">CAM 2</span>${lw("ok", "held")}`;
+          $("cam3cap").innerHTML = `<span class="nm">CAM 3</span>${lw("ok", "held")}`;
+          $("scriptLintel").innerHTML =
+            `<span class="name">The script</span><span class="job">read</span>` +
+            `<span class="nm">02 Interview intro</span>${M.playing ? lw("ok", "playing") : lw("off", "paused")}<span class="sp"></span>${door("Teleprompter")}`;
+          $("soundLintel").innerHTML =
+            `<span class="name">The sound</span><span class="job">listen</span><span class="sp"></span>${door("Audio")}`;
+        }
+        function svgPic(id, scene, vb, marker) {
+          $(id).innerHTML =
+            `<svg viewBox="${vb}" preserveAspectRatio="xMidYMid slice"><use href="#${scene}"/>${marker || ""}</svg>`;
+        }
+        function renderPictures() {
+          svgPic(
+            "cam1",
+            "scene1",
+            "0 0 1920 1080",
+            `<rect x="870" y="458" width="180" height="101" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="2.4" stroke-dasharray="10 7"/>`
+          );
+          svgPic("cam2", "scene2", "0 0 1920 1080");
+          svgPic("cam3", "scene3", "0 0 1920 1080");
+          svgPic("loupe", "scene1", "870 458 180 101");
+        }
+
+        /* the speed tape: one tick a detent (5 words/min), a label every 20 */
+        const TAPE = { px: 13, min: 40, max: 300 };
+        function buildTape() {
+          let h = "";
+          for (let v = TAPE.min; v <= TAPE.max; v += 5) {
+            const y = ((TAPE.max - v) * TAPE.px) / 5,
+              major = v % 20 === 0;
+            h += `<div class="tk${major ? " major" : ""}" style="top:${y}px;width:${major ? 26 : 14}px"></div>`;
+            if (major) h += `<div class="lbl" style="top:${y - 8}px">${v}</div>`;
+          }
+          $("tape").innerHTML = h + `<div class="range" id="tapeRange" style="left:66px"></div>`;
+          $("tape").style.height = ((TAPE.max - TAPE.min) / 5) * TAPE.px + 2 + "px";
+        }
+        function renderSpeed() {
+          const centre = 110,
+            y = ((TAPE.max - M.speed) * TAPE.px) / 5;
+          $("tape").style.transform = `translateY(${centre - y}px)`;
+          const y1 = ((TAPE.max - M.range[1]) * TAPE.px) / 5,
+            y0 = ((TAPE.max - M.range[0]) * TAPE.px) / 5,
+            r = $("tapeRange");
+          r.style.top = y1 + "px";
+          r.style.height = Math.max(3, y0 - y1 + 1) + "px";
+          $("speedNum").textContent = M.speed;
+          const turned = Date.now() < M.turnedUntil;
+          $("pointer").classList.toggle("turned", turned);
+          const f = $("speedFrom");
+          f.classList.toggle("on", turned);
+          f.textContent = turned
+            ? "turned on the deck"
+            : M.range[0] !== M.range[1]
+              ? `this take ${M.range[0]} to ${M.range[1]}`
+              : "the script's own speed";
+        }
+        function renderAhead() {
+          const i = paraAt(M.pos),
+            left = (G.end - M.pos) / pps(M.speed);
+          $("placeP").textContent = `¶ ${i + 1} of ${G.paras.length}`;
+          $("placeS").textContent = `${Math.floor(shareAt(M.pos) * 100)} %`;
+          $("leftT").textContent = fmt(left);
+          $("leftS").textContent = M.playing ? `ends ${hhmm(clockNow() + left * 1000)}` : "if played from here";
+          $("cuesAt").textContent = `at ${M.speed} words/min`;
+          const ahead = G.paras.map((x, k) => ({ ...x, k })).filter((x) => x.cue && x.top > M.pos - 2);
+          $("cues").innerHTML = ahead.length
+            ? ahead
+                .slice(0, 3)
+                .map(
+                  (x, n) =>
+                    `<div class="c${n ? " later" : ""}"><span class="in">${fmt((x.top - M.pos) / pps(M.speed))}</span><span class="tx">${x.cue}</span><span class="pn">¶ ${x.k + 1}</span></div>`
+                )
+                .join("")
+            : `<div class="c later"><span class="in">—</span><span class="tx" style="font-style:normal;color:var(--text3)">No cue ahead</span><span></span></div>`;
+          $("backHint").textContent = `to the start of ¶ ${i + 1}`;
+          const P = $("play");
+          P.className = "key stack play" + (M.playing ? " live" : "");
+          P.innerHTML = `<span class="cap">Play</span><span class="hint">${M.playing ? "press to pause" : `from ¶ ${i + 1}`}</span>`;
+          const tl = $("place");
+          if (tl) tl.style.left = shareAt(M.pos) * 100 + "%";
+          document.querySelectorAll(".timeline .seg2").forEach((el, k) => el.classList.toggle("read", k < i));
+        }
+        function buildTimeline() {
+          const T = $("timeline");
+          T.innerHTML =
+            G.paras.map((p, k) => `<div class="seg2" style="flex:${p.words} 0 0">${k + 1}</div>`).join("") +
+            `<i class="place" id="place"></i>`;
+          let acc = 0;
+          G.paras.forEach((p) => {
+            if (p.cue)
+              T.insertAdjacentHTML(
+                "beforeend",
+                `<i class="cue" style="left:calc(${(acc / G.total) * 100}% + 1px)"></i>`
+              );
+            acc += p.words;
+          });
+        }
+        function renderGlass() {
+          $("gcol").style.transform = `translateY(${G.readY - M.pos}px)`;
+          const p = G.paras[paraAt(M.pos)],
+            into = M.pos - p.top;
+          const lineTop = into < p.h - G.gap ? p.top + Math.floor(into / G.line) * G.line : M.pos;
+          $("gread").style.height = Math.max(0, G.readY - (M.pos - lineTop)) + "px";
+        }
+
+        /* ------------------------------------------------------------------ the sound ------------------------------------------------------------------ */
+        const STRIPS = [
+          { id: "boom", name: "Boom", level: `${MINUS}10.0` },
+          { id: "sm7b1", name: "SM7B 1", level: `${MINUS}3.8` },
+          { id: "sm7b2", name: "SM7B 2", level: `${MINUS}4.5` },
+          { id: "sm7b3", name: "SM7B 3", level: `${MINUS}5.8` },
+          { id: "main", name: "Main Out", stereo: true },
+        ];
+        const INPUTS = STRIPS.filter((s) => !s.stereo);
+        const BW = { left: 2164, w: 352, top: 410, bottom: 1320, col0: 32, colW: 80 };
+        const BAR = { top: BW.top + 16, bottom: BW.bottom - 16 };
+        const dbY = (db) => BAR.bottom - ((Math.max(-60, Math.min(0, db)) + 60) / 60) * (BAR.bottom - BAR.top);
+        const dbX = (db) => (Math.max(-60, Math.min(0, db)) + 60) / 60;
+        function buildMeters() {
+          let h = `<div class="abs well in-umber" style="left:${BW.left}px;top:${BW.top}px;width:${BW.w}px;height:${BW.bottom - BW.top}px;background:var(--material-well)">`;
+          [0, -6, -12, -18, -24, -40, -60].forEach((d) => {
+            const y = dbY(d) - BW.top;
+            h += `<div class="sline${d === -18 ? " nom" : ""}" style="top:${y}px"></div><div class="scale" style="top:${y - 8}px">${d ? MINUS + Math.abs(d) : 0}</div>`;
+          });
+          INPUTS.forEach((s, i) => {
+            const cx = BW.col0 + BW.colW * i + BW.colW / 2;
+            h += `<div class="mslot" id="w-${s.id}" style="left:${cx - 12}px;top:${BAR.top - BW.top}px;width:24px;height:${BAR.bottom - BAR.top}px"><div class="ramp"></div><div class="mask" id="mk-${s.id}-0"></div><div class="pk" id="pk-${s.id}-0"></div><div class="tint"></div></div>`;
+          });
+          h += `<div id="gate" style="position:absolute;left:34px;right:8px;top:${(BW.bottom - BW.top) / 2 - 40}px;height:80px;background:var(--material-well);display:none;align-items:center;justify-content:center;gap:12px;font:400 16px/1.35 'PT Sans';color:var(--text3);text-align:center"><span class="lamp hollow" style="width:10px;height:10px"></span><span>The meters wait for a Sync<br>from TotalMix.</span></div></div>`;
+          INPUTS.forEach((s, i) => {
+            h += `<div class="strip in-umber" style="left:${BW.left + BW.col0 + BW.colW * i}px;top:302px;width:${BW.colW}px"><div class="nm">${s.name}</div><div class="lv" id="lv-${s.id}"></div><div class="mk"><span class="key" id="m-${s.id}">M</span></div></div>`;
+          });
+          $("meters").innerHTML = h;
+          $("hwell").innerHTML =
+            [0, 1]
+              .map(
+                (k) =>
+                  `<div class="hbar" style="top:${4 + k * 11}px"><div class="ramp"></div><div class="mask" id="mk-main-${k}"></div><div class="pk" id="pk-main-${k}"></div></div>`
+              )
+              .join("") + `<div class="hnom" style="left:${4 + dbX(-18) * (BW.w - 8)}px"></div>`;
+          STRIPS.forEach((s) =>
+            $("m-" + s.id).addEventListener("click", () => {
+              M.mutes[s.id] = !M.mutes[s.id];
+              renderMutes();
+            })
+          );
+        }
+        function renderMutes() {
+          STRIPS.forEach((s) => {
+            const muted = !!M.mutes[s.id],
+              dz = M.synced ? "" : ` class="doubtv"`;
+            if (!s.stereo) {
+              $("lv-" + s.id).innerHTML = muted
+                ? `<span class="muted">MUTED</span>`
+                : `<span${dz}>${s.level}<span class="u"> dB</span></span>`;
+              $("w-" + s.id).classList.toggle("clip", M.clip === s.id);
+            } else
+              $("mainLvl").innerHTML = muted
+                ? `<span class="t-yellow adelia" style="font-size:20px">Muted</span>`
+                : `<span${dz}>${MINUS}1.2<span class="u">dB</span></span>`;
+            $("m-" + s.id).className = "key" + (muted ? " engaged" : "");
+          });
+          $("gate").style.display = M.synced ? "none" : "flex";
+          if (!M.synced) STRIPS.forEach((s) => (s.stereo ? [0, 1] : [0]).forEach((k) => setMeter(s.id, k, -90, -90)));
+        }
+        function setMeter(id, k, v, pkv) {
+          if (id === "main") {
+            $(`mk-main-${k}`).style.width = (1 - dbX(v)) * 100 + "%";
+            const p = $(`pk-main-${k}`);
+            p.style.left = dbX(pkv) * 100 + "%";
+            p.style.display = pkv > -59 ? "block" : "none";
+            return;
+          }
+          $(`mk-${id}-${k}`).style.height = Math.max(0, dbY(v) - BAR.top) + "px";
+          const p = $(`pk-${id}-${k}`);
+          p.style.top = dbY(pkv) - BAR.top - 1 + "px";
+          p.style.display = pkv > -59 ? "block" : "none";
+        }
+        const LV = {};
+        STRIPS.forEach((s) => {
+          LV[s.id] = [
+            { v: -60, pk: -60, hold: 0 },
+            { v: -60, pk: -60, hold: 0 },
+          ];
+        });
+        let phase = 0,
+          syl = 0,
+          gap = 0,
+          seed = 7;
+        const rnd = () => {
+          seed = (seed * 16807) % 2147483647;
+          return seed / 2147483647;
+        };
+        function targetLevels(dt) {
+          const talk = STATES[STATE].talk && M.playing;
+          syl -= dt;
+          gap -= dt;
+          if (syl <= 0) {
+            syl = 0.09 + rnd() * 0.16;
+            phase = rnd();
+          }
+          if (gap <= 0) gap = talk ? 1.4 + rnd() * 3.2 : 1;
+          const voice = !talk || gap < 0.28 ? -70 : -19 + phase * 12 - (phase < 0.18 ? 14 : 0);
+          const room = -54 + rnd() * 4;
+          const t = {
+            sm7b1: Math.max(room - 2, voice),
+            sm7b2: Math.max(room - 3, voice - 30),
+            sm7b3: -61,
+            boom: Math.max(room + 3, voice - 13),
+          };
+          const mixIn = (id, trim) => (M.mutes[id] ? -90 : t[id] + trim);
+          const sum =
+            10 *
+            Math.log10(
+              [mixIn("sm7b1", 2.4), mixIn("sm7b2", 1.8), mixIn("boom", -6)].reduce(
+                (a, d) => a + Math.pow(10, d / 10),
+                0
+              ) + 1e-9
+            );
+          t.main = [sum, sum - 0.8 + (rnd() - 0.5)];
+          return t;
+        }
+        function tickMeters(dt) {
+          if (!M.synced) return;
+          const t = targetLevels(dt),
+            now = performance.now();
+          STRIPS.forEach((s) =>
+            (s.stereo ? t.main : [t[s.id]]).forEach((target, k) => {
+              const m = LV[s.id][k];
+              m.v += (target - m.v) * (target > m.v ? 1 - Math.exp(-dt / 0.045) : 1 - Math.exp(-dt / 0.34));
+              if (m.v > m.pk) {
+                m.pk = m.v;
+                m.hold = now + 1500;
+              } else if (now > m.hold) m.pk = Math.max(m.v, m.pk - 15 * dt);
+              setMeter(s.id, k, m.v, m.pk);
+            })
+          );
+        }
+        function stillLevels() {
+          if (!M.synced) return;
+          const pick = {
+            take: {
+              boom: [-30, -26],
+              sm7b1: [-11.5, -6.2],
+              sm7b2: [-46, -44],
+              sm7b3: [-61, -61],
+              main: [
+                [-13.1, -9.0],
+                [-13.9, -9.6],
+              ],
+            },
+            landing: {
+              boom: [-51, -49],
+              sm7b1: [-55, -52],
+              sm7b2: [-56, -53],
+              sm7b3: [-61, -61],
+              main: [
+                [-57, -54],
+                [-58, -55],
+              ],
+            },
+            fault: {
+              boom: [-27, -23],
+              sm7b1: [-9.4, -0.6],
+              sm7b2: [-45, -43],
+              sm7b3: [-61, -61],
+              main: [
+                [-10.9, -2.9],
+                [-11.6, -3.5],
+              ],
+            },
+          }[STATE];
+          STRIPS.forEach((s) =>
+            (s.stereo ? pick.main : [pick[s.id]]).forEach(([v, pkv], k) => setMeter(s.id, k, v, pkv))
+          );
+        }
+
+        /* ------------------------------------------------------------------ the footer, render, the loop ------------------------------------------------------------------ */
+        function renderFooter() {
+          const it = (l, v) => `<span class="item"><span>${l}</span><span class="v">${v}</span></span>`;
+          $("footer").innerHTML =
+            it("Takes today", STATE === "landing" ? "none yet · 4 yesterday" : "4 · 41 min") +
+            it("Started", "09:05") +
+            it("Last sync", M.synced ? (STATE === "landing" ? "09:14" : "09:12") : "none since the start") +
+            it("Backup", "today 09:12") +
+            (HEADER !== "today" ? `<span class="colophon">Studio Control</span>` : "");
+        }
+        function render(all) {
+          if (all) {
+            renderCluster();
+            renderMutes();
+            renderFooter();
+          }
+          renderLintels();
+          renderHeader();
+          renderSpeed();
+          renderAhead();
+          renderGlass();
+        }
+        let last = performance.now(),
+          acc = 0,
+          secAcc = 0;
+        function loop(now) {
+          const dt = Math.min(0.1, (now - last) / 1000);
+          last = now;
+          if (!STILL) {
+            if (M.playing) {
+              M.pos += pps(M.speed) * dt;
+              if (M.pos >= G.end) {
+                M.pos = G.end;
+                M.playing = false;
+                renderLintels();
+              }
+              renderGlass();
+            }
+            acc += dt;
+            if (acc > 1 / 30) {
+              tickMeters(acc);
+              acc = 0;
+            }
+            secAcc += dt;
+            if (secAcc > 0.25) {
+              secAcc = 0;
+              renderHeader();
+              renderAhead();
+              renderTakeRows();
+              renderSpeed();
+            }
+          }
+          requestAnimationFrame(loop);
+        }
+
+        /* ------------------------------------------------------------------ the presses ------------------------------------------------------------------ */
+        function turn(steps, fromDeck = true) {
+          const v = Math.max(40, Math.min(300, M.speed + steps * 5));
+          if (v === M.speed) return;
+          M.speed = v;
+          M.range = [Math.min(M.range[0], v), Math.max(M.range[1], v)];
+          if (fromDeck) M.turnedUntil = Date.now() + 1200;
+          renderSpeed();
+          renderAhead();
+          renderHeader();
+          renderDeck();
+        }
+        function playPause() {
+          M.playing = !M.playing;
+          if (M.pos >= G.end) M.pos = G.paras[0].top;
+          renderLintels();
+          renderAhead();
+          renderHeader();
+          renderDeck();
+        }
+        function rec() {
+          if (STATES[STATE].cam1 === "unreachable") return;
+          if (!M.recording) {
+            M.recording = true;
+            M.recStart = clockNow();
+            M.armed = null;
+          } else if (M.armed === "rec") {
+            M.recording = false;
+            M.armed = null;
+            clearTimeout(M.armT);
+          } else {
+            M.armed = "rec";
+            clearTimeout(M.armT);
+            M.armT = setTimeout(() => {
+              M.armed = null;
+              renderRec();
+              renderDeck();
+            }, 3000);
+          }
+          renderRec();
+          renderHeader();
+          renderLintels();
+          renderDeck();
+        }
+        function jumpPara(d) {
+          M.pos = G.paras[Math.max(0, Math.min(G.paras.length - 1, paraAt(M.pos) + d))].top;
+          renderGlass();
+          renderAhead();
+        }
+        function jumpCue(d) {
+          const cues = G.paras.filter((p) => p.cue);
+          const t = d > 0 ? cues.find((p) => p.top > M.pos + 2) : [...cues].reverse().find((p) => p.top < M.pos - 2);
+          if (t) {
+            M.pos = t.top;
+            renderGlass();
+            renderAhead();
+          }
+        }
+        const back = () => {
+          M.pos = G.paras[paraAt(M.pos)].top;
+          renderGlass();
+          renderAhead();
+        };
+        const toTop = () => {
+          M.playing = false;
+          M.pos = G.paras[0].top;
+          renderLintels();
+          renderGlass();
+          renderAhead();
+        };
+        $("play").addEventListener("click", playPause);
+        $("back").addEventListener("click", back);
+        $("top").addEventListener("click", toTop);
+        $("slower").addEventListener("click", () => turn(-1, false));
+        $("faster").addEventListener("click", () => turn(1, false));
+        $("cuePrev").addEventListener("click", () => jumpCue(-1));
+        $("cueNext").addEventListener("click", () => jumpCue(1));
+        $("rec").addEventListener("click", rec);
+        $("latch").addEventListener("click", (e) => {
+          if (e.target.id === "clearClip") {
+            M.clip = null;
+            renderCluster();
+            renderMutes();
+          }
+        });
+        $("speed").addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            turn(e.deltaY < 0 ? 1 : -1);
+          },
+          { passive: false }
+        );
+        addEventListener("keydown", (e) => {
+          if (e.key === "ArrowUp") {
+            turn(1);
+            e.preventDefault();
+          }
+          if (e.key === "ArrowDown") {
+            turn(-1);
+            e.preventDefault();
+          }
+          if (e.key === " ") {
+            playPause();
+            e.preventDefault();
+          }
+        });
+
+        /* ------------------------------------------------------------------ the drawn deck ------------------------------------------------------------------ */
+        function renderDeck() {
+          const left = (G.end - M.pos) / pps(M.speed),
+            lost = STATES[STATE].cam1 === "unreachable";
+          const recK =
+            M.armed === "rec"
+              ? `<div class="k arm" data-k="rec">STOP?</div>`
+              : M.recording
+                ? `<div class="k red" data-k="rec">● REC<small>${lost ? "LAST KNOWN" : "CAM 1"}</small></div>`
+                : `<div class="k" data-k="rec">REC<small>CAM 1</small></div>`;
+          $("deckKeys").innerHTML =
+            recK +
+            `<div class="k" data-k="cp">◂ CUE</div><div class="k" data-k="cn">CUE ▸</div><div class="k page">LIGHTS ›</div>` +
+            `<div class="k${M.playing ? " green" : ""}" data-k="play">PLAY<small>${fmt(left)}</small></div><div class="k" data-k="back">BACK</div><div class="k dark"></div><div class="k" data-k="top">TOP</div>`;
+          const i = paraAt(M.pos);
+          $("deckLcd").innerHTML =
+            `<div>SPEED<span>${M.speed}</span></div><div>LINE<span>${Math.floor(shareAt(M.pos) * 100)} %</span></div><div>PARAGRAPH<span>${i + 1} / ${G.paras.length}</span></div><div>SIZE<span>88 px</span></div>`;
+        }
+        $("deckKeys").addEventListener("click", (e) => {
+          const k = e.target.closest("[data-k]");
+          if (!k) return;
+          ({ rec, play: playPause, cp: () => jumpCue(-1), cn: () => jumpCue(1), back, top: toTop })[k.dataset.k]?.();
+          renderDeck();
+        });
+        $("deckDials").addEventListener(
+          "wheel",
+          (e) => {
+            const d = e.target.closest("[data-dial]");
+            if (!d) return;
+            e.preventDefault();
+            const s = e.deltaY < 0 ? 1 : -1;
+            if (d.dataset.dial === "speed") turn(s);
+            if (d.dataset.dial === "line") {
+              M.pos = Math.max(0, M.pos + s * G.line);
+              renderGlass();
+              renderAhead();
+            }
+            if (d.dataset.dial === "para") jumpPara(s);
+            renderDeck();
+          },
+          { passive: false }
+        );
+        $("deckDials").addEventListener("click", (e) => {
+          const d = e.target.closest("[data-dial]");
+          if (d && d.dataset.dial === "speed") playPause();
+        });
+        $("bDeck").addEventListener("click", () => {
+          $("deck").classList.toggle("open");
+          $("bDeck").classList.toggle("on");
+          renderDeck();
+        });
+        document.querySelectorAll("[data-state]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const u = new URL(location.href);
+            u.searchParams.set("state", b.dataset.state);
+            history.replaceState(null, "", u);
+            load(b.dataset.state);
+            markState();
+            placeNotes();
+          })
+        );
+        function markState() {
+          document.querySelectorAll("[data-state]").forEach((b) => b.classList.toggle("on", b.dataset.state === STATE));
+          document
+            .querySelectorAll("[data-header]")
+            .forEach((b) => b.classList.toggle("on", b.dataset.header === HEADER));
+        }
+        document.querySelectorAll("[data-header]").forEach((b) =>
+          b.addEventListener("click", () => {
+            HEADER = b.dataset.header;
+            const u = new URL(location.href);
+            u.searchParams.set("header", HEADER);
+            history.replaceState(null, "", u);
+            renderHeader();
+            renderFooter();
+            markState();
+            placeNotes();
+          })
+        );
+
+        /* ------------------------------------------------------------------ the notes (numbered as in overview-2.md) ------------------------------------------------------------------ */
+        const NOTES = [
+          [
+            200,
+            22,
+            "The header, a skylight",
+            "Apple's toolbar thinking with the SSE brand: a quiet raised bar (the atrium's glass roof) closed by a crisp divider; hierarchy from grouping, not decoration: the pages on one platter (Overview first), the system's own things on another, REC on its own; the logotype and the clock on the bar itself. Concentric shapes (platter 12, segment 8). Tint only for focus: the open page is the one Dark Green segment. The footer takes the same surface. The product's name moves to the footer. The fullest row has 113 px to spare.",
+          ],
+          [
+            16,
+            104,
+            "The studio's state",
+            "The worst page's own word, its sentence with the page named first, and that page's own way-out key. READY when every link answers. It stands outside the rooms and speaks for all of them; the room whose page it names takes the same keyline (coral, yellow), so the eye goes from the word to the room.",
+          ],
+          [
+            16,
+            300,
+            "Every page's latches",
+            "Solo, a clip, a scene drift, a highlight: the one latch slot, each with its clear key. The header leaves them off on this page.",
+          ],
+          [
+            16,
+            372,
+            "THE TAKE · act",
+            "Stone. Everything pressed during a take, in one room: REC where Cameras has it, then the prompter's transport in the Teleprompter page's order.",
+          ],
+          [
+            16,
+            844,
+            "Outside the rooms",
+            "What each page has set, one line each, on the page's own floor: quiet, so it never competes with the four rooms.",
+          ],
+          [
+            456,
+            104,
+            "Four rooms, four jobs",
+            "Act · watch · read · listen. Each room is the brand's Room: a back wall, four bevelled planes, its name carved in the lintel, tinted with the dark member of one brand pair (Beige, Dark Green, Sky, Brown). The bright member already lives inside: green lamps, blue cues, yellow mutes.",
+          ],
+          [
+            1720,
+            164,
+            "Four pictures, used exactly",
+            "CAM 1 at 1236 × 695 on the back wall; CAM 2, CAM 3 and CAM 1's loupe at 2:1 beside it: the helper's four.",
+          ],
+          [
+            456,
+            904,
+            "THE SCRIPT · read",
+            "Slate. The speed (one tick a detent, the keyline when the deck turned it), the glass where the eyes are, and what comes: place, time left, each cue's time.",
+          ],
+          [
+            800,
+            964,
+            "The glass, cropped to its column",
+            "The glass's own copy at 55 %, its line breaks the glass's own, the reading line at the glass's 35 %.",
+          ],
+          [
+            484,
+            1336,
+            "The whole script on the floor",
+            "The Teleprompter page's bar, laid along the room's floor: read only here.",
+          ],
+          [
+            2136,
+            104,
+            "THE SOUND · listen",
+            "Umber. Main Out first, flat as on the Console; then the inputs TotalMix shows on the Console's own scale; Phones on the floor. Gated, as on the Console, while it is not sure of the desk.",
+          ],
+          [
+            2092,
+            126,
+            "Doors",
+            "Each room's lintel ends in a door to its own page: Cameras →, Teleprompter →, Audio →. The tabs still do the same; the door is where the eye already is.",
+          ],
+          [
+            14,
+            1404,
+            "Quiet telemetry",
+            "The day so far: takes and minutes recorded (from the action log), the start, the last sync, the backup.",
+          ],
+        ];
+        function placeNotes() {
+          const box = $("notes");
+          box.innerHTML = "";
+          if (!(q.get("notes") === "1" || $("bNotes").classList.contains("on"))) return;
+          NOTES.forEach(([x, y, title, text], i) => {
+            const pin = document.createElement("div");
+            pin.className = "pin";
+            pin.style.left = x + "px";
+            pin.style.top = y + "px";
+            pin.textContent = i + 1;
+            const note = document.createElement("div");
+            note.className = "note";
+            note.innerHTML = `<b>${i + 1} · ${title}</b>${text}`;
+            note.style.left = Math.min(2560 - 400, x + 20) + "px";
+            note.style.top = Math.min(1440 - 160, y + 20) + "px";
+            pin.addEventListener("mouseenter", () => {
+              note.style.display = "block";
+            });
+            pin.addEventListener("mouseleave", () => {
+              note.style.display = "none";
+            });
+            box.append(pin, note);
+          });
+        }
+        $("bNotes").addEventListener("click", () => {
+          $("bNotes").classList.toggle("on");
+          placeNotes();
+        });
+        if (q.get("notes") === "1") $("bNotes").classList.add("on");
+        if (q.get("deck") === "1") {
+          $("deck").classList.add("open");
+          $("bDeck").classList.add("on");
+        }
+
+        /* ------------------------------------------------------------------ start ------------------------------------------------------------------ */
+        window.__report = () => {
+          const cut = [...document.querySelectorAll("body *")]
+            .filter((el) => {
+              if (el.closest("[data-picture]") || el.closest(".board") || el.closest("#notes") || el.closest("#rooms"))
+                return false;
+              const cs = getComputedStyle(el);
+              if (cs.display === "none" || !el.textContent.trim()) return false;
+              return (
+                (cs.whiteSpace === "nowrap" || cs.textOverflow === "ellipsis") &&
+                el.scrollWidth > el.clientWidth + 1 &&
+                el.children.length === 0
+              );
+            })
+            .map((el) => `${el.className || el.tagName}: ${el.textContent.trim().slice(0, 40)}`);
+          const over = [...document.querySelectorAll(".lintel")]
+            .filter((el) => el.scrollWidth > el.clientWidth + 1)
+            .map((el) => el.id);
+          // the header: the room between the pages' tabs and what follows the spacer; the logotype's clear space (half its height)
+          const H = $("hdr"),
+            kids = [...H.querySelectorAll(":scope > *, #hDyn > *")].filter(
+              (el) => el.id !== "hDyn" && getComputedStyle(el).display !== "contents"
+            );
+          const sp = kids.findIndex((el) => el.classList.contains("sp"));
+          const r = (el) => el.getBoundingClientRect();
+          const headerSpare = Math.round(r(kids[sp + 1]).left - r(kids[sp - 1]).right);
+          const logo = $("logo"),
+            li = kids.indexOf(logo.closest(".tile") || logo);
+          const nb = [kids[li - 1], kids[li + 1]]
+            .filter(Boolean)
+            .filter((el) => !el.classList.contains("rule") || HEADER === "today");
+          const nextAfterRule = kids[li + 1] && kids[li + 1].classList.contains("rule") ? kids[li + 2] : kids[li + 1];
+          const clear = Math.round(
+            Math.min(
+              r(logo).left - r(H).left,
+              nextAfterRule ? r(nextAfterRule).left - r(logo).right : 999,
+              r(H).right - r(logo).right
+            )
+          );
+          void nb;
+          return {
+            state: STATE,
+            header: HEADER,
+            headerSpare,
+            logoClear: clear,
+            cut,
+            over,
+            left: fmt((G.end - M.pos) / pps(M.speed)),
+          };
+        };
+        function start() {
+          drawRooms();
+          buildGlass();
+          buildTape();
+          buildMeters();
+          renderPictures();
+          load(STATE);
+          markState();
+          placeNotes();
+          renderDeck();
+          if (STILL) stillLevels();
+          requestAnimationFrame((t) => {
+            last = t;
+            loop(t);
+          });
+        }
+        Promise.all(
+          [
+            "500 88px Inter",
+            "600 88px Inter",
+            "italic 500 62px Inter",
+            "700 20px 'SSE Adelia'",
+            "400 16px 'PT Sans'",
+            "700 16px 'PT Sans'",
+            "italic 400 16px 'PT Serif'",
+          ].map((f) => document.fonts.load(f))
+        )
+          .catch(() => null)
+          .then(() => document.fonts.ready)
+          .then(start);
+      })();
+    </script>
+  </body>
+</html>

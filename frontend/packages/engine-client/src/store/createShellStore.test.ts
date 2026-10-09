@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFixtureScenario } from "@sse/test-fixtures";
 
+import { EngineRequestError } from "../transports/engineRequestError";
 import { createFixtureTransport } from "../transports/fixtureTransport";
 import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
-import type { EngineTransport } from "../types";
+import type { EngineTransport, ShellStore } from "../types";
 import { createShellStore, prompterGlassIsStale } from "./createShellStore";
 import { anchorArrival } from "../prompter/anchorArrival";
 import type { PrompterAnchor } from "../generated/snapshots/PrompterAnchor";
@@ -890,14 +891,17 @@ describe("createShellStore scoped refresh", () => {
   });
 });
 
-// New pages program, D1: Studio Control keeps opening on the page last used.
-// Planning left the screen in Slice 1, and a page saved while it was open reads
-// as the Console until the hardware link rewrites the saved value (Slice 2).
+// New pages program, D1: the page on screen is the page last saved. Planning
+// left the screen in Slice 1, and a page saved while it was open reads as the
+// Console until the hardware link rewrites the saved value (Slice 2). D47
+// amends D1: the app opens on the Overview at every start of the app, which
+// is a write at the start (the cases at the end), not a rule of the reading.
 describe("createShellStore landing page", () => {
   const savedPage = (workspace: string, targetSurface = "dashboard") => ({
     shell: { workspace },
     startup: { targetSurface },
   });
+  const writes = (calls: readonly string[]) => calls.filter((call) => call === "request:settings.update").length;
 
   it("reads a saved Planning page as the Console", async () => {
     const { answer, transport } = supervisedTransport();
@@ -915,6 +919,7 @@ describe("createShellStore landing page", () => {
     await store.initialize();
 
     for (const [saved, expected] of [
+      ["overview", "overview"],
       ["lighting", "lighting"],
       ["audio", "audio"],
       ["setup", "setup"],
@@ -929,6 +934,146 @@ describe("createShellStore landing page", () => {
     answer("app.snapshot", savedPage("planning", "commissioning"));
     await store.refresh();
     expect(store.getSnapshot().activeWorkspace).toBe("setup");
+    await store.dispose();
+  });
+
+  // D47: the landing is one write of the page, before the ready state, so the
+  // saved page never shows first, and the deck's word follows it (D49). The
+  // hardware link answers the write with the whole app snapshot, as the double
+  // does; an answer of the settings alone carries the page in `shell` too.
+  it.each([
+    ["the whole app snapshot", savedPage("overview")],
+    ["the settings alone", { settings: { "shell.workspace": "overview" }, shell: { workspace: "overview" } }],
+  ])("a start lands on the Overview with one write, answered with %s", async (_answer, reply) => {
+    const { answer, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("cameras"));
+    answer("settings.update", reply);
+    const sent: Array<[string, unknown, string]> = [];
+    const store: ShellStore = createShellStore(
+      {
+        ...transport,
+        request: (method, params) => {
+          if (method === "settings.update") sent.push([method, params ?? {}, store.getSnapshot().lifecycle]);
+          return transport.request(method, params);
+        },
+      },
+      { landing: "overview" }
+    );
+    const shownWhenReady = new Set<string>();
+    store.subscribe(() => {
+      if (store.getSnapshot().lifecycle === "ready") shownWhenReady.add(store.getSnapshot().activeWorkspace);
+    });
+    await store.initialize();
+
+    expect(sent).toEqual([["settings.update", { workspace: "overview" }, "waiting-for-app-snapshot"]]);
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("overview");
+    expect(store.getSnapshot().appSnapshot?.shell).toMatchObject({ workspace: "overview" });
+    expect(store.getSnapshot().appSnapshot?.startup).toEqual({ targetSurface: "dashboard" });
+    expect([...shownWhenReady]).toEqual(["overview"]);
+    expect(store.getSnapshot().backgroundFailures).toEqual([]);
+    await store.dispose();
+  });
+
+  it("a start while the setup is not done stays on Setup and writes nothing, and the publish's restart does not land", async () => {
+    const { answer, calls, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("setup", "commissioning"));
+    const store = createShellStore(transport, { landing: "overview" });
+    await store.initialize();
+    expect(store.getSnapshot().activeWorkspace).toBe("setup");
+    expect(writes(calls)).toBe(0);
+
+    // The first start that reached ready was the landing's one chance, so a
+    // restart of the hardware link after the publish keeps the page.
+    answer("app.snapshot", savedPage("setup"));
+    await store.restart();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("setup");
+    expect(writes(calls)).toBe(0);
+    await store.dispose();
+  });
+
+  // Setup's Restart, a database restore and the restart after a crash are
+  // all `restartEngine`: the operator is mid-session, so the page stays.
+  it("a restart of the hardware link keeps the page the operator is on", async () => {
+    const { answer, calls, launches, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("audio"));
+    answer("settings.update", savedPage("overview"));
+    const store = createShellStore(transport, { landing: "overview" });
+    await store.initialize();
+    expect(store.getSnapshot().activeWorkspace).toBe("overview");
+    expect(writes(calls)).toBe(1);
+
+    // The operator opens Lighting, and the hardware link restarts.
+    answer("settings.update", savedPage("lighting"));
+    answer("app.snapshot", savedPage("lighting"));
+    await store.setWorkspace("lighting");
+    expect(store.getSnapshot().activeWorkspace).toBe("lighting");
+    expect(writes(calls)).toBe(2);
+    await store.restart();
+    expect(launches()).toBe(2);
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("lighting");
+    expect(writes(calls)).toBe(2);
+    await store.dispose();
+  });
+
+  it("without a landing page the start writes nothing and shows the saved page", async () => {
+    const { answer, calls, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("cameras"));
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().activeWorkspace).toBe("cameras");
+    expect(writes(calls)).toBe(0);
+    await store.dispose();
+  });
+
+  it("a refused write keeps the saved page, records the failure and is not tried again", async () => {
+    const { answer, calls, refuse, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("cameras"));
+    refuse("settings.update");
+    const store = createShellStore(transport, { landing: "overview" });
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("cameras");
+    expect(store.getSnapshot().backgroundFailures).toEqual([
+      expect.objectContaining({ context: "the landing page", message: "settings.update refused" }),
+    ]);
+    expect(writes(calls)).toBe(1);
+
+    await store.restart();
+    expect(store.getSnapshot().activeWorkspace).toBe("cameras");
+    expect(writes(calls)).toBe(1);
+    await store.dispose();
+  });
+
+  // The review of the landing: a hardware link that stops while it answers
+  // the write is no refusal. The start fails, as a read would fail it, and the
+  // start that follows (the automatic restart, or Retry startup) lands.
+  it("a hardware link that stops during the write fails the start, and the next start lands", async () => {
+    const { answer, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("teleprompter"));
+    let stopped = true;
+    const store = createShellStore(
+      {
+        ...transport,
+        request: (method, params) =>
+          method === "settings.update" && stopped
+            ? Promise.reject(new EngineRequestError("ENGINE_EXITED", "The hardware link stopped."))
+            : transport.request(method, params),
+      },
+      { landing: "overview" }
+    );
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("failed");
+    expect(store.getSnapshot().startupFailure).not.toBeNull();
+    expect(store.getSnapshot().backgroundFailures).toEqual([]);
+
+    stopped = false;
+    answer("settings.update", savedPage("overview"));
+    await store.restart();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("overview");
     await store.dispose();
   });
 });

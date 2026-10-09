@@ -17,7 +17,7 @@ describe("domainRefresh", () => {
   const everyMapping: Array<[string, readonly DomainKey[]]> = [
     ...EVENT_NAMES.map((event): [string, readonly DomainKey[]] => [event, EVENT_DOMAIN_REFRESH[event]]),
     ...REQUEST_METHODS.map((method): [string, readonly DomainKey[]] => [method, domainsForMethod(method)]),
-    ...(["setup", "lighting", "audio"] as const).map((workspace): [string, readonly DomainKey[]] => [
+    ...(["setup", "lighting", "audio", "overview"] as const).map((workspace): [string, readonly DomainKey[]] => [
       `opening ${workspace}`,
       domainsForMethod("settings.update", { workspace }),
     ]),
@@ -122,5 +122,16 @@ describe("domainRefresh", () => {
     }
     expect(domainsForEvent("cameras.changed")).toEqual({ domains: ["cameras"], known: true });
     expect(domainsForMethod("settings.update", { workspace: "cameras" })).toEqual(["app", "cameras"]);
+    // The Overview (D47) shows every page's facts, but not the deck's page model.
+    expect(domainsForMethod("settings.update", { workspace: "overview" })).toEqual([
+      "app",
+      "health",
+      "support",
+      "lighting",
+      "lightingDmxMonitor",
+      "audio",
+      "prompter",
+      "cameras",
+    ]);
   });
 });

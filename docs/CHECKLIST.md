@@ -10,11 +10,20 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] F5, Ctrl+R, Ctrl+Shift+R, Ctrl+P and Ctrl+F do nothing.
 - [ ] Esc closes a dialog and cancels an armed key.
 - [ ] Alt+F4 asks first; Cancel keeps the session, and Confirm leaves no `studio-control-engine.exe` in Task Manager.
-- [ ] The tabs are Setup / Support, Lighting, Audio, Cameras and Teleprompter, and nothing says Planning.
-- [ ] Setup's `⋯` › `Back to the Console` opens the Console.
+- [ ] The app opens on the Overview, also after a restart on another page; Setup / Support's `Publish` and its `⋯` › `Back to the Overview` open it too (since 2026-10-09, D47).
+- [ ] The header (the skylight, D48): the SSE logotype at the left; `Overview`, `Lighting`, `Audio`, `Cameras` and `Teleprompter` on one platter, the open page in dark green; `Surface` and `Setup / Support` on a second platter at the right; `REC` on its own; the clock last; `Studio Control` ends the footer, and nothing says Planning.
 - [ ] `Studio fullscreen` and `Reset the window layout`, in Setup / Support › Workstation, each put the window back fullscreen.
 - [ ] From the chair, the header is one row, taller than in the last build (88 px, 80 before; finding 6 of the walk of 2026-10-07), and every lamp can be read, in Setup too. The Console's plate and the cameras' pictures still fit under it.
 - [ ] Hovering moves nothing, and on an idle screen only the meters move.
+
+## The Overview
+
+- [ ] Every link answering, the state display reads `READY` and no room is outlined. With the Console not yet synced it reads `ASSUMED` with `Console: …` and `Sync from TotalMix`, THE SOUND is outlined amber and its meters wait; one press syncs and wakes them.
+- [ ] `REC` on the Overview starts CAM 1 with one press and stops it with two; the take's length counts, and the header's `REC` lights.
+- [ ] `PLAY`, and the deck's `SPEED` dial: the tape moves one tick a detent and says `turned on the deck`; the glass band matches the Prompter XL's text, its arrow at the reading line; the cue times fall as the knob turns up.
+- [ ] The four pictures and the loupe come; a press on CAM 1 moves the loupe, and Cameras shows the same loupe and aids.
+- [ ] The levels move on the bridge, and `M` mutes an input and Main Out as the Console does; a clip held on an input shows in the latch slot with its strip's name, and `Clear` clears it.
+- [ ] With a camera that stops answering, the state display reads its word with `Cameras: …` and `Open Cameras`, and THE PICTURE is outlined coral; `Open Cameras` opens the page.
 
 ## Lighting
 
@@ -57,7 +66,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 ## Stream Deck
 
 - [ ] The new profile is imported before the deck is used on the new build, not before the build is on: an old build with the new profile greys the whole deck (`/api/deck/displays` answers `400`), `PHONES` answers `400` and `RECALL` recalls at once.
-- [ ] After Companion's Full Reset & Import of the new profile (Companion 5's own format, 2026-10-03), the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, and the deck follows the app's page to each of the four.
+- [ ] After Companion's Full Reset & Import of the new profile (Companion 5's own format, 2026-10-03), the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, and the deck follows the app's page to each of the four. On the Overview it turns to PROMPTER, and back to each page's own when that page is opened (D49; after the export of 2026-10-09 or later).
 - [ ] In Companion's Surfaces, "Horizontal Swipe Changes Page" is off for the deck (the reset turns it off; the profile cannot carry it): a swipe along the strip turns no page. If it is on, turn it off.
 - [ ] No key and no cell has a top bar, a yellow border while pressed or a status icon; the images fill each key and each strip cell, not letterboxed.
 - [ ] The deck has the screen's look (2026-10-03): its words in the screen's faces, the keys' faces dark green-black, the strip black; at the studio's brightness every key at rest still reads apart from the black glass between keys, and its words read at arm's length.
@@ -165,5 +174,5 @@ Once a camera's link is built (CAM 1 now, the BGH1s later), with the cameras on 
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
 - [ ] Five minutes after a restart of the app with a daily backup less than a day old, the backups folder has no new `-daily` copy, and `engine.log` says when the next daily is due.
 - [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `LINK STOPPED` and the hardware link starts again by itself; the Console then reads `ASSUMED` until `Sync from TotalMix`.
-- [ ] On a published setup, a step key reads `press twice`; pressed, it turns dark red with a countdown and keeps its height, and the state display says that Lighting, Audio, Cameras and Teleprompter would lock. Left alone, it lapses in 3 s and nothing locks.
+- [ ] On a published setup, a step key reads `press twice`; pressed, it turns dark red with a countdown and keeps its height, and the state display says that every page but Setup / Support would lock. Left alone, it lapses in 3 s and nothing locks.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.

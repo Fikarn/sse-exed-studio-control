@@ -323,12 +323,22 @@ describe("the header on each page", () => {
 
   it("keeps REC in its own slot on every page, Cameras included", () => {
     const items = buildMonitorItems(recording as never, { lightingSceneDrift: false, audioSolo: false });
-    for (const page of ["setup", "lighting", "audio", "cameras", "teleprompter"]) {
+    for (const page of ["overview", "setup", "lighting", "audio", "cameras", "teleprompter"]) {
       const header = headerItems(items, page);
       expect(header.rec?.id, page).toBe("latched:rec");
       expect(ids(header.lamps), page).not.toContain("latched:rec");
     }
     expect(headerItems(buildMonitorItems({ checks: {} }), "audio").rec).toBeNull();
+  });
+
+  // The Overview (D47) shows every page's latches in its own latch slot.
+  it("leaves every latch off the Overview's header but REC, and keeps the lamps", () => {
+    const items = buildMonitorItems(recording as never, { lightingSceneDrift: true, audioSolo: true });
+    const header = headerItems(items, "overview");
+    expect(ids(header.lamps)).not.toContain("latched:solo");
+    expect(ids(header.lamps)).not.toContain("latched:scene-drift");
+    expect(ids(header.lamps)).toEqual(expect.arrayContaining(["lighting", "audio", "cameras", "prompter", "surface"]));
+    expect(header.rec?.id).toBe("latched:rec");
   });
 
   it("leaves a latch off the page that shows it itself: Solo on Audio, the drifted scene on Lighting", () => {

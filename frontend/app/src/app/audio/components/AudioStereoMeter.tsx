@@ -15,7 +15,7 @@ import {
 // The visual overhaul's polish (2026-10-05): the marks print the real minus
 // (DESIGN.md §3); each mark's `data-meter-scale-mark` stays its number as
 // written in code ("-6"), the name the meter tests read it by.
-const METER_SCALE_MARKS = [
+export const METER_SCALE_MARKS = [
   { dbfs: 0, label: "0" },
   { dbfs: -6, label: `${MINUS}6` },
   { dbfs: -12, label: `${MINUS}12` },

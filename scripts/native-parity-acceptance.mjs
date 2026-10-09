@@ -86,20 +86,23 @@ export async function awaitConsoleLinkQuiet(harness, requestIdPrefix, { timeoutM
 export const DECK_PAGE_LABELS = ["LIGHTS", "AUDIO", "CAMERAS", "PROMPTER"];
 
 // New pages program, Slices 2 and 2b: the saved data these lanes follow
-// through a restart, an update or reinstall and a backup's restore is the page
-// the app opens on (`shell.workspace`). Until Slice 2 it was the imported
-// Planning projects and tasks, which schema 8 no longer holds; until Slice 2b
-// the page came from a db.json fixture through the import, which is retired.
-// Now a lane saves it through the app's own request on fresh saved data,
-// which opens on the Console (D1), so the seeded page can be seen.
+// through a restart, an update or reinstall and a backup's restore is the
+// saved page (`shell.workspace`), which the deck's `workspace` word reads.
+// Until Slice 2 it was the imported Planning projects and tasks, which schema
+// 8 no longer holds; until Slice 2b the page came from a db.json fixture
+// through the import, which is retired. Now a lane saves it through the app's
+// own request on fresh saved data, whose page is the Overview (D47; the
+// Console from D1 until then), so the seeded page can be seen. These lanes
+// start no window, so nothing writes the Overview at a start (the app's
+// window does, D47) and the seeded page stays what was saved.
 /** The page new saved data opens on (`DEFAULT_WORKSPACE`, shell_settings.rs). */
-export const NEW_DATA_WORKSPACE = "audio";
+export const NEW_DATA_WORKSPACE = "overview";
 /** The page a lane saves on fresh saved data (`seedSavedWorkspace`). */
 export const SEEDED_WORKSPACE = "lighting";
 /** The page a lane saves after the backup, which the restore must undo. */
 export const MOVED_WORKSPACE = "audio";
 export const SAVED_DATA_MARKER_CHANGED =
-  "New pages program, Slices 2 and 2b: the saved data followed is the page the app opens on, saved as Lighting through settings.update on fresh saved data (which opens on the Console); until Slice 2b it was imported from a db.json fixture, and until Slice 2 it was the imported Planning projects and tasks.";
+  "D47 (2026-10-09): fresh saved data's page is the Overview (the Console from the new pages program's D1), and the saved data followed is still the saved page, saved as Lighting through settings.update. Slices 2 and 2b: until Slice 2b the page was imported from a db.json fixture, and until Slice 2 the saved data followed was the imported Planning projects and tasks.";
 
 /**
  * The backup archive's format: 5 since the new pages program's Slice 2 (D3, no
@@ -165,10 +168,10 @@ export function assertSavedWorkspace(appSnapshot, expected, runtimeLabel, when) 
 }
 
 /**
- * Seeds the saved data a lane follows on fresh saved data: the app opens on
- * the Console, and `settings.update` saves Lighting instead (new pages
- * program, Slice 2b; until then the page came from a db.json fixture through
- * the import, which is retired).
+ * Seeds the saved data a lane follows on fresh saved data: its page is the
+ * Overview (D47; the Console until then), and `settings.update` saves
+ * Lighting instead (new pages program, Slice 2b; until then the page came
+ * from a db.json fixture through the import, which is retired).
  */
 export async function seedSavedWorkspace(harness, requestIdPrefix, runtimeLabel) {
   const fresh = await harness.request(`${requestIdPrefix}-app-snapshot-fresh`, "app.snapshot");

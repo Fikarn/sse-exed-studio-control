@@ -14,9 +14,12 @@ pub const WINDOW_MAXIMIZED_KEY: &str = "shell.window.maximized";
 pub const WINDOW_MODE_KEY: &str = "shell.window.mode";
 
 /// The page new saved data opens on, and the one a saved page this build no
-/// longer has reads as: the Console (new pages program, D1 — Planning, the
-/// default until Slice 2, left the app).
-pub const DEFAULT_WORKSPACE: &str = "audio";
+/// longer has reads as: the Overview (D47, 2026-10-09, which amends D1). The
+/// app opens on it at every start too, unless the setup is not done: the
+/// pages' store writes it as the saved page before the shell is ready, so the
+/// deck's `workspace` word follows it. It was the Console from the new pages
+/// program's D1 (Planning, the default until Slice 2, left the app).
+pub const DEFAULT_WORKSPACE: &str = "overview";
 /// The pages the hardware link accepts as the page to open, in the order the
 /// refusal names them. New pages program, Slice 4: `teleprompter` joins them
 /// (it refused every page but the first three until then, so the tab could
@@ -501,20 +504,24 @@ mod tests {
         assert_eq!(snapshot.window_mode, DEFAULT_WINDOW_MODE);
     }
 
-    // New pages program, D1: new saved data opens on the Console, and so does
-    // a saved Planning page (the page left the app), which settings.update
-    // now refuses.
+    // D47 (2026-10-09, D1 amended): new saved data opens on the Overview. A
+    // saved page this build does not know reads as the default, so a saved
+    // Planning page (the page left the app; settings.update refuses it) reads
+    // as the Overview too: it read as the Console from the new pages
+    // program's D1. The schema-8 upgrade rewrote every saved `planning` as
+    // `audio` (`storage.rs`), and a format-4 archive's is restored as `audio`
+    // (`support.rs`), so the saved data holds none.
     #[test]
-    fn new_saved_data_and_a_saved_planning_page_open_the_console() {
-        assert_eq!(DEFAULT_WORKSPACE, "audio");
-        assert!(default_settings_entries().contains(&(WORKSPACE_KEY, "audio")));
-        assert_eq!(ShellSettingsSnapshot::default().workspace, "audio");
+    fn new_saved_data_and_a_saved_planning_page_open_the_overview() {
+        assert_eq!(DEFAULT_WORKSPACE, "overview");
+        assert!(default_settings_entries().contains(&(WORKSPACE_KEY, "overview")));
+        assert_eq!(ShellSettingsSnapshot::default().workspace, "overview");
 
         let saved_planning =
             HashMap::from([(String::from(WORKSPACE_KEY), String::from("planning"))]);
         assert_eq!(
             ShellSettingsSnapshot::from_settings(&saved_planning).workspace,
-            "audio"
+            "overview"
         );
         assert!(!is_valid_workspace("planning"));
         let error = parse_settings_update(&json!({ "workspace": "planning" }))
@@ -568,10 +575,9 @@ mod tests {
         );
     }
 
-    // D47: the Overview is a page the hardware link accepts and keeps,
-    // before the page itself, as the Cameras' was. New saved data still
-    // opens on the Console until the page is built (the acceptance lane
-    // opens the default page).
+    // D47: the Overview is a page the hardware link accepts and keeps, as
+    // the Cameras' is; it joined before its page, as theirs did. It is the
+    // page new saved data opens on since the page was built (above).
     #[test]
     fn the_overview_is_a_page_to_open() {
         assert!(is_valid_workspace("overview"));

@@ -15,7 +15,10 @@ export async function openFixture(
   fixtureId: string,
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
-    crash?: "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+    crash?: "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+    /** D47: open as the app does, on the Overview unless the setup is not
+     *  done; without it the page opens on the fixture's saved page. */
+    landing?: boolean;
   }
 ) {
   const params = new URLSearchParams({
@@ -24,6 +27,9 @@ export async function openFixture(
   });
   if (options?.crash) {
     params.set("crash", options.crash);
+  }
+  if (options?.landing) {
+    params.set("landing", "1");
   }
   const response = await page.goto(`/?${params.toString()}`);
   expect(response, `fixture ${fixtureId} should return a document response`).not.toBeNull();
@@ -39,6 +45,8 @@ export async function openFixture(
 // Each mark is an element only the mounted workspace draws: never its loading
 // surface, never the shell's `workspace-loading`.
 const WORKSPACE_MARKS = {
+  // The Overview (D47): its bay, drawn once the page has the snapshots.
+  overview: "overview-bay",
   setup: "setup-workspace",
   lighting: "lighting-stage",
   audio: "audio-monitor-bar",

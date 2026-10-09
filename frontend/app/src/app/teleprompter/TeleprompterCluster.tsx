@@ -28,11 +28,10 @@ import type { GlassParagraph } from "./glass/glassText";
 import {
   paragraphRows,
   paragraphWindow,
-  playLockReason,
   runLockReason,
   SIZE_RANGE,
-  SPEED_RANGE,
   stepLocks,
+  takeKeysView,
   type PrompterStateView,
 } from "./teleprompterModel";
 import { TAKE, type PerformAction } from "./perform";
@@ -139,21 +138,14 @@ export function TeleprompterCluster({
   const [reopened, setReopened] = useState<Reopened | null>(null);
   const glass = snapshot.glass;
   const runLock = runLockReason(snapshot);
-  const playLock = playLockReason(snapshot);
+  // PLAY, BACK, TOP, the speed and the cues, as the Overview draws them too (D47).
+  const keys = takeKeysView(snapshot, backTo);
+  const placeParagraph = glass ? Math.min(glass.place.paragraph, Math.max(glass.paragraphCount - 1, 0)) : 0;
   const layoutLock = glass && !glass.laidOut ? "The text is being laid out on the glass." : null;
   const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request), false, TAKE);
-  const placeParagraph = glass ? Math.min(glass.place.paragraph, Math.max(glass.paragraphCount - 1, 0)) : 0;
   const speedWpm = glass?.speedWpm ?? 0;
   const rows = useMemo(() => paragraphRows(cut, speedWpm), [cut, speedWpm]);
   const steps = stepLocks(glass);
-  const slowest =
-    glass && glass.speedWpm <= SPEED_RANGE.min
-      ? `The pace is at its slowest, ${SPEED_RANGE.min} words a minute.`
-      : null;
-  const fastest =
-    glass && glass.speedWpm >= SPEED_RANGE.max
-      ? `The pace is at its fastest, ${SPEED_RANGE.max} words a minute.`
-      : null;
   // The size is the glass's, not the script's: it is set while nothing is on
   // the prompter too (the screen's look sets it at any time; only the deck's
   // dial waits for a script), so only its ends lock it.
@@ -280,12 +272,12 @@ export function TeleprompterCluster({
           cap="Play"
           // What a press does; a locked PLAY says nothing here, the state
           // display says why.
-          hint={playLock !== null ? undefined : glass?.playing ? "press to pause" : `from ¶ ${placeParagraph + 1}`}
+          hint={keys.play.hint}
           layout="stack"
           size="tall"
-          live={glass?.playing ?? false}
-          locked={playLock !== null}
-          reason={playLock ?? undefined}
+          live={keys.play.live}
+          locked={keys.play.lock !== null}
+          reason={keys.play.lock ?? undefined}
           take
           testId="teleprompter-play"
           className={styles.play}
@@ -296,20 +288,20 @@ export function TeleprompterCluster({
         />
         <Key
           cap="Back"
-          hint={glass ? `to the start of ¶ ${backTo + 1}` : undefined}
+          hint={keys.back.hint}
           layout="stack"
-          locked={runLock !== null}
-          reason={runLock ?? undefined}
+          locked={keys.back.lock !== null}
+          reason={keys.back.lock ?? undefined}
           take
           testId="teleprompter-back"
           onClick={() => jump({ to: "back" })}
         />
         <Key
           cap="Top"
-          hint={glass ? "pauses · to ¶ 1" : undefined}
+          hint={keys.top.hint}
           layout="stack"
-          locked={runLock !== null}
-          reason={runLock ?? undefined}
+          locked={keys.top.lock !== null}
+          reason={keys.top.lock ?? undefined}
           take
           testId="teleprompter-top"
           onClick={() => jump({ to: "top" })}
@@ -329,8 +321,8 @@ export function TeleprompterCluster({
           </DialCell>
           <div className={styles.dialKeys}>
             <Key
-              locked={(runLock ?? slowest) !== null}
-              reason={runLock ?? slowest ?? undefined}
+              locked={keys.slower.lock !== null}
+              reason={keys.slower.lock ?? undefined}
               take
               testId="teleprompter-speed-down"
               aria-label="Slower by 5 words a minute"
@@ -339,8 +331,8 @@ export function TeleprompterCluster({
               − 5
             </Key>
             <Key
-              locked={(runLock ?? fastest) !== null}
-              reason={runLock ?? fastest ?? undefined}
+              locked={keys.faster.lock !== null}
+              reason={keys.faster.lock ?? undefined}
               take
               testId="teleprompter-speed-up"
               aria-label="Faster by 5 words a minute"
@@ -432,8 +424,8 @@ export function TeleprompterCluster({
           Paragraph ▸
         </Key>
         <Key
-          locked={(runLock ?? steps.previousCue) !== null}
-          reason={runLock ?? steps.previousCue ?? undefined}
+          locked={keys.previousCue.lock !== null}
+          reason={keys.previousCue.lock ?? undefined}
           take
           testId="teleprompter-cue-back"
           onClick={() => jump({ to: "previousCue" })}
@@ -441,8 +433,8 @@ export function TeleprompterCluster({
           ◂ Cue
         </Key>
         <Key
-          locked={(runLock ?? steps.nextCue) !== null}
-          reason={runLock ?? steps.nextCue ?? undefined}
+          locked={keys.nextCue.lock !== null}
+          reason={keys.nextCue.lock ?? undefined}
           take
           testId="teleprompter-cue-on"
           onClick={() => jump({ to: "nextCue" })}

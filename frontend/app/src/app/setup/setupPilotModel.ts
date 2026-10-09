@@ -84,8 +84,9 @@ export const UNPUBLISH_ARM_LABEL = "Unpublish the setup";
 /** What the state display says while that press is armed: what gets locked
  *  (two lines of the display, at most 70 characters, the owner's rule of
  *  2026-10-05; the armed row says what the press does and that it presses
- *  again). */
-export const UNPUBLISH_ARMED_SENTENCE = "Unpublishing locks Lighting, Audio, Cameras and Teleprompter.";
+ *  again). Since D47 the Overview locks too, so the sentence names what stays
+ *  open; it named the four pages until then. */
+export const UNPUBLISH_ARMED_SENTENCE = "Unpublishing locks every page but Setup / Support.";
 
 /** The hardware link's default profile (`DEFAULT_HARDWARE_PROFILE` in
  *  native/rust-engine/src/app_state.rs), in words. */

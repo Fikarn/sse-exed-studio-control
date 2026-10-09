@@ -19,13 +19,13 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 /**
- * The time left on the glass now, in seconds: the hardware link's figure,
- * counted down once a second while the text scrolls. `null` while nothing is
- * on the prompter. Nothing ticks while the text stands still.
+ * The seconds since the hardware link's last report of the glass, counted
+ * once a second while the text scrolls; 0 while it stands still. What the
+ * report gave (the time left, a cue's seconds ahead) goes down by it until
+ * the next report (2026-10-09: the Overview's cue times, D47).
  */
-export function usePrompterTimeLeft(glass: PrompterGlassSummary | null | undefined): number | null {
+export function usePrompterElapsed(glass: PrompterGlassSummary | null | undefined): number {
   const playing = glass?.playing ?? false;
-  const reported = glass?.timeLeftSeconds ?? null;
   // A new report starts the count again from its own figure.
   const receivedAt = useMemo(() => ({ glass, at: Date.now() }), [glass]);
   const [now, setNow] = useState(() => Date.now());
@@ -35,7 +35,17 @@ export function usePrompterTimeLeft(glass: PrompterGlassSummary | null | undefin
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [playing, receivedAt]);
+  return playing ? Math.max(0, now - receivedAt.at) / 1000 : 0;
+}
+
+/**
+ * The time left on the glass now, in seconds: the hardware link's figure,
+ * counted down once a second while the text scrolls. `null` while nothing is
+ * on the prompter. Nothing ticks while the text stands still.
+ */
+export function usePrompterTimeLeft(glass: PrompterGlassSummary | null | undefined): number | null {
+  const elapsed = usePrompterElapsed(glass);
+  const reported = glass?.timeLeftSeconds ?? null;
   if (reported === null) return null;
-  if (!playing) return reported;
-  return Math.max(0, reported - Math.max(0, now - receivedAt.at) / 1000);
+  return Math.max(0, reported - elapsed);
 }

@@ -28,7 +28,7 @@ export async function openMenu(page: Page, opener: Locator): Promise<Locator> {
   return menu;
 }
 
-/** The state display's ⋯: Export backup, Open the log, Back to the Console. */
+/** The state display's ⋯: Export backup, Open the log, Back to the Overview. */
 export function openSetupPageMenu(page: Page): Promise<Locator> {
   return openMenu(page, page.getByTestId("setup-page-menu"));
 }

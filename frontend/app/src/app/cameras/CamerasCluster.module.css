@@ -15,51 +15,6 @@
   overflow: hidden;
 }
 
-/* REC, the take-time key: 64 px, the take-time height (the shell, overhaul
-   3), across the cluster. */
-.rec {
-  width: 100%;
-  min-height: 64px;
-  flex: none;
-}
-
-/* While CAM 1 records the key is a hazard: the coral lamp beside the word,
-   the hint under them. The polish (2026-10-05): a row that wraps, so the lamp
-   stands 8 px from REC and the pair is centred on the key; the grid it
-   replaces let the hint widen the lamp's track, and the lamp stood far from
-   its word. The row direction is said, since the stack's is a column. */
-.rec[data-key-mode="hazard"] {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-content: center;
-  justify-content: center;
-  column-gap: 8px;
-  row-gap: 6px;
-}
-
-.rec[data-key-mode="hazard"] > span:last-child {
-  flex-basis: 100%;
-  justify-content: center;
-}
-
-/* Doubt on the take-time key: the last thing CAM 1 reported, not a fact now.
-   The dashed yellow keyline at full strength: it is to be read. Under the
-   cap one line, in yellow: when it was last known and why STOP is locked. */
-.recDoubt {
-  opacity: 1;
-  border: 1px dashed var(--role-yellow-line);
-  background: var(--material-well);
-  color: var(--role-yellow-text);
-}
-
-.recDoubt:hover {
-  border-color: var(--role-yellow-line);
-}
-
-.recDoubt > span:last-child {
-  color: var(--role-yellow-text);
-}
-
 /* What is known about the take: label · value rows on hairlines, one line
    each whatever they say, so the keys under the take stand where they stood. */
 .take {

@@ -1,39 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ShellRegion } from "@sse/design-system";
 import {
-  EngineRequestError,
   type CameraDialBank,
   type CameraNumber,
   type CameraPressSetting,
   type CameraSnapshot,
   type CamerasSnapshot,
-  type JsonValue,
   type PicturePlaces,
   type PicturesLink,
   type ShellStore,
 } from "@sse/engine-client";
 
-import { useToast } from "../shared/toastContext";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { CamerasBay } from "./CamerasBay";
 import { CamerasCluster } from "./CamerasCluster";
 import { CamerasFooter } from "./CamerasFooter";
 import { buildCameraMenu } from "./camerasMenus";
 import { CamerasPlate } from "./CamerasPlate";
-import {
-  cameraNumber,
-  cameraOf,
-  camerasFingerprint,
-  camerasStateView,
-  releaseLabel,
-  selectedCamera,
-} from "./camerasModel";
-import { STOP_WINDOW_MS, type PerformAction } from "./perform";
+import { cameraNumber, cameraOf, camerasStateView, releaseLabel, selectedCamera } from "./camerasModel";
+import { useCamerasFollow, useCamerasPerform, useCamerasReadAgain, useRecPress } from "./useCamerasActions";
 import { armedCamera, camerasArmedWords, camerasArmKey, STOP_ARM_KEY, useCamerasArming } from "./useCamerasArming";
-import { NO_AIDS, type PictureAids } from "./pictures/CameraPicture";
 import { usePictureFrames } from "./pictures/pictureFrames";
-import { CENTRE, type BigView, type LoupeZoom, type Point } from "./pictures/pictureGeometry";
+import { type BigView, type Point } from "./pictures/pictureGeometry";
+import { usePictureView } from "./pictures/pictureViewMemory";
 import styles from "./CamerasWorkspace.module.css";
 
 // The Cameras page (board 2, "Hero and two", `docs/design/boards/A-cameras-2.html`,
@@ -46,7 +36,8 @@ import styles from "./CamerasWorkspace.module.css";
 // Everything the page shows is the hardware link's (`camerasModel.ts`). What
 // it holds itself is what the operator is looking at, and all of it is off
 // again at every start: the view, the picture aids, the loupe and the one
-// armed key. One press sets exposure, colour and focus and starts a take;
+// armed key. The aids, the loupe's zoom and its points it shares with the
+// Overview (`usePictureView`, 2026-10-09, D47), which shows the same pictures. One press sets exposure, colour and focus and starts a take;
 // stopping it, the format, the look and Release are press twice (D11).
 //
 // The visual overhaul (2026-10-05): one arm for the page (`useCamerasArming`),
@@ -71,23 +62,13 @@ export interface CamerasWorkspaceProps {
   store: ShellStore;
 }
 
-/** What an action answers: the hardware link's sentence, when it gives one. */
-function sentenceOf(result: JsonValue): string | null {
-  return result && typeof result === "object" && !Array.isArray(result) && typeof result.sentence === "string"
-    ? result.sentence
-    : null;
-}
-
-const EVERY_CAMERA: Record<CameraNumber, Point> = { 1: CENTRE, 2: CENTRE, 3: CENTRE };
-
 export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: CamerasWorkspaceProps) {
-  const toast = useToast();
   const arm = useCamerasArming();
   const [view, setView] = useState<BigView>("whole");
-  const [aids, setAids] = useState<PictureAids>(NO_AIDS);
-  const [zoom, setZoom] = useState<LoupeZoom>(2);
-  const [points, setPoints] = useState(EVERY_CAMERA);
-  const [now, setNow] = useState(() => Date.now());
+  const { view: pictureView, toggleAid, setZoom, setPoint } = usePictureView(store);
+  const { aids, zoom, points } = pictureView;
+  // The cameras read once a second, the pictures wanted (`useCamerasFollow`).
+  const now = useCamerasFollow(store);
 
   const selected = camerasSnapshot ? selectedCamera(camerasSnapshot) : null;
   const selectedNumber = selected ? cameraNumber(selected) : 1;
@@ -96,30 +77,6 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
 
   const frames = usePictureFrames(pictures?.drawnBy === "page" ? pictures : null);
   const sayPlaces = useMemo(() => (pictures ? (places: PicturePlaces) => pictures.place(places) : null), [pictures]);
-
-  // A read that fails is recorded when it begins to fail, not once a second.
-  const readFailing = useRef(false);
-  useEffect(() => {
-    // The pictures are wanted from the moment the page opens: it says so now,
-    // then with every read. What it says changes nothing, so a failure is not
-    // worth a word.
-    const showPictures = () => void store.showCameraPictures().catch(() => {});
-    showPictures();
-    const id = window.setInterval(() => {
-      showPictures();
-      setNow(Date.now());
-      store.refreshCamerasSnapshot().then(
-        () => {
-          readFailing.current = false;
-        },
-        (error: unknown) => {
-          if (!readFailing.current) store.reportBackgroundFailure(error, "the cameras");
-          readFailing.current = true;
-        }
-      );
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [store]);
 
   // An armed key names a camera that must still be held when it is pressed
   // again: a camera that was released, lost or selected away drops the arm.
@@ -134,50 +91,8 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
     if (!armedHeld || !armedInView || !stillRecording) clearArm();
   }, [armedHeld, armedInView, stillRecording, clearArm]);
 
-  const perform: PerformAction = useLiveCallback(async (action, announce = false) => {
-    try {
-      const result = await action();
-      const sentence = announce ? sentenceOf(result) : null;
-      if (sentence) toast.push({ tone: "ok", message: sentence });
-      return result;
-    } catch (error) {
-      // A camera that is held already is no fault: the page says so and reads again.
-      const alreadyHeld = error instanceof EngineRequestError && error.code === "CAMERA_ALREADY_HELD";
-      toast.push({
-        tone: alreadyHeld ? "info" : "attention",
-        message:
-          error instanceof Error
-            ? error.message
-            : "The cameras did not answer. Look at what the page shows before pressing again.",
-      });
-      store.refreshCamerasSnapshot().catch((failure: unknown) => store.reportBackgroundFailure(failure, "the cameras"));
-      return null;
-    }
-  });
-
-  /**
-   * One read of the cameras, which sends nothing and leaves no row. The page
-   * says that it tried when nothing has changed; what has changed shows.
-   */
-  const readAgain = useLiveCallback(async (camera: CameraNumber | null) => {
-    const before = camerasFingerprint(store.getSnapshot().camerasSnapshot);
-    try {
-      await store.refreshCamerasSnapshot();
-    } catch (error) {
-      toast.push({
-        tone: "attention",
-        message: error instanceof Error ? error.message : "The cameras could not be read. Try again.",
-      });
-      return;
-    }
-    const after = store.getSnapshot().camerasSnapshot;
-    if (camerasFingerprint(after) !== before) return;
-    const asked = camera !== null && after ? cameraOf(after, camera) : null;
-    toast.push({
-      tone: "info",
-      message: asked ? `Read again: nothing has changed. ${asked.sentence}` : "Read again: nothing has changed.",
-    });
-  });
+  const perform = useCamerasPerform(store);
+  const readAgain = useCamerasReadAgain(store);
 
   const select = useLiveCallback((camera: CameraNumber) => {
     if (camera === selectedNumber) return;
@@ -207,19 +122,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
     void perform(() => store.openSetupSection("support"));
   });
 
-  const record = useLiveCallback(() => {
-    if (main?.state !== "held") return;
-    if (main.recording.recording !== true) {
-      void perform(() => store.startCameraRecording());
-      return;
-    }
-    arm.armOrApply(
-      STOP_ARM_KEY,
-      "Stop recording on CAM 1",
-      () => void perform(() => store.stopCameraRecording(true)),
-      STOP_WINDOW_MS
-    );
-  });
+  const record = useRecPress(store, main, arm, perform);
   /** The plate's Release key for `target`: the first press arms, the second releases. */
   const armRelease = (target: CameraSnapshot) => {
     const camera = cameraNumber(target);
@@ -298,10 +201,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
   const armedWords = arm.armed ? camerasArmedWords(arm.armed, camerasSnapshot) : null;
 
   const moveLoupe = useLiveCallback((point: Point) => {
-    setPoints((held) => ({ ...held, [selectedNumber]: point }));
-  });
-  const toggleAid = useLiveCallback((aid: keyof PictureAids) => {
-    setAids((held) => ({ ...held, [aid]: !held[aid] }));
+    setPoint(selectedNumber, point);
   });
 
   if (!camerasSnapshot || !selected || !state) {

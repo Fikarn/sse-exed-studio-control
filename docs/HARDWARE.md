@@ -128,7 +128,7 @@ To put the profile on the deck:
 4. In Companion's Surfaces, check that "Horizontal Swipe Changes Page" is off for the deck: a swipe on the strip would turn Companion's page away from the app's.
 5. In Setup's Verify step, press each key and dial: its cell pulses.
 
-The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the app's tabs. The deck follows the app's page, and each page has one page key, top right, to the page after it; `PROMPTER`'s goes round to `LIGHTS`. When the pages change, export and import again: the deck has a new layout only after the next import.
+The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the app's tabs. The deck follows the app's page, the Overview to `PROMPTER` (D49), and each page has one page key, top right, to the page after it; `PROMPTER`'s goes round to `LIGHTS`. When the pages change, export and import again: the deck has a new layout only after the next import.
 
 ## Cameras
 

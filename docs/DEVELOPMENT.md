@@ -69,7 +69,7 @@ The layers, and what each is for:
 
 The committed captures are under `frontend/app/tests/__visual__/`.
 
-A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (nine headers, five footers). A change to the header moves the strips and no page.
+A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (ten headers, six footers). A change to the header moves the strips and no page.
 
 A board that a page reaches by a press (the Teleprompter's editor, Setup's Map step on a page of the deck) has its presses in `BOARD_STEPS`, in `frontend/app/tests/helpers/ui-contract/boards.mjs`. The captures and the layout measures both make them.
 

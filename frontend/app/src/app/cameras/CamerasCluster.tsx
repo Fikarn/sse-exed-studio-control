@@ -1,7 +1,6 @@
 import { useRef } from "react";
 
 import {
-  ArmKey,
   EmptyLine,
   Key,
   LampWord,
@@ -26,12 +25,11 @@ import {
   dialsView,
   pictureRows,
   recentRows,
-  recKeyView,
   takeReadouts,
   type CamerasStateView,
   type TakeReadout,
 } from "./camerasModel";
-import { STOP_WINDOW_MS } from "./perform";
+import { RecKey } from "./RecKey";
 import styles from "./CamerasCluster.module.css";
 
 // The Cameras page's cluster (board 2's left column): the state display with
@@ -174,7 +172,6 @@ export function CamerasCluster({
   onOpenActions,
 }: CamerasClusterProps) {
   const main = cameraOf(snapshot, 1);
-  const rec = recKeyView(main);
   const stopArmed = armed?.key === "stop";
   const recent = snapshot.recent === null ? null : recentRows(snapshot.recent).slice(0, RECENT_ROOM);
   const wayOut = state.wayOut;
@@ -244,53 +241,13 @@ export function CamerasCluster({
         title={<Head word="Recording" tip="REC is CAM 1's, whichever camera is selected." />}
         testId="cameras-recording"
       >
-        {rec.kind === "recording" ? (
-          <ArmKey
-            hazard
-            armed={stopArmed}
-            timeoutMs={STOP_WINDOW_MS}
-            countdownTestId="cameras-stop-countdown"
-            cap={stopArmed ? "Stop?" : "Rec"}
-            hint={rec.hint}
-            layout="stack"
-            size="tall"
-            take
-            className={styles.rec}
-            data-rec="recording"
-            aria-label={
-              stopArmed ? "Stop armed. Press again to stop CAM 1." : "CAM 1 reports recording. Press twice to stop."
-            }
-            testId="cameras-rec"
-            onClick={onRecord}
-          />
-        ) : rec.kind === "start" ? (
-          <Key
-            cap="Rec"
-            hint={rec.hint}
-            layout="stack"
-            size="tall"
-            take
-            className={styles.rec}
-            data-rec="stopped"
-            aria-label="Start recording on CAM 1"
-            testId="cameras-rec"
-            onClick={onRecord}
-          />
-        ) : (
-          <Key
-            cap="Rec"
-            hint={rec.hint}
-            layout="stack"
-            size="tall"
-            take
-            locked
-            reason={rec.reason}
-            className={[styles.rec, rec.kind === "last-known" ? styles.recDoubt : ""].filter(Boolean).join(" ")}
-            data-rec={rec.kind}
-            data-doubt={rec.kind === "last-known" ? "" : undefined}
-            testId="cameras-rec"
-          />
-        )}
+        <RecKey
+          main={main}
+          stopArmed={stopArmed}
+          onRecord={onRecord}
+          testId="cameras-rec"
+          countdownTestId="cameras-stop-countdown"
+        />
         <Readouts
           className={styles.take}
           data-testid="cameras-take"

@@ -511,7 +511,8 @@ export function PrompterGlass({
             </div>
             {dim ? <div ref={readRef} className={styles.read} /> : null}
             {look?.readingLineAcross ? <i className={styles.across} /> : null}
-            <i className={styles.arrow} />
+            {/* `data-glass-arrow`: the reading line, for the pages' tests. */}
+            <i className={styles.arrow} data-glass-arrow="" />
           </>
         ) : null}
       </div>

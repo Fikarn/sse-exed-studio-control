@@ -48,6 +48,7 @@ export interface SetupClusterProps {
   /** What the armed key's second press does, in the page's words; `null` with nothing armed. */
   armedWords: string | null;
   busy?: boolean;
+  /** The way back (the page's ⋯) is open: the setup is published. */
   canReturnToConsole: boolean;
   checks: readonly CommissioningCheck[];
   mode: SetupMode;
@@ -60,6 +61,7 @@ export interface SetupClusterProps {
   steps: readonly SetupClusterStep[];
   onExportBackup: () => void;
   onOpenEngineLog: () => void;
+  /** Back to the Overview (D47; its name is from when it went to the Console). */
   onReturnToConsole: () => void;
   onRunAllProbes: () => void;
   onSelectMode: (mode: SetupMode) => void;
@@ -175,9 +177,11 @@ export function SetupCluster({
       testId: "setup-engine-log",
     },
     { kind: "divider", id: "divider" },
+    // D47: the way back is to the Overview, the page the app opens on (the
+    // Console until then); the test id is the key's, as it was.
     {
-      id: "console",
-      label: "Back to the Console",
+      id: "overview",
+      label: "Back to the Overview",
       onSelect: onReturnToConsole,
       disabledReason: canReturnToConsole ? undefined : "the setup is not published",
       testId: "setup-back-to-console",

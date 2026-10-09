@@ -22,9 +22,11 @@ Every page is one grid: **header · cluster · bay · plate · footer**, 88 · 4
 | Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                              |  440 wide |
 | Footer        | the raised bar: telemetry as `Label value` items, one action key, and the product's name as the colophon                                                       |   40 high |
 
-The header is the skylight (D48, 2026-10-09): one raised bar, a step lighter than the page (`--material-bar`) and closed by a line (`--material-bar-line`), with no gradient. It reads left to right: the SSE logotype alone at the frame's 32 px margin, 40 px high with half its height clear on every side, then a rule; the pages on one platter (radius 12, `--material-platter`, the light edge, 4 px in from its edge, a hairline between two segments that are not the open one), Lighting · Audio · Cameras · Teleprompter, the names bold in the second ink, each page's tab carrying its page's lamp and state word (16 px), the open page's none, because its state display says it, though it keeps the word's room (drawn unseen after its name), so no tab moves when the page changes; the open page is the one Dark Green segment (radius 8), its name in Beige Light, and the only tint in the header; the room left over; the system's own things on a second platter: the deck's lamp, `Surface`, a `Backup` chip only while the automatic backup failed or is overdue, the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself (on Lighting, which has a Solo of its own, the Console's reads `AUDIO SOLO`), and `Setup / Support` last, so it stays put while a latch comes, goes or changes its word; the `REC` tally on a platter of its own that never moves, quiet at rest, a coral edge on a faint coral tint while CAM 1 records, a dashed yellow edge while what it says is last known; and the clock at the right margin. The product's name stands nowhere in the header: beside the logotype it would read as a lockup, which the brand does not allow. It ends the footer instead, as its colophon: SSE Adelia at 14 px, tracked `0.14em`, in the quiet ink. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer; no tab is the current one, and a lamp never read is hollow and says `pending`, or `not read` after a start that failed. Density never comes from the type; the sizes stay.
+The header is the skylight (D48, 2026-10-09): one raised bar, a step lighter than the page (`--material-bar`) and closed by a line (`--material-bar-line`), with no gradient. It reads left to right: the SSE logotype alone at the frame's 32 px margin, 40 px high with half its height clear on every side, then a rule; the pages on one platter (radius 12, `--material-platter`, the light edge, 4 px in from its edge, a hairline between two segments that are not the open one), Overview · Lighting · Audio · Cameras · Teleprompter, the names bold in the second ink, each page's tab carrying its page's lamp and state word (16 px), the Overview's none (it shows every page) and the open page's none, because its state display says it, though it keeps the word's room (drawn unseen after its name), so no tab moves when the page changes; the open page is the one Dark Green segment (radius 8), its name in Beige Light, and the only tint in the header; the room left over; the system's own things on a second platter: the deck's lamp, `Surface`, a `Backup` chip only while the automatic backup failed or is overdue, the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself and all of them off the Overview, which shows every page's (on Lighting, which has a Solo of its own, the Console's reads `AUDIO SOLO`), and `Setup / Support` last, so it stays put while a latch comes, goes or changes its word; the `REC` tally on a platter of its own that never moves, quiet at rest, a coral edge on a faint coral tint while CAM 1 records, a dashed yellow edge while what it says is last known; and the clock at the right margin. The product's name stands nowhere in the header: beside the logotype it would read as a lockup, which the brand does not allow. It ends the footer instead, as its colophon: SSE Adelia at 14 px, tracked `0.14em`, in the quiet ink. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer; no tab is the current one, and a lamp never read is hollow and says `pending`, or `not read` after a start that failed. Density never comes from the type; the sizes stay.
 
 Every take-time key has one fixed home. A latch goes into the latch slot, never above or between keys, so nothing a hand reaches for during a take is ever pushed.
+
+**The Overview** (D47, board 3: `docs/design/boards/overview-3.html`) is the landing page and keeps the frame. Its state display stands where every page's does, in a status card with the latch slot under it (16, 104, 408 × 252), and four rooms stand in the shell's columns, each 16 px inside its column and 16 px from the next: THE TAKE under the status card in the cluster, THE PICTURE over THE SCRIPT in the bay, THE SOUND the whole plate. The shell parts its columns with hairlines; on the Overview the rooms part them, so it draws none there. Outside the rooms there is only the studio list, under THE TAKE.
 
 ## 3. Type
 
@@ -32,7 +34,7 @@ Three faces, the brand's own:
 
 - **PT Sans** (Regular and Bold) for everything read to act: labels, values, keys, rows, tables. Its figures are tabular at both weights, so values never jitter; no monospace face is needed.
 - **SSE Adelia** (Bold, capitals only) for display words: state words, section heads, the product's name, big key caps. Adelia draws lowercase as capitals ("dB" would become "DB") and its figures are proportional, so it **never** carries a value, a unit, a number that changes, or a name that keeps its case (a strip's, a fixture's, a scene's, a script's). It is SSE's licensed face: the repository never holds its file; the pages use the copy installed on the studio PC and fall back to PT Serif elsewhere.
-- **PT Serif** italic for the hardware link's own voice: the sentence in the state display.
+- **PT Serif** italic for the hardware link's own voice: the sentence in the state display, and a room's job on the Overview (`act`, `watch`, `read`, `listen`).
 
 PT Sans and PT Serif are ParaType's, under the SIL Open Font License, committed with their licence (`frontend/packages/tokens/src/fonts/`). The prompter's glass is the presenter's picture, not the page: it keeps Inter (`--font-family-glass`).
 
@@ -50,7 +52,7 @@ Seven sizes. A page uses at most eight; the seven leave one spare.
 
 Why 12 is still the floor: on this monitor (108.8 px per inch) at 70 cm a 12 px capital is at the lower edge of reliable recognition for a short familiar label, and 20 px is the minimum for reading, which is why every word read during a take is 20 px or larger. The smallest step is 13.
 
-Two weights, 400 and 700. Units are half the size of their number, in the quiet ink, after a small gap. Minus signs are real (−). Adelia is tracked `0.03em` at 20 px and below and set tight above; PT Sans in capitals `0.04em`; the footer's colophon `0.14em` (D48); nothing else is tracked. Names never wrap: one line, with an ellipsis and the whole name in its tooltip if ever needed. Never justified text, never a text shadow.
+Two weights, 400 and 700. Units are half the size of their number, in the quiet ink, after a small gap. Minus signs are real (−). Adelia is tracked `0.03em` at 20 px and below and set tight above; PT Sans in capitals `0.04em`; the footer's colophon `0.14em` (D48) and a room's name on the Overview `0.08em`, cut like an inscription (D47); nothing else is tracked. Names never wrap: one line, with an ellipsis and the whole name in its tooltip if ever needed. Never justified text, never a text shadow.
 
 A picture is the exception: the prompter's glass and a camera's picture are marked `data-picture`, and what is inside them is the presenter's or the camera's, not the page's. The measures skip it.
 
@@ -65,25 +67,27 @@ The surface is the brand's Dark Green pulled almost to black: a trace of hue, no
 | Coral       | #FF7D55 | **error and hazard**: `OFFLINE`, `UNREACHABLE`, 48 V on, `REC`, a clip; the word and edge of a destructive command                                                 |
 | Burgundy    | #671919 | **armed**: the one armed form, a Burgundy fill with Beige text, "press again" and a countdown bar                                                                  |
 | Blue        | #3A87E5 | **information**: `PREVIEW`, a cue in a script                                                                                                                      |
-| Beige       | #EDEBD1 | **selection**: one 2 px keyline on the strip, fixture, script, camera, tab or step, and on a setting's current choice (a frame rate, the view); the tooltip        |
+| Beige       | #EDEBD1 | **selection**: one 2 px keyline on the strip, fixture, script, camera or step, and on a setting's current choice (a frame rate, the view); the tooltip             |
 | Beige Light | #F6F5E8 | the main ink; the primary command key's fill (black text)                                                                                                          |
-| Dark Green  | #004932 | the plate's title plate, the one brand moment on a working page; the deck's page keys                                                                              |
+| Dark Green  | #004932 | the plate's title plate, the one brand moment on a working page; the open page's segment in the header (D48); the deck's page keys                                 |
 
 Hue names the family, form names the meaning, and colour never stands alone: a lit fill means on, a lamp and its word mean look here, a keyline encloses a value or a word. A lamp always has its word beside it.
 
 Hazards are a coral lamp and a word on a dark key, never a coral fill: 48 V on, and `REC` while the main camera records. Doubt is a dashed yellow keyline on the value itself: a value the hardware link has not confirmed, or a last known value from a device that stopped answering. A locked control is a dashed edge at 55 %, and says why on hover; a locked key keeps its state: engaged, its word and dashed edge in yellow; live, in green.
 
-Text pairs that hold 4.5:1 (tested from the token values): the inks on every surface and well; black on Green, Yellow, Coral and Beige Light; Beige on Burgundy; Beige Light and the second ink on Dark Green. Never coral or the quiet ink on Dark Green.
+Text pairs that hold 4.5:1 (tested from the token values): the inks on every surface and well; black on Green, Yellow, Coral and Beige Light; Beige on Burgundy; Beige Light and the second ink on Dark Green; the main and the second ink on a platter and on a room's key face. Never coral or the quiet ink on Dark Green, and never the quiet ink on a platter, a room's key face or a list (it is under 4.5:1 there): it stands on a wall, a lintel, a floor or a well.
 
 The meter ramp and the colour-temperature track are signal, not status: green to −18 dBFS, yellow to −3, coral above; warm to cool.
 
 The operator's colour tags on scenes, groups and palettes are identity, not status: eight quiet tints, `--tag-0` to `--tag-7` (Clay, Ochre, Sand, Olive, Slate, Mist, Plum, Heather), clear of every role colour; Ochre and Mist are the palette's reserve Brown and Sky. A saved tag keeps its slot, and a colour-temperature palette carries none: its temperature colours it.
 
+The Overview's rooms (D47) are identity too: each takes the dark member of a brand pair, pulled down to the page's depth: stone (Beige) for THE TAKE, green (Dark Green) for THE PICTURE, slate (Sky and Blue) for THE SCRIPT and umber (Brown and Yellow) for THE SOUND (`--room-<tone>-wall`, `-lintel`, `-floor`, `-tray`, `-key`, `-line`, `-line2`). They are dark enough that a lamp, a lit key or a meter always stands out; inside a room the keys, the lists and the hairlines take the room's tones. A room in trouble takes the state display's keyline, coral or yellow, round the whole room.
+
 There is one theme, Studio.
 
 ## 5. Material
 
-Flat and matte, three planes, the raised layer of the header and the footer, and one floating layer:
+Flat and matte, three planes, the raised layer of the header and the footer, the Overview's rooms, and one floating layer:
 
 | Plane          | Token              | Lives there                                                                                                                                                                                                                                                              |
 | -------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -91,11 +95,14 @@ Flat and matte, three planes, the raised layer of the header and the footer, and
 | Key face       | `--material-key`   | every pressable thing, one step up, with a 1 px `--material-line2` edge                                                                                                                                                                                                  |
 | Well           | `--material-well`  | the state display, readouts, sliders' and meters' wells, fields, the plot: one step down, 1 px `--material-line` edge                                                                                                                                                    |
 | Raised layer   | `--material-bar`   | the header and the footer (D48): a step up from the surface, closed by a 1 px `--material-bar-line`; on it the platters (`--material-platter`, radius 12) carry the tabs, the chips and the REC tally, with a 1 px light edge along their top (`--elevation-edge-light`) |
+| Room           | `--room-<tone>-*`  | the Overview's four rooms (D47): a raised panel at 12 in its tone with the light edge, its name band a step darker, its floor a step darker again; a tray for keys that belong together, a step darker with a soft inner edge (`--elevation-recess`)                     |
 | Floating layer | `--material-raise` | menus, popovers, dialogs, drawers, toasts: a 1 px `--material-line2` edge, a 1 px black outline and one soft shadow                                                                                                                                                      |
 
-A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px), the head's row standing 4 px above it with or without keys. One radius, 4 px, everywhere (a lamp is a circle), but on the raised layer: a platter is 12 px and what sits on it 8 px, so the shapes nest.
+A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards outside the Overview's rooms. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px), the head's row standing 4 px above it with or without keys. One radius, 4 px, everywhere (a lamp is a circle), but on the raised layer and on the Overview: a platter, a room, the status card, a tray and a list are 12 px, what sits in them 8 px (a key, a well, a picture), and what sits in that 4 px, so the shapes nest.
 
-No gradient except signal (the meter ramp, the colour-temperature track), no glow, no inner highlight but a platter's one-pixel light edge, no shadow except on the floating layer. The tooltip is the one light surface (Beige with black text), so it reads as a note. Fader and slider caps are matte and light, so a position reads from 3 m.
+On the Overview (D47) board 3's forms are the page's: the room; the tray; the one grouped list for the take's facts, the studio and the cues (a rounded face in the key's tone, rows on hairlines that start after the row's margin, the value bold at the right); and the status card, the state display and the latch slot as one card, its latch row tinted yellow while something is latched, an error drawn as the coral keyline round the whole card. The pictures, the glass, the speed tape and the meters stand in black: the content is the hero.
+
+No gradient except signal (the meter ramp, the colour-temperature track), no glow, no inner highlight but the one-pixel light edge of a platter and of the Overview's raised parts, no shadow except on the floating layer and a tray's soft inner edge. The tooltip is the one light surface (Beige with black text), so it reads as a note. Fader and slider caps are matte and light, so a position reads from 3 m.
 
 ## 6. Motion
 
@@ -106,6 +113,7 @@ No gradient except signal (the meter ramp, the colour-temperature track), no glo
 | A state word or keyline changes               | 160 ms       | out                              |
 | A floating layer enters · leaves              | 200 · 120 ms | out · in (8 px rise and fade)    |
 | Bank or tab change                            | 160 ms       | in-out                           |
+| The Overview's speed tape, one tick a detent  | 160 ms       | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
 | Meters, countdown bars, the prompter's scroll | frame rate   | the hardware link's              |
 | The cameras' pictures                         | frame rate   | the source's                     |
 
@@ -123,6 +131,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
 - **Empty**: `EmptyLine`, an empty list or section: one quiet line in PT Sans body, the explanation as its tooltip, an optional hollow lamp (as the latch slot's "Nothing latched") and at most one key. Pages draw no empty state of their own.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
+- **The Overview** (D47, on the board "Overview"): `Room` (tone, name, job, what it holds now, a `Door` to its page, a floor where it needs one, the alert keyline), `Door`, `Tray`, `GroupedList` with `GroupedListRow`, `StatusCard` (the `StateDisplay` and the `LatchSlot` as one card), and `SpeedTape`, a display of the prompter's pace that slides one tick a detent of the deck's SPEED dial and says when the deck turned it. Inside a room the keys and wells take the room's tones with no edit of their own.
 - **Setup**: its step keys (an `ArmKey` with the step's number, name and word; on a published setup it reads `press twice` and arms in its own height) and its probe rows (the name, a `LampWord`, the answer under it) are the page's own, built from these, and so are the deck's map and the Support sections.
 
 ## 8. State words
@@ -139,6 +148,9 @@ The sentence keeps two lines, so every state sentence is written to fit them, ab
 | Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`                                       |
 | Cameras      | `HELD` · `RELEASED`, `NOT SET UP`, `PICTURE MISSING`, `NO PICTURES` · `UNREACHABLE`                                                         |
 | Before ready | `STARTING UP…`, `OPENING…` · `STARTUP FAILED`, `PROTOCOL MISMATCH`, `SAVED DATA DAMAGED`, `LINK STOPPED`, `ALREADY OPEN`, `<AREA> STOPPED`  |
+| Overview     | `READY` (every link answers) · the worst page's own word, its sentence with the page named first (`Console: …`, `Cameras: …`)               |
+
+The Overview adds no state of its own (D47): its display mirrors the worst of the header's lamps, an error before attention and a tie in the take's order (CAM 1's take, the prompter, the Console, the rig, the deck, the backup), with that page's way out: `Sync from TotalMix` sent from there when that is the Console's own, otherwise `Open <page>`. The room of the page it names takes its keyline.
 
 ## 9. Copy and controls
 
@@ -148,6 +160,7 @@ The sentence keeps two lines, so every state sentence is written to fit them, ab
 - Numbers carry sign and unit: `−3.8 dB`, `32 dB`, `3200 K`, `76 %`, `18:24`.
 - **Every action is reachable from a visible control: a key, or the ⋯ menu on its object.** Right-click on an object opens the same menu as its ⋯; nothing is right-click only. Controls used during a take stay keys, never menu items. A menu's head names its object; its items show their current value in words at the right; a disabled item says why; a destructive item sits last, in coral, and arms in place.
 - **Hints are tooltips**, except where a press cannot be undone or arms something: "press again", a countdown, 48 V, `LOAD?` and a lock's reason stay on screen. No tooltip covers a take-time control.
+- The Overview's speed tape is a display: it takes no wheel, no key and no press; the deck's dial and the − 5 and + 5 keys set the pace. The Overview's ⋯ holds the standing commands of the pages it shows: `Sync from TotalMix`, `Read all cameras again`, `Clear clips` and `Setup / Support`.
 - No surface shows a key, a key glyph or a key hint. The keyboard does only what it does in any program: Tab, Enter or Space on the focused control, typing, the arrows on a focused slider or list, and Esc on a dialog, a menu or an armed key.
 
 ### Menus, popovers and tooltips
@@ -176,4 +189,4 @@ Per page, at 2560×1440, the page tests hold:
 - chrome sizes within 2 px of section 2, and the state display at the same place on every page;
 - no forbidden word on screen (section 9).
 
-From the token values, unit tests hold the contrast pairs of section 4, that no colour is defined twice, that every custom property a stylesheet reads is declared, and that the deprecated tokens only lose readers (`frontend/packages/design-system/src/__tests__/css-tokens.test.ts`).
+From the token values, unit tests hold the contrast pairs of section 4, that no colour is defined twice, that every custom property a stylesheet reads is declared, and that the deprecated tokens only lose readers (`frontend/packages/tokens/src/contrast.test.ts` and `frontend/packages/design-system/src/__tests__/css-tokens.test.ts`).

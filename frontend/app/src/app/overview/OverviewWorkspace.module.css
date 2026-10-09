@@ -1,0 +1,17 @@
+/* The Overview's bay (board 3): THE PICTURE over THE SCRIPT, each 16 px
+   inside the bay, which the shell draws without hairlines on this page. The
+   cluster and the plate are their own components' (`ShellRegion`). */
+
+.workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.bay {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+}

@@ -58,7 +58,14 @@ const HEADER = '[data-region="header"]';
 const FOOTER = '[data-region="footer"]';
 
 function liveMasksFor(page: Page, fixture: string): Locator[] {
-  return fixture.startsWith("audio-") ? liveAudioMasks(page) : [];
+  if (fixture.startsWith("audio-")) return liveAudioMasks(page);
+  // The Overview (D47) shows the Console's live meters, and while the script
+  // plays its glass band scrolls on the page's own frames, which the fixed
+  // clock does not stop.
+  if (fixture.startsWith("overview-")) {
+    return [...liveAudioMasks(page), page.locator('[data-testid="overview-glass-band"][data-playing]')];
+  }
+  return [];
 }
 
 /** A page's capture leaves out the chrome, which has captures of its own. */
@@ -266,6 +273,12 @@ const STATE_FIXTURES = [
   // studio's list, and the Console with those strips locked, one on the plate.
   "setup-console",
   "audio-hidden-strips",
+  // The Overview (D47): its three moments, a take with every link answering,
+  // the first look of the day with the Console not yet read, and CAM 1 lost
+  // mid-take with a clip held.
+  "overview-take",
+  "overview-landing",
+  "overview-fault",
 ] as const;
 
 // The fixtures no capture draws: their state display says the whole of its
@@ -310,6 +323,7 @@ test.describe("state coverage", () => {
 // board whose desk does not answer, and on a start that failed; and each
 // page's footer.
 const CHROME = [
+  { name: "header-overview", fixture: "overview-take", region: HEADER },
   { name: "header-setup", fixture: "setup-ready", region: HEADER },
   { name: "header-lighting", fixture: "lighting-populated", region: HEADER },
   { name: "header-audio", fixture: "audio-populated", region: HEADER },
@@ -319,6 +333,7 @@ const CHROME = [
   { name: "header-cameras-lost-mid-take", fixture: "cameras-lost-mid-take", region: HEADER },
   { name: "header-desk-offline", fixture: "audio-offline", region: HEADER },
   { name: "header-start-failed", fixture: "bootstrap-failed", region: HEADER },
+  { name: "footer-overview", fixture: "overview-take", region: FOOTER },
   { name: "footer-setup", fixture: "setup-ready", region: FOOTER },
   { name: "footer-lighting", fixture: "lighting-populated", region: FOOTER },
   { name: "footer-audio", fixture: "audio-populated", region: FOOTER },

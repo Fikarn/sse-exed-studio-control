@@ -1,0 +1,14 @@
+/* A tray (the Overview, D47): a recess for keys that belong together, in the
+   room's tray tone with the soft inner edge. The default lays the keys in a
+   row, 4 apart; a page's own class (unlayered) replaces the layout. */
+@layer components {
+  .tray {
+    display: flex;
+    gap: 4px;
+    min-width: 0;
+    padding: 4px;
+    border-radius: var(--radius-panel);
+    background: var(--room-tray, var(--material-floor));
+    box-shadow: var(--elevation-recess);
+  }
+}

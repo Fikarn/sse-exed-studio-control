@@ -609,7 +609,9 @@ export function recentCameraActions(state: MutableFixtureState): CameraRecentAct
  * it, adding its length; a start while a take is open counts the open one and adds no seconds
  * (its end is not in the log); a stop with no take open is left out; a take still open counts,
  * with its seconds so far while CAM 1 reports recording. `null` while a test holds the log
- * unreadable, as `recent` is.
+ * unreadable, as `recent` is. The double counts from its own log, which keeps fifty rows
+ * (`RECENT_ACTIONS_LIMIT`, `recentEvents`) where the hardware link's keeps five thousand: a
+ * day of more than fifty rows of any page counts fewer takes here than in the studio.
  */
 export function takesToday(state: MutableFixtureState, recordingNow: boolean, now: number): TakesToday | null {
   if (fixtureCameras(state).recentUnreadable) return null;

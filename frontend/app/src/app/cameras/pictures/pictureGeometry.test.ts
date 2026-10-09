@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { CENTRE, WHOLE, bigRect, bigViewWord, loupeRect, oneToOneRect, pointAt } from "./pictureGeometry";
+import {
+  CENTRE,
+  OVERVIEW_HERO,
+  OVERVIEW_TILE,
+  WHOLE,
+  bigRect,
+  bigViewWord,
+  loupeRect,
+  oneToOneRect,
+  overviewLoupeRect,
+  pointAt,
+} from "./pictureGeometry";
 
 describe("where the pictures stand", () => {
   it("shows in the loupe a part of the picture around the point, each pixel enlarged", () => {
@@ -28,5 +39,14 @@ describe("where the pictures stand", () => {
     expect(pointAt(WHOLE, { x: 0, y: 1 })).toEqual({ x: 0, y: 1080 });
     expect(pointAt(oneToOneRect(CENTRE), { x: 0.25, y: 0.5 })).toEqual({ x: 540, y: 541 });
     expect(pointAt(WHOLE, { x: 1.4, y: -2 })).toEqual({ x: 1920, y: 0 });
+  });
+
+  // The Overview (D47): CAM 1 at two thirds, the small pictures and the loupe at a sixth.
+  it("shows the Overview's pictures at whole scales, and its loupe a small picture's size", () => {
+    expect([OVERVIEW_HERO.width / 1920, OVERVIEW_HERO.height / 1080]).toEqual([2 / 3, 2 / 3]);
+    expect([OVERVIEW_TILE.width / 1920, OVERVIEW_TILE.height / 1080]).toEqual([1 / 6, 1 / 6]);
+    expect(overviewLoupeRect(CENTRE, 2)).toEqual({ x: 880, y: 495, width: 160, height: 90 });
+    expect(overviewLoupeRect(CENTRE, 4)).toEqual({ x: 920, y: 518, width: 80, height: 45 });
+    expect(overviewLoupeRect({ x: 1920, y: 1080 }, 2)).toMatchObject({ x: 1760, y: 990 });
   });
 });

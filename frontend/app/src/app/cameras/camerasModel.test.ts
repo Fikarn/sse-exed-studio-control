@@ -27,6 +27,7 @@ import {
   selectedCamera,
   shutterUnit,
   takeReadouts,
+  batteryReadout,
   unavailableReason,
   valuesLine,
   worstCamera,
@@ -269,6 +270,24 @@ describe("what is known about the take", () => {
     const cam1 = cameraOf(await openCameras().read(), 1);
     expect(takeReadouts(cam1, NOW)[0]).toMatchObject({ value: null, note: "not recording" });
     expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · not recording");
+  });
+
+  // The Overview's take (D47) shows CAM 1's battery as a row, by the plate's rule.
+  it("reads CAM 1's battery as a take row, as the last read while it does not answer", async () => {
+    const { hooks, read } = openCameras();
+    const held = cameraOf(await read(), 1);
+    expect(batteryReadout(held)).toMatchObject({ id: "battery", label: "Battery", doubt: false });
+    expect(batteryReadout(held).value).toBe(held!.battery!.split(" · ")[0]);
+    hooks.stopAnswering(1);
+    const lost = batteryReadout(cameraOf(await read(), 1));
+    expect(lost).toMatchObject({ doubt: true });
+    expect(lost.note).toMatch(/last read$/);
+    const released = openCameras({ cameras: [{ camera: 1, paired: true, released: true }] });
+    expect(batteryReadout(cameraOf(await released.read(), 1))).toMatchObject({
+      value: null,
+      note: "not read while released",
+    });
+    expect(batteryReadout(null)).toMatchObject({ value: null, note: "CAM 1 is not set up" });
   });
 
   it("prints lengths whole, minutes unpadded below the hour", () => {

@@ -63,7 +63,7 @@ async function main() {
       `Expected fresh saved data to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
     // The page is seeded through the app's own request: new saved data opens
-    // on the Console, and Lighting is saved instead.
+    // on the Overview, and Lighting is saved instead.
     await seedSavedWorkspace(firstRun, "native-acceptance-installed", "Native acceptance engine");
     // The continuity sentinel, made on fresh, unconfigured lighting: the lane
     // proves it survives a restart and comes back with a restore.

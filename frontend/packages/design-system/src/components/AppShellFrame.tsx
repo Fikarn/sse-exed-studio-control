@@ -82,6 +82,9 @@ export interface AppShellFrameProps {
   /** The bay. The shell draws no margin in it: the page's picture decides
    *  its own. */
   children: ReactNode;
+  /** `quiet`: no hairlines between the columns, for a page whose own rooms
+   *  part them (the Overview, D47). The columns keep their widths. */
+  columns?: "quiet";
   onMonitorItemClick?: (item: MonitorItem) => void;
   onWorkspaceChange?: (workspaceId: string) => void;
 }
@@ -103,6 +106,7 @@ export function AppShellFrame({
   plate,
   footer,
   children,
+  columns,
   onMonitorItemClick,
   onWorkspaceChange,
 }: AppShellFrameProps) {
@@ -171,6 +175,7 @@ export function AppShellFrame({
           data-shell-frame=""
           data-cluster={cluster ? "" : undefined}
           data-plate={plate ? "" : undefined}
+          data-columns={columns}
         >
           <header className={styles.header} data-region="header" data-material="bar">
             <Crest size="header" className={styles.logo} />

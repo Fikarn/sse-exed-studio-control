@@ -33,7 +33,9 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
         <SetupStepScreen
           eyebrow={stepEyebrow}
           title="Publish"
-          lead="Publishing unlocks Lighting, Audio, Cameras and Teleprompter, exports a backup and opens the Console. Once published, the deck's pages, the bridge and the desk are live for the next session."
+          // D47: the published setup opens the Overview, the page the app
+          // opens on at every start (it opened the Console until then).
+          lead="Publishing unlocks every page, exports a backup and opens the Overview. Once published, the deck's pages, the bridge and the desk are live for the next session."
           // The visual overhaul's polish (2026-10-05): a rule only while a
           // press needs it read; "Every probe passed." said again what the
           // state display, the Probes section and the footer say.
@@ -57,7 +59,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
               />
               <SetupFactCard
                 label="Opens at start"
-                value={String(startup?.targetSurface ?? "commissioning") === "dashboard" ? "Console" : "Setup"}
+                value={String(startup?.targetSurface ?? "commissioning") === "dashboard" ? "Overview" : "Setup"}
                 tone={isReady ? "ok" : "attention"}
               />
             </>
@@ -76,14 +78,14 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
                   : overriding
                     ? "Publish with override…"
                     : isReady
-                      ? "Open the Console"
+                      ? "Open the Overview"
                       : "Publish setup"}
               </Key>
               {backKey}
             </>
           }
           // What the press changes, while it changes something.
-          note={!isReady && !overriding ? "Publish exports a backup, then opens the Console." : undefined}
+          note={!isReady && !overriding ? "Publish exports a backup, then opens the Overview." : undefined}
           record={
             // What publish commits, as the hardware link holds it: the
             // addresses and the counts, not a repeat of the probe sentences

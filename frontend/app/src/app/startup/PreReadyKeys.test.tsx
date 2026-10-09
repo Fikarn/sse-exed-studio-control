@@ -48,14 +48,14 @@ afterEach(() => {
 });
 
 describe("the startup screen has no key", () => {
-  // The visual overhaul (2026-10-05): which page opens is not known until the
-  // start is done (D1, the page last used); the line said "Setup opens" on
-  // every start, since the store begins on Setup.
-  it("carries the state and no key, and says the page last used opens", () => {
+  // The visual overhaul (2026-10-05): the line said "Setup opens" on every
+  // start, since the store begins on Setup. The app opens on the Overview
+  // since 2026-10-09 (D47, D1 amended).
+  it("carries the state and no key, and says the Overview opens", () => {
     render(<StartupSurface lifecycle="waiting-for-ready-event" />);
     const display = screen.getByTestId("startup-surface-state-display");
     expect(display.textContent).toContain("STARTING UP…");
-    expect(display.textContent).toContain("The page last used opens once Studio Control is ready.");
+    expect(display.textContent).toContain("The Overview opens once Studio Control is ready.");
     expect(keysOn("startup-surface-state-display")).toEqual([]);
   });
 

@@ -5,7 +5,7 @@ import type { PrompterJumpRequest, PrompterSnapshot, ShellStore } from "@sse/eng
 
 import type { GlassParagraph } from "./glass/glassText";
 import { PrompterGlass, type PrompterGlassLayoutReport, type PrompterGlassText } from "./glass/PrompterGlass";
-import { barStart, cueKeys, paragraphAt, placeView, scriptBar, timeLeftParts } from "./teleprompterModel";
+import { barStart, cueKeys, paragraphAt, placeView, runStateWord, scriptBar, timeLeftParts } from "./teleprompterModel";
 import { TAKE, type PerformAction } from "./perform";
 import styles from "./TeleprompterBay.module.css";
 
@@ -199,7 +199,7 @@ export function TeleprompterBay({
           </span>
           {glass ? (
             <LampWord tone={glass.playing ? "ok" : "off"} className={styles.runState} testId="teleprompter-run-state">
-              {glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused"}
+              {runStateWord(glass)}
             </LampWord>
           ) : null}
         </header>

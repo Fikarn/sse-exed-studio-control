@@ -28,6 +28,12 @@ import type { MutableFixtureState } from "./state";
 // CAM 1 recording started before the hardware link looked (`startedAt` null). It raises no
 // event: the scenario starts that way. A seed the hardware link could not hold is the
 // scenario's mistake, and says so.
+//
+// One key is the tests' alone: `recordingForSeconds` says the hardware link saw CAM 1's take
+// start that long before the start, which no start can see. The Overview's take (D47)
+// counts the take's length on screen, and a take started before the hardware link looked
+// has none ("not known"), so the seed sets `startedAt` after the first read, as a REC
+// pressed that long ago would have.
 
 const mistake = (message: string) => new Error(`cameras: ${message}`);
 
@@ -100,6 +106,7 @@ const CAMERA_SEED_KEYS = [
   "unreachable",
   "lastRead",
   "recording",
+  "recordingForSeconds",
   "values",
 ] as const;
 
@@ -118,6 +125,8 @@ interface CheckedCamera {
   unreachable: boolean;
   lastRead: boolean;
   recording: boolean | null;
+  /** Test-only: how long ago the hardware link saw the take start, in seconds. */
+  recordingForSeconds: number | null;
   values: FixtureCameraValuesSeed;
 }
 
@@ -160,7 +169,30 @@ function checkedCamera(seed: FixtureCameraSeed, index: number, seen: Set<number>
     if (camera !== 1) throw mistake(`${tag} does not record here: only CAM 1 records.`);
     recording = flag(seed.recording, "CAM 1's recording");
   }
-  return { camera, address, paired, vmixInput, released, unreachable, lastRead, recording, values: seed.values ?? {} };
+  let recordingForSeconds: number | null = null;
+  if (seed.recordingForSeconds !== undefined) {
+    const seconds = seed.recordingForSeconds;
+    if (camera !== 1) throw mistake(`${tag} does not record here: only CAM 1 records.`);
+    if (typeof seconds !== "number" || !Number.isInteger(seconds) || seconds < 1) {
+      throw mistake("CAM 1's recordingForSeconds must be a whole number of seconds, 1 or more.");
+    }
+    if (recording !== true) throw mistake("CAM 1's recordingForSeconds needs a take: give it recording: true.");
+    // A release forgets the take's start (`forgetRead`): the length would be dropped unsaid.
+    if (released) throw mistake("CAM 1's recordingForSeconds is not counted while it is released.");
+    recordingForSeconds = seconds;
+  }
+  return {
+    camera,
+    address,
+    paired,
+    vmixInput,
+    released,
+    unreachable,
+    lastRead,
+    recording,
+    recordingForSeconds,
+    values: seed.values ?? {},
+  };
 }
 
 /** Builds the scenario's cameras on the double, before its first read. */
@@ -196,6 +228,12 @@ export function seedFixtureCameras(state: MutableFixtureState, seed: FixtureCame
   const now = Date.now();
   readHeldCameras(cameras, now);
   for (const entry of checked) {
+    // After the first read, which takes a running take for one started before it looked;
+    // the reads after it keep the start while the take runs, and so does a camera that
+    // stops answering (`readCamera`).
+    if (entry.recordingForSeconds !== null) {
+      cameras.held[entry.camera].startedAt = now - entry.recordingForSeconds * 1000;
+    }
     if (entry.unreachable) {
       cameras.bodies[entry.camera].answering = false;
       readCamera(cameras, entry.camera, now);

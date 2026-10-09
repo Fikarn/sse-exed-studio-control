@@ -240,7 +240,7 @@ export function recKeyView(main: CameraSnapshot | null): RecKeyView {
 }
 
 export interface TakeReadout {
-  id: "length" | "timecode" | "card";
+  id: "length" | "timecode" | "card" | "battery";
   label: string;
   /** The value; `null` when there is none to print. */
   value: string | null;
@@ -328,6 +328,29 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
     { id: "timecode", label: "Timecode", explain: null, ...timecode },
     { id: "card", label: "Card time left", ...card },
   ];
+}
+
+/**
+ * CAM 1's battery as a take row (2026-10-09, the Overview's take, D47; the
+ * Cameras page shows it in the plate's head): `100 %` with what follows it
+ * (`on mains`) as its note, by the plate's own rule: shown while CAM 1 is
+ * held, and as the last read, in doubt, while it does not answer.
+ */
+export function batteryReadout(main: CameraSnapshot | null): TakeReadout {
+  const doubt = main?.state === "unreachable" || main?.valuesLastRead === true;
+  const shown = main?.state === "held" || doubt;
+  if (!main || !shown || !main.battery) {
+    const note =
+      !main || main.state === "not-set-up"
+        ? "CAM 1 is not set up"
+        : main.state === "released"
+          ? "not read while released"
+          : "not reported";
+    return { id: "battery", label: "Battery", value: null, note, doubt: false, explain: null };
+  }
+  const [value, ...rest] = main.battery.split(" · ");
+  const note = [...rest, ...(doubt ? ["last read"] : [])].join(" · ");
+  return { id: "battery", label: "Battery", value: value ?? main.battery, note, doubt, explain: null };
 }
 
 /**

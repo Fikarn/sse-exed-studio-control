@@ -146,6 +146,7 @@ test.describe("UI contract", () => {
       "setup-ready",
       "cameras-held",
       "teleprompter-ready",
+      "overview-take",
     ]) {
       await openBoard(page, fixture);
       const { measures } = await measureBoard(page);

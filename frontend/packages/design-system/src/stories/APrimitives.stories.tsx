@@ -6,9 +6,11 @@ import { Button } from "../components/Button";
 import { ColorPicker, type ColorPickerSwatch } from "../components/ColorPicker";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Crest } from "../components/Crest";
+import { Door } from "../components/Door";
 import { Drawer } from "../components/Drawer";
 import { EmptyLine } from "../components/EmptyLine";
 import { Footer } from "../components/Footer";
+import { GroupedList, GroupedListRow } from "../components/GroupedList";
 import { IconButton } from "../components/IconButton";
 import { ArmKey, Key, Segmented } from "../components/Key";
 import { Lamp, type LampTone } from "../components/Lamp";
@@ -20,14 +22,18 @@ import { Meter } from "../components/Meter";
 import { LoadingState } from "../components/OperationalState";
 import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../components/Plate";
 import { Popover } from "../components/Popover";
+import { Room } from "../components/Room";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { Groove, Slider } from "../components/Slider";
+import { SpeedTape } from "../components/SpeedTape";
 import { StateDisplay } from "../components/StateDisplay";
 import { StatusBadge } from "../components/StatusBadge";
+import { StatusCard } from "../components/StatusCard";
 import { Tab } from "../components/Tab";
 import { Tally } from "../components/Tally";
 import { Toast } from "../components/Toast";
 import { Tooltip } from "../components/Tooltip";
+import { Tray } from "../components/Tray";
 import type { UseArmResult } from "../components/useArm";
 import { Field, Readout, Screen } from "../components/Well";
 
@@ -36,7 +42,8 @@ import { Field, Readout, Screen } from "../components/Well";
 // cluster's inner width, on the one surface, and fits 2560×1440 without
 // scrolling. The page tests measure every board (ui-contract.spec.ts) and
 // capture the Sheet, which holds them all but the header's, the Shell board,
-// which holds those, and the board of the menus and overlays open
+// which holds those, the board of the menus and overlays open, and the
+// Overview board, which holds the Overview's parts at their own widths
 // (storybook.spec.ts).
 
 /** A card stands at the cluster's inner width (424 less its 24 px gutters). */
@@ -712,6 +719,300 @@ function ShellCards() {
   );
 }
 
+// The Overview's parts (D47; docs/design/overview-3.md), on a board of their
+// own: a room is 408 wide in the cluster and the plate and 1648 in the bay,
+// wider than the Sheet's cards, and the Sheet is full. Four columns laid side
+// by side: THE TAKE and THE SOUND at the columns' width; THE PICTURE and THE
+// SCRIPT wide enough for their facts; the status card at rest, latched and on
+// error; the speed tape still, then the door and the tray outside a room.
+
+/** A room in the cluster or the plate: the column less its 16 px gutters. */
+const ROOM_WIDTH = 408;
+
+const overviewBoard: CSSProperties = {
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 32,
+  height: "100vh",
+  padding: 24,
+  background: "var(--material-bg)",
+  color: "var(--text-text)",
+  font: "var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui)",
+};
+
+const overviewColumn: CSSProperties = { display: "flex", flexDirection: "column", gap: 20, flex: "none" };
+
+function Wide({ title, width = ROOM_WIDTH, children }: { title: string; width?: number; children: ReactNode }) {
+  return (
+    <section aria-label={title} style={{ width, display: "flex", flexDirection: "column", gap: 12 }}>
+      <span style={caption}>{title}</span>
+      {children}
+    </section>
+  );
+}
+
+const roomBody: CSSProperties = { display: "flex", flexDirection: "column", gap: 12, padding: 16 };
+
+/** THE TAKE's transport tray: PLAY two rows tall beside BACK and TOP (368 inside the tray). */
+const transport: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "196px 168px",
+  gridTemplateRows: "46px 46px",
+  gap: "8px 4px",
+};
+
+const steps: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))" };
+
+/** A name among a room's facts: bold at 16 in the main ink. */
+const factName: CSSProperties = {
+  font: "var(--font-weight-bold) var(--font-size-body) / 1 var(--font-family-ui)",
+  color: "var(--text-text)",
+};
+
+const floorWord: CSSProperties = {
+  font: "var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui)",
+  color: "var(--text-text2)",
+};
+
+const STUDIO_ROWS = [
+  { label: "Lighting", value: "Warm wash", tone: "ok", word: "on rig", doubt: false },
+  { label: "Console", value: "Mix 1", tone: "attention", word: "assumed", doubt: true },
+  { label: "Prompter XL", value: "1920×1080", tone: "ok", word: "on screen", doubt: false },
+] as const;
+
+const OVERVIEW_MENU = {
+  head: { title: "Overview" },
+  items: [
+    { id: "sync", label: "Sync from TotalMix", onSelect: () => undefined },
+    { id: "read", label: "Read all cameras again", onSelect: () => undefined },
+    { id: "clips", label: "Clear clips", onSelect: () => undefined },
+  ],
+};
+
+function OverviewCards() {
+  return (
+    <div style={overviewBoard}>
+      <div style={overviewColumn}>
+        <Wide title="Room · stone: REC, the take's rows (one in doubt), its keys in trays">
+          <Room tone="stone" name="The take" job="act" actions={<Door page="Cameras" />}>
+            <div style={roomBody}>
+              <ArmKey
+                hazard
+                armed={false}
+                timeoutMs={3000}
+                cap="REC"
+                hint="CAM 1 · press twice to stop"
+                size="tall"
+                take
+                style={{ width: "100%" }}
+              />
+              <GroupedList>
+                <GroupedListRow label="Take length" value="04:12" note="counted here" />
+                <GroupedListRow label="Timecode" value="10:42:06:00" />
+                <GroupedListRow label="Card time left" value="46 min" note="last read" doubt />
+                <GroupedListRow label="Battery" value="100 %" note="on mains" />
+              </GroupedList>
+              <Tray style={transport}>
+                <Key
+                  cap="Play"
+                  hint="press to pause"
+                  live
+                  layout="stack"
+                  take
+                  style={{ gridRow: "1 / span 2", minHeight: 100 }}
+                />
+                <Key cap="Back" hint="to the start of ¶ 8" layout="stack" take />
+                <Key cap="Top" hint="pauses · to ¶ 1" layout="stack" take />
+              </Tray>
+              <Tray style={steps}>
+                <Key size="large" take>
+                  − 5
+                </Key>
+                <Key size="large" take>
+                  + 5
+                </Key>
+                <Key size="large" take>
+                  ◂ Cue
+                </Key>
+                <Key size="large" take>
+                  Cue ▸
+                </Key>
+              </Tray>
+            </div>
+          </Room>
+        </Wide>
+        <Wide title="Room · umber on attention: a tall list, a floor">
+          <Room
+            tone="umber"
+            name="The sound"
+            job="listen"
+            alert="attention"
+            actions={<Door page="Audio" />}
+            floor={48}
+            floorContent={
+              <>
+                <span style={floorWord}>Phones 1</span>
+                <b>−7.2 dB</b>
+                <span style={floorWord}>Phones 2</span>
+                <b>−9.0 dB</b>
+              </>
+            }
+          >
+            <div style={roomBody}>
+              <GroupedList tall>
+                {STUDIO_ROWS.map(({ label, value, tone, word, doubt }) => (
+                  <GroupedListRow key={label} doubt={doubt}>
+                    <span style={{ width: 96, flex: "none", color: "var(--text-text2)" }}>{label}</span>
+                    <b data-row-value="">{value}</b>
+                    <span style={{ flex: 1 }} />
+                    <LampWord tone={tone}>{word}</LampWord>
+                  </GroupedListRow>
+                ))}
+              </GroupedList>
+            </div>
+          </Room>
+        </Wide>
+      </div>
+      <div style={overviewColumn}>
+        <Wide title="Room · green on error: the facts, a segmented choice, the door" width={1000}>
+          <Room
+            tone="green"
+            name="The picture"
+            job="watch"
+            alert="error"
+            facts={
+              <>
+                <b style={factName}>CAM 1</b>
+                <LampWord tone="error">unreachable</LampWord>
+                <span>values last read 10:43</span>
+              </>
+            }
+            actions={
+              <>
+                <Segmented label="Picture aids">
+                  <Key mode="segmented" size="small" cap="Guides" />
+                  <Key mode="segmented" size="small" cap="Zebras" engaged />
+                </Segmented>
+                <Door page="Cameras" />
+              </>
+            }
+          >
+            <div style={roomBody}>
+              <div
+                aria-hidden="true"
+                style={{ height: 200, borderRadius: "var(--radius-control)", background: "var(--material-well)" }}
+              />
+            </div>
+          </Room>
+        </Wide>
+        <Wide title="Room · slate with a floor: the speed turned on the deck, this take's range" width={1000}>
+          <Room
+            tone="slate"
+            name="The script"
+            job="read"
+            facts={
+              <>
+                <b style={factName}>02 Interview intro</b>
+                <LampWord tone="ok">playing</LampWord>
+              </>
+            }
+            actions={<Door page="Teleprompter" />}
+            floor={60}
+            floorContent={
+              <>
+                <span style={floorWord}>¶ 8 of 18</span>
+                <b>43 %</b>
+                <span style={floorWord}>2:31 left · ends 10:46</span>
+              </>
+            }
+          >
+            <div style={{ ...roomBody, flexDirection: "row", gap: 16 }}>
+              <div style={{ width: 300, height: 344, flex: "none" }}>
+                <SpeedTape value={145} range={[140, 150]} turned caption="turned on the deck" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <GroupedList tall>
+                  <GroupedListRow label="turn to the guest" value="0:10" note="¶ 9" />
+                  <GroupedListRow label="the clip rolls" value="1:42" note="¶ 12" />
+                  <GroupedListRow label="thank the guest" value="3:05" note="¶ 17" />
+                </GroupedList>
+              </div>
+            </div>
+          </Room>
+        </Wide>
+      </div>
+      <div style={overviewColumn}>
+        <Wide title="StatusCard · at rest, nothing latched">
+          <StatusCard>
+            <StateDisplay
+              tone="ok"
+              word="READY"
+              sentence="Every link answers. Nothing on any page needs you."
+              meta="8 of 8 links answer"
+              menu={<MenuButton buttonLabel="Overview menu" menu={OVERVIEW_MENU} />}
+            />
+            <LatchSlot />
+          </StatusCard>
+        </Wide>
+        <Wide title="StatusCard · latched: a clip and its Clear">
+          <StatusCard latched>
+            <StateDisplay
+              tone="attention"
+              word="ASSUMED"
+              sentence="Console: the strips may not match TotalMix since the start."
+              meta="since 09:05"
+              actions={
+                <Key mode="primary" size="small">
+                  Sync from TotalMix
+                </Key>
+              }
+            />
+            <LatchSlot>
+              <Latch who="Clip" action={<Key size="small">Clear</Key>}>
+                on Guest 1 · since 10:41
+              </Latch>
+            </LatchSlot>
+          </StatusCard>
+        </Wide>
+        <Wide title="StatusCard · on error: the keyline round the card">
+          <StatusCard error>
+            <StateDisplay
+              tone="error"
+              word="OFFLINE"
+              sentence="Cameras: CAM 1 does not answer. Its picture still comes from vMix."
+              meta="values last read 10:43"
+              actions={<Key size="small">Open Cameras</Key>}
+            />
+            <LatchSlot />
+          </StatusCard>
+        </Wide>
+      </div>
+      <div style={overviewColumn}>
+        <Wide title="SpeedTape · still, the script's own speed" width={300}>
+          <div style={{ width: 300, height: 344 }}>
+            <SpeedTape value={140} caption="the script's own speed" />
+          </div>
+        </Wide>
+        <Wide title="Door and Tray · on the page, outside a room" width={300}>
+          <div style={row}>
+            <Door page="Lighting" />
+            <Door page="Audio" />
+          </div>
+          <Tray>
+            <Key size="large" take>
+              − 5
+            </Key>
+            <Key size="large" take>
+              + 5
+            </Key>
+          </Tray>
+        </Wide>
+      </div>
+    </div>
+  );
+}
+
 function Sheet() {
   return (
     <>
@@ -1009,5 +1310,6 @@ export const ShellBoard: Story = {
     </div>
   ),
 };
+export const OverviewBoard: Story = { name: "Overview", render: () => <OverviewCards /> };
 export const WholeSheet: Story = { name: "Sheet", render: () => <Sheet /> };
 export const MenusAndOverlaysOpenBoard: Story = { name: "Menus and overlays, open", render: () => <OverlaysOpen /> };

@@ -236,6 +236,21 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
     }
   }
 
+  // The Overview's fixtures (D47): a fixture names the soloed strips as
+  // `clipChannelIds` names the clipped ones. The list replaces the console's
+  // solos (the default console solos FX 3/4), and `[]` clears them, so the
+  // take's console holds no Solo latch.
+  const fixtureSoloChannelIds = asArray(asRecord(state.audioSnapshot)?.soloChannelIds)
+    .map((entry) => asString(entry).trim())
+    .filter(Boolean);
+  if (state.audioSnapshot && asRecord(state.audioSnapshot)?.soloChannelIds !== undefined) {
+    delete state.audioSnapshot.soloChannelIds;
+    const soloIds = new Set(fixtureSoloChannelIds);
+    for (const channel of asArray(state.audioSnapshot.channels).map((entry) => asRecord(entry))) {
+      if (channel) channel.solo = soloIds.has(asString(channel.id));
+    }
+  }
+
   const fixtureMixLevelOverrides = asArray(asRecord(state.audioSnapshot)?.mixLevelOverrides)
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null);
@@ -416,7 +431,7 @@ export function buildCommissioningSteps(
             : "pending",
       summary: hasCompletedSetup
         ? "Startup is routed directly into the dashboard surface and the publish backup can be restored."
-        : "Commit setup, export a support backup, and return to the Console.",
+        : "Commit setup, export a support backup, and open the Overview.",
     },
   ];
 }

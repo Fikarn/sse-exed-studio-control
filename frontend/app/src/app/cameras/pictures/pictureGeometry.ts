@@ -24,6 +24,11 @@ export const TILE = { width: 544, height: 306 } as const;
 /** The loupe beside the small pictures: a whole number of the picture's pixels at 2:1 and at 4:1. */
 export const LOUPE = { width: 568, height: 272 } as const;
 
+/** The Overview's CAM 1 (D47): two thirds of the picture, a whole scale. */
+export const OVERVIEW_HERO = { width: 1280, height: 720 } as const;
+/** The Overview's small pictures and its loupe: a sixth of the picture. */
+export const OVERVIEW_TILE = { width: 320, height: 180 } as const;
+
 export type LoupeZoom = 2 | 4;
 export type BigView = "whole" | "one-to-one";
 
@@ -45,6 +50,12 @@ function partAround(point: Point, width: number, height: number): Rect {
 /** What the loupe shows at `zoom`: each pixel of the picture `zoom` pixels wide. */
 export function loupeRect(point: Point, zoom: LoupeZoom): Rect {
   return partAround(point, LOUPE.width / zoom, LOUPE.height / zoom);
+}
+
+/** What the Overview's loupe shows at `zoom`: a small picture's size, each pixel `zoom` pixels wide
+ *  (160 × 90 at 2:1, 80 × 45 at 4:1). */
+export function overviewLoupeRect(point: Point, zoom: LoupeZoom): Rect {
+  return partAround(point, OVERVIEW_TILE.width / zoom, OVERVIEW_TILE.height / zoom);
 }
 
 /** The 1:1 view: a 1680 × 945 part of the picture around `point`, pixel for pixel. */
