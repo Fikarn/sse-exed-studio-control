@@ -30,12 +30,16 @@
 //! row is on disk before the reply says ok. The prune runs in the insert's
 //! transaction.
 
+use crate::cameras::model::RECORDING_CAMERA;
+use crate::cameras::runtime::utc_time;
+use crate::cameras::snapshot::TakesToday;
 use crate::diagnostics::{log_event, LogLevel};
 use crate::storage::{open_connection, EngineResult};
-use rusqlite::{params, Transaction};
+use rusqlite::{params, Connection, Transaction};
 use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 
 /// How many rows `support.snapshot` carries.
 pub(crate) const RECENT_ACTIONS_LIMIT: usize = 50;
@@ -217,6 +221,95 @@ pub(crate) fn list_recent_domain_actions(
         .query_map(params![domain, limit as i64], recorded_action)?
         .collect::<Result<Vec<_>, rusqlite::Error>>()?;
     Ok(rows)
+}
+
+/// One domain's rows since local midnight, oldest first: the day's takes
+/// (`takes_today`).
+pub(crate) fn list_domain_actions_today(
+    db_path: &Path,
+    domain: &str,
+) -> EngineResult<Vec<RecordedAction>> {
+    let connection = open_connection(db_path)?;
+    let since = local_midnight(&connection)?;
+    Ok(domain_actions_since(&connection, domain, &since)?)
+}
+
+/// This day's local midnight in the rows' own UTC shape. SQLite reads the
+/// time zone from Windows, summer time included.
+fn local_midnight(connection: &Connection) -> Result<String, rusqlite::Error> {
+    connection.query_row(
+        "SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now', 'localtime', 'start of day', 'utc')",
+        [],
+        |row| row.get(0),
+    )
+}
+
+/// One domain's rows written at `since` or later, oldest first. The stamps
+/// share one fixed shape, so their text sorts as their times do.
+fn domain_actions_since(
+    connection: &Connection,
+    domain: &str,
+    since: &str,
+) -> Result<Vec<RecordedAction>, rusqlite::Error> {
+    let mut statement = connection.prepare(
+        "SELECT id, at, source, domain, action, target, detail
+         FROM event_log WHERE domain = ?1 AND at >= ?2 ORDER BY id",
+    )?;
+    let rows = statement
+        .query_map(params![domain, since], recorded_action)?
+        .collect::<Result<Vec<_>, rusqlite::Error>>()?;
+    Ok(rows)
+}
+
+/// CAM 1's takes in the cameras' rows of the day, oldest first (the
+/// Overview's footer, D47). A start opens a take and the next stop closes
+/// it, adding its length. A start while a take is open means the open one
+/// ended where the log does not show it (stopped on the camera, or its link
+/// lost): it counts, and adds no seconds, its length not being known. A stop
+/// with no take open (one started before midnight) is left out. A take still
+/// open counts, with its seconds so far while CAM 1 reports recording, and
+/// none otherwise.
+pub(crate) fn takes_today(
+    rows: &[RecordedAction],
+    now: SystemTime,
+    recording_now: bool,
+) -> TakesToday {
+    let target = format!("CAM {RECORDING_CAMERA}");
+    let mut count = 0_u32;
+    let mut recorded = Duration::ZERO;
+    let mut open: Option<SystemTime> = None;
+    let rows = rows
+        .iter()
+        .filter(|row| row.domain == DOMAIN_CAMERAS && row.target == target);
+    for row in rows {
+        let Some(at) = utc_time(&row.at) else {
+            continue;
+        };
+        match (row.action.as_str(), open) {
+            ("recording-started", None) => open = Some(at),
+            // The open take ended where the log does not show it.
+            ("recording-started", Some(_)) => {
+                count += 1;
+                open = Some(at);
+            }
+            ("recording-stopped", Some(started)) => {
+                count += 1;
+                recorded += at.duration_since(started).unwrap_or_default();
+                open = None;
+            }
+            _ => {}
+        }
+    }
+    if let Some(started) = open {
+        count += 1;
+        if recording_now {
+            recorded += now.duration_since(started).unwrap_or_default();
+        }
+    }
+    TakesToday {
+        count,
+        recorded_seconds: u32::try_from(recorded.as_secs()).unwrap_or(u32::MAX),
+    }
 }
 
 // ---------------------------------------------------------------------------

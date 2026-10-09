@@ -120,7 +120,7 @@ fn an_edit_is_saved_with_its_emphasis_and_its_counts() {
     assert_eq!(script["script"]["paragraphCount"], 3);
     assert_eq!(
         script["cues"],
-        json!([{ "paragraph": 1, "word": 0, "text": "PAUSE" }])
+        json!([{ "paragraph": 1, "word": 0, "text": "PAUSE", "secondsAhead": null }])
     );
 
     let too_long = vec![PrompterParagraph::plain(
@@ -481,7 +481,7 @@ fn the_editors_paste_keeps_the_emphasis_and_headings_as_cues() {
     assert_eq!(script["paragraphs"], json!(paragraphs));
     assert_eq!(
         script["cues"],
-        json!([{ "paragraph": 1, "word": 0, "text": "Guest" }])
+        json!([{ "paragraph": 1, "word": 0, "text": "Guest", "secondsAhead": null }])
     );
 }
 

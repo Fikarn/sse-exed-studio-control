@@ -61,6 +61,12 @@ pub(super) const DECK_PAGES: [DeckPage; 4] = [
     },
 ];
 
+/// The app's pages the deck follows without a deck page of their own, each
+/// with the deck page it turns to: the Overview turns the deck to PROMPTER,
+/// whose SPEED dial is the one turned while the Overview is watched (D49).
+/// Setup is not here: the deck stays where it is while Setup is open.
+pub(super) const DECK_FOLLOWS_WITHOUT_A_PAGE: [(&str, &str); 1] = [("overview", "prompter")];
+
 /// A page's Companion page number (1-based), 0 for a page the deck lacks.
 pub(super) fn deck_page_number(page_id: &str) -> i64 {
     DECK_PAGES

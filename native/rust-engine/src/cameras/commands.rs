@@ -16,7 +16,9 @@
 //! camera does not report or offer, a value it does not allow, and last the
 //! second press.
 
-use crate::action_log::{list_recent_domain_actions, DOMAIN_CAMERAS};
+use crate::action_log::{
+    list_domain_actions_today, list_recent_domain_actions, takes_today, DOMAIN_CAMERAS,
+};
 use crate::cameras::model::{
     address_refusal, model, parse_camera_address, step_choice, step_level, AutoKind, Setting,
     ALREADY_RECORDING, CAMERA_NUMBERS, NOT_CONFIRMED, NOT_RECORDING, RECORDING_CAMERA,
@@ -26,7 +28,7 @@ use crate::cameras::pocket::pairing::{parse_pin, NOT_WANTED};
 use crate::cameras::runtime::{with_cameras, Cameras};
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
 use crate::cameras::snapshot::{
-    CameraDialBank, CameraRecentAction, CameraState, CamerasHealthCheck,
+    CameraDialBank, CameraRecentAction, CameraState, CamerasHealthCheck, TakesToday,
 };
 use crate::cameras::store::{read_setup, write_setup, StoredSetup};
 use crate::cameras::{CameraError, CamerasReply};
@@ -55,8 +57,11 @@ pub(crate) fn handle_cameras_request(
         let before = cameras.health_check();
         let (result, event) = match method {
             "cameras.snapshot" => {
-                let recent = recent_actions(db_path, cameras);
-                (serde_json::to_value(cameras.snapshot(recent))?, None)
+                let (recent, takes_today) = from_the_log(db_path, cameras);
+                (
+                    serde_json::to_value(cameras.snapshot(recent, takes_today))?,
+                    None,
+                )
             }
             "cameras.select" => select_request(cameras, params)?,
             "cameras.bank.set" => bank_request(cameras, params)?,
@@ -88,35 +93,42 @@ pub(crate) fn handle_cameras_request(
     })
 }
 
-/// The cameras' newest Recent actions, as the action log holds them. A log
-/// that cannot be read never fails the cameras' read: the list is `None`,
-/// and the log says so once for as long as it lasts.
-fn recent_actions(db_path: &Path, cameras: &mut Cameras) -> Option<Vec<CameraRecentAction>> {
-    match list_recent_domain_actions(db_path, DOMAIN_CAMERAS, CAMERAS_RECENT_LIMIT) {
-        Ok(rows) => {
+/// What the cameras' read takes from the action log: the newest Recent
+/// actions, and CAM 1's takes since local midnight. A log that cannot be read
+/// never fails the cameras' read: both are `None`, and the log says so once
+/// for as long as it lasts.
+fn from_the_log(
+    db_path: &Path,
+    cameras: &mut Cameras,
+) -> (Option<Vec<CameraRecentAction>>, Option<TakesToday>) {
+    let read = list_recent_domain_actions(db_path, DOMAIN_CAMERAS, CAMERAS_RECENT_LIMIT)
+        .and_then(|recent| Ok((recent, list_domain_actions_today(db_path, DOMAIN_CAMERAS)?)));
+    match read {
+        Ok((recent, today)) => {
             cameras.recent_unread = false;
-            Some(
-                rows.into_iter()
-                    .map(|row| CameraRecentAction {
-                        id: row.id,
-                        at: row.at,
-                        source: row.source,
-                        action: row.action,
-                        target: row.target,
-                        detail: row.detail,
-                    })
-                    .collect(),
-            )
+            let recent = recent
+                .into_iter()
+                .map(|row| CameraRecentAction {
+                    id: row.id,
+                    at: row.at,
+                    source: row.source,
+                    action: row.action,
+                    target: row.target,
+                    detail: row.detail,
+                })
+                .collect();
+            let takes = takes_today(&today, SystemTime::now(), cameras.records_now());
+            (Some(recent), Some(takes))
         }
         Err(error) => {
             if !cameras.recent_unread {
                 log_event(
                     LogLevel::Warn,
-                    &format!("The cameras' Recent actions could not be read: {error}"),
+                    &format!("The cameras' Recent actions and takes could not be read: {error}"),
                 );
             }
             cameras.recent_unread = true;
-            None
+            (None, None)
         }
     }
 }

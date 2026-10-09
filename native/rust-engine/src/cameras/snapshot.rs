@@ -386,6 +386,24 @@ pub struct CamerasSnapshot {
     /// The cameras' newest Recent actions, newest first; `null` when the
     /// action log could not be read.
     pub recent: Option<Vec<CameraRecentAction>>,
+    /// CAM 1's takes since local midnight, from the action log (the
+    /// Overview's footer, D47); `null` when the log could not be read.
+    #[serde(rename = "takesToday")]
+    pub takes_today: Option<TakesToday>,
+}
+
+/// CAM 1's takes since local midnight, as the action log holds them
+/// (`action_log::takes_today`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct TakesToday {
+    /// The takes started since midnight, a running one included.
+    pub count: u32,
+    /// Their length in whole seconds: a running one's so far, and none for
+    /// a take whose end the log does not show.
+    #[serde(rename = "recordedSeconds")]
+    pub recorded_seconds: u32,
 }
 
 /// One camera in `checks.cameras`.

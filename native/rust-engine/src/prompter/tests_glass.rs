@@ -3,7 +3,7 @@
 //! it (D11), the clock's rules (D12, D19, §14), a restart, and the look.
 
 use crate::prompter::test_support::TestPrompter;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::thread;
 use std::time::Duration;
 
@@ -330,11 +330,12 @@ fn back_and_the_steps_go_where_the_proposal_says() {
     prompter.call("prompter.jump", json!({ "to": "nextCue" }));
     assert_eq!(at(), (2, 0));
     let cues = prompter.snapshot()["glass"]["cues"].clone();
+    // Not laid out: the cues have no time ahead (D47).
     assert_eq!(
         cues,
         json!([
-            { "paragraph": 0, "word": 0, "text": "INTRO" },
-            { "paragraph": 2, "word": 0, "text": "GUEST" }
+            { "paragraph": 0, "word": 0, "text": "INTRO", "secondsAhead": null },
+            { "paragraph": 2, "word": 0, "text": "GUEST", "secondsAhead": null }
         ])
     );
     assert_eq!(
@@ -352,6 +353,48 @@ fn back_and_the_steps_go_where_the_proposal_says() {
             .0,
         "INVALID_PARAMS"
     );
+}
+
+// D47, the Overview's cues ahead: once laid out, each cue of the glass says
+// its seconds from the reading line at the pace, as the time left does to
+// END: none for the cue at the reading line, below zero once passed.
+#[test]
+fn the_glass_cues_say_their_seconds_ahead_once_laid_out() {
+    let prompter = TestPrompter::new("cues-ahead");
+    let script = prompter.script(
+        "Talk",
+        &[
+            "[INTRO]",
+            "one two three four",
+            "[GUEST]",
+            "five six seven eight",
+        ],
+    );
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    // Three words a line of 100 px, half a line between paragraphs: GUEST's
+    // line stands 400 px down, twelve words of 100/3 px.
+    prompter.lay_out(3, 100.0);
+    let glass = prompter.snapshot()["glass"].clone();
+    let pace = glass["speedWpm"].as_f64().expect("a pace");
+    let ahead = |glass: &Value, index: usize| {
+        glass["cues"][index]["secondsAhead"]
+            .as_f64()
+            .expect("a time ahead")
+    };
+    assert!(ahead(&glass, 0).abs() < 1e-6, "{}", glass["cues"]);
+    assert!(
+        (ahead(&glass, 1) - 12.0 * 60.0 / pace).abs() < 1e-6,
+        "{}",
+        glass["cues"]
+    );
+
+    prompter.call(
+        "prompter.jump",
+        json!({ "to": "paragraph", "paragraph": 3 }),
+    );
+    let glass = prompter.snapshot()["glass"].clone();
+    assert!(ahead(&glass, 0) < ahead(&glass, 1), "{}", glass["cues"]);
+    assert!(ahead(&glass, 1) < 0.0, "{}", glass["cues"]);
 }
 
 // §5.1 and §4.1: the pace is 40–300 words a minute in steps of 5 and is the

@@ -3,6 +3,7 @@ import type { CameraDials } from "./CameraDials";
 import type { CameraRecentAction } from "./CameraRecentAction";
 import type { CameraSnapshot } from "./CameraSnapshot";
 import type { CamerasPictures } from "./CamerasPictures";
+import type { TakesToday } from "./TakesToday";
 
 /**
  * `cameras.snapshot`.
@@ -26,4 +27,9 @@ export type CamerasSnapshot = {
    * action log could not be read.
    */
   recent: Array<CameraRecentAction> | null;
+  /**
+   * CAM 1's takes since local midnight, from the action log (the
+   * Overview's footer, D47); `null` when the log could not be read.
+   */
+  takesToday: TakesToday | null;
 };

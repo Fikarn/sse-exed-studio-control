@@ -277,8 +277,8 @@ describe("the place, the paragraph list and the script bar", () => {
 
 describe("the steps the hardware link would refuse", () => {
   const cues = [
-    { paragraph: 2, word: 0, text: "Pause" },
-    { paragraph: 9, word: 0, text: "Look up" },
+    { paragraph: 2, word: 0, text: "Pause", secondsAhead: null },
+    { paragraph: 9, word: 0, text: "Look up", secondsAhead: null },
   ];
 
   it("locks the steps with nothing that way, with the hardware link's sentences, while paused", () => {

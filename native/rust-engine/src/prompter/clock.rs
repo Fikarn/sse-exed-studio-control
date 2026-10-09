@@ -848,6 +848,18 @@ impl GlassClock {
         }
     }
 
+    /// The seconds until the reading line reaches word `word` of `paragraph`
+    /// at the script's pace, as `time_left` counts to `END`: the pixels
+    /// between them over the pace's pixels a second, below zero once it has
+    /// passed it. `None` without a layout (a cue's time ahead, D47).
+    pub(crate) fn seconds_to(&self, now: Instant, paragraph: u32, word: u32) -> Option<f64> {
+        let layout = self.layout.as_ref()?;
+        let position = self.position_at(now)?;
+        let pixels_a_second = layout.px_per_read_word * f64::from(self.speed_wpm.max(1)) / 60.0;
+        let target = layout.position_of(paragraph, f64::from(word), self.paragraph_count());
+        Some((target - position) / pixels_a_second)
+    }
+
     /// The whole script's length at its pace, from the top to `END`.
     pub(crate) fn length(&self) -> (f64, bool) {
         let pace = f64::from(self.speed_wpm.max(1));

@@ -252,7 +252,8 @@ export function cueTargets(paragraphs: readonly PrompterParagraph[]): PrompterCu
           if (words[middle]![0] < firstWordOffset) low = middle + 1;
           else high = middle;
         }
-        targets.push({ paragraph: paragraphIndex, word: low, text: trimmed.slice(1, -1).trim() });
+        // A cue's time ahead is the glass's to say (`prompterReads.ts`).
+        targets.push({ paragraph: paragraphIndex, word: low, text: trimmed.slice(1, -1).trim(), secondsAhead: null });
       }
       lineStart += line.length + 1;
     }

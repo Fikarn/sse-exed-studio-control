@@ -115,6 +115,7 @@ export type { CameraPicture } from "./generated/snapshots/CameraPicture";
 export type { CameraDialBank } from "./generated/snapshots/CameraDialBank";
 export type { CameraDials } from "./generated/snapshots/CameraDials";
 export type { CameraRecentAction } from "./generated/snapshots/CameraRecentAction";
+export type { TakesToday } from "./generated/snapshots/TakesToday";
 export type { CameraRecording } from "./generated/snapshots/CameraRecording";
 export type { CameraSetupSummary } from "./generated/snapshots/CameraSetupSummary";
 export type { CameraSnapshot } from "./generated/snapshots/CameraSnapshot";

@@ -89,7 +89,7 @@ describe("the fixture double's prompter scripts", () => {
     ]);
     expect((saved.paragraphs as JsonObject[])[2]).toEqual({ runs: [] });
     expect(saved.script).toMatchObject({ readWords: 4, paragraphCount: 3, lengthSeconds: (4 * 60) / 140 });
-    expect(saved.cues).toEqual([{ paragraph: 1, word: 0, text: "PAUSE" }]);
+    expect(saved.cues).toEqual([{ paragraph: 1, word: 0, text: "PAUSE", secondsAhead: null }]);
     expect(saved.versions).toEqual([]);
 
     const tooLong = [{ runs: [{ text: "word ".repeat(30_001) }] }];
@@ -579,7 +579,7 @@ describe("the double's editor paste", () => {
     await call("prompter.script.edit", { scriptId: id, paragraphs });
     const saved = await call("prompter.script.snapshot", { scriptId: id });
     expect(saved.paragraphs).toEqual(paragraphs);
-    expect(saved.cues).toEqual([{ paragraph: 1, word: 0, text: "Guest" }]);
+    expect(saved.cues).toEqual([{ paragraph: 1, word: 0, text: "Guest", secondsAhead: null }]);
   });
 
   // `the_editors_paste_falls_back_to_the_plain_text`.

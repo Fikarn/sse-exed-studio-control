@@ -492,6 +492,18 @@ export class GlassClock {
     return [(readWordsFrom(this.paragraphs, this.placeAt(now)) * 60) / wordsAMinute, true];
   }
 
+  /**
+   * The seconds until the reading line reaches word `word` of `paragraph` at the pace, as
+   * `timeLeft` counts to `END`, below zero once it has passed it; `null` without a layout
+   * (`GlassClock::seconds_to`, a cue's time ahead, D47).
+   */
+  secondsTo(now: number, paragraph: number, word: number): number | null {
+    const position = this.positionAt(now);
+    if (position === null || !this.layout) return null;
+    const pixelsASecond = (this.layout.pxPerReadWord * Math.max(this.speedWpm, 1)) / 60;
+    return (positionOf(this.layout, paragraph, word, this.paragraphCount) - position) / pixelsASecond;
+  }
+
   /** The whole script's length at its pace, from the top to `END`. */
   length(): [number, boolean] {
     const wordsAMinute = Math.max(this.speedWpm, 1);

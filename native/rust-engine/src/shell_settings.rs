@@ -23,8 +23,17 @@ pub const DEFAULT_WORKSPACE: &str = "audio";
 /// not have opened in the real app). The fixture double reads this list out
 /// of this file (`setupRequests.test.ts`), so the two cannot drift apart.
 /// Slice 8: `cameras` joins them, before the Cameras page (Slice 9), as the
-/// Teleprompter's did before its page.
-pub const WORKSPACES: &[&str] = &["lighting", "audio", "setup", "teleprompter", "cameras"];
+/// Teleprompter's did before its page. The Overview (D47) joins them before
+/// its page, as the Cameras' did; the deck's word `workspace` reads it, and
+/// the deck turns to PROMPTER on it (D49).
+pub const WORKSPACES: &[&str] = &[
+    "lighting",
+    "audio",
+    "setup",
+    "teleprompter",
+    "cameras",
+    "overview",
+];
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
 /// Setup / Support's sections: the runner, Support, the cameras' setup (the
 /// Cameras page's "Camera setup" opens it) and the Console's setup (the strips
@@ -514,7 +523,7 @@ mod tests {
         // was "workspace must be one of: lighting, audio, setup").
         assert_eq!(
             error,
-            "workspace must be one of: lighting, audio, setup, teleprompter, cameras"
+            "workspace must be one of: lighting, audio, setup, teleprompter, cameras, overview"
         );
     }
 
@@ -556,6 +565,28 @@ mod tests {
         assert_eq!(
             ShellSettingsSnapshot::from_settings(&saved).workspace,
             "cameras"
+        );
+    }
+
+    // D47: the Overview is a page the hardware link accepts and keeps,
+    // before the page itself, as the Cameras' was. New saved data still
+    // opens on the Console until the page is built (the acceptance lane
+    // opens the default page).
+    #[test]
+    fn the_overview_is_a_page_to_open() {
+        assert!(is_valid_workspace("overview"));
+        assert_eq!(
+            parse_settings_update(&json!({ "workspace": "overview" })),
+            Ok(vec![(WORKSPACE_KEY, String::from("overview"))])
+        );
+        let saved = HashMap::from([(String::from(WORKSPACE_KEY), String::from("overview"))]);
+        assert_eq!(
+            ShellSettingsSnapshot::from_settings(&saved).workspace,
+            "overview"
+        );
+        assert_eq!(
+            parse_settings_update(&json!({ "workspace": "Overview" })),
+            Err(workspace_refusal())
         );
     }
 

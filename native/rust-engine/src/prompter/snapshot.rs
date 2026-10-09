@@ -28,6 +28,12 @@ pub struct PrompterCue {
     pub word: u32,
     /// The cue's words, brackets taken off.
     pub text: String,
+    /// On the glass: the seconds until the reading line reaches the cue at
+    /// the pace, from the layout as the time left is, below zero once it has
+    /// passed it (the Overview's cues ahead, D47). `null` without a layout,
+    /// and in a script's own read.
+    #[serde(rename = "secondsAhead")]
+    pub seconds_ahead: Option<f64>,
 }
 
 /// One script in the lists.
@@ -174,6 +180,7 @@ pub(crate) fn cues_of(paragraphs: &[PrompterParagraph]) -> Vec<PrompterCue> {
             paragraph: target.paragraph as u32,
             word: target.word as u32,
             text: target.text,
+            seconds_ahead: None,
         })
         .collect()
 }
@@ -275,7 +282,13 @@ pub(crate) fn read_snapshot(
                 time_left_seconds: time_left,
                 length_seconds: length,
                 estimated,
-                cues: cues_of(&glass.paragraphs),
+                cues: cues_of(&glass.paragraphs)
+                    .into_iter()
+                    .map(|cue| PrompterCue {
+                        seconds_ahead: glass.seconds_to(now, cue.paragraph, cue.word),
+                        ..cue
+                    })
+                    .collect(),
                 anchor,
             })
         }

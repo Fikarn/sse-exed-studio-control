@@ -193,7 +193,10 @@ function glassSummary(prompter: FixturePrompter, glass: GlassClock, now: number)
     timeLeftSeconds,
     lengthSeconds,
     estimated,
-    cues: cueTargets(glass.paragraphs),
+    cues: cueTargets(glass.paragraphs).map((cue) => ({
+      ...cue,
+      secondsAhead: glass.secondsTo(now, cue.paragraph, cue.word),
+    })),
     anchor: numberedAnchor(prompter, glass, now),
   };
 }

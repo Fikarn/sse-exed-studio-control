@@ -788,6 +788,37 @@ describe("the fixture double's cameras: Setup", () => {
   });
 });
 
+// D47, the Overview's footer: CAM 1's takes since local midnight, from the action log, as
+// `action_log::takes_today` counts them.
+describe("the fixture double's cameras: the day's takes in the read", () => {
+  it("pairs CAM 1's starts with the next stop, and counts a running take with its seconds so far", async () => {
+    const { call, snapshot } = held();
+    expect((await snapshot()).takesToday).toEqual({ count: 0, recordedSeconds: 0 });
+    await call("cameras.record.start");
+    vi.setSystemTime(NOW + 90_500);
+    expect((await snapshot()).takesToday).toEqual({ count: 1, recordedSeconds: 90 });
+    await call("cameras.record.stop", { confirm: true });
+    vi.setSystemTime(NOW + 600_000);
+    expect((await snapshot()).takesToday, "a stopped take keeps its length").toEqual({
+      count: 1,
+      recordedSeconds: 90,
+    });
+    await call("cameras.record.start");
+    vi.setSystemTime(NOW + 610_000);
+    await call("cameras.record.stop", { confirm: true });
+    expect((await snapshot()).takesToday).toEqual({ count: 2, recordedSeconds: 100 });
+  });
+
+  it("leaves out a take begun before local midnight, its stop included", async () => {
+    const { call, snapshot } = held();
+    await call("cameras.record.start");
+    vi.setSystemTime(NOW + 24 * 3_600_000);
+    expect((await snapshot()).takesToday).toEqual({ count: 0, recordedSeconds: 0 });
+    await call("cameras.record.stop", { confirm: true });
+    expect((await snapshot()).takesToday).toEqual({ count: 0, recordedSeconds: 0 });
+  });
+});
+
 describe("the fixture double's cameras: their Recent actions in the read", () => {
   it("carries the newest five rows about the cameras, newest first, and no row of another page", async () => {
     const { call, snapshot, seen, rows } = held();
@@ -832,6 +863,7 @@ describe("the fixture double's cameras: their Recent actions in the read", () =>
     cameras.actionLogUnreadable(true);
     const unread = await snapshot();
     expect(unread.recent).toBeNull();
+    expect(unread.takesToday).toBeNull();
     expect(unread.cameras[0]).toMatchObject({ state: "held", recording: { recording: true } });
     expect(seen(), "a read raises nothing").toEqual([]);
     cameras.actionLogUnreadable(false);
