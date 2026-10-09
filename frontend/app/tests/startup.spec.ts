@@ -52,7 +52,7 @@ test("no tab is the current one before ready", async ({ page }) => {
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
   for (const fixture of ["startup-loading", "protocol-mismatch", "bootstrap-failed"]) {
     await openFixture(page, fixture);
-    await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toBeVisible();
+    await expect(page.locator('[data-nav-id="setup"]')).toBeVisible();
     await expect(nav.locator('[aria-current="page"]'), fixture).toHaveCount(0);
   }
 });
@@ -106,10 +106,12 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   // New pages program, Slice 1: three tabs, and no others. Old: four, the
   // fourth being Planning. Slice 6a: four again, the Teleprompter after Audio.
   // Five with the Cameras, between the two (D4).
-  const tabLabels = ["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"];
-  await expect(nav.getByRole("button")).toHaveCount(tabLabels.length);
+  // The skylight (D48): the four pages on their platter, Setup / Support on the system's.
+  const tabLabels = ["Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"];
+  const header = page.locator('[data-region="header"]');
+  await expect(header.locator("[data-nav-id]")).toHaveCount(tabLabels.length);
   for (const label of tabLabels) {
-    await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-disabled", "true");
+    await expect(header.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-disabled", "true");
   }
   await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
@@ -159,10 +161,7 @@ test("an area that stopped: its word fits, nothing scrolls, no line is cut", asy
     ["teleprompter", "Teleprompter", "PROMPTER STOPPED"],
   ] as const) {
     await openFixture(page, "audio-populated", { crash });
-    await page
-      .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("button", { name: tab, exact: true })
-      .click();
+    await page.locator('[data-region="header"]').getByRole("button", { name: tab, exact: true }).click();
     await expect(page.getByTestId("workspace-boundary-state-display")).toContainText(word);
     await expect(page.getByTestId("workspace-boundary-bay")).toContainText("The rest of Studio Control keeps working");
     const room = await measureRoom(page);

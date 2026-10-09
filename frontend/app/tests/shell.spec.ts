@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
@@ -321,14 +321,9 @@ for (const { fixture, tab, label, band, tone, word } of [
     await expect(workspaceBand).toHaveAttribute("data-tone", tone);
     const lamp = page.getByTestId(`shell-lamp-${tab}`);
     await expect(lamp).toHaveCount(0);
-    await page
-      .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("button", { name: "Setup / Support", exact: true })
-      .click();
+    await page.locator('[data-nav-id="setup"]').click();
     await expect(page.getByTestId("setup-state-display")).toBeVisible();
-    const tabButton = page
-      .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("button", { name: label, exact: true });
+    const tabButton = page.locator('[data-region="header"]').getByRole("button", { name: label, exact: true });
     await expect(tabButton.getByTestId(`shell-lamp-${tab}`)).toHaveAttribute("data-tone", tone);
     await expect(tabButton.getByTestId(`shell-lamp-${tab}`)).toContainText(word);
   });
@@ -341,10 +336,7 @@ test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
   await openFixture(page, "setup-ready");
   await expect(page.getByRole("tablist", { name: "Commissioning runner" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
-  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
-    "aria-current",
-    "page"
-  );
+  await expect(page.locator('[data-nav-id="setup"]')).toHaveAttribute("aria-current", "page");
   for (const id of ["lighting", "audio", "surface"]) {
     await expect(page.getByTestId(`shell-lamp-${id}`)).toBeVisible();
   }
@@ -496,23 +488,144 @@ test("lazy workspace loads", async ({ page }) => {
 // pointer (DESIGN §1).
 test("no tab moves when the page changes", async ({ page }) => {
   await openFixture(page, "setup-ready");
-  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  // The skylight (D48): the pages' platter and the system's, Setup / Support on the latter.
+  const header = page.locator('[data-region="header"]');
   // The baseline once the shell is ready: before it, the tabs carry other
   // words (pending), and the faces may still be loading.
   await expectWorkspaceMounted(page, "setup");
-  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
-    "aria-current",
-    "page"
-  );
+  await expect(page.locator('[data-nav-id="setup"]')).toHaveAttribute("aria-current", "page");
   await page.evaluate(() => document.fonts.ready);
   const lefts = () =>
-    nav.evaluate((element) =>
-      [...element.querySelectorAll("button")].map((button) => Math.round(button.getBoundingClientRect().left))
+    header.evaluate((element) =>
+      [...element.querySelectorAll("[data-nav-id]")].map((tab) => Math.round(tab.getBoundingClientRect().left))
     );
   const first = await lefts();
   for (const label of ["Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"]) {
-    await nav.getByRole("button", { name: label, exact: true }).click();
-    await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
+    await header.getByRole("button", { name: label, exact: true }).click();
+    await expect(header.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
     expect(await lefts(), `the tabs on ${label}`).toEqual(first);
   }
+});
+
+// The skylight (D48, 2026-10-09; until then the test of the header with the
+// cameras): the fullest header is Setup's, where every page's tab carries its
+// word, with the deck, the latches and the REC tally lit. A drifted scene is
+// the Lighting tab's word, the prompter's play its tab's. Left to right: the
+// logotype at the frame's margin with its clear space, the rule, the pages'
+// platter, the room left over, the system's platter (the deck, the latches,
+// Setup / Support), the REC tally and the clock at the frame's margin; nothing
+// cut.
+test.describe("the header, the skylight", () => {
+  const recChip = (page: Page) => page.getByTestId("shell-lamp-latched-rec");
+
+  test("its fullest row fits: every tab's word, Solo, the prompter playing and REC together", async ({ page }) => {
+    await openFixture(page, "every-page");
+    await expectWorkspaceMounted(page, "cameras");
+    await page.getByTestId("cameras-rec").click();
+    await expect(recChip(page)).toBeVisible();
+
+    await page.getByRole("button", { name: "Lighting", exact: true }).click();
+    await expectWorkspaceMounted(page, "lighting");
+    await page.getByRole("button", { name: /^Front, 2 fixtures at 67 %, on/ }).click();
+
+    await page.getByRole("button", { name: "Teleprompter", exact: true }).click();
+    // The lighting page asks before it is left with a scene that drifted.
+    const leave = page.getByRole("button", { name: /Leave|Discard|Continue/ });
+    if (await leave.count()) await leave.first().click();
+    await expectWorkspaceMounted(page, "teleprompter");
+    await expect(page.getByTestId("teleprompter-play")).not.toHaveAttribute("data-locked", "", { timeout: 10_000 });
+    await page.getByTestId("teleprompter-play").click();
+
+    await page.getByRole("button", { name: "Setup / Support", exact: true }).click();
+    await expect(page.getByTestId("setup-state-display")).toBeVisible();
+    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("playing");
+    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("left");
+    await expect(page.getByTestId("shell-lamp-latched-solo")).toBeVisible();
+    await expect(recChip(page)).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+
+    const row = await page.evaluate(() => {
+      const header = document.querySelector('[data-region="header"]')!;
+      const box = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+      };
+      const pages = header.querySelector('[data-platter="pages"]')!;
+      const system = header.querySelector('[data-platter="system"]')!;
+      const testIds = (element: Element) =>
+        [...element.querySelectorAll('[data-testid^="shell-lamp-"]')].map((item) => item.getAttribute("data-testid"));
+      return {
+        header: box(header),
+        logo: box(header.querySelector("img")!),
+        rule: box(pages.previousElementSibling!),
+        pages: box(pages),
+        pagesClipped: pages.scrollWidth > pages.clientWidth,
+        pageWords: testIds(pages),
+        pageTabs: [...pages.querySelectorAll("[data-nav-id]")].map((tab) => tab.getAttribute("data-nav-id")),
+        system: box(system),
+        systemClipped: system.scrollWidth > system.clientWidth,
+        systemLast:
+          system.lastElementChild?.querySelector("[data-nav-id]")?.getAttribute("data-nav-id") ??
+          system.lastElementChild?.getAttribute("data-nav-id"),
+        chips: testIds(system),
+        tally: box(header.querySelector('[data-testid="shell-rec-slot"]')!),
+        clock: box(header.querySelector('[data-testid="shell-clock"]')!),
+        headerClipped: header.scrollWidth > header.clientWidth,
+      };
+    });
+    expect(row.pageTabs).toEqual(["lighting", "audio", "cameras", "teleprompter"]);
+    expect(row.pageWords).toEqual([
+      "shell-lamp-lighting",
+      "shell-lamp-audio",
+      "shell-lamp-cameras",
+      "shell-lamp-prompter",
+    ]);
+    // Last on the system's platter, so it stays put while the latches change with the page.
+    expect(row.systemLast, "Setup / Support ends the system's platter").toBe("setup");
+    expect(row.chips).toEqual(["shell-lamp-surface", "shell-lamp-latched-solo"]);
+    expect(row.headerClipped, "nothing in the header is cut").toBe(false);
+    expect(row.pagesClipped, "no tab is cut").toBe(false);
+    expect(row.systemClipped, "no chip is cut").toBe(false);
+    expect(row.logo.left, "the logotype stands at the frame's margin").toBe(row.header.left + 32);
+    expect(row.logo.bottom - row.logo.top, "the logotype is 40 px high").toBe(40);
+    expect(row.rule.left - row.logo.right, "the logotype's clear space before the rule").toBeGreaterThanOrEqual(20);
+    expect(row.pages.left, "the pages' platter after the rule").toBeGreaterThanOrEqual(row.rule.right + 20);
+    expect(row.system.left - row.pages.right, "room to spare between the two platters").toBeGreaterThanOrEqual(16);
+    expect(row.system.right, "the system's platter ends before the REC tally").toBeLessThanOrEqual(row.tally.left);
+    expect(row.tally.right, "the REC tally ends before the clock").toBeLessThanOrEqual(row.clock.left);
+    expect(Math.round(row.clock.right), "the clock keeps the frame's margin").toBe(row.header.right - 32);
+    for (const platter of [row.pages, row.system, row.tally]) {
+      expect(platter.bottom - platter.top, "a platter is 48 px high").toBe(48);
+    }
+  });
+
+  test("the REC tally and the system's platter stand still when REC lights", async ({ page }) => {
+    await openFixture(page, "every-page");
+    await expectWorkspaceMounted(page, "cameras");
+    const at = async () => ({
+      slot: await page.getByTestId("shell-rec-slot").boundingBox(),
+      surface: await page.getByTestId("shell-lamp-surface").boundingBox(),
+      setup: await page.locator('[data-nav-id="setup"]').boundingBox(),
+      clock: await page.getByTestId("shell-clock").boundingBox(),
+    });
+    const before = await at();
+    await page.getByTestId("cameras-rec").click();
+    await expect(recChip(page)).toBeVisible();
+    await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+    expect(await at(), "nothing in the header moves when REC lights").toEqual(before);
+  });
+
+  test("the footer ends with the product's name, and the header names it nowhere", async ({ page }) => {
+    await openFixture(page, "every-page");
+    await expectWorkspaceMounted(page, "cameras");
+    const colophon = page.getByTestId("shell-colophon");
+    await expect(colophon).toHaveText("Studio Control");
+    const ends = await page.evaluate(() => {
+      const footer = document.querySelector('[data-region="footer"]')!.getBoundingClientRect();
+      const name = document.querySelector('[data-testid="shell-colophon"]')!.getBoundingClientRect();
+      return { footer: footer.right, name: name.right };
+    });
+    expect(Math.round(ends.name), "the colophon keeps the frame's margin").toBe(Math.round(ends.footer) - 32);
+    await expect(page.locator('[data-region="header"]')).not.toContainText("Studio Control");
+  });
 });

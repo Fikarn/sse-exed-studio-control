@@ -16,6 +16,11 @@ const EMPTY: ShellRegionElements = { cluster: null, plate: null, footer: null };
 
 export const ShellRegionsContext = createContext<ShellRegionElements>(EMPTY);
 
+/** The product's name, which every footer inside the shell ends with as its
+ *  colophon (D48, the skylight: the name left the header, where it beside the
+ *  logotype would read as a lockup). `null` outside a shell. */
+export const ShellColophonContext = createContext<string | null>(null);
+
 export function useShellRegion(region: ShellRegionName): HTMLElement | null {
   return useContext(ShellRegionsContext)[region];
 }

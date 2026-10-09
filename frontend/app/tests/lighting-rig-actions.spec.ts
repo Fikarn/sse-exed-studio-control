@@ -327,7 +327,7 @@ test("The Grand master is taken and kept (lighting.settings.update { grandMaster
   // back. New: the header's tabs. Reason: the workspace keys are gone; the tabs
   // are their twins.
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
-  await nav.getByRole("button", { name: "Setup / Support", exact: true }).click();
+  await page.locator('[data-nav-id="setup"]').click();
   await expectWorkspaceMounted(page, "setup");
   await nav.getByRole("button", { name: "Lighting", exact: true }).click();
   await expectWorkspaceMounted(page, "lighting");

@@ -65,12 +65,19 @@ describe("Tab", () => {
   // Visual overhaul 2026-10 (Atrium): a tab has no box at rest; the active
   // tab is the selection, the 2 px Beige keyline, in the main ink and bold;
   // hover changes only the ink.
-  it("draws the active tab with the 2 px selection keyline and hover with ink only", () => {
+  // The skylight (D48, 2026-10-09): a segment of the header's platter, its
+  // name bold in the second ink; the open tab is the one Dark Green segment in
+  // Beige Light, with no keyline; hover is the platter's hover tone.
+  it("draws the open tab as the one Dark Green segment and hover as the platter's hover tone", () => {
     const css = cssOf("Tab.module.css");
-    expect(css).toMatch(/\.tab \{[^}]*color: var\(--text-text3\)/);
-    expect(css).toMatch(/\.active \{[^}]*color: var\(--text-text\);[^}]*font-weight: 700/);
-    expect(css).toMatch(/\.active::after \{[^}]*border: 2px solid var\(--accent\)/);
-    expect(css).toMatch(/:hover \{\s*color: var\(--text-text2\);\s*\}/);
+    expect(css).toMatch(
+      /\.tab \{[^}]*border-radius: var\(--radius-control\);[^}]*color: var\(--text-text2\);[^}]*font: 700 /
+    );
+    expect(css).toMatch(/\.active \{[^}]*background: var\(--sse-dark-green\);[^}]*color: var\(--sse-beige-light\)/);
+    // Bold on the name itself: the reset's `button { font: inherit }` outranks the button's own font.
+    expect(css).toMatch(/\.name \{[^}]*font: 700 var\(--font-size-body\)/);
+    expect(css).not.toMatch(/\.active::after/);
+    expect(css).toMatch(/:hover \{\s*background: var\(--material-platter-hover\);\s*\}/);
     expect(css).not.toMatch(/--radius-key|--elevation-/);
   });
 
@@ -143,12 +150,16 @@ describe("Footer", () => {
     expect(cssOf("Footer.module.css")).toMatch(/\.action \{[^}]*margin-left: auto/);
   });
 
-  // Visual overhaul 2026-10 (Atrium): the footer is the flat base under a
-  // hairline; its facts are quiet PT Sans at label size, 40 px apart.
-  it("is the flat base under a hairline, with quiet facts 40 px apart", () => {
+  // Visual overhaul 2026-10 (Atrium): its facts are quiet PT Sans at label
+  // size, 40 px apart. The skylight (D48): the footer is the header's raised
+  // layer, closed by its line at the top, and ends with the colophon.
+  it("is the raised bar under its line, with quiet facts 40 px apart and the colophon last", () => {
     const css = cssOf("Footer.module.css");
     expect(css).toMatch(
-      /\.footer \{[^}]*border-top: 1px solid var\(--material-line\);[^}]*background: var\(--material-bg\)/
+      /\.footer \{[^}]*border-top: 1px solid var\(--material-bar-line\);[^}]*background: var\(--material-bar\)/
+    );
+    expect(css).toMatch(
+      /\.colophon \{[^}]*margin-left: auto;[^}]*var\(--font-family-display\);[^}]*letter-spacing: var\(--font-tracking-colophon\)/
     );
     expect(css).toMatch(/\.items \{[^}]*gap: 40px/);
     expect(css).toMatch(/\.label \{\s*color: var\(--text-text3\)/);
@@ -160,6 +171,23 @@ describe("Footer", () => {
   // footer must keep its toasts clear of it. The toast stack keys its bottom
   // offset on `html:not(:has([data-health-bar]))`, so the marker moves with the
   // footer — the same assertion HealthBar carries.
+  // The skylight (D48): inside the shell the footer ends with the product's
+  // name, which the frame hands it; on its own it has none.
+  it("ends with the product's name inside the shell, and with nothing on its own", () => {
+    const { unmount } = render(<Footer items={[{ label: "Console", value: "confirmed" }]} />);
+    expect(screen.queryByTestId("shell-colophon")).toBeNull();
+    unmount();
+    render(
+      <AppShellFrame activeWorkspace="" monitorItems={[]} workspaces={[]} footer={{ items: [], action: <b>Act</b> }}>
+        <p>bay</p>
+      </AppShellFrame>
+    );
+    const colophon = screen.getByTestId("shell-colophon");
+    expect(colophon).toHaveTextContent("Studio Control");
+    expect(colophon.parentElement).toHaveAttribute("data-region", "footer");
+    expect(colophon.previousElementSibling).toHaveTextContent("Act");
+  });
+
   it("carries the inert data-health-bar marker the toast stack keys on", () => {
     render(<Footer items={[{ label: "Console", value: "confirmed" }]} testId="marked-footer" />);
     expect(screen.getByTestId("marked-footer")).toHaveAttribute("data-health-bar");
@@ -168,7 +196,7 @@ describe("Footer", () => {
 
 describe("AppShellFrame", () => {
   const workspaces = [
-    { id: "setup", label: "Setup / Support" },
+    { id: "setup", label: "Setup / Support", system: true },
     { id: "lighting", label: "Lighting" },
     { id: "audio", label: "Audio" },
   ];
@@ -202,11 +230,12 @@ describe("AppShellFrame", () => {
     expect(regions()).toEqual(["header", "cluster", "bay", "plate", "footer"]);
   });
 
-  // The shell (overhaul 3): the product's name alone at the left, the
-  // logotype alone at the right; each page's lamp in its tab, none in the
-  // active one; the lamps without a page and the latches after the tabs; the
-  // REC tally in its own slot, quiet at rest.
-  it("prints the product, the three tabs with their pages' lamps, the lamps, the REC tally, the clock and the logotype", () => {
+  // The shell (overhaul 3): each page's lamp in its tab, none in the active
+  // one; the REC tally in its own slot, quiet at rest. The skylight (D48): the
+  // logotype first and alone, no product name in the header; the pages on
+  // their platter; the lamps without a page, the latches and then Setup /
+  // Support on the system's platter.
+  it("prints the logotype, the pages' tabs with their lamps, the system's platter, the REC tally and the clock", () => {
     const { rerender } = render(
       <AppShellFrame
         activeWorkspace="audio"
@@ -218,11 +247,21 @@ describe("AppShellFrame", () => {
         <p>bay</p>
       </AppShellFrame>
     );
-    expect(screen.getByText("Studio Control")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "SSE Executive Education" })).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(header).not.toHaveTextContent("Studio Control");
+    const logo = screen.getByRole("img", { name: "SSE Executive Education" });
+    expect(header.firstElementChild).toBe(logo);
     const nav = screen.getByRole("navigation", { name: "Workspace navigation" });
-    expect(nav.querySelectorAll("button")).toHaveLength(3);
+    expect(nav).toHaveAttribute("data-platter", "pages");
+    expect([...nav.querySelectorAll("button")].map((tab) => tab.getAttribute("data-nav-id"))).toEqual([
+      "lighting",
+      "audio",
+    ]);
     expect(nav.querySelector("kbd")).toBeNull();
+    const system = header.querySelector('[data-platter="system"]')!;
+    expect(
+      [...system.children].map((item) => item.getAttribute("data-nav-id") ?? item.getAttribute("data-testid"))
+    ).toEqual(["shell-lamp-surface", "shell-lamp-latched-solo", "setup"]);
     expect(screen.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-current", "page");
     // The active tab carries no word: its page's state display says it.
     expect(screen.queryByTestId("shell-lamp-audio")).toBeNull();

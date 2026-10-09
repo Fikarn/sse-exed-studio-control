@@ -1,7 +1,8 @@
-/* The 40 px footer (system §2, §7). Visual overhaul 2026-10 (Atrium): the one
-   flat base under a hairline; quiet `Label value` facts in PT Sans at label
-   size, 40 px apart; the action key at the right edge. The shell (overhaul 3):
-   it keeps the frame's margin, as the header does. */
+/* The 40 px footer (system §2, §7). Visual overhaul 2026-10 (Atrium): quiet
+   `Label value` facts in PT Sans at label size, 40 px apart; the action key at
+   the right edge. The shell (overhaul 3): it keeps the frame's margin, as the
+   header does. The skylight (D48): the header's raised layer, closed by its
+   line at the top, and the product's name at the right as the colophon. */
 @layer components {
   .footer {
     display: flex;
@@ -9,8 +10,8 @@
     gap: 24px;
     height: calc(var(--chrome-studio-footer) * var(--operator-ui-scale-factor, 1));
     padding: 0 calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
-    border-top: 1px solid var(--material-line);
-    background: var(--material-bg);
+    border-top: 1px solid var(--material-bar-line);
+    background: var(--material-bar);
     color: var(--text-text3);
     /* A line box that contains its descenders: at `/ 1` the values sat a
        pixel proud of their box, which reads as a clipped value to anything
@@ -53,5 +54,21 @@
     align-items: center;
     margin-left: auto;
     flex: none;
+  }
+
+  /* The colophon ends the footer: the product's name in SSE Adelia at label
+     size, widely tracked, in the quiet ink (D48). After an action key it
+     follows the key. */
+  .colophon {
+    flex: none;
+    margin-left: auto;
+    font: var(--font-weight-bold) var(--font-size-label) / 1 var(--font-family-display);
+    letter-spacing: var(--font-tracking-colophon);
+    text-transform: uppercase;
+    color: var(--text-text3);
+  }
+
+  .action + .colophon {
+    margin-left: 16px;
   }
 }

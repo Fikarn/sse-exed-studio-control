@@ -32,10 +32,7 @@ test("renders the setup/support pilot shell from fixtures", async ({ page }) => 
   // is published the operator workspaces are locked.
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
   await expect(nav).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
-    "aria-current",
-    "page"
-  );
+  await expect(page.locator('[data-nav-id="setup"]')).toHaveAttribute("aria-current", "page");
   await expect(nav.getByRole("button", { name: "Audio", exact: true })).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
   await expect(page.getByRole("tab", { name: /Import profile/i })).toBeVisible();
@@ -418,10 +415,7 @@ test.describe("Light outputs: Armed / Held", () => {
       .getByRole("button", { name: "Lighting", exact: true });
     await expect(lamp).toHaveCount(1);
 
-    await page
-      .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("button", { name: "Setup / Support", exact: true })
-      .click();
+    await page.locator('[data-nav-id="setup"]').click();
     const plate = page.getByTestId("support-plate");
     const workstation = plate.getByTestId("support-workstation");
     await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "true");
@@ -461,10 +455,7 @@ test.describe("Light outputs: Armed / Held", () => {
     await expect(lightingState).not.toContainText("following it");
     await expect(lightingState).toHaveAttribute("data-tone", "attention");
 
-    await page
-      .getByRole("navigation", { name: "Workspace navigation" })
-      .getByRole("button", { name: "Setup / Support", exact: true })
-      .click();
+    await page.locator('[data-nav-id="setup"]').click();
     await plate.getByTestId("support-outputs-armed").click();
     await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "true");
     await expect(lamp).not.toContainText("held");
@@ -515,10 +506,7 @@ test("Recent actions lists what was done on the Lighting page, newest first, fro
   await page.getByRole("button", { name: "Recall scene Interview", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Recall scene Interview \(on rig/ })).toBeVisible();
 
-  await page
-    .getByRole("navigation", { name: "Workspace navigation" })
-    .getByRole("button", { name: "Setup / Support", exact: true })
-    .click();
+  await page.locator('[data-nav-id="setup"]').click();
   const rows = page.getByTestId("support-plate").getByTestId("support-recent-action");
   await expect(rows).toHaveCount(4);
   const details = [

@@ -1,5 +1,6 @@
 @layer components {
-  /* No box at rest: a transparent edge that a clickable chip shows under the
+  /* No box at rest: a segment of the header's system platter (the skylight,
+     D48), which a clickable chip fills with the platter's hover tone under the
      pointer. */
   .chip {
     appearance: none;
@@ -9,23 +10,23 @@
     height: 40px;
     padding: 0 8px;
     border: 1px solid transparent;
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-control);
     background: transparent;
     color: var(--text-text3);
     font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     white-space: nowrap;
     min-width: 0;
     flex: none;
-    transition: border-color var(--motion-duration-state) var(--motion-easing-mech);
+    transition: background-color var(--motion-duration-state) var(--motion-easing-mech);
   }
 
   button.chip {
     cursor: pointer;
   }
 
-  /* Hover changes an edge, never a position (system §6). */
+  /* Hover changes a colour, never a position (system §6). */
   button.chip:hover {
-    border-color: var(--material-line2);
+    background: var(--material-platter-hover);
   }
 
   button.chip:focus-visible {
@@ -33,10 +34,11 @@
     outline-offset: 2px;
   }
 
-  /* The name stands 10 px from the lamp; the lamp 6 px from its word. */
+  /* The name stands 10 px from the lamp; the lamp 6 px from its word. The
+     second ink: the quiet one is under 4.5:1 on a platter. */
   .label {
     font-weight: var(--font-weight-regular);
-    color: var(--text-text3);
+    color: var(--text-text2);
     margin-right: 4px;
   }
 
@@ -44,7 +46,8 @@
     font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-display);
     letter-spacing: var(--font-tracking-display);
     text-transform: uppercase;
-    color: var(--text-text3);
+    /* A neutral word (`pending`): the second ink, as the name. */
+    color: var(--text-text2);
   }
 
   /* A value that changes: PT Sans, tabular, in the word's colour. */
