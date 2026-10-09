@@ -197,7 +197,8 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
       ...(overrideProbes ? { overrideProbes: true } : {}),
     });
     const backup = asRecord(await store.exportSupportBackup());
-    await store.setWorkspace("audio");
+    // D47: the published setup opens the Overview, the page the app opens on.
+    await store.setWorkspace("overview");
 
     return {
       message: overrideProbes
@@ -299,7 +300,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     if (activeStepId === "verify") {
       return "Continue to publish";
     }
-    return isReady ? "Open the Console" : "Publish setup";
+    return isReady ? "Open the Overview" : "Publish setup";
   }, [activeStepId, isReady]);
 
   const invokePrimaryAction = useLiveCallback(() => {
@@ -327,7 +328,8 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     // explicit decision before publish; the dialog names each one. Visual
     // overhaul A, Slice 7: this is asked before the published check, so a
     // desk whose probes have gone off can be re-published with the override
-    // recorded rather than only offering the way back to the console.
+    // recorded rather than only offering the way back to the Overview (the
+    // Console until D47).
     const notPassed = probeChecks(checks).filter((check) => check.status !== "ok");
     if (notPassed.length > 0) {
       setPublishOverridePrompt(notPassed.map((check) => `${check.label} — ${check.detail}`));
@@ -335,10 +337,10 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     }
 
     if (isReady) {
-      void performAction("open-console", async () => {
-        await store.setWorkspace("audio");
+      void performAction("open-overview", async () => {
+        await store.setWorkspace("overview");
         return {
-          message: "Opened the Console.",
+          message: "Opened the Overview.",
           tone: "info" as const,
         };
       });

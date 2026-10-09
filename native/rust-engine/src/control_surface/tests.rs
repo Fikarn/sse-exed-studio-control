@@ -165,8 +165,9 @@ fn workspace_lcd_key_reads_shell_workspace() {
         DEFAULT_WORKSPACE
     );
 
-    // New pages program, D1: the default is the Console (`audio`) now, so the
-    // stored page that proves the key reads the setting is Lighting.
+    // The default is the Overview (`overview`, D47; the Console from the new
+    // pages program's D1 until then), so the stored page that proves the key
+    // reads the setting is Lighting.
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(String::from(WORKSPACE_KEY), String::from("lighting"))],

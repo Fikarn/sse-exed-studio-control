@@ -58,8 +58,9 @@ test("walks the fixture-backed commissioning runner and support actions", async 
   await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
 
   await page.getByRole("button", { name: "Publish setup" }).click();
-  // New pages program, Slice 1 (D1): Publish opens the Console. Old: Planning.
-  await expectWorkspaceMounted(page, "audio");
+  // D47 (2026-10-09): Publish opens the Overview, the page the app opens on.
+  // Old: the Console (new pages program, Slice 1, D1), and Planning before it.
+  await expectWorkspaceMounted(page, "overview");
 });
 
 test("publish refuses failing probes until the operator overrides explicitly", async ({ page }) => {
@@ -101,16 +102,17 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
-  // New pages program, Slice 1 (D1): Publish opens the Console, so the Console
-  // is what must not have opened. Old: the Planning workspace.
-  await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
+  // D47: Publish opens the Overview, so the Overview is what must not have
+  // opened. Old: the Console (new pages program, Slice 1, D1), and the
+  // Planning workspace before it.
+  await expect(page.getByTestId("overview-workspace")).toHaveCount(0);
 
   await page.getByTestId("setup-step-primary").click();
   await page
     .getByRole("dialog", { name: "Publish with failing probes?" })
     .getByRole("button", { name: "Publish anyway" })
     .click();
-  await expectWorkspaceMounted(page, "audio");
+  await expectWorkspaceMounted(page, "overview");
 });
 
 test("opens support mode and exercises backup workflows", async ({ page }) => {
@@ -146,10 +148,11 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
 
 // Found, to check (2026-09-28): on a published setup a step key, `Back to …`
 // and `Run all probes` each unpublished it at one press, and locked Lighting,
-// Audio, Cameras and Teleprompter until it was published again. The owner's
-// decision: the first press arms and says what gets locked, and a second press
-// within 3 s unpublishes. The page's clock stands still between the presses
-// (helpers/pageClock.ts), so the dwell and the window are true on any runner.
+// Audio, Cameras and Teleprompter (and since D47 the Overview) until it was
+// published again. The owner's decision: the first press arms and says what
+// gets locked, and a second press within 3 s unpublishes. The page's clock
+// stands still between the presses (helpers/pageClock.ts), so the dwell and
+// the window are true on any runner.
 test.describe("a published setup unpublishes only at a second press", () => {
   /** `UNPUBLISH_WINDOW_MS` in setupPilotModel.ts, which a test cannot import. */
   const UNPUBLISH_WINDOW_MS = 3_000;
@@ -177,13 +180,15 @@ test.describe("a published setup unpublishes only at a second press", () => {
     // press goes; the sentence says that it unpublishes, and what locks (in
     // the display's two lines since the polish, 2026-10-05).
     await expect(display).toContainText("Go to Probe hardware · press again");
-    await expect(display).toContainText("Unpublishing locks Lighting, Audio, Cameras and Teleprompter.");
+    await expect(display).toContainText("Unpublishing locks every page but Setup / Support.");
     await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
 
     await page.clock.fastForward(PAST_THE_DWELL_MS);
     await step.click();
     await page.clock.resume();
     await expect(audioNav(page)).toHaveAttribute("aria-disabled", "true");
+    // D47: the Overview locks with them, as the sentence says.
+    await expect(page.locator('[data-nav-id="overview"]')).toHaveAttribute("aria-disabled", "true");
   });
 
   test("the arm lapses after 3 s and nothing is unpublished", async ({ page }) => {
@@ -231,7 +236,7 @@ test.describe("a published setup unpublishes only at a second press", () => {
     await page.getByTestId("setup-state-run-probes").click();
     await expect(page.getByTestId("setup-state-run-probes")).toHaveAttribute("data-armed", "true");
     const display = page.getByTestId("setup-state-display");
-    await expect(display).toContainText("Unpublishing locks Lighting, Audio, Cameras and Teleprompter.");
+    await expect(display).toContainText("Unpublishing locks every page but Setup / Support.");
     await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
     await page.clock.resume();
   });
@@ -704,7 +709,7 @@ test("Workstation's window keys sit after UI scale, and in the browser they do n
 // keys for a layout under 2200 px (review finding 22). The plate's keys are the
 // case above's.
 
-test("Setup prints no key hints: the footer, the Console key, the bay head (S3)", async ({ page }) => {
+test("Setup prints no key hints: the footer, the way back, the bay head (S3)", async ({ page }) => {
   await openFixture(page, "setup-ready");
   await expectWorkspaceMounted(page, "setup");
 
@@ -721,9 +726,10 @@ test("Setup prints no key hints: the footer, the Console key, the bay head (S3)"
   await expect(page.getByTestId("setup-footer-shortcuts")).toHaveCount(0);
 
   // The visual overhaul (2026-10-05): the Console key is the page's ⋯ item,
-  // with the key's test id, and prints no key hint.
+  // with the key's test id, and prints no key hint. D47: it goes back to the
+  // Overview, the page the app opens on, and keeps the test id.
   const menu = await openSetupPageMenu(page);
-  await expect(menu.getByTestId("setup-back-to-console")).toContainText("Back to the Console");
+  await expect(menu.getByTestId("setup-back-to-console")).toContainText("Back to the Overview");
   await expect(menu).not.toContainText("Ctrl");
   await page.keyboard.press("Escape");
 
@@ -862,10 +868,11 @@ test.describe("Setup / Support after the visual overhaul", () => {
     const menu = await openSetupPageMenu(page);
     await expect(menu.getByTestId("setup-export-backup")).toHaveText("Export backup");
     await expect(menu.getByTestId("setup-engine-log")).toHaveText("Open the log");
-    // Before the setup is published the Console is locked, and the item says why.
-    const consoleItem = menu.getByTestId("setup-back-to-console");
-    await expect(consoleItem).toHaveAttribute("aria-disabled", "true");
-    await expect(consoleItem).toContainText("the setup is not published");
+    // Before the setup is published the Overview is locked (the Console until
+    // D47), and the item says why.
+    const backItem = menu.getByTestId("setup-back-to-console");
+    await expect(backItem).toHaveAttribute("aria-disabled", "true");
+    await expect(backItem).toContainText("the setup is not published");
     await menu.getByTestId("setup-export-backup").click();
     await expect(page.getByTestId("setup-feedback")).toContainText("Exported support backup to");
   });

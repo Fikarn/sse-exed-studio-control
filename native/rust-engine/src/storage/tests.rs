@@ -73,9 +73,10 @@ fn initialize_database_applies_the_schema_and_defaults_without_planning() {
     assert_eq!(planning_objects(&db_path), Vec::<String>::new());
     let shell_settings =
         list_settings_by_prefix(&db_path, "shell.").expect("shell settings should load");
+    // D47: new saved data opens on the Overview (the Console from D1 until then).
     assert_eq!(
         shell_settings.get(WORKSPACE_KEY).map(String::as_str),
-        Some("audio")
+        Some("overview")
     );
 }
 

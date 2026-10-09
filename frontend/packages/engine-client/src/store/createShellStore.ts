@@ -141,6 +141,16 @@ export interface ShellStoreOptions {
    * failure for the diagnostics export.
    */
   development?: boolean;
+  /**
+   * The page the app opens on at its start, whatever page was saved (D47,
+   * which amends D1: the Overview, at every start of the app). It is written
+   * as the saved page, so the deck's `workspace` word follows it (D49), and
+   * only once in the store's life: a restart of the hardware link keeps the
+   * page the operator is on. A start while the setup is not done stays on
+   * Setup. Left out, the app opens on the saved page (the test double's, so
+   * each fixture opens where it was saved).
+   */
+  landing?: WorkspaceId;
 }
 
 const initialAudioMeterFrame: AudioMeterFrame = {
@@ -198,6 +208,9 @@ function launchGeneration(launch: EngineLaunchInfo | void | undefined): number |
   return typeof record?.generation === "number" ? record.generation : null;
 }
 
+// The page on screen is the saved page. The landing (D47) is a write at the
+// start (`withLandingPage`), never a rule here: this runs on every read of
+// the app snapshot, and every tab press is a write and a read.
 function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
   const startup = appSnapshot?.startup;
   const startupTargetSurface =
@@ -505,6 +518,12 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
 
 export function createShellStore(transport: EngineTransport, options: ShellStoreOptions = {}): ShellStore {
   const development = options.development === true;
+  const landing = options.landing ?? null;
+  // D47: set at the first bootstrap that reaches ready, whether that one
+  // landed, stayed on Setup or had its write refused. Every later bootstrap is
+  // a restart of the hardware link (Setup's Restart, a database restore, the
+  // restart after a crash), which keeps the page the operator is on.
+  let landed = false;
   let state = initialState;
   // Slice 9 (F11): the snapshots asked for and not yet fetched, who is waiting
   // for them, and whether a batch is out. One batch is in flight at a time;
@@ -1161,6 +1180,28 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     }
   };
 
+  /**
+   * The app snapshot the start shows (D47), with `page` written as the saved
+   * page unless the setup is not done (Setup holds the screen then). It is
+   * written, not only shown, because the deck's `workspace` word is the saved
+   * page (D49). The reply's `shell` carries the page: the hardware link and
+   * the double answer the whole app snapshot, and an answer of the settings
+   * alone (`{ settings, shell }`) has it there too. A refused write is
+   * recorded, and the start shows the saved page.
+   */
+  const withLandingPage = async (page: WorkspaceId, app: JsonObject | null): Promise<JsonObject | null> => {
+    if (app === null || asRecord(app.startup)?.targetSurface === "commissioning") {
+      return app;
+    }
+    try {
+      const shell = asRecord(asRecord(await transport.request("settings.update", { workspace: page }))?.shell);
+      return shell ? { ...app, shell: { ...asRecord(app.shell), ...shell } } : app;
+    } catch (error) {
+      recordBackgroundFailure(error, "the landing page");
+      return app;
+    }
+  };
+
   const bootstrap = async () => {
     const generation = ++bootstrapGeneration;
     const isCurrentBootstrap = () => generation === bootstrapGeneration;
@@ -1269,6 +1310,17 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       for (const failure of cameras.failures) {
         recordBackgroundFailure(failure, "the cameras' state");
       }
+
+      // D47 (D1 amended): the app opens on the Overview at every start of the
+      // app, once in the store's life and before the ready state, so the saved
+      // page never shows first. The page shown is still the saved page
+      // (`deriveWorkspace`), which every tab press writes.
+      if (landing !== null && !landed && rest.accepted.has("app")) {
+        const app = await withLandingPage(landing, asRecord(rest.accepted.get("app")));
+        if (!isCurrentBootstrap()) return;
+        rest.accepted.set("app", app);
+      }
+      landed = true;
 
       setState({
         ...state,

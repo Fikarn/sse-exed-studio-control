@@ -48,7 +48,8 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
           steps={clusterSteps}
           onExportBackup={() => void performAction("support-export", exportSupportBackup)}
           onOpenEngineLog={openEngineLog}
-          onReturnToConsole={() => void store.setWorkspace("audio")}
+          // D47: the way back is to the Overview, the page the app opens on.
+          onReturnToConsole={() => void store.setWorkspace("overview")}
           onRunAllProbes={runAllProbesFromCluster}
           onSelectMode={persistMode}
           onSelectStep={(stepId) => requestStepSelection(stepId as RunnerStepId)}

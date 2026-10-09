@@ -1698,7 +1698,8 @@ mod tests {
                 }
             }
         }
-        assert_eq!(words["workspace"], "audio");
+        // New saved data: its page is the default (the Overview since D47).
+        assert_eq!(words["workspace"], crate::shell_settings::DEFAULT_WORKSPACE);
         assert_eq!(lines["light_intensity"]["head"], "INTENSITY");
         assert!(
             crate::lighting::SCENE_STATES.contains(&words["scene_state"].as_str().unwrap_or("")),

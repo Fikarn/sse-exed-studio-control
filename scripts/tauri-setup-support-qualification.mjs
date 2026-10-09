@@ -54,11 +54,14 @@ const DATABASE_MARKER = "Qualification: kept by the database backup";
 const LATER_CHANGE = "Qualification: added after the backup";
 const MARKER_CHANGED =
   "2026-10-01: the saved data followed is a lighting group; from the new pages program's Slice 1 it was a snapshot slot of the Console, which the app no longer keeps (its snapshots are TotalMix's), and until then it was the Planning projects and tasks.";
-// The page the shell opens on is saved data too. The lane leaves on Lighting:
-// a page never saved, and a saved Planning page, read as the Console (the
-// program's D1), so only a page that was saved and came back reads as Lighting.
+// The page is saved data too. The lane leaves on Lighting, and the restart
+// opens the Overview all the same: the app opens on it at every start once
+// the setup is published, and saves it (D47, 2026-10-09, D1 amended). Until
+// D47 the restart came back on Lighting, the page saved; the restored marker
+// and the backups prove the saved data now.
+const LANDING_WORKSPACE = "overview";
 const WORKSPACE_CHANGED =
-  "New pages program, Slice 1: the saved page is Lighting and the restored marker is checked too (a lighting group since 2026-10-01, a snapshot slot of the Console before); until then the page was Planning.";
+  "D47 (2026-10-09): the lane leaves on Lighting and the restart opens the Overview, the page the app opens on at every start, and saves it; the restored marker proves the saved data (a lighting group since 2026-10-01, a snapshot slot of the Console before). Until D47 the restart came back on Lighting, and until the new pages program's Slice 1 the page was Planning.";
 
 function lightingGroupNames(status) {
   const groups = status?.shellState?.lightingSnapshot?.groups;
@@ -641,9 +644,15 @@ async function runSetupSupportQualification() {
       restartStatus.shellState.appSnapshot?.startup?.targetSurface === "dashboard",
       "Expected restarted Tauri runtime to keep dashboard startup after publish and restore."
     );
+    // D47: Lighting was saved, and the start opens the Overview, written before
+    // the shell is ready, so the saved page (the deck's word) says it too.
     assert(
-      restartStatus.shellState.activeWorkspace === "lighting",
-      "Expected restarted Tauri runtime to restore the lighting workspace."
+      restartStatus.shellState.activeWorkspace === LANDING_WORKSPACE,
+      `Expected restarted Tauri runtime to open the ${LANDING_WORKSPACE} workspace, got '${restartStatus.shellState.activeWorkspace}'.`
+    );
+    assert(
+      restartStatus.shellState.appSnapshot?.shell?.workspace === LANDING_WORKSPACE,
+      `Expected restarted Tauri runtime to save the page it opened on, '${LANDING_WORKSPACE}', got '${restartStatus.shellState.appSnapshot?.shell?.workspace}'.`
     );
     assert(
       restartStatus.shellState.supportSnapshot?.backupCount >= 2,

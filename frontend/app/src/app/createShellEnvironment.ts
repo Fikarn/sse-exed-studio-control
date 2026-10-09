@@ -49,6 +49,13 @@ export async function createShellEnvironment() {
     window.__SSE_TEST_DISARM_CRASH__ = disarmWorkspaceCrash;
   }
 
+  // D47 (D1 amended): the app opens on the Overview at every start. On the
+  // double a page test opens on its fixture's saved page, as the boards and
+  // the captures do, unless the address asks for the landing with
+  // `?landing=1` (as `?crash=` asks for a fault).
+  const landing: WorkspaceId | undefined =
+    useLiveTransport || url.searchParams.get("landing") === "1" ? "overview" : undefined;
+
   return {
     crashWorkspace,
     fixtureId,
@@ -56,6 +63,6 @@ export async function createShellEnvironment() {
     pictures,
     // A development build refuses a malformed reply loudly (Slice 9 — F32);
     // the packaged build keeps the last good snapshot and records the failure.
-    store: createShellStore(transport, { development: import.meta.env.DEV }),
+    store: createShellStore(transport, { development: import.meta.env.DEV, landing }),
   };
 }

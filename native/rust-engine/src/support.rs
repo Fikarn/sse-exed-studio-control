@@ -17,10 +17,9 @@ use crate::prompter::archive::{
 };
 use crate::prompter::model::counted;
 use crate::shell_settings::{
-    ShellSettingsSnapshot, DEFAULT_WORKSPACE, LIGHTING_CURRENT_SECTION_ID_KEY,
-    LIGHTING_SCENE_THUMBS_KEY, LIGHTING_TALENT_MARKS_KEY, SETUP_ACTIVE_SECTION_KEY,
-    SHELL_SETTINGS_PREFIX, WINDOW_HEIGHT_KEY, WINDOW_MAXIMIZED_KEY, WINDOW_MODE_KEY,
-    WINDOW_WIDTH_KEY, WORKSPACE_KEY,
+    ShellSettingsSnapshot, LIGHTING_CURRENT_SECTION_ID_KEY, LIGHTING_SCENE_THUMBS_KEY,
+    LIGHTING_TALENT_MARKS_KEY, SETUP_ACTIVE_SECTION_KEY, SHELL_SETTINGS_PREFIX, WINDOW_HEIGHT_KEY,
+    WINDOW_MAXIMIZED_KEY, WINDOW_MODE_KEY, WINDOW_WIDTH_KEY, WORKSPACE_KEY,
 };
 use crate::storage::{
     list_settings_by_prefix, open_connection, run_integrity_check, EngineResult,
@@ -100,8 +99,15 @@ const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
 const PLANNING_TABLES: [&str; 4] = ["projects", "tasks", "task_checklist_items", "activity_log"];
 const PLANNING_SETTINGS_PATTERN: &str = "planning.%";
 /// The page Planning was, which a backup from before Slice 2 may have saved;
-/// it opens the Console, as schema 8 does for the saved data (D1, D2).
+/// it is restored as `PLANNING_RESTORED_AS`, as schema 8 does for the saved
+/// data (D1, D2).
 const PLANNING_WORKSPACE: &str = "planning";
+/// The page a saved Planning page is restored as: the Console, the default
+/// page when Planning left (D1). It is history, kept as it was: the frozen
+/// schema-8 upgrade writes `audio` for the saved data too (`storage.rs`), and
+/// the default page moved to the Overview later (D47), where the app opens at
+/// every start anyway.
+const PLANNING_RESTORED_AS: &str = "audio";
 /// What Verify adds, and what a restore says, for a backup written before
 /// Planning left that holds Planning data (D3).
 const PLANNING_WILL_NOT_BE_RESTORED: &str =
@@ -1145,11 +1151,11 @@ fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite:
 
 /// A saved page an archive of format 4 or older may name that this build no
 /// longer has: Planning, the default page until Slice 2 of the new pages
-/// program, opens the Console, as the schema-8 upgrade does for the saved
-/// data (D1, D2). Every other page is restored as it is.
+/// program, is restored as the Console, as the schema-8 upgrade does for the
+/// saved data (D1, D2). Every other page is restored as it is.
 fn restored_workspace(workspace: &str) -> &str {
     if workspace == PLANNING_WORKSPACE {
-        DEFAULT_WORKSPACE
+        PLANNING_RESTORED_AS
     } else {
         workspace
     }
