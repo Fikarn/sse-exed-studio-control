@@ -144,6 +144,10 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
 // by accident, so the moment the operator looks is when they are fetched —
 // two to five requests where every switch used to cost ten.
 const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {
+  // The Overview (D47) shows every page's facts: the lamps' health, the
+  // backups and the day's log for its footer, and each page's own snapshot.
+  // Not the deck's page model: its row reads the deck's lamp, which is health.
+  overview: ["health", "support", ...LIGHTING_DOMAINS, "audio", "prompter", "cameras"],
   setup: ["health", "commissioning", "support", "controlSurface"],
   lighting: LIGHTING_DOMAINS,
   audio: ["audio"],

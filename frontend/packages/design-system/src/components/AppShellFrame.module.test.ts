@@ -48,6 +48,14 @@ describe("AppShellFrame.module.css", () => {
     expect(code).toMatch(/\.clock \{[^}]*var\(--font-family-ui\)/);
   });
 
+  // The Overview (D47): its rooms part the columns, so on it the hairlines go.
+  it("draws the columns' hairlines, and none on a page with quiet columns", () => {
+    expect(code).toMatch(/\.cluster \{[^}]*border-right: 1px solid var\(--material-line\)/);
+    expect(code).toMatch(/\.plate \{[^}]*border-left: 1px solid var\(--material-line\)/);
+    expect(code).toMatch(/\.shell\[data-columns="quiet"\] \.cluster \{[^}]*border-right-width: 0/);
+    expect(code).toMatch(/\.shell\[data-columns="quiet"\] \.plate \{[^}]*border-left-width: 0/);
+  });
+
   it("keeps the frame's margin at both of the header's sides and none in the bay", () => {
     expect(code).toMatch(/\.header \{[^}]*padding: 0 calc\(var\(--chrome-studio-margin\)/);
     expect(code).toMatch(/\.bay \{[^}]*\}/);

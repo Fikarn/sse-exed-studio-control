@@ -912,7 +912,8 @@ export interface HeaderItem {
  * in the rig's state display, the prompter's play on its take block); and the
  * drifted scene not twice, when the Lighting tab already says `unsaved`. A
  * page's own lamp stays in the list: the frame draws it in the page's tab,
- * and leaves it out of the active tab.
+ * and leaves it out of the active tab. The Overview (D47) shows every page's
+ * latches in its own latch slot, so on it the header shows none but REC.
  */
 export function headerItems(items: readonly HeaderItem[], activeWorkspace: string) {
   const rec = items.find((item) => item.id === "latched:rec") ?? null;
@@ -920,7 +921,7 @@ export function headerItems(items: readonly HeaderItem[], activeWorkspace: strin
   const lamps = items
     .filter((item) => {
       if (item === rec) return false;
-      if (item.page !== undefined && item.page === activeWorkspace) return false;
+      if (item.page !== undefined && (item.page === activeWorkspace || activeWorkspace === "overview")) return false;
       if (item.id === "latched:scene-drift" && lightingWord === "unsaved") return false;
       return true;
     })

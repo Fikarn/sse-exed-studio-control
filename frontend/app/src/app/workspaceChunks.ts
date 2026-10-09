@@ -72,6 +72,7 @@ function workspaceChunk<Props>(load: () => Promise<ComponentType<Props>>) {
 }
 
 export const workspaceChunks = {
+  overview: workspaceChunk(() => import("./overview/OverviewWorkspace").then((module) => module.OverviewWorkspace)),
   setup: workspaceChunk(() => import("./setup/SetupSupportPilot").then((module) => module.SetupSupportPilot)),
   lighting: workspaceChunk(() =>
     import("./lighting/LightingWorkspace").then((module) => module.LightingWorkspaceSurface)
@@ -83,7 +84,14 @@ export const workspaceChunks = {
   ),
 };
 
-export const WORKSPACE_IDS: readonly WorkspaceId[] = ["setup", "lighting", "audio", "cameras", "teleprompter"];
+export const WORKSPACE_IDS: readonly WorkspaceId[] = [
+  "overview",
+  "setup",
+  "lighting",
+  "audio",
+  "cameras",
+  "teleprompter",
+];
 
 export function preloadWorkspace(workspaceId: WorkspaceId): Promise<void> {
   return workspaceChunks[workspaceId].preload();

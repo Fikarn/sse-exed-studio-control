@@ -15,7 +15,7 @@ export async function openFixture(
   fixtureId: string,
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
-    crash?: "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+    crash?: "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
   }
 ) {
   const params = new URLSearchParams({
@@ -39,6 +39,8 @@ export async function openFixture(
 // Each mark is an element only the mounted workspace draws: never its loading
 // surface, never the shell's `workspace-loading`.
 const WORKSPACE_MARKS = {
+  // The Overview (D47): its bay, drawn once the page has the snapshots.
+  overview: "overview-bay",
   setup: "setup-workspace",
   lighting: "lighting-stage",
   audio: "audio-monitor-bar",

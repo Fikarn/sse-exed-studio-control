@@ -106,8 +106,9 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   // New pages program, Slice 1: three tabs, and no others. Old: four, the
   // fourth being Planning. Slice 6a: four again, the Teleprompter after Audio.
   // Five with the Cameras, between the two (D4).
-  // The skylight (D48): the four pages on their platter, Setup / Support on the system's.
-  const tabLabels = ["Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"];
+  // The skylight (D48): the pages on their platter, Setup / Support on the system's.
+  // The Overview (D47) first.
+  const tabLabels = ["Overview", "Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"];
   const header = page.locator('[data-region="header"]');
   await expect(header.locator("[data-nav-id]")).toHaveCount(tabLabels.length);
   for (const label of tabLabels) {
@@ -155,6 +156,7 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
 // word that fits the display, its short name (`PROMPTER STOPPED`).
 test("an area that stopped: its word fits, nothing scrolls, no line is cut", async ({ page }) => {
   for (const [crash, tab, word] of [
+    ["overview", "Overview", "OVERVIEW STOPPED"],
     ["setup", "Setup / Support", "SETUP STOPPED"],
     ["lighting", "Lighting", "LIGHTING STOPPED"],
     ["cameras", "Cameras", "CAMERAS STOPPED"],

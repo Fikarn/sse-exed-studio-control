@@ -21,8 +21,8 @@ import type { PrompterPlace } from "./generated/snapshots/PrompterPlace";
 import type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScriptSnapshot";
 import type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
 
-/** The pages, in the tab order (D4). */
-export type WorkspaceId = "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+/** The pages, in the tab order (D4); the Overview first since D47. */
+export type WorkspaceId = "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
 export type RecoveryState = "healthy" | "degraded" | "recovery";
 export type CommissioningStage = "setup-required" | "in-progress" | "ready";
 export type RunnerStage = "import" | "probe" | "map" | "verify" | "publish";

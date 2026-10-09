@@ -62,7 +62,7 @@ async function settle(page: Page) {
   await page.waitForTimeout(150);
 }
 
-type Workspace = "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+type Workspace = "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
 
 async function open(page: Page, fixture: string, workspace: Workspace) {
   await openFixture(page, fixture);

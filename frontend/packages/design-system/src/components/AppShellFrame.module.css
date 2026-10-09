@@ -146,6 +146,17 @@
   border-left: 1px solid var(--material-line);
 }
 
+/* Quiet columns (the Overview, D47): the page's rooms part the columns, so
+   the hairlines go, and with them their pixel, so a room stands 16 px inside
+   its column on both sides. */
+.shell[data-columns="quiet"] .cluster {
+  border-right-width: 0;
+}
+
+.shell[data-columns="quiet"] .plate {
+  border-left-width: 0;
+}
+
 .footerSlot {
   display: contents;
 }
