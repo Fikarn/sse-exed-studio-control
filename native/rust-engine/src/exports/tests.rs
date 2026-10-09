@@ -485,7 +485,8 @@ fn the_four_pages_hold_the_approved_layout() {
 // D5: LIGHTS, AUDIO, CAMERAS and PROMPTER, chained by the page keys and by
 // the deck following the app. The page keys make a ring, top right on every
 // page (2026-10-03), each to the page after it, PROMPTER's round to LIGHTS.
-// Setup has no deck page, so nothing follows it and the deck stays put.
+// Setup has no deck page, so nothing follows it and the deck stays put. The
+// Overview has none either, and turns the deck to PROMPTER (D49).
 #[test]
 fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
     let config = profile();
@@ -548,14 +549,21 @@ fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
             (on("audio"), 2),
             (on("cameras"), 3),
             (on("lighting"), 1),
+            // D49: the Overview turns the deck to PROMPTER, the
+            // Teleprompter's deck page.
+            (on("overview"), 4),
             // The page's word in the app is the one the hardware link
             // accepts (`shell_settings::WORKSPACES`).
             (on("teleprompter"), 4),
         ]
     );
-    for workspace in ["audio", "cameras", "lighting", "teleprompter"] {
+    for workspace in ["audio", "cameras", "lighting", "overview", "teleprompter"] {
         assert!(crate::shell_settings::WORKSPACES.contains(&workspace));
     }
+    assert_eq!(config["pages"]["4"]["name"], "PROMPTER");
+    let overview = &triggers["sse-trigger-follow-overview"];
+    assert_eq!(overview["options"]["name"], "SSE follow app - overview");
+    assert_eq!(overview["actions"][0]["options"]["page"]["value"], 4);
 
     let fallback = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
     assert_eq!(
@@ -1375,7 +1383,8 @@ fn a_silence_turns_no_page_of_the_deck() {
         .values()
         .filter(|trigger| trigger["events"][0]["type"] == "condition_true")
         .collect();
-    assert_eq!(follows.len(), 4);
+    // The four deck pages' and the Overview's (D49).
+    assert_eq!(follows.len(), 5);
     for follow in follows {
         let condition = follow["condition"][0]["options"]["expression"]["value"]
             .as_str()

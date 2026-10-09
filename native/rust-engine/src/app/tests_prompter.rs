@@ -197,7 +197,7 @@ fn the_teleprompter_page_is_kept() {
             .error
             .and_then(|error| error["message"].as_str().map(str::to_string)),
         Some(String::from(
-            "workspace must be one of: lighting, audio, setup, teleprompter, cameras"
+            "workspace must be one of: lighting, audio, setup, teleprompter, cameras, overview"
         ))
     );
 }

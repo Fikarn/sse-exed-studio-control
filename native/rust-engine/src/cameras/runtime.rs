@@ -36,11 +36,11 @@ use crate::engine_events::{emit_app_changed, emit_cameras_changed};
 use crate::health::APP_CHANGED_REASON_HEALTH;
 use crate::pictures_helper::{self, Wanted};
 use crate::storage::{apply_settings, list_settings_by_prefix, open_connection, set_settings};
-use crate::storage_backups::civil_from_days;
+use crate::storage_backups::{civil_from_days, days_from_civil};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use studio_control_protocol::pictures::WantedCamera;
 
 /// UTC as `2026-09-27T14:03:22.123Z`, the shape the other times in the
@@ -57,6 +57,18 @@ pub(crate) fn utc_text(time: SystemTime) -> String {
         seconds_of_day % 60,
         since_epoch.subsec_millis()
     )
+}
+
+/// `utc_text`'s shape read back, which is also the action log's stamp
+/// (`action_log::RecordedAction::at`). Any other text, a month 13 or a
+/// damaged time, is `None`.
+pub(crate) fn utc_time(text: &str) -> Option<SystemTime> {
+    let field = |at: usize, width: usize| text.get(at..at + width)?.parse::<i64>().ok();
+    let days = days_from_civil(field(0, 4)?, field(5, 2)?, field(8, 2)?);
+    let seconds = days * 86_400 + field(11, 2)? * 3_600 + field(14, 2)? * 60 + field(17, 2)?;
+    let millis = u64::try_from(seconds * 1_000 + field(20, 3)?).ok()?;
+    let time = UNIX_EPOCH + Duration::from_millis(millis);
+    (utc_text(time) == text).then_some(time)
 }
 
 /// The setting that keeps a camera's release across a start (D41):

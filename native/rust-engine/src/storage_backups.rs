@@ -172,7 +172,8 @@ pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
 /// Howard Hinnant's `days_from_civil`, the inverse of `civil_from_days`:
 /// (y, m, d) to days since 1970-01-01. Signed throughout, so a damaged
 /// date gives a wrong number rather than a panic; the caller reads it back.
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+/// The cameras' times are read with it too (`cameras::runtime::utc_time`).
+pub(crate) fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let year = year - i64::from(month <= 2);
     let era = if year >= 0 { year } else { year - 399 } / 400;
     let year_of_era = year - era * 400;

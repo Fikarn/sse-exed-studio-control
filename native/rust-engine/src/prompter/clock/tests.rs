@@ -504,6 +504,69 @@ fn the_time_left_comes_from_the_layout_or_the_words() {
     assert!(exact > estimate, "{exact} > {estimate}");
 }
 
+// D47, the Overview's cues ahead: a cue's seconds are the pixels from the
+// reading line to the cue's line over the pace's pixels a second, as the time
+// left's are to END. A faster pace makes them fewer, a cue passed is below
+// zero, and without a layout there are none.
+#[test]
+fn a_cues_seconds_ahead_come_from_the_layout_at_the_pace() {
+    let now = Instant::now();
+    // Six words three a line, a cue on a line of its own, six words again:
+    // the cue's line stands two full lines and half a line's gap below the
+    // top, at 100 px a line and 100/3 px a read word.
+    let mut paragraphs: Vec<PrompterParagraph> = (*script(1, 6)).clone();
+    paragraphs.push(PrompterParagraph::plain("[CUE]"));
+    paragraphs.extend(script(1, 6).iter().cloned());
+    let paragraphs = Arc::new(paragraphs);
+    let clock_at = |place: PrompterPlace, laid_out: bool| {
+        let mut clock = GlassClock::paused(
+            now,
+            String::from("script-a"),
+            paragraphs.clone(),
+            String::from("k"),
+            place,
+            140,
+        );
+        if laid_out {
+            clock.accept_layout(now, layout_of("k", &paragraphs, 3, 100.0));
+        }
+        clock
+    };
+
+    assert_eq!(
+        clock_at(PrompterPlace::TOP, false).seconds_to(now, 1, 0),
+        None
+    );
+
+    let mut clock = clock_at(PrompterPlace::TOP, true);
+    assert!(close(
+        clock.layout.as_ref().unwrap().px_per_read_word,
+        100.0 / 3.0
+    ));
+    let at_140 = clock.seconds_to(now, 1, 0).expect("a time");
+    // Two lines of three words and the gap's 50 px, a word and a half.
+    assert!(close(at_140, 7.5 * 60.0 / 140.0), "{at_140}");
+    clock.set_speed(now, 145);
+    let at_145 = clock.seconds_to(now, 1, 0).expect("a time");
+    assert!(close(at_145, 7.5 * 60.0 / 145.0), "{at_145}");
+    assert!(at_145 < at_140);
+
+    // Playing, the cue comes nearer as the text moves.
+    clock.play(now);
+    let later = clock.seconds_to(after(now, 2_000), 1, 0).expect("a time");
+    assert!(later < at_145, "{later} < {at_145}");
+
+    let passed = clock_at(
+        PrompterPlace {
+            paragraph: 2,
+            word: 0,
+        },
+        true,
+    );
+    let behind = passed.seconds_to(now, 1, 0).expect("a time");
+    assert!(close(behind, -4.5 * 60.0 / 140.0), "{behind}");
+}
+
 #[test]
 fn a_line_step_moves_one_line_and_stays_inside_the_script() {
     let paragraphs = script(3, 10);

@@ -8,7 +8,7 @@ use crate::cameras::simulated::{record_time_text, CameraReading};
 use crate::cameras::snapshot::{
     CameraChoice, CameraDials, CameraHealthEntry, CameraLevel, CameraPicture, CameraRecentAction,
     CameraRecording, CameraSnapshot, CameraState, CameraSwitch, CameraTone, CameraUnavailable,
-    CameraValues, CamerasHealthCheck, CamerasSnapshot, PictureState,
+    CameraValues, CamerasHealthCheck, CamerasSnapshot, PictureState, TakesToday,
 };
 
 fn choice(model: &CameraModel, reading: &CameraReading, setting: Setting) -> CameraChoice {
@@ -149,7 +149,11 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime, picture: CameraPicture) -
 impl Cameras {
     /// `cameras.snapshot`, with the cameras' Recent actions as the action
     /// log holds them (`None` when it could not be read).
-    pub(crate) fn snapshot(&self, recent: Option<Vec<CameraRecentAction>>) -> CamerasSnapshot {
+    pub(crate) fn snapshot(
+        &self,
+        recent: Option<Vec<CameraRecentAction>>,
+        takes_today: Option<TakesToday>,
+    ) -> CamerasSnapshot {
         CamerasSnapshot {
             selected: self.selected,
             dials: self.dials(),
@@ -160,7 +164,20 @@ impl Cameras {
                 .collect(),
             pictures: self.pictures(),
             recent,
+            takes_today,
         }
+    }
+
+    /// CAM 1 reports recording (the last it reported, while it does not
+    /// answer).
+    pub(crate) fn records_now(&self) -> bool {
+        camera_snapshot(
+            self.camera(RECORDING_CAMERA),
+            self.picture(RECORDING_CAMERA),
+        )
+        .recording
+        .recording
+            == Some(true)
     }
 
     /// What the deck's dials set, as the snapshot says it.
@@ -205,13 +222,7 @@ impl Cameras {
             })
             .cloned()
             .expect("three cameras");
-        let recording = camera_snapshot(
-            self.camera(RECORDING_CAMERA),
-            self.picture(RECORDING_CAMERA),
-        )
-        .recording
-        .recording
-            == Some(true);
+        let recording = self.records_now();
         debug_assert_eq!(cameras.len(), CAMERA_NUMBERS.len());
         let pictures = self.pictures();
         let (status, word, summary) =

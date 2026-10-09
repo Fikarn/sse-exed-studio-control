@@ -835,3 +835,197 @@ fn sentences_avoid_the_words_the_operator_never_reads() {
         }
     }
 }
+
+// The day's takes (D47, the Overview's footer): CAM 1's starts paired with
+// the next stop, from the cameras' rows of the day, oldest first.
+fn take_row(at: &str, action: &str, target: &str) -> RecordedAction {
+    RecordedAction {
+        id: 0,
+        at: String::from(at),
+        source: String::from("ui"),
+        domain: String::from(DOMAIN_CAMERAS),
+        action: String::from(action),
+        target: String::from(target),
+        detail: String::new(),
+    }
+}
+
+fn at(text: &str) -> SystemTime {
+    crate::cameras::runtime::utc_time(text).expect("a time")
+}
+
+#[test]
+fn the_days_takes_are_the_starts_paired_with_the_next_stop() {
+    let rows = [
+        take_row("2026-10-09T08:00:00.000Z", "recording-started", "CAM 1"),
+        // Another camera's row and another kind of row change nothing.
+        take_row("2026-10-09T08:01:00.000Z", "format-changed", "CAM 1"),
+        take_row("2026-10-09T08:02:00.000Z", "released", "CAM 2"),
+        take_row("2026-10-09T08:05:30.500Z", "recording-stopped", "CAM 1"),
+        take_row("2026-10-09T09:00:00.000Z", "recording-started", "CAM 1"),
+        take_row("2026-10-09T09:01:00.000Z", "recording-stopped", "CAM 1"),
+    ];
+    let now = at("2026-10-09T10:00:00.000Z");
+    assert_eq!(
+        takes_today(&rows, now, false),
+        TakesToday {
+            count: 2,
+            recorded_seconds: 330 + 60
+        }
+    );
+    assert_eq!(takes_today(&[], now, true), TakesToday::default());
+}
+
+// A take running now counts with its length so far; one whose stop the log
+// does not show (stopped on the camera, its link lost) counts and adds no
+// seconds, whether another start follows it or nothing does.
+#[test]
+fn an_open_take_counts_with_its_seconds_only_while_cam_1_records() {
+    let rows = [
+        take_row("2026-10-09T08:00:00.000Z", "recording-started", "CAM 1"),
+        take_row("2026-10-09T08:00:20.000Z", "recording-stopped", "CAM 1"),
+        take_row("2026-10-09T09:00:00.000Z", "recording-started", "CAM 1"),
+    ];
+    let now = at("2026-10-09T09:01:30.900Z");
+    assert_eq!(
+        takes_today(&rows, now, true),
+        TakesToday {
+            count: 2,
+            recorded_seconds: 20 + 90
+        }
+    );
+    assert_eq!(
+        takes_today(&rows, now, false),
+        TakesToday {
+            count: 2,
+            recorded_seconds: 20
+        }
+    );
+
+    let unseen_end = [
+        take_row("2026-10-09T08:00:00.000Z", "recording-started", "CAM 1"),
+        take_row("2026-10-09T09:00:00.000Z", "recording-started", "CAM 1"),
+        take_row("2026-10-09T09:00:10.000Z", "recording-stopped", "CAM 1"),
+    ];
+    assert_eq!(
+        takes_today(&unseen_end, now, false),
+        TakesToday {
+            count: 2,
+            recorded_seconds: 10
+        }
+    );
+}
+
+// A stop with no take open (the take began before midnight) is left out, and
+// so is a row whose time cannot be read.
+#[test]
+fn a_stop_without_a_start_is_left_out() {
+    let rows = [
+        take_row("2026-10-09T00:10:00.000Z", "recording-stopped", "CAM 1"),
+        take_row("2026-10-09T08:00:00.000Z", "recording-started", "CAM 1"),
+        take_row("2026-10-09T08:00:30.000Z", "recording-stopped", "CAM 1"),
+        take_row("2026-10-09T08:00:40.000Z", "recording-stopped", "CAM 1"),
+        take_row("2026-13-09T08:00:00.000Z", "recording-started", "CAM 1"),
+    ];
+    assert_eq!(
+        takes_today(&rows, at("2026-10-09T10:00:00.000Z"), true),
+        TakesToday {
+            count: 1,
+            recorded_seconds: 30
+        }
+    );
+}
+
+// The day begins at local midnight: rows before it are not read, a row at it
+// is, oldest first, of the one domain. Local midnight is SQLite's, from the
+// time zone Windows keeps: it reads back as 00:00 local, within the last day
+// (25 hours on the day summer time ends).
+#[test]
+fn the_day_begins_at_local_midnight() {
+    let test_dir = TestDir::new("action-log-today");
+    let db_path = test_dir.db_path();
+    initialize_test_database(db_path.as_path()).expect("database should initialize");
+    let connection = open_connection(db_path.as_path()).expect("connection should open");
+    let insert = |at: &str, domain: &str, action: &str| {
+        connection
+            .execute(
+                "INSERT INTO event_log(at, source, domain, action, target, detail)
+                 VALUES (?1, 'ui', ?2, ?3, 'CAM 1', 'A take')",
+                params![at, domain, action],
+            )
+            .expect("a row should be written");
+    };
+    insert(
+        "2020-03-01T20:00:00.000Z",
+        DOMAIN_CAMERAS,
+        "recording-started",
+    );
+    insert(
+        "2020-03-01T21:59:59.999Z",
+        DOMAIN_CAMERAS,
+        "recording-stopped",
+    );
+    insert(
+        "2020-03-01T22:00:00.000Z",
+        DOMAIN_CAMERAS,
+        "recording-started",
+    );
+    insert("2020-03-01T23:00:00.000Z", DOMAIN_LIGHTING, "all-off");
+    insert(
+        "2020-03-02T07:00:00.000Z",
+        DOMAIN_CAMERAS,
+        "recording-stopped",
+    );
+
+    let rows = domain_actions_since(&connection, DOMAIN_CAMERAS, "2020-03-01T22:00:00.000Z")
+        .expect("the rows read");
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.at.as_str(), row.action.as_str()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("2020-03-01T22:00:00.000Z", "recording-started"),
+            ("2020-03-02T07:00:00.000Z", "recording-stopped"),
+        ]
+    );
+    assert_eq!(
+        takes_today(&rows, at("2020-03-02T08:00:00.000Z"), false),
+        TakesToday {
+            count: 1,
+            recorded_seconds: 9 * 3_600
+        }
+    );
+
+    let midnight = local_midnight(&connection).expect("midnight reads");
+    let (local, hours_ago): (String, f64) = connection
+        .query_row(
+            "SELECT strftime('%H:%M:%f', ?1, 'localtime'),
+                    (julianday('now') - julianday(?1)) * 24",
+            [&midnight],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("midnight reads back");
+    assert_eq!(local, "00:00:00.000", "{midnight}");
+    assert!(
+        (0.0..=25.0).contains(&hours_ago),
+        "{midnight}: {hours_ago} h ago"
+    );
+    assert!(at(&midnight) <= SystemTime::now());
+
+    // Today's rows are the one written now, not the old days'.
+    record_actions(
+        db_path.as_path(),
+        &[ActionRecord::new(
+            ActionSource::Deck,
+            DOMAIN_CAMERAS,
+            "recording-started",
+            "CAM 1",
+            "CAM 1 started recording.",
+        )],
+    )
+    .expect("a row should be written");
+    let today =
+        list_domain_actions_today(db_path.as_path(), DOMAIN_CAMERAS).expect("the day's rows read");
+    assert_eq!(today.len(), 1, "{today:?}");
+    assert_eq!(today[0].source, "deck");
+}

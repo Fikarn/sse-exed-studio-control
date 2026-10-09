@@ -35,8 +35,11 @@ const DECK_ACTION_ROUTES = [
   "/api/deck/camera-action",
   "/api/deck/prompter-action",
 ];
-/** The page of the app each page-follow trigger waits for, and the deck page it turns to. */
-const FOLLOW_TARGETS = ["audio:2", "cameras:3", "lighting:1", "teleprompter:4"];
+/**
+ * The page of the app each page-follow trigger waits for, and the deck page it turns to: the
+ * Overview turns the deck to PROMPTER, as the Teleprompter does (D49).
+ */
+const FOLLOW_TARGETS = ["audio:2", "cameras:3", "lighting:1", "overview:4", "teleprompter:4"];
 /**
  * Actions the bridge answered once and refuses now (the deck-mode key, Planning's; talkback's,
  * D26), and the ones that left the profile on 2026-10-03, which it still answers (GAIN's

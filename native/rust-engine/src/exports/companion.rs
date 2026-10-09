@@ -28,7 +28,7 @@
 
 use super::images::image_library;
 use super::model::{Control, Element, ElementKind, Place, Prop, Step, DECK_CAP};
-use super::pages::{deck_page_number, DeckPage, DECK_PAGES};
+use super::pages::{deck_page_number, DeckPage, DECK_FOLLOWS_WITHOUT_A_PAGE, DECK_PAGES};
 use crate::control_surface::{DisplayShape, DECK_DISPLAYS, DECK_DISPLAYS_MARK};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
@@ -685,10 +685,14 @@ fn triggers(writer: &Writer) -> Value {
 
     // The deck follows the app's page: one trigger per deck page, on the
     // page the app saves (`workspace`), read from the kept answer, which a
-    // silence leaves as it was. The app's Setup page has no deck page, so
-    // the deck stays where it is while Setup is open.
-    for (index, deck_page) in DECK_PAGES.iter().enumerate() {
-        let slug = deck_page.workspace;
+    // silence leaves as it was; then one per app page that turns the deck to
+    // another page's (the Overview to PROMPTER, D49). The app's Setup page
+    // has neither, so the deck stays where it is while Setup is open.
+    let follows = DECK_PAGES
+        .iter()
+        .map(|deck_page| (deck_page.workspace, deck_page.id))
+        .chain(DECK_FOLLOWS_WITHOUT_A_PAGE);
+    for (index, (slug, page_id)) in follows.enumerate() {
         triggers.insert(
             format!("sse-trigger-follow-{slug}"),
             trigger(
@@ -701,7 +705,7 @@ fn triggers(writer: &Writer) -> Value {
                     "connectionId": "internal",
                     "options": {
                         "surfaceId": fixed(writer.surface),
-                        "page": fixed(deck_page_number(deck_page.id))
+                        "page": fixed(deck_page_number(page_id))
                     }
                 })],
                 vec![json!({

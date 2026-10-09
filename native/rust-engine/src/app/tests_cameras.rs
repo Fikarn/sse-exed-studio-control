@@ -320,9 +320,11 @@ fn the_cameras_read_carries_their_newest_recent_actions() {
     let test_dir = TestDir::new("cameras-recent");
     let app = app_for(&test_dir);
     let _forget = Forget(&app);
+    let empty = result(&app, "cameras.snapshot", json!({}));
+    assert_eq!(empty["recent"], json!([]));
     assert_eq!(
-        result(&app, "cameras.snapshot", json!({}))["recent"],
-        json!([])
+        empty["takesToday"],
+        json!({ "count": 0, "recordedSeconds": 0 })
     );
 
     set_up(&app);
@@ -366,7 +368,17 @@ fn the_cameras_read_carries_their_newest_recent_actions() {
 
     let reply = request(&app, "cameras.snapshot", json!({}));
     assert!(reply.events.is_empty());
-    let recent = reply.response.result.expect("a result")["recent"].clone();
+    let snapshot = reply.response.result.expect("a result");
+    // D47: the screen's start and the deck's stop are one take of the day.
+    assert_eq!(snapshot["takesToday"]["count"], 1);
+    assert!(
+        snapshot["takesToday"]["recordedSeconds"]
+            .as_u64()
+            .is_some_and(|seconds| seconds <= 5),
+        "{}",
+        snapshot["takesToday"]
+    );
+    let recent = snapshot["recent"].clone();
     let rows: Vec<(String, String, String, String)> = recent
         .as_array()
         .expect("a list")
@@ -445,6 +457,7 @@ fn the_cameras_read_answers_when_the_action_log_cannot_be_read() {
     for _ in 0..2 {
         let snapshot = result(&app, "cameras.snapshot", json!({}));
         assert_eq!(snapshot["recent"], Value::Null);
+        assert_eq!(snapshot["takesToday"], Value::Null);
         assert_eq!(snapshot["cameras"][0]["state"], "held");
         assert_eq!(snapshot["cameras"][0]["recording"]["recording"], true);
         assert!(said(), "said, and not again while it lasts");
@@ -455,6 +468,8 @@ fn the_cameras_read_answers_when_the_action_log_cannot_be_read() {
         .expect("the table is back");
     let snapshot = result(&app, "cameras.snapshot", json!({}));
     assert_eq!(snapshot["recent"].as_array().map(Vec::len), Some(1));
+    // The take started above is running: it counts.
+    assert_eq!(snapshot["takesToday"]["count"], 1);
     assert!(!said(), "the next failure is said again");
 }
 
