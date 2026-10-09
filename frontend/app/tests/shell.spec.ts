@@ -629,3 +629,32 @@ test.describe("the header, the skylight", () => {
     await expect(page.locator('[data-region="header"]')).not.toContainText("Studio Control");
   });
 });
+
+// The cascade layers rank as `src/styles/global.css` declares them (2026-10-09).
+// The one bundled stylesheet puts the design system's components ahead of the
+// global stylesheet, and the first place a layer appears fixes its rank, so
+// `components` ranked lowest and the reset's `button { font: inherit }` beat
+// every font set on a component's button. The pages declare the order in
+// their <head>, before any stylesheet.
+test("the cascade layers rank as declared, so a component's own button font wins over the reset", async ({ page }) => {
+  await openFixture(page, "every-page");
+  await expectWorkspaceMounted(page, "cameras");
+  const order = await page.evaluate(() => {
+    const seen: string[] = [];
+    const see = (name: string | null | undefined) => {
+      if (name && !seen.includes(name)) seen.push(name);
+    };
+    for (const sheet of document.styleSheets) {
+      for (const rule of sheet.cssRules) {
+        if (rule instanceof CSSLayerStatementRule) rule.nameList.forEach(see);
+        else if (rule instanceof CSSLayerBlockRule) see(rule.name);
+        else if (rule instanceof CSSImportRule) see(rule.layerName);
+      }
+    }
+    return seen;
+  });
+  expect(order.slice(0, 6)).toEqual(["reset", "tokens", "primitives", "components", "utilities", "overrides"]);
+  // The tab's button sets its own font (bold, `Tab.module.css`): it applies.
+  const weight = await page.locator('[data-nav-id="lighting"]').evaluate((tab) => getComputedStyle(tab).fontWeight);
+  expect(weight).toBe("700");
+});

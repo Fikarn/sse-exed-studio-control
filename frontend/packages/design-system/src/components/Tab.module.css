@@ -92,10 +92,11 @@
     color: var(--role-blue-text);
   }
 
-  /* The name is bold (D48), set on the name itself: the reset's
-     `button { font: inherit }` outranks a font set on the tab's button in the
-     app's bundle. It holds its bold width with an invisible bold copy, as it
-     did when only the open tab was bold. */
+  /* The name is bold (D48), set on the name itself as well as on the tab:
+     until the pages declared the layer order in their <head> (2026-10-09) the
+     reset's `button { font: inherit }` outranked a font set on a component's
+     button. It holds its bold width with an invisible bold copy, as it did
+     when only the open tab was bold. */
   .name {
     display: inline-flex;
     flex-direction: column;
