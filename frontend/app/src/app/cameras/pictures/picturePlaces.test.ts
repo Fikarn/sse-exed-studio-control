@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_HOLES, MAX_PICTURES, buildPlaces, type MeasuredPicture, type MeasuredPlaces } from "./picturePlaces";
+import {
+  MAX_HOLES,
+  MAX_PICTURES,
+  buildPlaces,
+  measurePlaces,
+  type MeasuredPicture,
+  type MeasuredPlaces,
+} from "./picturePlaces";
 
 // What the page reports to the shell for the native picture layer (D30): the builder,
 // from a layout as measured. The shell's side of the same numbers is
@@ -138,5 +145,23 @@ describe("the page's report of its pictures", () => {
     for (const field of ["pub guides: bool,", "pub zebras: bool,", "pub peaking: bool,", "pub marker: Option<Part>,"]) {
       expect(source).toContain(field);
     }
+  });
+});
+
+// The Overview (D47) shows the glass's copy beside the pictures. The glass marks
+// itself `data-picture` for the measures, but it is no camera: it never becomes
+// a picture place, so the helper never draws a fifth picture over it.
+describe("what the page measures", () => {
+  it("takes the cameras' pictures and leaves the glass's copy", () => {
+    const bay = document.createElement("div");
+    bay.innerHTML =
+      '<div data-picture data-camera="1" data-part="0,0,1920,1080"></div>' +
+      '<div data-picture="prompter-glass" data-layout-key="k"></div>' +
+      '<div data-picture data-camera="2" data-part="0,0,1920,1080" data-aids="zebras"></div>';
+    document.body.append(bay);
+    const measured = measurePlaces(bay);
+    expect(measured.pictures.map((picture) => picture.camera)).toEqual([1, 2]);
+    expect(measured.pictures[1]).toMatchObject({ zebras: true, guides: false });
+    bay.remove();
   });
 });

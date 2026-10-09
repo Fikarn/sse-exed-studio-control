@@ -21,6 +21,7 @@ import {
   paragraphWindow,
   placeView,
   playLockReason,
+  prompterCheckOf,
   prompterStateView,
   readWordsOf,
   scriptBar,
@@ -28,7 +29,9 @@ import {
   scriptDetailParts,
   scriptLine,
   screenMode,
+  runStateWord,
   stepLocks,
+  takeKeysView,
 } from "./teleprompterModel";
 
 // The Teleprompter page's model (new pages program, Slice 6a): what the page
@@ -376,5 +379,50 @@ describe("the plate's lines", () => {
     expect(scriptDetailParts({ ...script, sourceFileName: null }).from).toBeNull();
     expect(formatDuration(3725)).toBe("1:02:05");
     expect(formatDuration(37)).toBe("0:37");
+  });
+});
+
+// The take's keys, as the Teleprompter page and the Overview both draw them (D47).
+describe("the take's keys", () => {
+  it("says what PLAY, BACK and TOP do, and locks none while a script is laid out on the glass", () => {
+    const keys = takeKeysView(snapshot(), 6);
+    expect(keys.play).toEqual({ live: false, lock: null, hint: "from ¶ 8" });
+    expect(keys.back).toEqual({ lock: null, hint: "to the start of ¶ 7" });
+    expect(keys.top).toEqual({ lock: null, hint: "pauses · to ¶ 1" });
+    expect(takeKeysView(snapshot({ glass: glass({ playing: true }) }), 7).play).toEqual({
+      live: true,
+      lock: null,
+      hint: "press to pause",
+    });
+  });
+
+  it("locks every key while nothing is on the prompter, and PLAY says nothing under its cap", () => {
+    const keys = takeKeysView(snapshot({ glass: null }), 0);
+    for (const key of [keys.play, keys.back, keys.top, keys.slower, keys.faster, keys.previousCue, keys.nextCue]) {
+      expect(key.lock).toMatch(/Nothing is on the prompter/);
+    }
+    expect(keys.play.hint).toBeUndefined();
+    expect(keys.back.hint).toBeUndefined();
+  });
+
+  it("locks − 5 and + 5 at the pace's ends, and the cue steps where there is no cue", () => {
+    expect(takeKeysView(snapshot({ glass: glass({ speedWpm: 40 }) }), 0).slower.lock).toMatch(/slowest, 40/);
+    expect(takeKeysView(snapshot({ glass: glass({ speedWpm: 300 }) }), 0).faster.lock).toMatch(/fastest, 300/);
+    const keys = takeKeysView(snapshot({ glass: glass({ cues: [] }) }), 0);
+    expect(keys.previousCue.lock).toBe("There is no cue before the reading line.");
+    expect(keys.nextCue.lock).toBe("There is no cue after the reading line.");
+  });
+
+  it("names the scroll's state", () => {
+    expect(runStateWord(glass({ playing: true }))).toBe("Playing");
+    expect(runStateWord(glass({ atEnd: true }))).toBe("At the end");
+    expect(runStateWord(glass())).toBe("Paused");
+  });
+
+  it("reads the Prompter XL's check from the health snapshot", () => {
+    const check = { ok: true, status: "ready", word: "ON SCREEN" } as unknown as PrompterHealthCheck;
+    expect(prompterCheckOf({ checks: { prompter: check } } as never)).toBe(check);
+    expect(prompterCheckOf({ checks: {} })).toBeNull();
+    expect(prompterCheckOf(null)).toBeNull();
   });
 });

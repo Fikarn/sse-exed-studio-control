@@ -471,7 +471,10 @@ export function AudioMeterCanvasOverlay({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const root = canvas?.closest<HTMLElement>('[data-testid="audio-workspace"]');
+    // The page that mounts the canvas, found by the metering gate it carries:
+    // the Console's workspace, or the Overview's (D47), which paints the same
+    // meters in its own placeholders.
+    const root = canvas?.closest<HTMLElement>("[data-canvas-metering]");
     // Visual overhaul A, Slice 4: the cluster's meters live in the shell's own
     // region, outside the workspace element, so the canvas covers the shell
     // frame and the observers watch it. The workspace element stays the source

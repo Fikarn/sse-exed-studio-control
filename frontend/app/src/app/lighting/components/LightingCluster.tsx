@@ -21,6 +21,7 @@ import { GroupRail, type GroupRailProps } from "./GroupRail";
 import { SceneRail, type SceneRailProps } from "./SceneRail";
 import { LightingSearchField, type LightingRecentScene } from "./LightingSearchField";
 import { deriveLightingState, type LightingState } from "../lightingState";
+import { latchNames } from "../lightingLatches";
 import { CUT_ALL_ARM_KEY, CUT_ALL_WINDOW_MS, SAVE_SCENE_ARM_KEY } from "../editor/useLightingArming";
 
 // The visual overhaul's Lighting page (2026-10-04): the cluster. The rig's
@@ -103,11 +104,6 @@ const UNDO_LABEL_MAX_CHARS = 40;
 
 function undoSmallPrint(label: string) {
   return label.length > UNDO_LABEL_MAX_CHARS ? `${label.slice(0, UNDO_LABEL_MAX_CHARS - 1)}…` : label;
-}
-
-function names(list: readonly string[]) {
-  if (list.length <= 2) return list.join(", ");
-  return `${list.slice(0, 2).join(", ")} and ${list.length - 2} more`;
 }
 
 export function LightingCluster(props: LightingClusterProps) {
@@ -403,7 +399,7 @@ export function LightingCluster(props: LightingClusterProps) {
               </Key>
             }
           >
-            {names(highlightNames)}
+            {latchNames(highlightNames)}
           </Latch>
         ) : null}
         {soloNames.length > 0 ? (
@@ -416,7 +412,7 @@ export function LightingCluster(props: LightingClusterProps) {
               </Key>
             }
           >
-            {names(soloNames)}
+            {latchNames(soloNames)}
           </Latch>
         ) : null}
       </LatchSlot>

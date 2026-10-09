@@ -2,16 +2,8 @@ import { ShellRegion } from "@sse/design-system";
 import { LightingCluster } from "../components/LightingCluster";
 import { lightingArmedWords } from "../editor/useLightingArming";
 import { buildGroupMenu, buildSceneMenu } from "../lightingMenus";
+import { clockLabel } from "../lightingState";
 import type { LightingEditor } from "../useLightingEditor";
-
-const clockFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-
-/** `10:42`, the studio's clock, for the time the bridge went silent. */
-function clockLabel(isoTime: string | null) {
-  if (!isoTime) return null;
-  const date = new Date(isoTime);
-  return Number.isNaN(date.getTime()) ? null : clockFormat.format(date);
-}
 
 function sceneFacts(scene: { fixtureStates: ReadonlyArray<{ on: boolean; cct: number }> }) {
   const lit = scene.fixtureStates.filter((state) => state.on);

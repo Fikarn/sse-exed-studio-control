@@ -1,4 +1,5 @@
 import type { StateDisplayTone } from "@sse/design-system";
+import type { LightingSnapshot } from "@sse/engine-client";
 
 // Visual overhaul A, Slice 5 (plan D1, console-a-states §Lighting): what the
 // rig is, in one word, one sentence and one way out — derived from what the
@@ -150,5 +151,58 @@ export function deriveLightingState({
     sentence: `${bridge} is answering and the rig is following it.`,
     meta,
     locked: false,
+  };
+}
+
+const clockFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** `10:42`, the studio's clock, for the time the bridge went silent. */
+export function clockLabel(isoTime: string | null) {
+  if (!isoTime) return null;
+  const date = new Date(isoTime);
+  return Number.isNaN(date.getTime()) ? null : clockFormat.format(date);
+}
+
+/**
+ * The scene on the rig: the one last recalled (the hardware link tracks it),
+ * else the scene saved as selected. The Lighting page's own rule
+ * (`useLightingSceneEditor`), for the pages that have only the snapshot.
+ */
+export function liveSceneOf(snapshot: Pick<LightingSnapshot, "scenes" | "selectedSceneId">) {
+  return (
+    snapshot.scenes.find((scene) => scene.lastRecalled) ??
+    snapshot.scenes.find((scene) => scene.id === snapshot.selectedSceneId) ??
+    null
+  );
+}
+
+/**
+ * What `deriveLightingState` needs, read from the snapshot alone as the
+ * Lighting page reads it (2026-10-09, the Overview, D47): the live rig's
+ * fixtures, not the preview's; in preview, the scene being edited.
+ */
+export function lightingStateInputOf(snapshot: LightingSnapshot): LightingStateInput {
+  const previewMode = snapshot.previewMode === true;
+  const previewDirty = previewMode && snapshot.previewDirty === true;
+  const live = liveSceneOf(snapshot);
+  const previewScene = previewMode
+    ? (snapshot.scenes.find((scene) => scene.id === snapshot.previewSceneId) ?? live)
+    : null;
+  return {
+    bridgeIp: String(snapshot.bridgeIp ?? ""),
+    bridgeReachable: snapshot.reachable === true,
+    bridgeAnswering: snapshot.bridgeAnswering ?? null,
+    bridgeSilentLabel: clockLabel(snapshot.bridgeSilentSince ?? null),
+    channelCount: 0,
+    fixtureOnCount: snapshot.fixtures.filter((fixture) => fixture.on).length,
+    fixtureTotal: snapshot.fixtures.length,
+    lastSavedLabel: null,
+    // Only an explicit false is a hold, as on the hardware link and the header's lamp.
+    outputsHeld: snapshot.outputArmed === false,
+    previewDirty,
+    previewMode,
+    sceneModified: previewMode ? previewDirty : snapshot.sceneState === "unsaved",
+    sceneName: (previewMode ? previewScene : live)?.name ?? null,
+    universe: snapshot.universe ?? 1,
   };
 }

@@ -1,4 +1,5 @@
 import type {
+  JsonObject,
   PrompterCue,
   PrompterGlassSnapshot,
   PrompterGlassSummary,
@@ -324,6 +325,8 @@ export function runLockReason(snapshot: PrompterSnapshot | null): string | null 
 
 /** The pace and the size the hardware link takes (`native/protocol/v1.md`, the take): a step stops at the ends. */
 export const SPEED_RANGE = { min: 40, max: 300 } as const;
+/** One press of − 5 or + 5, one detent of the deck's SPEED dial. */
+export const SPEED_STEP = 5;
 export const SIZE_RANGE = { min: 48, max: 160 } as const;
 
 export interface StepLocks {
@@ -403,5 +406,71 @@ export function timeLeftParts(
     left: formatDuration(timeLeftSeconds),
     of: `of ${formatDuration(glass.lengthSeconds)}`,
     ends: ends !== null ? `ends ${ends}` : glass.atEnd ? null : "if played from here",
+  };
+}
+
+/** `checks.prompter` from the health snapshot; `null` while it is absent or could not be read. */
+export function prompterCheckOf(healthSnapshot: JsonObject | null): PrompterHealthCheck | null {
+  const checks = healthSnapshot?.checks;
+  if (!checks || typeof checks !== "object" || Array.isArray(checks)) return null;
+  const check = (checks as JsonObject).prompter;
+  return check && typeof check === "object" && !Array.isArray(check) ? (check as unknown as PrompterHealthCheck) : null;
+}
+
+/** Whether the text scrolls, in the page's words: `Playing`, `At the end`, `Paused`. */
+export function runStateWord(glass: PrompterGlassSummary): "Playing" | "At the end" | "Paused" {
+  return glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused";
+}
+
+/** A take key: what a press does, under its cap, and why it is locked. */
+export interface TakeKeyView {
+  hint?: string;
+  lock: string | null;
+}
+
+/**
+ * The take's keys, as the Teleprompter page and the Overview (D47) both draw
+ * them: PLAY, BACK and TOP with their hints, − 5 and + 5, ◂ Cue and Cue ▸,
+ * each locked with the hardware link's reason. A locked key says nothing under
+ * its cap: the state display says why. `backTo` is where BACK goes
+ * (`backParagraph`).
+ */
+export function takeKeysView(
+  snapshot: PrompterSnapshot,
+  backTo: number
+): {
+  play: TakeKeyView & { live: boolean };
+  back: TakeKeyView;
+  top: TakeKeyView;
+  slower: TakeKeyView;
+  faster: TakeKeyView;
+  previousCue: TakeKeyView;
+  nextCue: TakeKeyView;
+} {
+  const glass = snapshot.glass;
+  const runLock = runLockReason(snapshot);
+  const playLock = playLockReason(snapshot);
+  const steps = stepLocks(glass);
+  const placeParagraph = glass ? Math.min(glass.place.paragraph, Math.max(glass.paragraphCount - 1, 0)) : 0;
+  const slowest =
+    glass && glass.speedWpm <= SPEED_RANGE.min
+      ? `The pace is at its slowest, ${SPEED_RANGE.min} words a minute.`
+      : null;
+  const fastest =
+    glass && glass.speedWpm >= SPEED_RANGE.max
+      ? `The pace is at its fastest, ${SPEED_RANGE.max} words a minute.`
+      : null;
+  return {
+    play: {
+      live: glass?.playing ?? false,
+      lock: playLock,
+      hint: playLock !== null ? undefined : glass?.playing ? "press to pause" : `from ¶ ${placeParagraph + 1}`,
+    },
+    back: { lock: runLock, hint: glass ? `to the start of ¶ ${backTo + 1}` : undefined },
+    top: { lock: runLock, hint: glass ? "pauses · to ¶ 1" : undefined },
+    slower: { lock: runLock ?? slowest },
+    faster: { lock: runLock ?? fastest },
+    previousCue: { lock: runLock ?? steps.previousCue },
+    nextCue: { lock: runLock ?? steps.nextCue },
   };
 }

@@ -4,6 +4,7 @@ import { Key, Latch, LatchSlot, MenuButton, StateDisplay, type MenuEntry, type U
 
 import styles from "./AudioCluster.module.css";
 import type { AudioArmedAction } from "../audioArming";
+import { audioDeskLockReason, audioLatches, audioWayOut } from "../audioLatches";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import { type AudioFeedbackTone } from "../audioFormatting";
 import type { AudioLoadReport } from "../audioLoadReport";
@@ -54,26 +55,6 @@ export interface AudioClusterProps {
   viewModel: AudioWorkspaceViewModel;
 }
 
-/** The way out of the state the engine reports, and the words on its key. */
-function wayOutFor(label: string): "probe" | "sync" | "setup" | "failed" | null {
-  switch (label) {
-    case "NOT VERIFIED":
-    case "STALE":
-    case "OFFLINE":
-    case "DISCONNECTED":
-      return "probe";
-    case "ASSUMED":
-    case "SYNC NEEDED":
-      return "sync";
-    case "DISABLED":
-      return "setup";
-    case "ACTION FAILED":
-      return "failed";
-    default:
-      return null;
-  }
-}
-
 /**
  * The words of the state display's armed row. A strip menu's "Turn 48 V off…"
  * arms `menu:phantom:<channel>:false` with its own words; the row names the
@@ -117,7 +98,6 @@ export function AudioCluster({
 }: AudioClusterProps) {
   const status = viewModel.status;
   const snapshot = viewModel.audioSnapshot;
-  const actionsAllowed = viewModel.actionsAllowed;
   const consoleLink = snapshot.consoleLink;
 
   // The meta line: the engine's own counts. Never a count the snapshot does
@@ -138,7 +118,7 @@ export function AudioCluster({
     return confirmed === null ? undefined : `${confirmed} values confirmed`;
   }, [consoleLink?.confirmedSends, consoleLink?.unconfirmedSends]);
 
-  const wayOut = wayOutFor(status.label);
+  const wayOut = audioWayOut(status.label);
   const stateActions = (
     <>
       {wayOut === "probe" ? (
@@ -217,7 +197,11 @@ export function AudioCluster({
   // Why a refused key is locked, in the desk's own words: the outputs' and the
   // snapshot keys' reason, and since the visual overhaul's polish (2026-10-05)
   // the latch's Clear all's.
-  const deskLockReason = status.warningBody ?? `The desk is ${status.label}.`;
+  const deskLockReason = audioDeskLockReason(status);
+  // The latches, as the Overview shows them too (`audioLatches`, D47).
+  const latches = audioLatches(viewModel);
+  const solo = latches.find((latch) => latch.id === "solo");
+  const clip = latches.find((latch) => latch.id === "clip");
 
   return (
     <div
@@ -258,45 +242,45 @@ export function AudioCluster({
           locked (dashed, 55 %, its reason on hover) like every key the desk
           refuses, not disabled, which is the busy form. */}
       <LatchSlot testId="audio-latch-slot">
-        {viewModel.soloedChannels.length > 0 ? (
+        {solo ? (
           <Latch
-            who="Solo"
+            who={solo.who}
             action={
               <Key
                 size="small"
                 testId="audio-topbar-solo"
-                aria-label="Clear all solo"
+                aria-label={solo.clear.ariaLabel}
                 onClick={onClearAllSolo}
-                locked={!actionsAllowed}
-                reason={deskLockReason}
+                locked={solo.clear.locked}
+                reason={solo.clear.reason}
               >
-                Clear all
+                {solo.clear.label}
               </Key>
             }
             testId="audio-solo-warning-band"
           >
-            {viewModel.soloedChannels.length} on {viewModel.soloedChannels.map((channel) => channel.name).join(", ")}
+            {solo.text}
           </Latch>
         ) : null}
 
-        {viewModel.healthStats.clippedChannels > 0 ? (
+        {clip ? (
           <Latch
-            who="Clip"
+            who={clip.who}
             action={
               <Key
                 size="small"
                 testId="audio-clip-clear-clips"
-                aria-label="Clear clips"
+                aria-label={clip.clear.ariaLabel}
                 onClick={() => onClearClips()}
-                locked={!viewModel.capabilities.canClearClips}
-                reason="OSC control is off"
+                locked={clip.clear.locked}
+                reason={clip.clear.reason}
               >
-                Clear
+                {clip.clear.label}
               </Key>
             }
             testId="audio-clip-warning-band"
           >
-            {viewModel.healthStats.clippedChannels} over 0 dBFS
+            {clip.text}
           </Latch>
         ) : null}
       </LatchSlot>
