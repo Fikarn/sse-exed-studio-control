@@ -76,6 +76,7 @@ const OPEN: Record<RankedLamp, OverviewWayOut> = {
 };
 
 const SYNC: OverviewWayOut = { kind: "sync", label: "Sync from TotalMix" };
+const OPEN_SETUP: OverviewWayOut = { kind: "open", page: "setup", label: "Open Setup" };
 
 export const READY_SENTENCE = "Every link answers. Nothing on any page needs you.";
 
@@ -124,7 +125,9 @@ function pageState(lamp: RankedLamp, sources: OverviewSources): PageState | null
         word: status.label,
         sentence: status.warningBody ?? appSummary,
         meta: null,
-        wayOut: way === "sync" || way === "failed" ? SYNC : OPEN.audio,
+        // The Console's own way out: a Sync, Setup while OSC control is off,
+        // else its page (the review of the page: DISABLED opened Audio).
+        wayOut: way === "sync" || way === "failed" ? SYNC : way === "setup" ? OPEN_SETUP : OPEN.audio,
       };
     }
     case "lighting": {
@@ -136,7 +139,7 @@ function pageState(lamp: RankedLamp, sources: OverviewSources): PageState | null
         state.word === "UNREACHABLE" || state.word === "HELD" || (state.word === "NOT ANSWERING" && input.outputsHeld);
       return {
         ...state,
-        wayOut: toSetup ? { kind: "open", page: "setup", label: "Open Setup" } : OPEN.lighting,
+        wayOut: toSetup ? OPEN_SETUP : OPEN.lighting,
       };
     }
     default:
@@ -291,16 +294,26 @@ export function studioRows(input: {
   const { lighting, audio, prompter, cameras, surface } = input;
 
   if (lighting) {
-    const live = liveSceneOf(lighting);
-    const lit = lighting.fixtures.filter((fixture) => fixture.on).length;
-    const unsaved = lighting.sceneState === "unsaved";
+    // The scene on the rig, by the hardware link's word for it (`sceneState`):
+    // live or unsaved, the scene put on the rig; in Preview the rig keeps the
+    // one last recalled; a scene only chosen, or none, is on no rig (the
+    // review of the page).
+    const state = lighting.sceneState;
+    const onRig =
+      state === "live" || state === "unsaved"
+        ? liveSceneOf(lighting)
+        : state === "preview"
+          ? (lighting.scenes.find((scene) => scene.lastRecalled) ?? null)
+          : null;
+    const lit = `${lighting.fixtures.filter((fixture) => fixture.on).length} of ${lighting.fixtures.length} lit`;
     rows.push({
       id: "lighting",
       label: "Lighting",
-      value: `${live?.name ?? "No scene"} · ${lit} of ${lighting.fixtures.length} lit`,
-      // The live scene's word on the rig, as the deck's RECALL says it.
-      word: unsaved ? "unsaved" : lighting.sceneState === "live" ? "on rig" : "no scene",
-      tone: unsaved ? "attention" : lighting.sceneState === "live" ? "ok" : "off",
+      value: onRig ? `${onRig.name} · ${lit}` : lit,
+      // The scene's word, as the deck's RECALL says it.
+      word:
+        state === "live" ? "on rig" : state === "unsaved" ? "unsaved" : state === "preview" ? "preview" : "no scene",
+      tone: state === "live" ? "ok" : state === "unsaved" ? "attention" : "off",
       doubt: false,
     });
   }

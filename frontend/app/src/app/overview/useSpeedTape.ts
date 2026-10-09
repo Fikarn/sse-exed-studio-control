@@ -32,34 +32,46 @@ export function speedCaption(
   return range && range[0] !== range[1] ? `this take ${range[0]} to ${range[1]}` : `this take at ${value}`;
 }
 
+/** CAM 1's take, as the tape reads it. */
+export interface SpeedTapeTake {
+  /** CAM 1 records, or did when it last answered (a last known take goes on). */
+  recording: boolean;
+  /** When the take began, as the hardware link counted it; `null` when it does not know. */
+  startedAt: string | null;
+}
+
 /**
  * The tape's view of `glass`, and `ownChange`, which the page calls as it
  * sends its own − 5 or + 5. The range starts again with a new script and
- * with a new take.
+ * with a new take: a take is known by when it began, so CAM 1 dropping for a
+ * moment mid-take, which the hardware link reports as a take of unknown start,
+ * keeps the range (the review of the page).
  */
-export function useSpeedTape(glass: PrompterGlassSummary | null, recording: boolean) {
+export function useSpeedTape(glass: PrompterGlassSummary | null, take: SpeedTapeTake) {
   const scriptId = glass?.scriptId ?? null;
   const speed = glass?.speedWpm ?? null;
+  const { recording, startedAt } = take;
   const ownUntil = useRef(0);
-  const seen = useRef<{ scriptId: string | null; speed: number | null; recording: boolean }>({
+  const seen = useRef<{ scriptId: string | null; speed: number | null; take: string | null }>({
     scriptId,
     speed,
-    recording,
+    take: startedAt,
   });
   const [turnedUntil, setTurnedUntil] = useState(0);
   const [range, setRange] = useState<readonly [number, number] | null>(speed === null ? null : [speed, speed]);
 
   useEffect(() => {
     const before = seen.current;
-    seen.current = { scriptId, speed, recording };
+    const newTake = startedAt !== null && startedAt !== before.take;
+    seen.current = { scriptId, speed, take: startedAt ?? before.take };
     if (speed === null) {
       setRange(null);
       return;
     }
-    const restart = scriptId !== before.scriptId || (recording && !before.recording) || before.speed === null;
+    const restart = scriptId !== before.scriptId || newTake || before.speed === null;
     setRange((held) => (restart || !held ? [speed, speed] : [Math.min(held[0], speed), Math.max(held[1], speed)]));
     if (!restart && speed !== before.speed && Date.now() > ownUntil.current) setTurnedUntil(Date.now() + TURNED_MS);
-  }, [scriptId, speed, recording]);
+  }, [scriptId, speed, startedAt]);
 
   // The pointer's keyline goes after its while, once, with nothing ticking in between.
   const [, setTick] = useState(0);

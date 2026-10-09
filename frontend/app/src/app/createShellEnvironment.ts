@@ -52,17 +52,49 @@ export async function createShellEnvironment() {
   // D47 (D1 amended): the app opens on the Overview at every start. On the
   // double a page test opens on its fixture's saved page, as the boards and
   // the captures do, unless the address asks for the landing with
-  // `?landing=1` (as `?crash=` asks for a fault).
-  const landing: WorkspaceId | undefined =
-    useLiveTransport || url.searchParams.get("landing") === "1" ? "overview" : undefined;
+  // `?landing=1` (as `?crash=` asks for a fault). A start of the app is a
+  // window's first load: the root error screen's Reload loads the window again
+  // over the hardware link that runs on, and keeps the page and the deck where
+  // they were (the review of the landing), so a window that has landed says so
+  // for as long as it lives.
+  const landingAsked = useLiveTransport || url.searchParams.get("landing") === "1";
+  const landing: WorkspaceId | undefined = landingAsked && !windowHasLanded() ? "overview" : undefined;
+
+  // A development build refuses a malformed reply loudly (Slice 9 — F32);
+  // the packaged build keeps the last good snapshot and records the failure.
+  const store = createShellStore(transport, { development: import.meta.env.DEV, landing });
+  if (landing) {
+    const stopWatching = store.subscribe(() => {
+      if (store.getSnapshot().lifecycle !== "ready") return;
+      markWindowLanded();
+      stopWatching();
+    });
+  }
 
   return {
     crashWorkspace,
     fixtureId,
     liveTransportRequested: useLiveTransport,
     pictures,
-    // A development build refuses a malformed reply loudly (Slice 9 — F32);
-    // the packaged build keeps the last good snapshot and records the failure.
-    store: createShellStore(transport, { development: import.meta.env.DEV, landing }),
+    store,
   };
+}
+
+/** Kept in the window's own session storage, which a reload keeps and a new start of the app does not. */
+const LANDED_KEY = "sse.landed";
+
+function windowHasLanded(): boolean {
+  try {
+    return window.sessionStorage.getItem(LANDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markWindowLanded() {
+  try {
+    window.sessionStorage.setItem(LANDED_KEY, "1");
+  } catch {
+    // Without storage a reload lands again, as a start does.
+  }
 }

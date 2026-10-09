@@ -71,7 +71,7 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
       tone: done(2) ? reachedTone : "neutral",
     },
     {
-      description: "Load the page last used and whether Setup is published.",
+      description: "Load whether Setup is published: the Overview opens, or Setup until it is.",
       label: "Pages",
       tone: done(3) ? reachedTone : "neutral",
     },

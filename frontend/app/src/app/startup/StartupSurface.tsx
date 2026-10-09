@@ -35,9 +35,11 @@ export function StartupSurface({
       // sentence is what is happening, the meta line what comes next, and the
       // stage with the steps' count heads the steps.
       sentence="Connecting to the desk, the rig and the deck."
-      // Which page opens is not known until the start is done (D1: the page
-      // last used); the line said "Setup opens" on every start.
-      meta="The page last used opens once Studio Control is ready."
+      // The app opens on the Overview (D47, D1 amended); on Setup only while
+      // the setup is not published, which the start knows only once it is
+      // done. The line said "Setup opens" on every start, then "the page last
+      // used" until 2026-10-09.
+      meta="The Overview opens once Studio Control is ready."
       testId="startup-surface"
       // No key on the plate either: the start-up screen has none (S3).
       plate={

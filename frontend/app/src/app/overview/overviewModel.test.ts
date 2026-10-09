@@ -149,6 +149,13 @@ describe("the state display: the worst page", () => {
     expect(state).toMatchObject({ word: "HELD", wayOut: { kind: "open", page: "setup", label: "Open Setup" } });
   });
 
+  it("sends the Console's DISABLED to Setup, where OSC control is switched on, as the Console does", async () => {
+    const audio = await audioViewModelOf("audio-osc-disabled");
+    expect(audio.status.label).toBe("DISABLED");
+    const state = overviewState(sources({ lamps: withLamp(lamp("audio", "attention", "disabled")), audio }), links);
+    expect(state).toMatchObject({ word: "DISABLED", wayOut: { kind: "open", page: "setup", label: "Open Setup" } });
+  });
+
   it("names the deck and the backup, which have no page, and opens Setup", () => {
     const deck = overviewState(sources({ lamps: withLamp(lamp("surface", "attention", "no deck")) }), links);
     expect(deck).toMatchObject({ word: "NO DECK", wayOut: { kind: "open", page: "setup" }, room: null });
@@ -214,6 +221,39 @@ describe("the studio", () => {
     expect(rows[2]).toMatchObject({ label: "Prompter XL", value: "1920×1080 · 60 Hz", word: "connected", tone: "ok" });
     expect(rows[3]).toMatchObject({ label: "Pictures", value: "test pictures · 3 of 3", word: "live" });
     expect(rows[4]).toMatchObject({ label: "Deck", value: "Stream Deck+", word: "ready", tone: "ok" });
+  });
+});
+
+describe("the studio's rig row", () => {
+  const rowOf = async (over: Partial<LightingSnapshot>) => {
+    const lighting = await read<LightingSnapshot>("lighting-populated", "lighting.snapshot");
+    const rows = studioRows({
+      lighting: { ...lighting, ...over },
+      audio: null,
+      prompter: null,
+      cameras: null,
+      picturesWord: null,
+      surface: null,
+    });
+    return { row: rows[0]!, lighting };
+  };
+
+  it("names the scene on the rig only while one is: chosen or none is no scene, Preview keeps the rig's", async () => {
+    const { lighting } = await rowOf({});
+    const recalled = lighting.scenes.map((scene, index) => ({ ...scene, lastRecalled: index === 0 }));
+    const chosen = await rowOf({
+      sceneState: "chosen",
+      scenes: lighting.scenes.map((scene) => ({ ...scene, lastRecalled: false })),
+    });
+    expect(chosen.row).toMatchObject({ word: "no scene", tone: "off" });
+    expect(chosen.row.value).toMatch(/^\d+ of \d+ lit$/);
+    const none = await rowOf({ sceneState: "none" });
+    expect(none.row).toMatchObject({ word: "no scene", tone: "off" });
+    const preview = await rowOf({ sceneState: "preview", scenes: recalled });
+    expect(preview.row).toMatchObject({ word: "preview", tone: "off" });
+    expect(preview.row.value).toMatch(new RegExp(`^${recalled[0]!.name} · `));
+    const live = await rowOf({ sceneState: "live", scenes: recalled });
+    expect(live.row).toMatchObject({ word: "on rig", tone: "ok" });
   });
 });
 

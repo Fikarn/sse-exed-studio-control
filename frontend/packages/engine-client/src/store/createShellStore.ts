@@ -20,6 +20,7 @@ import { deriveRecoveryState } from "../machines/recoveryMachine";
 import { ALL_DOMAINS, DOMAIN_REQUESTS, domainsForEvent, domainsForMethod, type DomainKey } from "./domainRefresh";
 import { identifyFlashMoments } from "./identifyFlashes";
 import { SnapshotShapeError, snapshotProblem } from "./snapshotGuards";
+import { EngineRequestError } from "../transports/engineRequestError";
 
 // Boundary cast for a command result that may or may not be a whole audio
 // snapshot (`coerceAudioSnapshot` below tells the two apart). The snapshots
@@ -1187,7 +1188,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
    * page (D49). The reply's `shell` carries the page: the hardware link and
    * the double answer the whole app snapshot, and an answer of the settings
    * alone (`{ settings, shell }`) has it there too. A refused write is
-   * recorded, and the start shows the saved page.
+   * recorded, and the start shows the saved page. A hardware link that stops
+   * during the write fails the start, as a read would, and the start that
+   * follows lands.
    */
   const withLandingPage = async (page: WorkspaceId, app: JsonObject | null): Promise<JsonObject | null> => {
     if (app === null || asRecord(app.startup)?.targetSurface === "commissioning") {
@@ -1197,6 +1200,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       const shell = asRecord(asRecord(await transport.request("settings.update", { workspace: page }))?.shell);
       return shell ? { ...app, shell: { ...asRecord(app.shell), ...shell } } : app;
     } catch (error) {
+      if (engineStartupFailure) throw engineStartupFailure;
+      if (error instanceof EngineRequestError && error.code === "ENGINE_EXITED") throw error;
       recordBackgroundFailure(error, "the landing page");
       return app;
     }
@@ -1318,6 +1323,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       if (landing !== null && !landed && rest.accepted.has("app")) {
         const app = await withLandingPage(landing, asRecord(rest.accepted.get("app")));
         if (!isCurrentBootstrap()) return;
+        // The hardware link said it stopped while it answered: the start fails.
+        if (engineStartupFailure) throw engineStartupFailure;
         rest.accepted.set("app", app);
       }
       landed = true;

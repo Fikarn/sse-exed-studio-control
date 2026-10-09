@@ -125,7 +125,12 @@ export function OverviewWorkspace({
   const cut = useMemo(() => cutGlassText(prompterGlassSnapshot), [prompterGlassSnapshot]);
   const timeLeft = usePrompterTimeLeft(glass);
   const elapsed = usePrompterElapsed(glass);
-  const tape = useSpeedTape(glass, recording);
+  // The tape's take goes on while CAM 1 does not answer for a moment: its
+  // last known take (`RecKey`'s last-known form) is still the take.
+  const tape = useSpeedTape(glass, {
+    recording: main?.recording.recording === true && (main.state === "held" || main.state === "unreachable"),
+    startedAt: main?.recording.startedAt ?? null,
+  });
   // The layout the band last reported, which BACK's hint reads; the hardware
   // link keeps the first report for a key, so the band's is harmless beside
   // the Prompter XL's and the Teleprompter page's.

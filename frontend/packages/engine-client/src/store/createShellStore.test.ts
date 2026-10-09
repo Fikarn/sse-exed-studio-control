@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFixtureScenario } from "@sse/test-fixtures";
 
+import { EngineRequestError } from "../transports/engineRequestError";
 import { createFixtureTransport } from "../transports/fixtureTransport";
 import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
 import type { EngineTransport, ShellStore } from "../types";
@@ -1043,6 +1044,36 @@ describe("createShellStore landing page", () => {
     await store.restart();
     expect(store.getSnapshot().activeWorkspace).toBe("cameras");
     expect(writes(calls)).toBe(1);
+    await store.dispose();
+  });
+
+  // The review of the landing: a hardware link that stops while it answers
+  // the write is no refusal. The start fails, as a read would fail it, and the
+  // start that follows (the automatic restart, or Retry startup) lands.
+  it("a hardware link that stops during the write fails the start, and the next start lands", async () => {
+    const { answer, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("teleprompter"));
+    let stopped = true;
+    const store = createShellStore(
+      {
+        ...transport,
+        request: (method, params) =>
+          method === "settings.update" && stopped
+            ? Promise.reject(new EngineRequestError("ENGINE_EXITED", "The hardware link stopped."))
+            : transport.request(method, params),
+      },
+      { landing: "overview" }
+    );
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("failed");
+    expect(store.getSnapshot().startupFailure).not.toBeNull();
+    expect(store.getSnapshot().backgroundFailures).toEqual([]);
+
+    stopped = false;
+    answer("settings.update", savedPage("overview"));
+    await store.restart();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("overview");
     await store.dispose();
   });
 });
