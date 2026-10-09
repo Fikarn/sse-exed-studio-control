@@ -1,0 +1,231 @@
+/* THE SCRIPT (board 3): the speed tape, the glass band and what comes next,
+   side by side; the whole script as a tray along the floor. The band is the
+   glass's own copy, cropped and kept in black at 8 inside the room's 12. */
+
+.room {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.body {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+  padding: 16px;
+}
+
+.speed {
+  flex: none;
+  width: 300px;
+  height: 100%;
+}
+
+.speedEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border-radius: var(--radius-panel);
+  background: var(--material-well);
+}
+
+/* The band (the board's note 9): the copy at its own scale, its column and
+   arrow in view, the reading line at the glass's own share of the height. */
+.band {
+  position: relative;
+  flex: none;
+  width: 880px;
+  height: 332px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--prompter-glass-floor);
+}
+
+.glassAt {
+  position: absolute;
+}
+
+/* Dimmed while the Prompter XL shows nothing, and marked so, as on the Teleprompter page. */
+.band:not([data-on-glass]) [data-picture] {
+  opacity: 0.45;
+}
+
+.notOnGlass {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  padding: 8px 12px;
+  border: 1px solid var(--role-coral-text);
+  border-radius: var(--radius-control);
+  background: var(--material-bg);
+}
+
+.side {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 76px;
+  padding: 13px 16px;
+  border-radius: var(--radius-panel);
+  outline: 1px solid var(--material-line);
+  outline-offset: -1px;
+  background: var(--material-well);
+}
+
+.kick {
+  font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+  color: var(--text-text3);
+}
+
+.cellValue {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+  font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.cellNote {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+/* A section head: Adelia over the heavy rule, the head's row 4 px above it. */
+.cuesHead {
+  display: flex;
+  align-items: last baseline;
+  gap: 12px;
+  height: 28px;
+  margin: 20px 0 12px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--material-line2);
+  white-space: nowrap;
+}
+
+.cuesTitle {
+  font: var(--font-weight-bold) var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+}
+
+.cuesAt {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.cueTime {
+  flex: none;
+  width: 56px;
+  font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The cues after the first are further off: their time in the second ink. */
+[data-grouped-row] + [data-grouped-row] .cueTime {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-text2);
+}
+
+/* A cue in the glass's own cue colour, upright (PT Sans has no italic). */
+.cueText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--prompter-glass-cue);
+}
+
+.cueParagraph {
+  flex: none;
+  font-size: var(--font-size-label);
+  color: var(--text-text2);
+}
+
+.cueNone {
+  color: var(--text-text2);
+}
+
+.factName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text);
+}
+
+/* The whole script along the floor, read only: a segment a paragraph, raised
+   while still to read, the cues as ticks, the place as a mark. */
+.script {
+  flex: 1 1 auto;
+  height: 40px;
+}
+
+/* Its marks stand by shares of the track, which fills the tray. */
+.track {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+.segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: var(--radius-base);
+  background: var(--material-key);
+  box-shadow: var(--elevation-edge-light);
+}
+
+.segment[data-read] {
+  background: transparent;
+  box-shadow: none;
+}
+
+.segmentNumber {
+  padding: 0 0 5px 6px;
+  font: var(--font-weight-regular) var(--font-size-tick) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text2);
+}
+
+.segment[data-read] .segmentNumber {
+  color: var(--text-text3);
+}
+
+.cueTick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--role-blue-text);
+}
+
+.placeMark {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--accent);
+}

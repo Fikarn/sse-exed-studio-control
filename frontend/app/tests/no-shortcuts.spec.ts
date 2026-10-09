@@ -219,6 +219,35 @@ test.describe("No key does anything (new pages S3, D6)", () => {
   // The keys a camera program usually binds: R and Space to record, 1 to 3
   // for the camera, the arrows and + and − for a value, F for focus, I and
   // Shift+I for the iris, W for white balance, Z, P and G for the aids.
+  // The Overview (D47): REC, the prompter's take keys and the mutes are keys,
+  // and the speed tape is a display that takes neither the wheel nor a key.
+  test("the Overview: R, Space, the arrows, + and −, the brackets, M, Z and G", async ({ page }) => {
+    await open(page, "overview-landing", "overview");
+    await expectNoKeyGlyphs(page, "the Overview");
+    await expectKeysDoNothing(page, "overview-landing", "overview", [
+      "r",
+      "Space",
+      "Enter",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "PageUp",
+      "PageDown",
+      "Equal",
+      "Minus",
+      "[",
+      "]",
+      "1",
+      "m",
+      "z",
+      "g",
+      "Control+k",
+      "?",
+      "Escape",
+    ]);
+  });
+
   test("the Cameras: R and Space, 1 to 3, the arrows, + and −, F, I, W, Z, P and G", async ({ page }) => {
     await open(page, "cameras-held", "cameras");
     await expectNoKeyGlyphs(page, "the Cameras");

@@ -8,7 +8,10 @@ export const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 const fixtureMap = JSON.parse(
   readFileSync(new URL("../../../../packages/test-fixtures/src/fixtures.json", import.meta.url), "utf8")
 );
-export const FIXTURES = Object.keys(fixtureMap);
+// The Overview's three moments (D47) are built in code (test-fixtures'
+// `index.ts`), not in `fixtures.json`, so they are named here to be measured.
+export const CODE_BOARDS = ["overview-take", "overview-landing", "overview-fault"];
+export const FIXTURES = [...Object.keys(fixtureMap), ...CODE_BOARDS];
 
 // Pre-ready families never hydrate the audio snapshot, so they skip the
 // `html[data-audio-hydrated]` wait the operator surfaces need (the same rule as

@@ -1,0 +1,265 @@
+/* THE SOUND (board 3), the plate: Main Out as one raised row with its meter
+   under it, then the inputs over one meter bridge in a black well, Phones on
+   the floor. The bridge's scale and its slots share one height, so each mark
+   stands where the Console's canvas paints its level (−60 at the foot, 0 at
+   the top, as on the Console). */
+
+.plate {
+  height: 100%;
+  padding: 16px;
+}
+
+.room {
+  height: 100%;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px;
+}
+
+.waiting {
+  margin: 0;
+  color: var(--text-text3);
+}
+
+/* Main Out: one raised row, the level read at word size, M at its end. On
+   the room's key face the quiet ink is under 4.5:1, so the words take the
+   second ink. */
+.mainRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  height: 52px;
+  padding: 0 6px 0 16px;
+  border-radius: var(--radius-panel);
+  outline: 1px solid var(--material-line);
+  outline-offset: -1px;
+  background: var(--material-key);
+  box-shadow: var(--elevation-edge-light);
+  white-space: nowrap;
+}
+
+.kick {
+  font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+  color: var(--text-text2);
+}
+
+.mainLevel {
+  font: var(--font-weight-regular) var(--font-size-readout) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.mainLevel .unit {
+  color: var(--text-text2);
+}
+
+.unit {
+  margin-left: 4px;
+  font-size: var(--font-size-label);
+  color: var(--text-text3);
+}
+
+.muted,
+.stripMuted {
+  font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+  color: var(--role-yellow-text);
+}
+
+.stripMuted {
+  font-size: var(--font-size-label);
+}
+
+/* Doubt: the desk not yet read; the dashed yellow keyline on the value itself. */
+.mainLevel[data-doubt],
+.stripLevel[data-doubt] {
+  color: var(--role-yellow-text);
+  outline: 1px dashed var(--role-yellow-line);
+  outline-offset: 2px;
+}
+
+.mainFacts {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.mainMute {
+  width: 52px;
+  min-height: 40px;
+  padding: 0;
+}
+
+.mainMeter {
+  flex: none;
+  --master-meter-height: 24px;
+}
+
+.mainMeter > * {
+  border-radius: var(--radius-control);
+}
+
+/* A section head: Adelia over the heavy rule. */
+.head {
+  display: flex;
+  align-items: last baseline;
+  gap: 12px;
+  flex: none;
+  height: 28px;
+  margin-top: 4px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--material-line2);
+  white-space: nowrap;
+}
+
+.headTitle {
+  font: var(--font-weight-bold) var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
+}
+
+.headDetail {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+/* The strips stand over their meters: the same columns, after the scale. */
+.strips {
+  display: grid;
+  grid-template-columns: repeat(var(--strips, 4), minmax(0, 1fr));
+  flex: none;
+  padding-left: 32px;
+}
+
+.strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.stripName {
+  max-width: 100%;
+  overflow: hidden;
+  font: var(--font-weight-bold) var(--font-size-word) / 24px var(--font-family-ui);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stripLevel {
+  font: var(--font-weight-regular) var(--font-size-body) / 20px var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+.stripMute {
+  width: 56px;
+  padding: 0;
+}
+
+/* The bridge: one black well, the Console's scale at its left, a slot a
+   strip; the canvas paints in the slots. */
+.bridge {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--radius-panel);
+  outline: 1px solid var(--material-line);
+  outline-offset: -1px;
+  background: var(--material-well);
+}
+
+.scale,
+.slots {
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+}
+
+.scale {
+  left: 0;
+  right: 10px;
+}
+
+.mark {
+  position: absolute;
+  top: var(--at);
+  left: 34px;
+  right: 0;
+  height: 1px;
+  background: var(--material-line);
+}
+
+.mark[data-nominal] {
+  background: var(--material-line2);
+}
+
+.markLabel {
+  position: absolute;
+  top: -8px;
+  right: calc(100% + 6px);
+  font: var(--font-weight-regular) var(--font-size-tick) / 16px var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text3);
+  white-space: nowrap;
+}
+
+.slots {
+  left: 32px;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--strips, 4), minmax(0, 1fr));
+}
+
+.slotColumn {
+  display: flex;
+  justify-content: center;
+}
+
+.slot {
+  width: 24px;
+  height: 100%;
+  border-radius: var(--radius-base);
+  background: var(--material-bg);
+}
+
+.gate {
+  position: absolute;
+  top: 50%;
+  left: 34px;
+  right: 10px;
+  margin: 0;
+  padding: 16px;
+  transform: translateY(-50%);
+  background: var(--material-well);
+  color: var(--text-text3);
+  text-align: center;
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+.floorLine {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  white-space: nowrap;
+  font: var(--font-weight-regular) var(--font-size-label) / 24px var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.floorLine b {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-text2);
+}

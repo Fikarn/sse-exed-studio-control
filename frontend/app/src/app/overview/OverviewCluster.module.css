@@ -1,0 +1,98 @@
+/* The Overview's cluster (board 3's left column): the status card where every
+   page's state display stands, THE TAKE, then the studio outside the rooms.
+   The column keeps the 16 px rhythm every page's cluster keeps, so the state
+   display stands where it stands on every page. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.take {
+  flex: none;
+}
+
+.takeBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+/* REC while CAM 1 records (board 3): the take's one prominent key, a coral
+   edge and a faint coral tint, as the header's tally; never a coral fill. */
+.rec[data-rec="recording"] {
+  border-color: var(--role-coral-text);
+  background: var(--material-platter-rec);
+}
+
+/* PLAY, BACK and TOP in one recess, in the Teleprompter page's order: PLAY
+   104 high across both rows, BACK over TOP beside it. */
+.transport {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  grid-template-rows: 48px 48px;
+  gap: 8px 4px;
+}
+
+.transport > * {
+  min-height: 0;
+  height: 100%;
+}
+
+.play {
+  grid-row: 1 / span 2;
+}
+
+/* The speed's steps and the cues, in the other recess. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* The studio, outside the rooms: its list stands on the raised layer's
+   platter, as the header's items do, so the quiet ink is never on it. */
+.studio {
+  flex: none;
+  --material-key: var(--material-platter);
+  --material-line: var(--material-bar-line);
+}
+
+.studioLabel {
+  flex: none;
+  width: 96px;
+  color: var(--text-text2);
+}
+
+.studioValue {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-text);
+}
+
+/* Doubt: the desk not yet read, as the Console marks its levels. */
+.studioValue[data-doubt] {
+  color: var(--role-yellow-text);
+  outline: 1px dashed var(--role-yellow-line);
+  outline-offset: 2px;
+}
+
+.studioWord {
+  flex: none;
+  margin-left: auto;
+}
+
+/* A quiet word on the platter takes the second ink: the quiet ink is under
+   4.5:1 there. */
+.studioWord[data-tone="off"] {
+  color: var(--text-text2);
+}

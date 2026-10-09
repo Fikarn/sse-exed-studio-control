@@ -1,0 +1,120 @@
+/* THE PICTURE (board 3): CAM 1 at 1280 × 720, two thirds of its pixels, and
+   beside it CAM 2, CAM 3 and the loupe at 320 × 180, a sixth, each under its
+   caption row; the column's last picture ends where CAM 1 does. Content in
+   black, the pictures at 8 inside the room's 12. */
+
+.room {
+  flex: none;
+  height: 796px;
+}
+
+.pictures {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+  padding: 16px;
+}
+
+.hero {
+  appearance: none;
+  flex: none;
+  width: 1280px;
+  height: 720px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--material-well);
+  color: var(--text-text);
+  cursor: crosshair;
+}
+
+.hero[aria-disabled="true"] {
+  cursor: default;
+}
+
+.hero:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.column {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 320px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.caption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  white-space: nowrap;
+}
+
+.captionName {
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.captionDetail {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.zoom {
+  margin-left: auto;
+}
+
+.small {
+  width: 320px;
+  height: 180px;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--material-well);
+}
+
+.noPicture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.noPictureDetail {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.aids {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.factName {
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.factValues {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waiting {
+  margin: 0;
+  color: var(--text-text3);
+}
