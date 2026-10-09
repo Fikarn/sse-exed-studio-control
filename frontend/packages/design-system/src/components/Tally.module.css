@@ -1,11 +1,13 @@
 /* The header's REC tally (the shell, visual overhaul 3). A fixed slot as wide
    as its longest form ("REC not read while released", measured), so nothing
-   beside it moves when it lights. */
+   beside it moves when it lights. The skylight (D48): a platter of its own,
+   with the coral edge on a faint coral tint while CAM 1 records and a dashed
+   yellow edge while what it says is last known. */
 @layer components {
   .slot {
     display: flex;
     width: 272px;
-    height: 40px;
+    height: 48px;
     flex: none;
   }
 
@@ -17,17 +19,13 @@
     width: 100%;
     height: 100%;
     padding: 0 14px;
-    border: 1px solid var(--material-line);
-    border-radius: var(--radius-base);
-    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-panel);
+    background: var(--material-platter);
+    box-shadow: var(--elevation-edge-light);
     color: var(--text-text3);
     font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     white-space: nowrap;
-  }
-
-  /* At rest the slot is quiet: no edge, a hollow lamp and the name. */
-  .rest {
-    border-color: transparent;
   }
 
   .lit {
@@ -55,6 +53,7 @@
 
   .error {
     border-color: var(--role-coral-text);
+    background: var(--material-platter-rec);
     color: var(--role-coral-text);
   }
 

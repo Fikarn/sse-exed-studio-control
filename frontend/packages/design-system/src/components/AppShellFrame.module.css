@@ -1,10 +1,10 @@
 /* The shell grid (system §2, plan D4). Header 88 (80 until 2026-10-08), cluster 440, plate 440,
    footer 40 at 2560×1440, every value a chrome token scaled by the operator
-   UI scale. Visual overhaul 2026-10 (Atrium): one flat, matte surface —
-   header, cluster, bay, plate and footer are all the base, parted by 1 px
-   hairlines (header bottom, cluster right, plate left, footer top). No
-   gradient, no sheen, no shadow. Every colour here is a token, so the chrome
-   has one source. */
+   UI scale. Visual overhaul 2026-10 (Atrium): one flat, matte surface, the
+   cluster, bay and plate all the base, parted by 1 px hairlines. The skylight
+   (D48): the header and the footer are the raised layer above it, flat, each
+   closed by its line. Every colour here is a token, so the chrome has one
+   source. */
 
 .shell {
   display: grid;
@@ -23,63 +23,88 @@
   font-family: var(--font-family-ui);
 }
 
-/* The header (the shell, overhaul 3): the product's name at the frame's
-   margin, the tabs after it, the lamps without a page and the latches set to
-   the right, then the REC tally, the clock and the logotype at the frame's
-   margin. The tabs follow the name rather than the bay's edge: the row has to
-   hold every page's longest word, the deck's, the backup's and the latches at
-   once, and nothing in it may be cut. */
+/* The header (the skylight, D48): one raised bar, a step lighter than the
+   page and closed by a line, with no gradient. Left to right: the logotype at
+   the frame's margin with its clear space, a rule, the pages' platter, the
+   room left over, the system's platter (the lamps that have no page, the
+   latches, and Setup / Support last, so it stays put while a latch comes,
+   goes or changes its word with the page), the REC tally on its own platter,
+   and the clock at the frame's margin. The row has to hold every page's longest word, the
+   deck's, the backup's and the latches at once, and nothing in it may be cut
+   (the fullest row has about 110 px to spare). */
 .header {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
-  align-items: center;
-  padding-right: calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
-  min-width: 0;
-  overflow: hidden;
-  border-bottom: 1px solid var(--material-line);
-  background: var(--material-bg);
-}
-
-/* The product name: a display word, SSE Adelia in capitals, at the frame's
-   margin. */
-.product {
-  padding-left: calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
-  font: 700 var(--font-size-word) / 1 var(--font-family-display);
-  letter-spacing: var(--font-tracking-display);
-  text-transform: uppercase;
-  color: var(--text-text);
-  white-space: nowrap;
-}
-
-.tabs {
   display: flex;
+  align-items: center;
   gap: 4px;
-  margin-left: 40px;
+  padding: 0 calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--material-bar-line);
+  background: var(--material-bar);
 }
 
-.health {
+/* The logotype, 40 px high: half its height clear on every side, so the rule
+   after it stands 20 px off. Nothing stands beside it as a name: the brand
+   asks for no new lockup. */
+.logo {
+  flex: none;
+}
+
+.rule {
+  flex: none;
+  width: 1px;
+  height: 40px;
+  margin: 0 20px;
+  background: var(--material-bar-line);
+}
+
+/* A platter: the segments it holds stand on one raised box, 4 px in from its
+   edge and 2 px apart, a hairline between two that are not the open one. */
+.platter {
   display: flex;
+  flex: none;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-  padding: 0 8px;
-  overflow: hidden;
+  gap: 2px;
+  height: 48px;
+  padding: 4px;
+  border-radius: var(--radius-panel);
+  background: var(--material-platter);
+  box-shadow: var(--elevation-edge-light);
+}
+
+.platter > * {
+  position: relative;
+}
+
+.platter > * + *::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: -2px;
+  width: 1px;
+  background: var(--material-bar-line);
+  pointer-events: none;
+}
+
+.platter > :is([aria-current="page"], :has(> [aria-current="page"]))::before,
+.platter > :is([aria-current="page"], :has(> [aria-current="page"])) + *::before {
+  display: none;
+}
+
+.spacer {
+  flex: 1;
+  min-width: 16px;
 }
 
 /* The clock is read during a take: PT Sans at word size, tabular digits. */
 .clock {
-  margin-left: 16px;
+  flex: none;
+  margin-left: 20px;
   font: 700 var(--font-size-word) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   color: var(--text-text);
-  white-space: nowrap;
-}
-
-/* The logotype's clear space: half its height, 20 px, on every side. */
-.logo {
-  margin-left: 20px;
 }
 
 .body {

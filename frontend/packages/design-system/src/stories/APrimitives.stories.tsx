@@ -71,6 +71,20 @@ const caption: CSSProperties = {
 
 const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" };
 
+// The header's platter (the skylight, D48), as the shell draws it, for the
+// tabs and the chips that stand on one.
+const platter: CSSProperties = {
+  display: "inline-flex",
+  alignSelf: "flex-start",
+  alignItems: "center",
+  gap: 2,
+  height: 48,
+  padding: 4,
+  borderRadius: "var(--radius-panel)",
+  background: "var(--material-platter)",
+  boxShadow: "var(--elevation-edge-light)",
+};
+
 const quiet: CSSProperties = {
   font: "var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui)",
   color: "var(--text-text3)",
@@ -393,11 +407,15 @@ function StateCards() {
           </LampWord>
         </div>
       </Card>
-      <Card title="LampChip · the header's chips">
-        <div style={{ ...row, gap: 4 }}>
+      <Card title="LampChip · the header's chips, on platters">
+        <div style={platter}>
           <LampChip label="Surface" word="READY" tone="ok" />
           <LampChip label="Solo" word="LATCHED" tone="attention" latch />
+        </div>
+        <div style={platter}>
           <LampChip label="Lighting" word="UNREACHABLE" tone="error" />
+        </div>
+        <div style={platter}>
           <LampChip label="Cameras" word="NOT SET UP" tone="neutral" />
           <LampChip label="Audio" word="ASSUMED" tone="attention" onClick={() => {}} />
         </div>
@@ -658,12 +676,16 @@ const LAMP_TONES: ReadonlyArray<readonly [LampTone, string]> = [
 function ShellCards() {
   return (
     <>
-      <Card title="Tab · locked, a word, the open page, a value">
-        <div style={row}>
-          <Tab id="setup" label="Setup / Support" disabled />
-          <Tab id="lighting" label="Lighting" word="unreachable" tone="error" />
+      <Card title="Tab · on platters: the open page, a word, locked, a value">
+        <div style={platter}>
           <Tab id="audio" label="Audio" active />
+          <Tab id="lighting" label="Lighting" word="unreachable" tone="error" />
+        </div>
+        <div style={platter}>
           <Tab id="cameras" label="Cameras" word="not set up" tone="attention" />
+          <Tab id="setup" label="Setup / Support" disabled />
+        </div>
+        <div style={platter}>
           <Tab id="teleprompter" label="Teleprompter" word="playing" value="2:31 left" tone="ok" />
         </div>
       </Card>

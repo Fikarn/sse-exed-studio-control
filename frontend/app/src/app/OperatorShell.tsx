@@ -42,8 +42,11 @@ export type ShellEnvironment = Awaited<ReturnType<typeof createShellEnvironment>
 
 // New pages program, Slice 3 (D4, D6): the header tabs are the way between the
 // workspaces. They print no key hint — Studio Control binds no key of its own.
+// The skylight (D48): Setup / Support is the system's own page, so its tab
+// stands on the system's platter at the header's right, beside the deck's
+// lamp, the backup and the latches.
 const WORKSPACES = [
-  { id: "setup", label: "Setup / Support" },
+  { id: "setup", label: "Setup / Support", system: true },
   { id: "lighting", label: "Lighting" },
   { id: "audio", label: "Audio" },
   { id: "cameras", label: "Cameras" },

@@ -1,7 +1,7 @@
-/* A workspace tab (system §7). Visual overhaul 2026-10 (Atrium): no box at
-   rest, PT Sans in the quiet ink; hover brightens the ink; the active tab is
-   the selection — the 2 px Beige keyline drawn inside its edge, the main ink,
-   bold; a locked tab is dashed at 55 %. */
+/* A workspace tab (system §7), a segment of the header's platter (the
+   skylight, D48): no box at rest, PT Sans bold in the second ink; under the
+   pointer the platter's hover tone; the open page is the one Dark Green
+   segment in Beige Light; a locked tab is dashed at 55 %. */
 @layer components {
   .tab {
     appearance: none;
@@ -12,20 +12,20 @@
     height: 40px;
     padding: 0 12px;
     border: 1px solid transparent;
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-control);
     background: none;
-    color: var(--text-text3);
-    font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+    color: var(--text-text2);
+    font: 700 var(--font-size-body) / 1 var(--font-family-ui);
     white-space: nowrap;
     cursor: pointer;
     transition:
-      color var(--motion-duration-state) var(--motion-easing-mech),
+      background-color var(--motion-duration-state) var(--motion-easing-mech),
       border-color var(--motion-duration-state) var(--motion-easing-mech);
   }
 
   /* Hover changes a colour, never a position (system §6). */
   .tab:not(.active):not([aria-disabled="true"]):hover {
-    color: var(--text-text2);
+    background: var(--material-platter-hover);
   }
 
   .tab:focus-visible {
@@ -33,20 +33,11 @@
     outline-offset: 2px;
   }
 
+  /* The open page: the one Dark Green segment of the header (D48), its name
+     in Beige Light. The focus ring (an outline) still stands outside it. */
   .active {
-    color: var(--text-text);
-    font-weight: 700;
-  }
-
-  /* The selection keyline: 2 px of Beige over the tab's own edge, so the
-     focus ring (an outline) can still stand outside it. */
-  .active::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border: 2px solid var(--accent);
-    border-radius: inherit;
-    pointer-events: none;
+    background: var(--sse-dark-green);
+    color: var(--sse-beige-light);
   }
 
   .tab[aria-disabled="true"] {
@@ -70,7 +61,9 @@
     font: var(--font-weight-bold) var(--font-size-body) / 1 var(--font-family-display);
     letter-spacing: var(--font-tracking-display);
     text-transform: uppercase;
-    color: var(--text-text3);
+    /* A neutral word (`pending`): the second ink, the quiet one being under
+       4.5:1 on the platter. */
+    color: var(--text-text2);
   }
 
   /* A value that changes (the prompter's time left): PT Sans, tabular, never
@@ -99,11 +92,14 @@
     color: var(--role-blue-text);
   }
 
-  /* The name holds its bold width at rest too (an invisible bold copy under
-     it), so the open tab's bold name moves nothing after it. */
+  /* The name is bold (D48), set on the name itself: the reset's
+     `button { font: inherit }` outranks a font set on the tab's button in the
+     app's bundle. It holds its bold width with an invisible bold copy, as it
+     did when only the open tab was bold. */
   .name {
     display: inline-flex;
     flex-direction: column;
+    font: 700 var(--font-size-body) / 1 var(--font-family-ui);
   }
 
   .name::after {
@@ -117,11 +113,19 @@
   }
 
   /* The open tab and the room of its word (the polish, 2026-10-05): the word
-     is drawn invisible after the keyline, as wide as the lamp, gaps and word
-     the tab carries when it is not open, so no tab moves with the page. */
+     is drawn invisible after the name, as wide as the lamp, gaps and word the
+     tab carries when it is not open, so no tab moves with the page. The Dark
+     Green segment spans both, the room the tab takes when it is not open. */
   .slot {
     display: inline-flex;
     align-items: center;
+    height: 40px;
+    border-radius: var(--radius-control);
+    background: var(--sse-dark-green);
+  }
+
+  .slot > .active {
+    background: none;
   }
 
   .reserve {

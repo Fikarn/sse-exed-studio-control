@@ -22,6 +22,12 @@
   --material-floor: #0A110F; /** the room drawn inside the plot's well */
   --material-line: #212D28; /** the hairline between things; a well's edge; a meter's slot */
   --material-line2: #36453E; /** a key's edge; the heavy rule under a section head or a table head; a menu's edge */
+  --material-bar: #18221F; /** the raised layer (D48, the skylight): the header and the footer, a step lighter than the page */
+  --material-bar-line: #33433D; /** the raised layer's closing line: the header's bottom edge, the footer's top edge */
+  --material-platter: #222E29; /** a platter on the raised layer: the header's pages, its system's things, the REC tally */
+  --material-platter-hover: #2C3A34; /** a segment of a platter under the pointer */
+  --material-platter-rec: #2C1D16; /** the REC tally's platter while CAM 1 records: a faint coral tint under its coral edge */
+  --material-edge: rgba(246, 245, 232, 0.07); /** the one-pixel light edge along a raised surface's top */
   --material-sheen: transparent; /** deprecated: no highlights */
   --material-shade: transparent; /** deprecated: only the floating layer casts a shadow */
   --material-well-shade: transparent; /** deprecated: wells are flat */
@@ -75,6 +81,7 @@
   --chrome-studio-strip: 120px;
   --elevation-float: 0 0 0 1px #000000, 0 16px 40px rgba(0, 0, 0, 0.55); /** the floating layer: menu, popover, dialog, drawer, toast (data-level=float) */
   --elevation-tip: 0 6px 16px rgba(0, 0, 0, 0.45); /** the tooltip (data-level=float) */
+  --elevation-edge-light: inset 0 1px 0 var(--material-edge); /** a raised surface's light top edge: a platter, the REC tally (D48) */
   --elevation-well: inset 0 0 0 1px var(--material-line); /** deprecated: a well's edge, drawn inside */
   --elevation-key: inset 0 0 0 1px var(--material-line2); /** deprecated: a key's edge, drawn inside */
   --elevation-key-lit-yellow: inset 0 0 0 1px var(--role-yellow-fill); /** deprecated: engaged */
@@ -114,6 +121,7 @@
   --font-line-height-text: 1.35;
   --font-tracking-display: 0.03em; /** Adelia at 20 px and below */
   --font-tracking-cap: 0.04em; /** PT Sans set in capitals */
+  --font-tracking-colophon: 0.14em; /** the product's name at the footer's end, SSE Adelia at 14 px (D48) */
   --font-tracking-eyebrow: 0.06em; /** deprecated: use display */
   --space-1: 4px;
   --space-2: 8px;
@@ -126,6 +134,8 @@
   --space-9: 36px;
   --space-10: 40px;
   --radius-base: 4px; /** the one radius: keys, wells, fields, menus, the state display */
+  --radius-panel: 12px; /** a platter on the raised layer and the REC tally (D48); the Overview's rooms, cards, trays and lists */
+  --radius-control: 8px; /** what sits on a platter: a header tab, a lamp chip; the Overview's keys, wells and pictures */
   --radius-pill: 999px; /** a lamp */
   --motion-duration-lamp: 0ms; /** a lamp or a lit fill switches; it does not ramp */
   --motion-duration-press: 100ms; /** key press feedback */

@@ -5,8 +5,8 @@ import type { SharedStatusTone } from "./statusTone";
 import styles from "./Tab.module.css";
 
 // Visual overhaul A, Slice 2 (system §7): a workspace tab in the shell
-// header. Visual overhaul 2026-10 (Atrium): the active tab is the selection,
-// the 2 px Beige keyline round its name in bold (it keeps
+// header. The skylight (D48, 2026-10-09): a segment of the header's platter,
+// its name bold at rest; the open tab is the one Dark Green segment (it keeps
 // `data-material="key"` as its hook); a locked tab (startup, recovery,
 // commissioning not published) is a dashed outline at 55 % with
 // `aria-disabled` (plan D7), never opacity alone. New pages program, Slice 3
@@ -17,7 +17,7 @@ import styles from "./Tab.module.css";
 // describes the tab and is never part of its name.
 //
 // The polish (2026-10-05): the open tab keeps the room its word takes when
-// it is not open (`reserve`, drawn invisible after its keyline), so no tab
+// it is not open (`reserve`, drawn invisible after its name), so no tab
 // moves when the page changes and the tab just pressed stays under the
 // pointer (system §1: controls never move).
 export interface TabProps {

@@ -80,6 +80,30 @@
       "$value": "#36453E",
       "$description": "a key's edge; the heavy rule under a section head or a table head; a menu's edge"
     },
+    "bar": {
+      "$value": "#18221F",
+      "$description": "the raised layer (D48, the skylight): the header and the footer, a step lighter than the page"
+    },
+    "barLine": {
+      "$value": "#33433D",
+      "$description": "the raised layer's closing line: the header's bottom edge, the footer's top edge"
+    },
+    "platter": {
+      "$value": "#222E29",
+      "$description": "a platter on the raised layer: the header's pages, its system's things, the REC tally"
+    },
+    "platterHover": {
+      "$value": "#2C3A34",
+      "$description": "a segment of a platter under the pointer"
+    },
+    "platterRec": {
+      "$value": "#2C1D16",
+      "$description": "the REC tally's platter while CAM 1 records: a faint coral tint under its coral edge"
+    },
+    "edge": {
+      "$value": "rgba(246, 245, 232, 0.07)",
+      "$description": "the one-pixel light edge along a raised surface's top"
+    },
     "bay": {
       "$value": "{material.bg}",
       "$description": "deprecated: the bay is the one surface"
@@ -469,6 +493,10 @@
       "$value": "0 6px 16px rgba(0, 0, 0, 0.45)",
       "$description": "the tooltip (data-level=float)"
     },
+    "edgeLight": {
+      "$value": "inset 0 1px 0 var(--material-edge)",
+      "$description": "a raised surface's light top edge: a platter, the REC tally (D48)"
+    },
     "well": {
       "$value": "inset 0 0 0 1px var(--material-line)",
       "$description": "deprecated: a well's edge, drawn inside"
@@ -722,6 +750,10 @@
         "$value": "0.04em",
         "$description": "PT Sans set in capitals"
       },
+      "colophon": {
+        "$value": "0.14em",
+        "$description": "the product's name at the footer's end, SSE Adelia at 14 px (D48)"
+      },
       "eyebrow": {
         "$value": "0.06em",
         "$description": "deprecated: use display"
@@ -764,6 +796,14 @@
     "base": {
       "$value": "4px",
       "$description": "the one radius: keys, wells, fields, menus, the state display"
+    },
+    "panel": {
+      "$value": "12px",
+      "$description": "a platter on the raised layer and the REC tally (D48); the Overview's rooms, cards, trays and lists"
+    },
+    "control": {
+      "$value": "8px",
+      "$description": "what sits on a platter: a header tab, a lamp chip; the Overview's keys, wells and pictures"
     },
     "pill": {
       "$value": "999px",
