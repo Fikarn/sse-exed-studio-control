@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Studio Control: the prompter</title>
+    <!-- The cascade layers' order, before any stylesheet: the first place a
+         layer appears fixes its rank, and the one bundled stylesheet puts the
+         design system's components ahead of src/styles/global.css, which
+         declares the same order. Without this, components ranked lowest and
+         the reset's `button { font: inherit }` beat every font set on a
+         component's button (2026-10-09). -->
+    <style>
+      @layer reset, tokens, primitives, components, utilities, overrides;
+    </style>
     <!-- Black before anything loads, and whatever goes wrong: the presenter's
          screen shows the script or nothing. -->
     <style>

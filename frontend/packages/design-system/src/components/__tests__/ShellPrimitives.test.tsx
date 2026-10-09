@@ -74,7 +74,7 @@ describe("Tab", () => {
       /\.tab \{[^}]*border-radius: var\(--radius-control\);[^}]*color: var\(--text-text2\);[^}]*font: 700 /
     );
     expect(css).toMatch(/\.active \{[^}]*background: var\(--sse-dark-green\);[^}]*color: var\(--sse-beige-light\)/);
-    // Bold on the name itself: the reset's `button { font: inherit }` outranks the button's own font.
+    // Bold on the name itself too (until 2026-10-09 the reset outranked the button's own font).
     expect(css).toMatch(/\.name \{[^}]*font: 700 var\(--font-size-body\)/);
     expect(css).not.toMatch(/\.active::after/);
     expect(css).toMatch(/:hover \{\s*background: var\(--material-platter-hover\);\s*\}/);

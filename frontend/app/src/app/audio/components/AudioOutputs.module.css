@@ -45,6 +45,8 @@
 }
 
 /* The output's name keeps its case: PT Sans, one line. */
+/* A line box that holds its descenders: inside the key it would take the
+   key's own line height of 1, and `overflow: hidden` would clip a pixel. */
 .targetName {
   display: block;
   max-width: 100%;
@@ -52,6 +54,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 700;
+  line-height: var(--font-line-height-text);
 }
 
 .level {
