@@ -370,6 +370,12 @@ export interface FixturePrompterSeed {
   /** The name of the script on the glass; nothing is on it without one. */
   onGlass?: string;
   notUpdated?: boolean;
+  /**
+   * The glass playing from its place, as PLAY starts it (the Overview's take, D47): refused
+   * where PLAY is, without a script on the glass or a Prompter XL that draws it. It plays
+   * before any layout, in words, until a view reports one.
+   */
+  playing?: boolean;
   look?: Partial<PrompterLook>;
   sizePx?: number;
 }
@@ -411,6 +417,12 @@ export interface FixtureCameraSeed {
   /** Its link has brought no setting since it connected: its values are the last read (finding 19). */
   lastRead?: boolean;
   recording?: boolean;
+  /**
+   * Test-only: the take CAM 1 records started this many whole seconds before the start, and
+   * the hardware link saw it start (`startedAt`), so the page counts its length (the Overview's
+   * take, D47). Only with `recording: true`, and never on a released camera.
+   */
+  recordingForSeconds?: number;
   values?: FixtureCameraValuesSeed;
 }
 

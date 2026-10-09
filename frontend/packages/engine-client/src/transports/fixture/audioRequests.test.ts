@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import type { JsonObject } from "../../generated/protocol";
+import type { FixtureScenario } from "../../types";
 import { createFixtureTransport } from "../fixtureTransport";
 
 // 2026-10-01 (the owner's decision, after the studio walk): the Console's
@@ -153,5 +154,25 @@ describe("the fixture double's TotalMix snapshots", () => {
     await transport.request("audio.settings.update", { hiddenChannelIds: [] });
     snapshot = await audioSnapshot(transport);
     expect((snapshot.channels as JsonObject[]).every((entry) => entry.hidden === false)).toBe(true);
+  });
+});
+
+describe("the fixture double's console seed", () => {
+  // The Overview's fixtures (D47): a scenario names the soloed strips as it names the
+  // clipped ones; the list replaces the default console's solo (FX 3/4), and `[]` clears it.
+  it("starts with the solos a scenario names, in place of the default console's", async () => {
+    const soloed = async (soloChannelIds?: string[]) => {
+      const scenario: FixtureScenario = getFixtureScenario("audio-populated");
+      const transport = createFixtureTransport({
+        ...scenario,
+        audioSnapshot: { ...scenario.audioSnapshot, ...(soloChannelIds ? { soloChannelIds } : {}) },
+      });
+      const snapshot = await audioSnapshot(transport);
+      expect(snapshot, "the seed's key is not the console's").not.toHaveProperty("soloChannelIds");
+      return (snapshot.channels as JsonObject[]).filter((entry) => entry.solo === true).map((entry) => entry.id);
+    };
+    expect(await soloed()).toEqual(["audio-playback-3-4"]);
+    expect(await soloed(["audio-input-12", "audio-input-9"])).toEqual(["audio-input-9", "audio-input-12"]);
+    expect(await soloed([])).toEqual([]);
   });
 });

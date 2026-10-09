@@ -47,6 +47,8 @@ export type FixturePrompterSeedRecord = {
   scripts?: FixtureScriptSeed[];
   onGlass?: string;
   notUpdated?: boolean;
+  /** The glass playing from its place (the Overview's fixtures, built in code: no JSON scenario plays). */
+  playing?: boolean;
   look?: FixtureLookSeed;
   sizePx?: number;
 };

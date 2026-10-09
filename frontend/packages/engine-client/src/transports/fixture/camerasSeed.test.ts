@@ -84,6 +84,28 @@ describe("the fixture double's cameras seed", () => {
     expect((await snapshot()).cameras[1]!.values.shutter.value).toBe("1/100");
   });
 
+  // Test-only (the Overview's take, D47): a take the hardware link saw start that long before
+  // the start, so the page counts its length; the reads after it keep the start while the
+  // take runs, and so does a camera that stops answering.
+  it("counts CAM 1's take from recordingForSeconds before the start", async () => {
+    const started = new Date(NOW - 90_000).toISOString();
+    const { camera, events } = openCamerasDouble({
+      cameras: [{ camera: 1, paired: true, recording: true, recordingForSeconds: 90 }],
+    });
+    expect((await camera(1)).recording).toMatchObject({ recording: true, startedAt: started });
+    vi.setSystemTime(NOW + 5_000);
+    expect((await camera(1)).recording.startedAt, "kept while the take runs").toBe(started);
+    expect(events, "the scenario starts that way").toEqual([]);
+
+    const lost = openCamerasDouble({
+      cameras: [{ camera: 1, paired: true, recording: true, unreachable: true, recordingForSeconds: 30 }],
+    });
+    expect(await lost.camera(1)).toMatchObject({
+      state: "unreachable",
+      recording: { recording: true, startedAt: new Date(NOW + 5_000 - 30_000).toISOString() },
+    });
+  });
+
   // Saved data that holds a pairing and an address in a build with no link, as a database
   // backup restored whole brings them: Setup itself would take neither.
   it("starts a hardware link with no link to a camera yet, when the scenario says so", async () => {
@@ -137,6 +159,26 @@ describe("the fixture double's cameras seed", () => {
       "cameras: CAM 2 does not answer, so it must be set up: give it an address."
     );
     mistake({ cameras: [{ camera: 3, recording: true }] }, "cameras: CAM 3 does not record here: only CAM 1 records.");
+    mistake(
+      { cameras: [{ camera: 2, address: CAM2_ADDRESS, recordingForSeconds: 90 }] },
+      "cameras: CAM 2 does not record here: only CAM 1 records."
+    );
+    for (const recording of [undefined, false]) {
+      mistake(
+        { cameras: [{ camera: 1, paired: true, recording, recordingForSeconds: 90 }] },
+        "cameras: CAM 1's recordingForSeconds needs a take: give it recording: true."
+      );
+    }
+    for (const seconds of [0, 1.5, "90"]) {
+      mistake(
+        { cameras: [{ camera: 1, paired: true, recording: true, recordingForSeconds: seconds }] },
+        "cameras: CAM 1's recordingForSeconds must be a whole number of seconds, 1 or more."
+      );
+    }
+    mistake(
+      { cameras: [{ camera: 1, paired: true, recording: true, released: true, recordingForSeconds: 90 }] },
+      "cameras: CAM 1's recordingForSeconds is not counted while it is released."
+    );
     mistake({ cameras: [{ camera: 1, paired: 1 }] }, "cameras: CAM 1's paired must be true or false.");
     mistake(
       { cameras: [{ camera: 2, values: { tint: 3 } }] },

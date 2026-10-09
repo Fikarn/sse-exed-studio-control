@@ -16,6 +16,7 @@ import {
   wordCount,
 } from "./prompterModel";
 import { newScript, putOnRequest, updatedLook } from "./prompterRequests";
+import { playRefusal } from "./prompterScreen";
 import {
   SIZE_MAX_PX,
   SIZE_MIN_PX,
@@ -42,6 +43,15 @@ import type { MutableFixtureState } from "./state";
 // scenario starts that way. Times count back from the moment the double is made — a
 // week ago for the scripts, an hour apart for their versions and for Removed — so a
 // page clock fixed by the test fixes them too.
+//
+// The Overview's take (D47) needs a glass that already plays, which `prompter.play`
+// cannot make here: it refuses before a layout, and no view has reported one when the
+// double is made. So `playing` starts the clock itself, held to PLAY's other rules (a
+// Prompter XL that draws the glass, a place before its end); before a layout the clock
+// runs in words, as it does after a new size, until the page's view reports one. Its
+// timer is left to the first `prompter.*` request, a read included, which settles the
+// clock and schedules it (`handleFixturePrompterRequest`): the page reads the prompter at
+// every start, and a double no request reaches leaves no timer behind.
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -165,8 +175,8 @@ function editedAfterPlace(paragraphs: readonly PrompterParagraph[], place: Promp
 
 /**
  * Builds the scenario's prompter on the double, before its first read: the look, the
- * scripts in the order given (their ids count up from there), Removed, the glass and
- * the NOT UPDATED edit. Without a seed the prompter starts empty, as it always has.
+ * scripts in the order given (their ids count up from there), Removed, the glass, the
+ * NOT UPDATED edit and PLAY. Without a seed the prompter starts empty, as it always has.
  */
 export function seedFixturePrompter(state: MutableFixtureState, seed: FixturePrompterSeed | undefined) {
   if (seed === undefined) return;
@@ -191,6 +201,7 @@ export function seedFixturePrompter(state: MutableFixtureState, seed: FixturePro
 
   if (seed.onGlass === undefined) {
     if (seed.notUpdated === true) throw mistake("notUpdated needs a script on the glass (onGlass).");
+    if (seed.playing === true) throw mistake("playing needs a script on the glass (onGlass).");
     return;
   }
   const onGlass = byName.get(seed.onGlass);
@@ -202,5 +213,15 @@ export function seedFixturePrompter(state: MutableFixtureState, seed: FixturePro
   if (seed.notUpdated === true) {
     // As `prompter.script.edit` makes it: the place stays with the glass's text until Update.
     writeScriptText(onGlass, editedAfterPlace(onGlass.paragraphs, onGlass.place), onGlass.place, now);
+  }
+  if (seed.playing === true) {
+    // PLAY's refusals but the layout's (`playRequest`), in its own words. `putOn` never
+    // leaves the glass at its end (a script left there goes on at the top); the check
+    // keeps the seed to PLAY's rule all the same.
+    const glass = prompter.glass!;
+    const refusal = playRefusal(prompter.screen);
+    if (refusal) throw mistake(`playing is refused as PLAY is: ${refusal.message}`);
+    if (glass.atEnd(now)) throw mistake(`playing is refused as PLAY is: ${seed.onGlass} is at its end.`);
+    glass.play(now);
   }
 }

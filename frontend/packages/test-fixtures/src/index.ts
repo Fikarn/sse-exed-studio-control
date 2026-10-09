@@ -1,5 +1,10 @@
 import fixtureMap from "./fixtures.json";
-import { expandCamerasRecord, type FixtureCamerasSeedRecord, type RawCamerasRecord } from "./camerasSeeds";
+import {
+  expandCamerasRecord,
+  type FixtureCameraSeedRecord,
+  type FixtureCamerasSeedRecord,
+  type RawCamerasRecord,
+} from "./camerasSeeds";
 import { expandPrompterRecord, type CompactPrompterRecord, type FixturePrompterSeedRecord } from "./prompterScripts";
 
 export {
@@ -239,6 +244,98 @@ function buildEveryPageFixture(): FixtureScenarioRecord {
   } as FixtureScenarioRecord;
 }
 
+// The Overview's three moments (D47), board 3's `?state=` (`docs/design/boards/overview-3.html`).
+// Built here as `every-page` is, so the layout gate measures them only where it names them.
+// Each opens on the Overview with lighting-populated's rig (reachable, armed, Warm wash on
+// it), the three probes passed (so no health check waits on a probe), the studio's hidden
+// strips and no solo, the deck's bridge serving and the Prompter XL connected; CAM 1 is
+// selected, as the double serves the full-size test card only to the selected camera.
+//
+// - take: the moment that reads READY. CAM 1 records, its take counted from 07:09:30Z, its
+//   start row in cameras-recording's log, which is 90 s before the captures' 09:11 in
+//   Stockholm; so the day's takes read 2. The script plays at ¶ 8 at 140; the meters tick.
+// - landing: the first look of the day (board 3's 09:14). Nothing records and the log has no
+//   camera row (no takes today); the script waits at ¶ 1; the console is assumed and not read
+//   since the start, so its meters wait and the Console is the worst page.
+// - fault: CAM 1 stops answering while it records; Guest 1 holds a clip, the meters tick;
+//   the script plays at ¶ 11 at 145.
+type OverviewMoment = "take" | "landing" | "fault";
+
+/** Setup's list of the strips TotalMix hides in the studio (D45): the four preamps Host, Co-host, Guest 1 and Guest 2 show. */
+const STUDIO_HIDDEN_STRIPS = fixtureMap["setup-console"].audioSnapshot.hiddenChannelIds;
+
+/** The take's and the fault's last Sync from TotalMix, before the day's first take (the double's own is 18:24 that evening). */
+const OVERVIEW_SYNCED_AT = "2026-04-23T08:38:12+02:00";
+
+/** A cameras fixture's cameras with CAM 1 selected, and CAM 1 with `cam1` besides. */
+function overviewCameras(
+  id: string,
+  source: "cameras-held" | "cameras-recording" | "cameras-lost-mid-take",
+  cam1: Partial<FixtureCameraSeedRecord> = {}
+): FixtureCamerasSeedRecord {
+  const seed = expandCamerasRecord(id, {
+    ...(fixtureMap[source] as { cameras: RawCamerasRecord }).cameras,
+    selected: 1,
+  });
+  return { ...seed, cameras: seed.cameras?.map((camera) => (camera.camera === 1 ? { ...camera, ...cam1 } : camera)) };
+}
+
+/** teleprompter-ready's prompter (02 Interview intro on the glass) at the moment's place, pace and run. */
+function overviewPrompter(id: string, moment: OverviewMoment): FixturePrompterSeedRecord {
+  const ready = (fixtureMap["teleprompter-ready"] as { prompter: CompactPrompterRecord }).prompter;
+  if (moment === "take") return { ...expandPrompterRecord(id, ready), playing: true };
+  if (moment === "landing") return expandPrompterRecord(id, { ...ready, place: { paragraph: 0, word: 0 } });
+  // The compact record has no pace: the script on the glass takes 145 here.
+  const seed = expandPrompterRecord(id, { ...ready, place: { paragraph: 10, word: 0 } });
+  return {
+    ...seed,
+    playing: true,
+    scripts: seed.scripts?.map((script) => (script.name === seed.onGlass ? { ...script, speedWpm: 145 } : script)),
+  };
+}
+
+function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
+  const id = `overview-${moment}`;
+  const lighting = cloneFixture(fixtureMap["lighting-populated"]);
+  lighting.appSnapshot.shell = { ...lighting.appSnapshot.shell, workspace: "overview" };
+  // The console's meters are TotalMix's (`meteringSource`), so a desk read at the last Sync
+  // reads VERIFIED, as the studio's does, not SIMULATED; its `adapterMode` stays the double's
+  // simulated one, so its meters still tick (`isSimulatedAudioSnapshot`).
+  const desk = moment === "landing" ? fixtureMap["audio-state-assumed"] : fixtureMap["audio-populated"];
+  const audioSnapshot = {
+    ...cloneFixture(desk.audioSnapshot),
+    meteringSource: "rme-totalmix-osc",
+    lastConsoleSyncAt: moment === "landing" ? null : OVERVIEW_SYNCED_AT,
+    lastConsoleSyncReason: moment === "landing" ? null : "console-pull",
+    hiddenChannelIds: [...STUDIO_HIDDEN_STRIPS],
+    soloChannelIds: [],
+    // audio-clipped's clip: Guest 1.
+    ...(moment === "fault" ? { clipChannelIds: ["audio-input-11"] } : {}),
+  };
+  const cameras =
+    moment === "take"
+      ? overviewCameras(id, "cameras-recording", { recordingForSeconds: 90 })
+      : moment === "landing"
+        ? overviewCameras(id, "cameras-held")
+        : overviewCameras(id, "cameras-lost-mid-take");
+  const supportSnapshot =
+    moment === "take"
+      ? cloneFixture(fixtureMap["cameras-recording"].supportSnapshot)
+      : moment === "landing"
+        ? { recentEvents: [] }
+        : cloneFixture(fixtureMap["cameras-lost-mid-take"].supportSnapshot);
+  const scenario = {
+    ...lighting,
+    commissioningSnapshot: cloneFixture(fixtureMap["audio-populated"].commissioningSnapshot),
+    audioSnapshot,
+    audioMeteringActive: moment !== "landing",
+    supportSnapshot,
+    prompter: overviewPrompter(id, moment),
+    cameras,
+  };
+  return scenario as FixtureScenarioRecord;
+}
+
 // 2026-09-29: the rig as `lighting-populated`, with the bridge watch saying
 // the bridge stopped answering at 10:42 UTC. Setup's probe passed, so nothing
 // is locked. Built here, not in `fixtures.json`, so it adds no UI-contract
@@ -301,6 +398,9 @@ const derivedFixtureMap: FixtureMap = {
   "lighting-preview-dirty": buildLightingPreviewFixture("dirty"),
   "lighting-preview-patch-conflict": buildLightingPreviewFixture("patch-conflict"),
   "lighting-symbol-families": buildLightingSymbolFamiliesFixture(),
+  "overview-fault": buildOverviewFixture("fault"),
+  "overview-landing": buildOverviewFixture("landing"),
+  "overview-take": buildOverviewFixture("take"),
 };
 
 export const fixtureScenarios = derivedFixtureMap;

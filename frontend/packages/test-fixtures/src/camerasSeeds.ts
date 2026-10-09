@@ -30,6 +30,8 @@ export type FixtureCameraSeedRecord = {
   released?: boolean;
   unreachable?: boolean;
   recording?: boolean;
+  /** Test-only: the hardware link saw CAM 1's take start this many seconds before the start (the Overview's fixtures). */
+  recordingForSeconds?: number;
   values?: FixtureCameraValuesSeedRecord;
 };
 

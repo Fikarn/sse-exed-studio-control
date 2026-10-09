@@ -135,6 +135,56 @@ describe("the fixture double's prompter seed", () => {
       seeded({ scripts: [{ ...BETA, place: { paragraph: 2, word: 0 } }], onGlass: "Beta" })
     );
     expect((await glass()).place).toEqual({ paragraph: 0, word: 0 });
+    // So `playing` never finds the glass at its end: it plays from the top.
+    const playing = openPrompterDouble(
+      seeded({ scripts: [{ ...BETA, place: { paragraph: 2, word: 0 } }], onGlass: "Beta", playing: true })
+    );
+    expect(await playing.glass()).toMatchObject({ place: { paragraph: 0, word: 0 }, playing: true, atEnd: false });
+  });
+
+  // The Overview's take (D47): the glass already plays when the page first reads it. Before
+  // a layout the clock runs in words; the first request starts its timer, and a page that
+  // only reads the prompter once a second sees the place move on.
+  it("starts the glass playing at its place for playing, in words until a view lays it out", async () => {
+    const long: FixturePrompterScriptSeed = {
+      name: "Long",
+      paragraphs: text(
+        ...Array.from({ length: 6 }, (_, paragraph) =>
+          Array.from({ length: 12 }, (_, word) => `p${paragraph}w${word}`).join(" ")
+        )
+      ),
+      place: { paragraph: 2, word: 3 },
+    };
+    const { glass, layOut, reasons } = openPrompterDouble(seeded({ scripts: [long], onGlass: "Long", playing: true }));
+    expect(vi.getTimerCount(), "nothing runs before a request").toBe(0);
+    expect(await glass()).toMatchObject({
+      playing: true,
+      laidOut: false,
+      atEnd: false,
+      speedWpm: 140,
+      estimated: true,
+      place: { paragraph: 2, word: 3 },
+      anchor: { playing: true, toWpm: 140, position: null },
+    });
+    expect(vi.getTimerCount(), "the first read starts the clock's timer").toBe(1);
+
+    const after = (later: JsonObject, earlier: JsonObject) =>
+      (later.paragraph as number) * 100 + (later.word as number) >
+      (earlier.paragraph as number) * 100 + (earlier.word as number);
+    let place = (await glass()).place as JsonObject;
+    for (let second = 1; second <= 3; second += 1) {
+      await vi.advanceTimersByTimeAsync(1_000);
+      const next = (await glass()).place as JsonObject;
+      expect(after(next, place), `second ${second}: ${JSON.stringify(next)} after ${JSON.stringify(place)}`).toBe(true);
+      place = next;
+    }
+
+    // The page's view reports its layout; the scroll goes on in its pixels from where it was.
+    expect(await layOut(4, 100)).toEqual({ accepted: true });
+    expect(await glass()).toMatchObject({ playing: true, laidOut: true, estimated: false });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(after((await glass()).place as JsonObject, place)).toBe(true);
+    expect(reasons(), "the seed raised nothing").toEqual(["laid-out"]);
   });
 
   it("edits the glass script after it went on for NOT UPDATED, and Update takes the edit", async () => {
@@ -195,6 +245,17 @@ describe("the fixture double's prompter seed", () => {
     expect(refusal({ scripts: [BETA], notUpdated: true })).toThrow(
       "prompter: notUpdated needs a script on the glass (onGlass)."
     );
+    expect(refusal({ scripts: [BETA], playing: true })).toThrow(
+      "prompter: playing needs a script on the glass (onGlass)."
+    );
+    // PLAY's refusal where the Prompter XL draws nothing: not found, and not yet reported,
+    // as every start of the hardware link begins.
+    for (const prompterScreen of [{ found: false }, "unreported"] as const) {
+      const scenario = { ...seeded({ scripts: [BETA], onGlass: "Beta", playing: true }), prompterScreen };
+      expect(() => createFixtureTransport(scenario), JSON.stringify(prompterScreen)).toThrow(
+        "prompter: playing is refused as PLAY is: The Prompter XL is not connected, so the text cannot scroll."
+      );
+    }
     expect(refusal({ scripts: [{ ...BETA, place: { paragraph: 3, word: 0 } }] })).toThrow(
       "prompter: Beta's place (paragraph 3, word 0) is outside its text of 2 paragraphs."
     );
