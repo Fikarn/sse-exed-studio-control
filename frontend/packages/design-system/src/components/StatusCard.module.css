@@ -1,0 +1,66 @@
+/* The status card (the Overview, D47): one black well at 12, the state above
+   and the latch row below. The state display and the latch slot keep their
+   own stylesheets; the card takes their edges away through their data hooks
+   and draws one edge round itself. */
+@layer components {
+  .card {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: var(--radius-panel);
+    background: var(--material-well);
+    outline: 1px solid var(--material-line);
+    outline-offset: -1px;
+  }
+
+  /* An error: the coral keyline, 2 px, round the whole card and inside it. */
+  .card[data-tone="error"] {
+    outline: 2px solid var(--role-coral-text);
+    outline-offset: -2px;
+  }
+
+  /* The state display keeps its box, its padding and its error border's
+     width (17 px of padding beside 2 px of border, so nothing inside moves);
+     the card draws its edge, its fill and its corners. */
+  .card [data-region="state-display"] {
+    border-color: transparent;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  /* The latch row: 72 high, its hairline the first pixel. The bottom pixel
+     of padding balances it, so the 56 px slot stands 8 px from the row's top
+     and from its foot. The sides set the latch's lamp under the display's
+     lamp and its key under the display's ⋯. */
+  .latchRow {
+    display: flex;
+    align-items: center;
+    flex: none;
+    height: 72px;
+    min-width: 0;
+    padding: 0 10px 1px 8px;
+    border-top: 1px solid var(--material-line);
+  }
+
+  .card[data-latched] .latchRow {
+    border-top-color: var(--material-latch-edge);
+    background: var(--material-latch-tint);
+  }
+
+  /* Within the card the slot and a latch lose their own edges and corners
+     (their boxes stay, so nothing in them moves); the latch's word keeps its
+     yellow. */
+  .latchRow > [data-latch-slot] {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-color: transparent;
+    border-radius: 0;
+  }
+
+  .latchRow [data-latch] {
+    border-color: transparent;
+    border-radius: 0;
+  }
+}

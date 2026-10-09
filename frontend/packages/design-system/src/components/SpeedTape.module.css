@@ -1,0 +1,234 @@
+/* The speed tape (the Overview, D47; docs/design/overview-2.md §3): a black
+   well that fills the box the page gives it (300 × 344 on the Overview). The
+   head 14 px from the top, the dials 14 px from the foot, the tape's window
+   between them from x 180 to the edge; the pointer, the centre line and the
+   value on the strip all stand on the window's middle. Nothing animates at
+   rest: the strip moves only when the value changes. */
+@layer components {
+  .tape {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-panel);
+    background: var(--material-well);
+    outline: 1px solid var(--material-line);
+    outline-offset: -1px;
+    color: var(--text-text);
+    font-variant-numeric: tabular-nums;
+    /* The window's middle, the level everything reads on: the window runs
+       from 44 px below the top to 80 px above the foot. */
+    --tape-centre: calc(44px + (100% - 124px) / 2);
+  }
+
+  .head {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 14px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    white-space: nowrap;
+  }
+
+  .kick {
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
+    text-transform: uppercase;
+    color: var(--text-text3);
+  }
+
+  .headNote {
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
+  }
+
+  .window {
+    position: absolute;
+    left: 180px;
+    right: 1px;
+    top: 44px;
+    bottom: 80px;
+    overflow: hidden;
+  }
+
+  /* One detent a click of the knob, in the mechanical curve, at the move's
+     pace; still for anyone who asks for less motion. */
+  .strip {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transition: transform var(--motion-duration-move) var(--motion-easing-mech);
+  }
+
+  .minor,
+  .major {
+    position: absolute;
+    left: 0;
+    height: 1px;
+  }
+
+  .minor {
+    width: 14px;
+    background: var(--text-text4);
+  }
+
+  .major {
+    width: 26px;
+    background: var(--text-text3);
+  }
+
+  .label {
+    position: absolute;
+    left: 34px;
+    font: var(--font-weight-regular) var(--font-size-tick) / 16px var(--font-family-ui);
+    color: var(--text-text3);
+  }
+
+  /* The range of this take: a short bar beside the labels. */
+  .range {
+    position: absolute;
+    left: 66px;
+    width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--text-text2);
+  }
+
+  .centre {
+    position: absolute;
+    left: 180px;
+    right: 1px;
+    top: var(--tape-centre);
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+
+  /* The pointer: a raised face at 8 centred on the centre line, its notch (a
+     square turned 45°) pointing at the tape. The notch's fill covers the
+     face's edge where they meet, so the outline runs on into the point. */
+  .pointer {
+    position: absolute;
+    left: 16px;
+    top: calc(var(--tape-centre) - 48px);
+    width: 156px;
+    height: 96px;
+    padding: 13px 15px;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-control);
+    background: var(--material-key);
+    box-shadow: var(--elevation-edge-light);
+  }
+
+  .pointer::after {
+    content: "";
+    position: absolute;
+    right: -9px;
+    top: 39px;
+    width: 15px;
+    height: 15px;
+    border-top: 1px solid var(--material-line2);
+    border-right: 1px solid var(--material-line2);
+    background: var(--material-key);
+    transform: rotate(45deg);
+  }
+
+  /* Turned on the deck: the selection keyline, 2 px inside the pointer, and
+     the notch's edge in the same Beige. */
+  .turned .pointer {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .turned .pointer::after {
+    border-color: var(--accent);
+  }
+
+  .number {
+    display: block;
+    font: var(--font-weight-bold) var(--font-size-display) / var(--font-line-height-tight) var(--font-family-ui);
+  }
+
+  /* On the key's face the second ink: the quiet ink misses 4.5:1 there. */
+  .unit {
+    display: block;
+    margin-top: 10px;
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text2);
+  }
+
+  .caption {
+    position: absolute;
+    left: 16px;
+    top: calc(var(--tape-centre) + 56px);
+    margin: 0;
+    font: var(--font-weight-regular) var(--font-size-label) / 1.2 var(--font-family-ui);
+    color: var(--text-text3);
+    white-space: nowrap;
+  }
+
+  .turned .caption {
+    color: var(--accent);
+  }
+
+  /* The deck's dials as they sit on it, the one this tape follows lit. */
+  .dials {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 14px;
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    gap: 6px;
+  }
+
+  .dial {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font: var(--font-weight-regular) var(--font-size-tick) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
+  }
+
+  .knob {
+    position: relative;
+    display: block;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-pill);
+  }
+
+  /* The dial's index, a short tick at its top. */
+  .knob::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 3px;
+    width: 1px;
+    height: 8px;
+    background: var(--text-text4);
+  }
+
+  .dial[data-on] {
+    color: var(--text-text2);
+  }
+
+  .dial[data-on] .knob {
+    border-color: var(--text-text2);
+  }
+
+  .dial[data-on] .knob::after {
+    background: var(--text-text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .strip {
+      transition: none;
+    }
+  }
+}

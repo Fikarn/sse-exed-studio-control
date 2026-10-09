@@ -1,0 +1,86 @@
+/* The one list (the Overview, D47): a rounded face in the key's tone, rows on
+   hairlines that start after the row's margin, the value bold at the right. */
+@layer components {
+  .list {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: var(--radius-panel);
+    background: var(--material-key);
+    color: var(--text-text);
+  }
+
+  /* The list's edge: a 1 px hairline with the light edge under its top, on a
+     frame laid over the rows, so the rows keep their 34 px and the list its
+     rows' height. */
+  .list::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--material-line);
+    border-radius: inherit;
+    box-shadow: var(--elevation-edge-light);
+    pointer-events: none;
+  }
+
+  .row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 34px;
+    min-width: 0;
+    padding: 0 14px;
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    white-space: nowrap;
+  }
+
+  .tall .row {
+    height: 42px;
+  }
+
+  /* The hairline between rows starts after the row's own margin and runs to
+     the list's edge. */
+  .row + .row::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 0;
+    top: 0;
+    height: 1px;
+    background: var(--material-line);
+  }
+
+  /* The label gives way first; the value stands whole. */
+  .label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-text2);
+  }
+
+  .value {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: none;
+    margin-left: auto;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-text);
+  }
+
+  .note {
+    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-label);
+    color: var(--text-text2);
+  }
+
+  /* Doubt (system §4): the value in yellow inside a dashed yellow keyline
+     2 px off it; the outline moves nothing. */
+  .row[data-doubt] [data-row-value] {
+    color: var(--role-yellow-text);
+    outline: 1px dashed var(--role-yellow-line);
+    outline-offset: 2px;
+  }
+}

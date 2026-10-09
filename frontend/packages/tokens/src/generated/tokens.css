@@ -28,6 +28,8 @@
   --material-platter-hover: #2C3A34; /** a segment of a platter under the pointer */
   --material-platter-rec: #2C1D16; /** the REC tally's platter while CAM 1 records: a faint coral tint under its coral edge */
   --material-edge: rgba(246, 245, 232, 0.07); /** the one-pixel light edge along a raised surface's top */
+  --material-latch-tint: rgba(242, 222, 111, 0.07); /** the Overview's status card (D47): the latch row's faint yellow while something is latched */
+  --material-latch-edge: rgba(242, 222, 111, 0.35); /** the line over that row while something is latched */
   --material-sheen: transparent; /** deprecated: no highlights */
   --material-shade: transparent; /** deprecated: only the floating layer casts a shadow */
   --material-well-shade: transparent; /** deprecated: wells are flat */
@@ -63,6 +65,30 @@
   --tag-4: #7E93A6; /** Slate (was Emerald) */
   --tag-6: #A3809B; /** Plum (was Violet) */
   --tag-7: #C69CB0; /** Heather (was Pink) */
+  --room-stone-wall: #1B1E19; /** THE TAKE's wall (act): the room's raised panel */
+  --room-stone-lintel: #151813; /** its name band across the top, a step darker than the wall */
+  --room-stone-floor: #121410; /** its floor band, a step darker again */
+  --room-stone-key: #282C24; /** a key's face and a list's face in the room */
+  --room-stone-line: #30352D; /** the room's hairline: under the name band, between rows, a well's edge */
+  --room-stone-line2: #434A3F; /** a key's edge in the room */
+  --room-green-wall: #112B21; /** THE PICTURE's wall (watch): the room's raised panel */
+  --room-green-lintel: #0C2219; /** its name band across the top, a step darker than the wall */
+  --room-green-floor: #0A1C15; /** its floor band, a step darker again */
+  --room-green-key: #1A3A2D; /** a key's face and a list's face in the room */
+  --room-green-line: #224536; /** the room's hairline: under the name band, between rows, a well's edge */
+  --room-green-line2: #305C4A; /** a key's edge in the room */
+  --room-slate-wall: #12202A; /** THE SCRIPT's wall (read): the room's raised panel */
+  --room-slate-lintel: #0D1820; /** its name band across the top, a step darker than the wall */
+  --room-slate-floor: #0B141B; /** its floor band, a step darker again */
+  --room-slate-key: #1B2D3B; /** a key's face and a list's face in the room */
+  --room-slate-line: #243849; /** the room's hairline: under the name band, between rows, a well's edge */
+  --room-slate-line2: #324B5F; /** a key's edge in the room */
+  --room-umber-wall: #231B12; /** THE SOUND's wall (listen): the room's raised panel */
+  --room-umber-lintel: #1A140C; /** its name band across the top, a step darker than the wall */
+  --room-umber-floor: #16110A; /** its floor band, a step darker again */
+  --room-umber-key: #30261A; /** a key's face and a list's face in the room */
+  --room-umber-line: #3B2F21; /** the room's hairline: under the name band, between rows, a well's edge */
+  --room-umber-line2: #50412D; /** a key's edge in the room */
   --prompter-glass-floor: #000000; /** the glass's background, black in every look */
   --prompter-glass-text: #ffffff; /** white text, the standard */
   --prompter-glass-text-yellow: #ffd84a; /** yellow text, the look's other colour */
@@ -82,6 +108,7 @@
   --elevation-float: 0 0 0 1px #000000, 0 16px 40px rgba(0, 0, 0, 0.55); /** the floating layer: menu, popover, dialog, drawer, toast (data-level=float) */
   --elevation-tip: 0 6px 16px rgba(0, 0, 0, 0.45); /** the tooltip (data-level=float) */
   --elevation-edge-light: inset 0 1px 0 var(--material-edge); /** a raised surface's light top edge: a platter, the REC tally (D48) */
+  --elevation-recess: inset 0 1px 1px rgba(0, 0, 0, 0.35); /** a tray's soft inner edge: keys that belong together, set into one recess (the Overview, D47) */
   --elevation-well: inset 0 0 0 1px var(--material-line); /** deprecated: a well's edge, drawn inside */
   --elevation-key: inset 0 0 0 1px var(--material-line2); /** deprecated: a key's edge, drawn inside */
   --elevation-key-lit-yellow: inset 0 0 0 1px var(--role-yellow-fill); /** deprecated: engaged */
@@ -122,6 +149,7 @@
   --font-tracking-display: 0.03em; /** Adelia at 20 px and below */
   --font-tracking-cap: 0.04em; /** PT Sans set in capitals */
   --font-tracking-colophon: 0.14em; /** the product's name at the footer's end, SSE Adelia at 14 px (D48) */
+  --font-tracking-room: 0.08em; /** a room's name on the Overview, SSE Adelia at 20 px (D47) */
   --font-tracking-eyebrow: 0.06em; /** deprecated: use display */
   --space-1: 4px;
   --space-2: 8px;
@@ -287,6 +315,10 @@
   --signal-cct-6500: var(--sse-sky);
   --tag-1: var(--sse-brown); /** Ochre, the palette's reserve Brown (was Orange) */
   --tag-5: var(--sse-sky); /** Mist, the palette's reserve Sky (was Cyan) */
+  --room-stone-tray: var(--room-stone-floor); /** a tray's recess: the floor's tone */
+  --room-green-tray: var(--room-green-floor); /** a tray's recess: the floor's tone */
+  --room-slate-tray: var(--room-slate-floor); /** a tray's recess: the floor's tone */
+  --room-umber-tray: var(--room-umber-floor); /** a tray's recess: the floor's tone */
   --elevation-key-fill: var(--material-key); /** deprecated: the face of a key */
   --elevation-plate-fill: var(--material-bg); /** deprecated: plates are the one surface */
   --elevation-cap-fill: var(--role-cap-fill); /** deprecated: the cap's colour */

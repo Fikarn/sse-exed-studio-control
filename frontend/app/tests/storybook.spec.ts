@@ -14,10 +14,12 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 //
 // Of the A primitives the Sheet is captured, which holds every primitive at
 // rest but the header's, the Shell board, which holds those (the tabs, the
-// lamps, the REC tally and the logotype), and the boards of the overlays held
-// open (their names end ", open"); `ui-contract.spec.ts` measures every one of
-// their pages. The shell's page stories are gone (2026-09-28):
-// `visual-review.spec.ts` captures the same boards from the same fixtures. The
+// lamps, the REC tally and the logotype), the Overview board, which holds the
+// Overview's parts (D47: the rooms, the status card, the speed tape), and the
+// boards of the overlays held open (their names end ", open");
+// `ui-contract.spec.ts` measures every one of their pages. The shell's page
+// stories are gone (2026-09-28): `visual-review.spec.ts` captures the same
+// boards from the same fixtures. The
 // visual overhaul's polish (2026-10-05): the old "Design System/Primitives"
 // boards are gone too, their components retired or on the A primitives boards.
 //
@@ -49,6 +51,7 @@ const stories: StoryEntry[] = Object.values(index.entries)
       story.title !== A_PRIMITIVES ||
       story.name.startsWith("Sheet") ||
       story.name === "Shell" ||
+      story.name === "Overview" ||
       story.name.endsWith(", open")
   );
 

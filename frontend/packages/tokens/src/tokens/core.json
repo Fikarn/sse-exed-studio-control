@@ -104,6 +104,14 @@
       "$value": "rgba(246, 245, 232, 0.07)",
       "$description": "the one-pixel light edge along a raised surface's top"
     },
+    "latchTint": {
+      "$value": "rgba(242, 222, 111, 0.07)",
+      "$description": "the Overview's status card (D47): the latch row's faint yellow while something is latched"
+    },
+    "latchEdge": {
+      "$value": "rgba(242, 222, 111, 0.35)",
+      "$description": "the line over that row while something is latched"
+    },
     "bay": {
       "$value": "{material.bg}",
       "$description": "deprecated: the bay is the one surface"
@@ -416,6 +424,133 @@
       "$description": "Heather (was Pink)"
     }
   },
+  "room": {
+    "$description": "The Overview's four rooms (D47): the dark member of four brand pairs, a step lighter than the page, so each room reads as a raised panel in its own tone. Identity, not status, as the colour tags are: a room's tone never means on, engaged, an error or the selection. Inside a room the keys, the lists and the hairlines take its key and its lines (Room.module.css).",
+    "stone": {
+      "$description": "Stone: THE TAKE, where the operator acts",
+      "wall": {
+        "$value": "#1B1E19",
+        "$description": "THE TAKE's wall (act): the room's raised panel"
+      },
+      "lintel": {
+        "$value": "#151813",
+        "$description": "its name band across the top, a step darker than the wall"
+      },
+      "floor": {
+        "$value": "#121410",
+        "$description": "its floor band, a step darker again"
+      },
+      "tray": {
+        "$value": "{room.stone.floor}",
+        "$description": "a tray's recess: the floor's tone"
+      },
+      "key": {
+        "$value": "#282C24",
+        "$description": "a key's face and a list's face in the room"
+      },
+      "line": {
+        "$value": "#30352D",
+        "$description": "the room's hairline: under the name band, between rows, a well's edge"
+      },
+      "line2": {
+        "$value": "#434A3F",
+        "$description": "a key's edge in the room"
+      }
+    },
+    "green": {
+      "$description": "Green: THE PICTURE, where the operator watches",
+      "wall": {
+        "$value": "#112B21",
+        "$description": "THE PICTURE's wall (watch): the room's raised panel"
+      },
+      "lintel": {
+        "$value": "#0C2219",
+        "$description": "its name band across the top, a step darker than the wall"
+      },
+      "floor": {
+        "$value": "#0A1C15",
+        "$description": "its floor band, a step darker again"
+      },
+      "tray": {
+        "$value": "{room.green.floor}",
+        "$description": "a tray's recess: the floor's tone"
+      },
+      "key": {
+        "$value": "#1A3A2D",
+        "$description": "a key's face and a list's face in the room"
+      },
+      "line": {
+        "$value": "#224536",
+        "$description": "the room's hairline: under the name band, between rows, a well's edge"
+      },
+      "line2": {
+        "$value": "#305C4A",
+        "$description": "a key's edge in the room"
+      }
+    },
+    "slate": {
+      "$description": "Slate: THE SCRIPT, where the operator reads",
+      "wall": {
+        "$value": "#12202A",
+        "$description": "THE SCRIPT's wall (read): the room's raised panel"
+      },
+      "lintel": {
+        "$value": "#0D1820",
+        "$description": "its name band across the top, a step darker than the wall"
+      },
+      "floor": {
+        "$value": "#0B141B",
+        "$description": "its floor band, a step darker again"
+      },
+      "tray": {
+        "$value": "{room.slate.floor}",
+        "$description": "a tray's recess: the floor's tone"
+      },
+      "key": {
+        "$value": "#1B2D3B",
+        "$description": "a key's face and a list's face in the room"
+      },
+      "line": {
+        "$value": "#243849",
+        "$description": "the room's hairline: under the name band, between rows, a well's edge"
+      },
+      "line2": {
+        "$value": "#324B5F",
+        "$description": "a key's edge in the room"
+      }
+    },
+    "umber": {
+      "$description": "Umber: THE SOUND, where the operator listens",
+      "wall": {
+        "$value": "#231B12",
+        "$description": "THE SOUND's wall (listen): the room's raised panel"
+      },
+      "lintel": {
+        "$value": "#1A140C",
+        "$description": "its name band across the top, a step darker than the wall"
+      },
+      "floor": {
+        "$value": "#16110A",
+        "$description": "its floor band, a step darker again"
+      },
+      "tray": {
+        "$value": "{room.umber.floor}",
+        "$description": "a tray's recess: the floor's tone"
+      },
+      "key": {
+        "$value": "#30261A",
+        "$description": "a key's face and a list's face in the room"
+      },
+      "line": {
+        "$value": "#3B2F21",
+        "$description": "the room's hairline: under the name band, between rows, a well's edge"
+      },
+      "line2": {
+        "$value": "#50412D",
+        "$description": "a key's edge in the room"
+      }
+    }
+  },
   "prompterGlass": {
     "$description": "The Prompter XL's screen, the glass the presenter reads (docs/design/teleprompter.md 4.1). A picture, never themed: black gives off no light, so the glass shows only the words.",
     "floor": {
@@ -484,7 +619,7 @@
     }
   },
   "elevation": {
-    "$description": "Flat: only the floating layer casts a shadow. The other names are deprecated and draw an edge or nothing, until the pages stop reading them.",
+    "$description": "Flat: only the floating layer casts a shadow. A raised surface carries its one-pixel light edge (D48) and a tray its soft inner edge (D47), both drawn inside. The other names are deprecated and draw an edge or nothing, until the pages stop reading them.",
     "float": {
       "$value": "0 0 0 1px #000000, 0 16px 40px rgba(0, 0, 0, 0.55)",
       "$description": "the floating layer: menu, popover, dialog, drawer, toast (data-level=float)"
@@ -496,6 +631,10 @@
     "edgeLight": {
       "$value": "inset 0 1px 0 var(--material-edge)",
       "$description": "a raised surface's light top edge: a platter, the REC tally (D48)"
+    },
+    "recess": {
+      "$value": "inset 0 1px 1px rgba(0, 0, 0, 0.35)",
+      "$description": "a tray's soft inner edge: keys that belong together, set into one recess (the Overview, D47)"
     },
     "well": {
       "$value": "inset 0 0 0 1px var(--material-line)",
@@ -753,6 +892,10 @@
       "colophon": {
         "$value": "0.14em",
         "$description": "the product's name at the footer's end, SSE Adelia at 14 px (D48)"
+      },
+      "room": {
+        "$value": "0.08em",
+        "$description": "a room's name on the Overview, SSE Adelia at 20 px (D47)"
       },
       "eyebrow": {
         "$value": "0.06em",

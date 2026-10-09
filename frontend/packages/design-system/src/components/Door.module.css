@@ -1,0 +1,42 @@
+/* A room's door (the Overview, D47): a small raised key, 30 high, that opens
+   the room's page. The edge is the key's own (1 px in the second line), the
+   light edge under it; hover lifts the name to the main ink, nothing moves. */
+@layer components {
+  .door {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    height: 30px;
+    padding: 0 11px;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-control);
+    background: var(--material-key);
+    box-shadow: var(--elevation-edge-light);
+    color: var(--text-text2);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--motion-duration-press) var(--motion-easing-mech);
+  }
+
+  .door:hover:not(:disabled) {
+    color: var(--text-text);
+  }
+
+  .door:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .door:disabled {
+    color: var(--text-text4);
+    cursor: not-allowed;
+  }
+
+  /* SSE Adelia's arrow, a step larger than the name. */
+  .arrow {
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-display);
+  }
+}
