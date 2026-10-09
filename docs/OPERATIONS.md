@@ -5,8 +5,8 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 ## Before a session
 
 1. Start TotalMix FX and Companion, and vMix when the cameras are used.
-2. Start the verified build: `Studio Control.cmd` in the builds folder. It opens fullscreen on the studio display, on the page last used. (Until the first build is verified there, the studio's build is the one in `release\native\windows\` in the repository.)
-3. On Audio's Console press `Sync from TotalMix`: after every start the Console reads `ASSUMED` until it has read the desk, and its meters wait.
+2. Start the verified build: `Studio Control.cmd` in the builds folder. It opens fullscreen on the studio display, on the Overview, whatever page was open when it closed (on Setup / Support while the setup is not published). (Until the first build is verified there, the studio's build is the one in `release\native\windows\` in the repository.)
+3. Press `Sync from TotalMix`, which the Overview's state display offers: after every start the Console reads `ASSUMED` until it has read the desk, and its meters wait.
 4. Read the header's lamps. `Lighting`, `Audio`, `Prompter` and `Surface` should be green and read `ready`. `Cameras` reads `not set up` until the links to the cameras are built. `Prompter` reads `not connected` while the Prompter XL is unplugged.
 5. Look up any other word under [When something goes wrong](#when-something-goes-wrong).
 6. If `Lighting` reads `held`, nothing reaches the rig. Look at the Lighting page and its `DMX monitor`: that is what the rig will get. Then set `Light outputs` to `ARMED` in Setup / Support.
@@ -14,7 +14,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 ## The screen
 
-**Header.** `Studio Control` at the left; then the tabs, `Setup / Support`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`. Each page's tab carries that page's lamp with its worst state as a word: green is fine, amber wants attention, red is a fault. The open page's tab carries none, because its state display says it, but keeps the room of it, so no tab moves when the page changes. Before the app is ready the lamps are hollow and read `pending`, or `not read` after a start that failed. The deck's lamp, `Surface`, follows the tabs; pressing it opens Setup / Support. The SSE logotype stands at the right.
+**Header.** The SSE logotype at the left; then the pages on one platter, `Overview`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`, the open one in dark green. Each page's tab carries that page's lamp with its worst state as a word: green is fine, amber wants attention, red is a fault. The Overview's tab carries none, since the page shows every page, and the open page's tab carries none, because its state display says it, but keeps the room of it, so no tab moves when the page changes. Before the app is ready the lamps are hollow and read `pending`, or `not read` after a start that failed. At the right, on a second platter, the deck's lamp `Surface`, the backup and the latches, and `Setup / Support` last; pressing a lamp opens Setup / Support. Then `REC` on a platter of its own, and the clock. The product's name ends the footer.
 
 - `Lighting`. `ready`: the bridge passed its last probe, and answers during the session. `not answering`: it has stopped answering (the app looks every 5 s); nothing is locked. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `unreachable`: the probe has not passed. `no output`: the light output could not open its port, so nothing reaches the rig; arming does not help, restarting the hardware link does.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
@@ -23,13 +23,25 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 - `Surface`. `ready`: Companion, with the profile and its token, asked the app in the last 5 s (it asks once a second, whether the Stream Deck is plugged in or not). `no deck`, amber: it has not; Companion may be closed, or its profile lacks the right token. Nothing locks. `unavailable`: the app could not open its port. That the deck itself answers, Setup's `Verify live echo` shows.
 - `Backup`, amber, after `Surface`, only while something is wrong: `failed` when the automatic backup could not be written, `overdue` when none has been written for two days. Pressing it opens Setup / Support, where the backups are.
 
-A latch shows while something is on, on every page but its own, which shows it itself: `SOLO` (the Console shows it in its latch slot; on Lighting, which has a Solo of its own, it reads `AUDIO SOLO`), `SCENE DRIFT` (only while the Lighting tab says something worse than `unsaved`). Pressing it opens its page. `REC` has a slot of its own before the clock, on every page: quiet while nothing records, `REC CAM 1` in coral while CAM 1 records, amber `last known` when CAM 1 stopped answering while it recorded, amber `not read while released` while CAM 1 is released. Pressing it opens the Cameras page. The clock comes last.
+A latch shows while something is on, on every page but its own, which shows it itself: `SOLO` (the Console shows it in its latch slot; on Lighting, which has a Solo of its own, it reads `AUDIO SOLO`), `SCENE DRIFT` (only while the Lighting tab says something worse than `unsaved`). Pressing it opens its page. On the Overview none shows in the header: the page shows them all in its latch slot. `REC` has a slot of its own before the clock, on every page: quiet while nothing records, `REC CAM 1` in coral while CAM 1 records, amber `last known` when CAM 1 stopped answering while it recorded, amber `not read while released` while CAM 1 is released. Pressing it opens the Cameras page. The clock comes last.
 
 **Page.** The cluster on the left, the bay in the middle, the plate on the right. The state display, top left, says what is true in one word and one sentence of at most two lines (point at a sentence cut short to read it whole), and offers the way out as a key; its `⋯` opens the page's menu. Under it, the latch slot shows what is latched and the key that clears it, or `Nothing latched`. The footer holds the page's facts, such as `Metering TotalMix · live`.
 
 **Keys.** Amber is switched on, green is running now, a red lamp is a hazard that is on. A dashed, dim key is locked: point at it to read why. A `press twice` key arms at the first press, reads `ARMED · press again` and counts down 4.5 s (3 s for the cameras' stop and for a press that would unpublish the setup). A second press, 0.35 s later at the earliest, applies it. `Esc` cancels.
 
 **Keyboard.** No shortcuts. Tab, Enter and Space, typing, the arrows on a slider or a list, and `Esc` do what they do in any program.
+
+## The Overview
+
+The page the app opens on (D47). It shows every page's key facts at once, so a take can be watched (the picture, the script, the levels) while the deck's dials are turned, and the deck turns to `PROMPTER` while it is open. The status card stands where every page's state display does, and four rooms, one for each job, hold the rest, each with a door to its own page (`Cameras →`, `Teleprompter →`, `Audio →`).
+
+- **The status card.** Its word is the worst page's, with that page's sentence, the page named first (`Console: …`, `Cameras: …`), and its way out: `Sync from TotalMix`, sent from here as the Console sends it, or `Open Cameras`, `Open Setup` and the like. `READY` while every link answers, with how many do. The room of the page it names takes the same coral or amber outline. Under a hairline every page's latches: a held clip with the strip's name, the Console's solo, the rig's highlight or solo, each with its `Clear` or `Off`, two at most. The `⋯` holds `Sync from TotalMix`, `Read all cameras again`, `Clear clips` and `Setup / Support`.
+- **THE TAKE** (act). `REC`, as on the Cameras page: one press starts CAM 1, two stop it. The take's length, counted here, CAM 1's timecode, its card time left and its battery. `PLAY`, `BACK` and `TOP`; `− 5`, `+ 5`, `◂ Cue` and `Cue ▸`, as on the Teleprompter page. Under the room, the studio: one row each for the rig's scene, the Console's snapshot (`assumed` with a dashed amber outline until TotalMix is read), the Prompter XL, the pictures and the deck.
+- **THE PICTURE** (watch). CAM 1 large, and beside it CAM 2, CAM 3 and CAM 1's loupe; a press on CAM 1 moves the loupe there. `Guides`, `Zebras 95 %` and the loupe's `2:1` and `4:1` are the screen's own and the Cameras page's too: what is set on one stands on the other until the app closes.
+- **THE SCRIPT** (read). The speed as a tape that moves one tick for each detent of the deck's `SPEED` dial. For a moment after the deck turns it the pointer is outlined and reads `turned on the deck`; while CAM 1 records it says the speeds of this take. Beside it the glass's own text, cropped to its column, then the place, the time left with when the script ends, and the next three cues with the time until each at this speed: turn the knob and they follow. The whole script lies along the floor; here it only shows.
+- **THE SOUND** (listen). Main Out's level and `M`, with its meter; the inputs TotalMix shows, each with its level into Main Out and its `M`, over one meter bridge on the Console's scale; Phones 1 and 2 on the floor. While the Console is not sure of the desk the meters wait and say why, as on the Console.
+
+The footer counts CAM 1's takes today with the minutes recorded, and says when the Console last read the desk and when the last backup was made.
 
 ## Lighting
 
@@ -167,7 +179,7 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 
 ## Setup / Support
 
-`Runner`, `Support`, `Cameras` and `Console` choose what the bay shows. The plate on the right is always Support. The state display's `⋯` holds `Export backup`, `Open the log` and `Back to the Console`, which opens the Console once the setup is published. A step's sentence, and a section's, is the tooltip on its name.
+`Runner`, `Support`, `Cameras` and `Console` choose what the bay shows. The plate on the right is always Support. The state display's `⋯` holds `Export backup`, `Open the log` and `Back to the Overview`, which opens the Overview once the setup is published. A step's sentence, and a section's, is the tooltip on its name.
 
 **The runner's steps**
 
@@ -175,9 +187,9 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. Each probe saves the address it asks, whether it passes or not: the lights and the Console follow it. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed until the probes run again, even after the lamp turns `ready`: Setup reads `SETUP REQUIRED` before a publish, `DEGRADED` after one with the override. On a published setup, running the probes again unpublishes it first (below).
 3. `Map bindings` shows the deck's four pages as the profile draws them: the eight keys (the page key dark green, a dark key black), the strip under them, and each dial under its cell of the strip: its push reads `PUSH`, then its two turns.
 4. `Verify live echo`: a control pressed on the deck lights its cell on screen. A key of another page turns the screen to that page.
-5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
+5. `Publish` unlocks the pages, exports a backup and opens the Overview. Over a probe that is not green it asks first and records it.
 
-On a published setup, a step, `Back to …` and `Run all probes` read `press twice`. The first press arms the key, dark red with a 3 s countdown, in its own place and height; the state display says where the second press goes and that `Lighting`, `Audio`, `Cameras` and `Teleprompter` would lock, and a second press within 3 s unpublishes the setup. They stay locked until `Publish setup` is pressed again. The devices and the deck keep working. A press on `Publish`, the step a published setup stands on, does nothing. Leave the runner alone during a session; the Console has its own `Run audio probe`.
+On a published setup, a step, `Back to …` and `Run all probes` read `press twice`. The first press arms the key, dark red with a 3 s countdown, in its own place and height; the state display says where the second press goes and that every page but Setup / Support would lock, and a second press within 3 s unpublishes the setup. They stay locked until `Publish setup` is pressed again. The devices and the deck keep working. A press on `Publish`, the step a published setup stands on, does nothing. Leave the runner alone during a session; the Console has its own `Run audio probe`.
 
 **Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` reads `ARMED` or `HELD`, with `Armed` and `Held` under it; arming sends the current state at once. `Prompter XL` shows what Windows reports.
 

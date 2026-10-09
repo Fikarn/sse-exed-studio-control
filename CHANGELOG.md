@@ -8,6 +8,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Overview, a new page and the one the app opens on at every start: the worst page's state with its way out, every page's latches, REC and the prompter's take keys, CAM 1 with CAM 2, CAM 3 and a loupe, the glass with the speed as a tape that follows the deck's `SPEED` dial and the cues' times, and the levels with their mutes, in four rooms (#337).
+- Setup's `Publish` and `Back to the Overview` open the Overview. The aids and the loupe set on Cameras or the Overview stand on both until the app closes (#337).
 - Keys and tabs draw their labels as the design system sets them: bold, and a small key's at label size (`Clear all`, `Export backup`, `Paste`). Until now the app drew them in the regular weight of the page around them, because its styles were stacked in the wrong order; the Storybook boards already drew them this way (#336).
 - The header is a raised bar on every page: the SSE logotype at the left, the pages on one platter with the open page in Dark Green, the deck's lamp, the latches and `Setup / Support` on a second platter at the right, `REC` on a platter of its own and the clock at the far right. `Studio Control` left the header and ends the footer, which takes the header's surface (#335).
 - The deck's profile turns the deck to `PROMPTER` while the Overview is open, for its `SPEED` dial during a take; the page itself comes next. It takes effect after the next export of the profile and a Full Reset & Import in Companion (#334).

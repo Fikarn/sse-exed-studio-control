@@ -2,7 +2,7 @@
 
 Written 2026-10-09. The owner asked for an Overview page. It is the program's landing page, and during a take it shows the key facts of every page at once. The owner's example: during a take they turn the speed knob on the deck while watching the camera's picture and the audio levels. This note goes with the board `docs/design/boards/overview-2.html`. Nothing here is built yet. Where the board and this note differ, the board wins.
 
-The same day the owner found the first drawing cluttered: there was nothing to guide the eye. This version groups the page into four **rooms**, an idea taken from the SSE brand reference. The flat version stays beside it, as `overview-2-flat.html`, for comparison.
+The same day the owner found the first drawing cluttered: there was nothing to guide the eye. This version groups the page into four **rooms**, an idea taken from the SSE brand reference. The flat version stayed beside it, as `overview-2-flat.html` (not kept in git), for comparison.
 
 After that the owner asked for a new **header**: the logo at the left, and a header that no longer blends into the page. A Dark Green band came first. The owner liked the direction but not the band, and asked for Apple's design philosophy to be combined with the SSE brand. Section 2 describes the result, the **skylight**. The header belongs to the shell, so it would change on every page. The board shows five headers (`?header=today|skylight|facade|panel|doors`, or the corner panel's `Header` row). The skylight is the default.
 
@@ -181,7 +181,7 @@ A fourth, if the rooms are liked: whether they stay on the Overview, or later re
 
 ## 10. How this board differs from board 1
 
-Board 1 is `overview-1.html` from the same morning's other session. The differences:
+Board 1 is `overview-1.html` (not kept in git) from the same morning's other session. The differences:
 
 - **The rooms.** Board 1 is one flat surface.
 - **The picture.** CAM 1 is 1236 × 695 here against 1040 × 585, and CAM 2, CAM 3 and the loupe are added.
