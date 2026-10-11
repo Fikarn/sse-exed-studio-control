@@ -152,8 +152,9 @@
   white-space: nowrap;
 }
 
+/* A held clip: the meters' hot pink (D50), as the strip's peak well says CLIP. */
 .meterReadout dd[data-tone="clip"] {
-  color: var(--role-coral-text);
+  color: var(--signal-meter-over);
 }
 
 .outputPlate {

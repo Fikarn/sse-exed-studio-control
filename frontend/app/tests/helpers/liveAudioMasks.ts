@@ -20,11 +20,14 @@ export function liveAudioMasks(page: Page): Locator[] {
   // only other per-tick values are the inspector/monitor dB numerals
   // ([data-meter-readout-mode] / the monitor master meter). Masking just those
   // keeps the static mixer / inspector / snapshot-deck / top + monitor bar
-  // layout in the diff so it is actually regression-tested.
+  // layout in the diff so it is actually regression-tested. The Console's strip
+  // (2026-10-11, D50): the painter writes each strip's held peak into its
+  // well's number, so the number is masked and the well stays in the diff.
   return [
     page.locator('[data-meter-component="stereo"]'),
     page.locator("[data-mini-meter-kind]"),
     page.locator('[data-testid="audio-monitor-master-meter"]'),
     page.locator("[data-meter-readout-mode]"),
+    page.locator("[data-peak-well-value]"),
   ];
 }

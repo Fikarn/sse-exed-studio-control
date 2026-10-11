@@ -12,6 +12,7 @@ import { channelOrdinalLabel, channelTypeLabel, type AudioChannelUpdate } from "
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { AUDIO_HIDDEN_STRIP_MENU_LOCK, AUDIO_HIDDEN_STRIP_SENTENCE } from "../audioFormatting";
 import {
+  audioChannelMeterPoint,
   audioChannelSupportsGain,
   audioGroupLabel,
   getAudioChannelGroup,
@@ -115,6 +116,13 @@ function AudioChannelPlate({
     getDraftValue(sendDraftKey, selectedChannelSendLevel(channel, selectedMixTarget?.id ?? null))
   );
   const commitGain = (next: number) => {
+    // A press that does not turn the knob, an arrow at its end or a typed
+    // value the desk already has sends nothing: a click on the strip's knob
+    // only selects the strip (the Console's strip, 2026-10-11, D50).
+    if (next === channel.gain) {
+      clearDraftValueLater(gainDraftKey);
+      return;
+    }
     setDraftValue(gainDraftKey, next);
     commitChannelContinuous({ channelId: channel.id, gain: next });
     clearDraftValueLater(gainDraftKey);
@@ -203,6 +211,7 @@ function AudioChannelPlate({
         ]}
         kind="channel"
         meterId={channel.id}
+        meterPoint={audioChannelMeterPoint(channel)}
         name={channel.name}
         left={channel.meterLeft}
         right={channel.stereo ? channel.meterRight : channel.meterLeft}
@@ -299,6 +308,7 @@ function AudioOutputPlate({
         facts={<Readouts rows={rows} />}
         kind="mixTarget"
         meterId={mixTarget.id}
+        meterPoint="post-fader"
         name={mixTarget.name}
         left={mixTarget.meterLeft}
         right={mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight}

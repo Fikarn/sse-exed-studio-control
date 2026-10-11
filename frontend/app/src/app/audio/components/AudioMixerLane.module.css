@@ -1,7 +1,9 @@
-/* The strip (visual overhaul, the Console): no box, only the selection's Beige
-   keyline. Fixed rows, the same on every strip and in the tier's scale gutter
-   (AudioTieredMixer.module.css), so the scale reads against every groove:
-   name 28 · readout 40 · M and S 48 · tools 28 · the fader in the rest. */
+/* The strip (the Console's strip, 2026-10-11, D50): no box, only the
+   selection's Beige keyline. Fixed rows, the same on every strip and in the
+   tier's scale gutter (AudioTieredMixer.module.css), with the spaces between
+   them as rows of their own, so space says what belongs together:
+     name 28 · 8 · M S 48 · 16 · 48 V 28 · 6 · knob 60 · 12 · peak 24 · 4 ·
+     meter and fader · 8 · send 24 */
 
 .strip {
   width: var(--console-strip-width);
@@ -26,6 +28,7 @@
 /* Names never wrap: one line, an ellipsis if ever needed; the plate's title
    and the menu's head carry the whole name. */
 .name {
+  grid-row: 1;
   align-self: center;
   min-width: 0;
   overflow: hidden;
@@ -36,11 +39,8 @@
   color: var(--text-text);
 }
 
-.readout {
-  padding: 0;
-}
-
 .keys {
+  grid-row: 3;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
@@ -52,46 +52,53 @@
   padding: 0;
 }
 
-/* 48 V, the gain and the ⋯ share the strip's 134 px: "Playback 11/12" fills
-   the name row exactly, so the ⋯ lives here. */
-.tools {
+/* 48 V on its own line, as wide as M and S together, so the strip's edges run
+   straight down. Armed it is one line: the question, its countdown under it. */
+.phantom {
+  grid-row: 5;
   display: flex;
-  align-items: center;
-  gap: 4px;
   min-width: 0;
 }
 
-/* The hazard key at rest and armed keeps the tools row's height: armed it is
-   one line, the question and the countdown under it. */
 .phantomKey {
+  width: 100%;
   height: 28px;
   min-height: 28px;
-  flex: none;
   gap: 6px;
   padding: 0 6px;
   flex-direction: row;
   align-items: center;
 }
 
-.gain {
-  padding-left: 2px;
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-text2);
-  white-space: nowrap;
-}
-
-.unit {
-  font-size: var(--font-size-tick);
-  color: var(--text-text3);
-}
-
-/* The strip's ⋯ at the tools row's end: shown on hover, while the strip is
-   selected or holds the focus, and while its menu is open. It keeps its place
-   when hidden, so nothing moves when it shows. */
-.menu {
+/* A strip TotalMix hides (Setup's list, 2026-10-08): its word stands where a
+   preamp's 48 V would be. */
+.hiddenWord {
+  grid-row: 5;
   display: inline-flex;
-  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* The gain knob on the strip's axis; the ⋯ at its side, on its centre line. */
+.knobRow {
+  grid-row: 7;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The strip's ⋯: shown on hover, while the strip is selected or holds the
+   focus, and while its menu is open. It keeps its place when hidden, so
+   nothing moves when it shows. */
+.menu {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  display: inline-flex;
+  transform: translateY(-50%);
   opacity: 0;
 }
 
@@ -102,11 +109,75 @@
   opacity: 1;
 }
 
+/* The peak's row: the well over the meter, a space the fader's width beside
+   it, so the pair stands as the meter and the fader do. */
+.peak {
+  grid-row: 9;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.peak::after {
+  content: "";
+  width: 28px;
+  flex: none;
+}
+
+/* The held peak: a small well the meter's width, 14 px in the second ink, so
+   it is a display and not the strip's headline. */
+.peakWell {
+  width: 64px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+/* Before the first frame, and while the meters wait: minus infinity. */
+.peakValue:empty::before {
+  content: "\2212\221E";
+}
+
+.peakWell[data-peak-level="floor"],
+.peakValue:empty {
+  color: var(--text-text3);
+}
+
+.peakWell[data-peak-level="hot"] {
+  color: var(--signal-meter-over);
+}
+
+/* A clip held: CLIP in the meters' hot pink, with its keyline, until it is cleared. */
+.peakWell[data-clip] {
+  color: var(--signal-meter-over);
+  border-color: var(--signal-meter-over);
+}
+
+.peakWell[data-clip] .peakValue {
+  display: none;
+}
+
+.clipWord {
+  font: 700 var(--font-size-tick) / 1 var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+}
+
+/* The meter, the strip's hero, and at its right the fader, 10 px apart. */
 .fader {
+  grid-row: 11;
   display: flex;
   justify-content: center;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
 }
 
@@ -114,9 +185,19 @@
   height: 100%;
 }
 
-/* A strip TotalMix hides (Setup's list, 2026-10-08): its word stands in the
-   tools row, where a preamp's keys would be; the ⋯ keeps its place. */
-.hiddenWord {
-  display: inline-flex;
-  min-width: 0;
+/* The live painter draws the level, the peak and the held peak over the bars;
+   the meter's own fill and tick are what shows without it. */
+[data-canvas-metering] .meter [data-meter-fill],
+[data-canvas-metering] .meter [data-meter-peak] {
+  opacity: 0;
+}
+
+/* The level it sends, under its fader: its right edge on the fader's. */
+.send {
+  grid-row: 13;
+  justify-self: end;
+  height: 24px;
+  margin-right: 12px;
+  padding: 0 3px;
+  color: var(--text-text2);
 }

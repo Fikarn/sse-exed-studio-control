@@ -1,5 +1,7 @@
-/* The Console's rotary control (visual overhaul, the Console): the arc in the
-   cap's matte light on the line, its value in PT Sans under it. */
+/* The Console's rotary control (the Console's strip, 2026-10-11, D50): the
+   ring in the cap's matte light on the line, the notch across it in the
+   text's ink, the face a key's face with its edge; its value in PT Sans on
+   the face, or under it. */
 
 .knobWrap {
   display: flex;
@@ -13,14 +15,32 @@
   position: relative;
   width: var(--knob-size, 52px);
   height: var(--knob-size, 52px);
+  flex: none;
   cursor: ns-resize;
   user-select: none;
   touch-action: none;
-  display: grid;
-  place-items: center;
   outline: 1px solid transparent;
   outline-offset: 1px;
   border-radius: var(--radius-pill);
+}
+
+/* The notch reaches past the ring, a little outside the box. */
+.knob svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.face {
+  fill: var(--material-key);
+  stroke: var(--material-line2);
+  stroke-width: 1;
+}
+
+/* Doubt: the dashed yellow keyline on the value, which is the knob's face. */
+.knobWrap[data-doubt] .face {
+  stroke: var(--role-yellow-line);
+  stroke-dasharray: 3 2;
 }
 
 /* Before a press: a hairline ring says the knob answers a drag. */
@@ -54,14 +74,12 @@
   white-space: nowrap;
 }
 
-/* The value inside the dial (the preamp's gain). */
+/* The value on the face: the number over its unit, the pair centred on the
+   face as one, so the number stands a little above the middle (the plate's
+   72 px knob; the strip's 56 px one below). */
 .valueInside {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
   font-family: var(--font-family-ui);
   font-variant-numeric: tabular-nums;
@@ -69,13 +87,32 @@
   color: var(--text-text);
 }
 
+.valueInsideValue,
+.valueInsideUnit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .valueInsideValue {
+  top: 20px;
   font-size: var(--font-size-word);
   font-weight: 700;
 }
 
 .valueInsideUnit {
+  top: 44px;
   font-size: var(--font-size-tick);
   color: var(--text-text3);
-  margin-top: 4px;
+}
+
+.knob[data-face="small"] .valueInsideValue {
+  top: 15px;
+  font-size: var(--font-size-head);
+}
+
+.knob[data-face="small"] .valueInsideUnit {
+  top: 33px;
 }

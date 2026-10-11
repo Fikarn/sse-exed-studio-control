@@ -59,9 +59,9 @@
   background: var(--material-well);
 }
 
-/* A held clip: the slot's edge in coral. */
+/* A held clip: the slot's edge in the meters' hot pink (D50). */
 .stereoMeter[data-clip="true"] .meterTrack {
-  border-color: var(--role-coral-text);
+  border-color: var(--signal-meter-over);
 }
 
 .meterFill {
