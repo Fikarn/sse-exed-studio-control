@@ -16,8 +16,9 @@
 //! - helper to shell: `hello`, with its process, so the shell can hand it a
 //!   surface;
 //! - shell to helper: `surface`, the handle as it is in the helper's process,
-//!   and `scene`, at every change: where each picture stands, which part of
-//!   it, the aids drawn over it and where the loupe looks.
+//!   and `scene`, at every change: where each picture stands, the radius of
+//!   its corners, which part of it, the aids drawn over it and where the
+//!   loupe looks.
 
 use serde::{Deserialize, Serialize};
 
@@ -56,6 +57,10 @@ pub struct ReportedPicture {
     pub camera: u8,
     /// Where it stands in the window.
     pub at: CssRect,
+    /// Its corners' radius: its place's, which rounds the page's own drawing
+    /// in a browser. A page that says none has square corners.
+    #[serde(default)]
+    pub radius: f64,
     pub part: Part,
     /// Smoothed when scaled; the loupe shows each pixel as it is.
     pub smooth: bool,
@@ -110,6 +115,10 @@ pub struct PictureRect {
 pub struct PlacedPicture {
     pub camera: u8,
     pub at: PictureRect,
+    /// Its corners' radius: the helper leaves what lies outside the rounded
+    /// corners clear, so the page under them shows.
+    #[serde(default)]
+    pub radius: u32,
     pub part: Part,
     pub smooth: bool,
     pub guides: bool,
@@ -175,6 +184,20 @@ fn edges(rect: &CssRect, scale: f64) -> Option<(i64, i64, i64, i64)> {
     ))
 }
 
+/// A picture's corner radius in CSS pixels as physical pixels, rounded as an
+/// edge is, and at most half the picture's shorter side, as the helper draws
+/// it. A radius that is not a number or is below zero is none: the corners
+/// are square, and the picture is still drawn.
+fn corner(css: f64, scale: f64, at: &PictureRect) -> u32 {
+    let physical = (css * scale).round();
+    if physical.is_finite() && physical > 0.0 {
+        // Within half the shorter side, so the cast is exact.
+        physical.min(f64::from(at.width.min(at.height) / 2)) as u32
+    } else {
+        0
+    }
+}
+
 /// A rectangle inside the surface, clipped to it; `None` when nothing of it
 /// is inside.
 fn inside(
@@ -214,7 +237,9 @@ fn part_fits(part: &Part) -> bool {
 /// a camera that is not one of the three, with a part outside the picture,
 /// or that lies wholly outside the bay is left out, and so is a hole outside
 /// the bay; more than the scene holds are left out too. A picture the bay
-/// cuts keeps its whole rectangle, so its part stays the part drawn.
+/// cuts keeps its whole rectangle, so its part stays the part drawn. A radius
+/// no page would say squares the picture's corners (`corner`) and never
+/// leaves the picture out: a refused scene would hide every picture.
 pub fn placement(report: &PlaceReport) -> Option<Placement> {
     if !report.showing || !report.scale.is_finite() || report.scale <= 0.0 || report.scale > 8.0 {
         return None;
@@ -241,14 +266,16 @@ pub fn placement(report: &PlaceReport) -> Option<Placement> {
                     .ok()
                     .filter(|length| (1..=MAX_PIXELS).contains(length))
             };
+            let at = PictureRect {
+                x: i32::try_from(left - origin.0).ok()?,
+                y: i32::try_from(top - origin.1).ok()?,
+                width: length(right - left)?,
+                height: length(bottom - top)?,
+            };
             Some(PlacedPicture {
                 camera: picture.camera,
-                at: PictureRect {
-                    x: i32::try_from(left - origin.0).ok()?,
-                    y: i32::try_from(top - origin.1).ok()?,
-                    width: length(right - left)?,
-                    height: length(bottom - top)?,
-                },
+                radius: corner(picture.radius, report.scale, &at),
+                at,
                 part: picture.part,
                 smooth: picture.smooth,
                 guides: picture.guides,
@@ -285,7 +312,8 @@ impl Scene {
     /// A scene as the helper takes it: a size a surface may have, at most
     /// `MAX_PICTURES` pictures and `MAX_HOLES` holes, each hole inside the
     /// surface, each picture partly inside it at least, of one of the three
-    /// cameras, with a part inside the picture.
+    /// cameras, with a part inside the picture. A radius is not held here:
+    /// the helper's shader holds it to half the place's shorter side.
     pub fn check(&self) -> Result<(), String> {
         if !(1..=MAX_PIXELS).contains(&self.width) || !(1..=MAX_PIXELS).contains(&self.height) {
             return Err(format!("a surface of {} × {}", self.width, self.height));
@@ -365,7 +393,7 @@ mod tests {
     };
 
     /// The Cameras page at 2560 × 1440: the bay, the big picture, a small one
-    /// with its chip, and the loupe.
+    /// with its chip, and the loupe, each rounded at 4 as their places are.
     fn report(scale: f64) -> PlaceReport {
         PlaceReport {
             showing: true,
@@ -375,6 +403,7 @@ mod tests {
                 ReportedPicture {
                     camera: 1,
                     at: css(444.0, 138.0, 1680.0, 945.0),
+                    radius: 4.0,
                     part: WHOLE,
                     smooth: true,
                     guides: true,
@@ -385,6 +414,7 @@ mod tests {
                 ReportedPicture {
                     camera: 2,
                     at: css(444.0, 1095.0, 544.0, 306.0),
+                    radius: 4.0,
                     part: WHOLE,
                     smooth: true,
                     guides: false,
@@ -395,6 +425,7 @@ mod tests {
                 ReportedPicture {
                     camera: 1,
                     at: css(1556.0, 1129.0, 568.0, 272.0),
+                    radius: 4.0,
                     part: LOUPE,
                     smooth: false,
                     guides: false,
@@ -421,6 +452,7 @@ mod tests {
                 height: 945
             }
         );
+        assert_eq!(placed.scene.pictures[0].radius, 4);
         assert_eq!(placed.scene.pictures[2].part.width, 284);
         assert!(!placed.scene.pictures[2].smooth);
         assert_eq!(
@@ -433,6 +465,38 @@ mod tests {
             }]
         );
         assert_eq!(placed.scene.check(), Ok(()));
+    }
+
+    // A picture's corners take its place's radius, scaled and rounded as an
+    // edge is. A radius no page would say leaves them square, and one larger
+    // than the picture can hold is half its shorter side: the picture is
+    // drawn either way.
+    #[test]
+    fn a_picture_s_corners_take_its_place_s_radius() {
+        let radii = |scale: f64, radius: f64| {
+            let mut rounded = report(scale);
+            for picture in &mut rounded.pictures {
+                picture.radius = radius;
+            }
+            let placed = placement(&rounded).expect("a placement");
+            assert_eq!(placed.scene.check(), Ok(()));
+            placed
+                .scene
+                .pictures
+                .iter()
+                .map(|picture| picture.radius)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(radii(1.0, 8.0), [8, 8, 8]);
+        assert_eq!(radii(1.25, 8.0), [10, 10, 10]);
+        assert_eq!(radii(1.25, 4.0), [5, 5, 5]);
+        assert_eq!(radii(1.0, 0.0), [0, 0, 0]);
+        assert_eq!(radii(1.0, 0.4), [0, 0, 0], "less than half a pixel");
+        for odd in [-8.0, -0.6, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(radii(1.0, odd), [0, 0, 0], "a radius of {odd}");
+        }
+        // 1680 × 945, 544 × 306 and the loupe's 568 × 272.
+        assert_eq!(radii(1.0, 1e9), [472, 153, 136]);
     }
 
     // The aids and the marker are the page's to say and pass as they are;
@@ -467,6 +531,7 @@ mod tests {
             ReportedPicture {
                 camera: 1,
                 at: css(444.5, 100.0, 100.0, 50.0),
+                radius: 0.0,
                 part: WHOLE,
                 smooth: true,
                 guides: false,
@@ -477,6 +542,7 @@ mod tests {
             ReportedPicture {
                 camera: 2,
                 at: css(544.5, 100.0, 100.3, 50.0),
+                radius: 0.0,
                 part: WHOLE,
                 smooth: true,
                 guides: false,
@@ -536,6 +602,7 @@ mod tests {
         odd.pictures.push(ReportedPicture {
             camera: 3,
             at: css(1000.0, 1095.0, 544.0, 306.0),
+            radius: 4.0,
             part: WHOLE,
             smooth: true,
             guides: false,
@@ -577,6 +644,7 @@ mod tests {
             ReportedPicture {
                 camera: 2,
                 at: css(444.0, 1091.0, 544.0, 306.0),
+                radius: 4.0,
                 part: WHOLE,
                 smooth: true,
                 guides: false,
@@ -587,6 +655,7 @@ mod tests {
             ReportedPicture {
                 camera: 1,
                 at: css(1556.0, 1125.0, 568.0, 272.0),
+                radius: 4.0,
                 part: Part {
                     x: 818,
                     y: 472,
@@ -603,6 +672,7 @@ mod tests {
             ReportedPicture {
                 camera: 3,
                 at: css(400.0, 50.0, 544.0, 306.0),
+                radius: 4.0,
                 part: WHOLE,
                 smooth: true,
                 guides: false,
@@ -649,11 +719,12 @@ mod tests {
         let read: PlaceReport = serde_json::from_str(
             r#"{"showing":true,"scale":1,"bay":{"x":428,"y":76,"width":1712,"height":1344},
                 "pictures":[{"camera":1,"at":{"x":444,"y":138,"width":1680,"height":945},
-                "part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,
+                "radius":8,"part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,
                 "guides":false,"zebras":true,"peaking":false,"marker":null}],"holes":[]}"#,
         )
         .expect("a report");
         assert_eq!(read.pictures[0].at, css(444.0, 138.0, 1680.0, 945.0));
+        assert_eq!(read.pictures[0].radius, 8.0);
         assert!(read.pictures[0].zebras && !read.pictures[0].guides);
         assert_eq!(read.pictures[0].marker, None);
         assert!(serde_json::from_str::<PlaceReport>(r#"{"showing":true}"#).is_err());
@@ -663,6 +734,14 @@ mod tests {
                 "part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true}"#
         )
         .is_err());
+        // One that says nothing of the corners has square ones.
+        let square: ReportedPicture = serde_json::from_str(
+            r#"{"camera":1,"at":{"x":0,"y":0,"width":1,"height":1},
+                "part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,
+                "guides":false,"zebras":false,"peaking":false,"marker":null}"#,
+        )
+        .expect("a picture");
+        assert_eq!(square.radius, 0.0);
     }
 
     #[test]
@@ -678,13 +757,21 @@ mod tests {
         let scene = placement(&report(1.0)).expect("a placement").scene;
         let line = to_line(&ToLayerHelper::Scene(scene.clone()));
         assert!(
-            line.starts_with(r#"{"type":"scene","width":1712,"height":1344,"pictures":[{"camera":1,"at":{"x":16,"y":62,"width":1680,"height":945},"part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,"guides":true,"zebras":true,"peaking":true,"marker":{"x":818,"y":472,"width":284,"height":136}},"#),
+            line.starts_with(r#"{"type":"scene","width":1712,"height":1344,"pictures":[{"camera":1,"at":{"x":16,"y":62,"width":1680,"height":945},"radius":4,"part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,"guides":true,"zebras":true,"peaking":true,"marker":{"x":818,"y":472,"width":284,"height":136}},"#),
             "{line}"
         );
         assert_eq!(
             from_line::<ToLayerHelper>(&line),
-            Ok(ToLayerHelper::Scene(scene))
+            Ok(ToLayerHelper::Scene(scene.clone()))
         );
+        // A shell that says nothing of the corners asks for square ones.
+        let Ok(ToLayerHelper::Scene(square)) =
+            from_line::<ToLayerHelper>(&line.replace(r#""radius":4,"#, ""))
+        else {
+            panic!("a scene without radii: {line}")
+        };
+        assert!(square.pictures.iter().all(|picture| picture.radius == 0));
+        assert_eq!(square.pictures.len(), scene.pictures.len());
         assert!(from_line::<ToLayerHelper>(r#"{"type":"frame"}"#).is_err());
         assert!(from_line::<FromLayerHelper>(r#"{"type":"hello","pid":-1}"#).is_err());
     }
@@ -710,6 +797,7 @@ mod tests {
                 PlacedPicture {
                     camera: 3,
                     at: far,
+                    radius: MAX_PIXELS / 2,
                     part: Part {
                         x: 1919,
                         y: 1079,

@@ -1036,6 +1036,7 @@ mod tests {
                     width: 1920,
                     height: 1080,
                 },
+                radius: 0,
                 part: WHOLE,
                 smooth: false,
                 guides,

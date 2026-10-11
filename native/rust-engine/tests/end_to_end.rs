@@ -726,7 +726,7 @@ fn the_helper_says_the_secret_and_hello_to_the_shell_s_listener_while_the_page_s
 
     // A scene with no surface to draw it into: the helper takes it, draws
     // nothing and says nothing. Written as the shell writes it, so that it is
-    // one the helper reads, aids and marker included.
+    // one the helper reads, aids, marker and corners included.
     let scene = ToLayerHelper::Scene(Scene {
         width: 1712,
         height: 1344,
@@ -738,6 +738,7 @@ fn the_helper_says_the_secret_and_hello_to_the_shell_s_listener_while_the_page_s
                 width: 1680,
                 height: 945,
             },
+            radius: 4,
             part: Part {
                 x: 0,
                 y: 0,

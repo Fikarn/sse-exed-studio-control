@@ -1022,6 +1022,7 @@ mod tests {
                         width: 480,
                         height: 270,
                     },
+                    radius: 0,
                     part: Part {
                         x: 0,
                         y: 0,
