@@ -67,7 +67,8 @@
 }
 
 /* The picture's area is exactly the picture: its edge is an outline outside
-   it, not a border inside it. */
+   it, not a border inside it. Its corners, the loupe's too, are the helper's
+   picture's in the app's window (`PICTURE_RADIUS` in `CamerasBay.tsx`). */
 .hero,
 .tile {
   appearance: none;

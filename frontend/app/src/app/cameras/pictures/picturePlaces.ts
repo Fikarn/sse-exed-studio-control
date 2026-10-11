@@ -6,9 +6,9 @@ import type { PictureCamera, PicturePlaces, PlaceRect, PlacedPicture } from "@ss
 // Where the Cameras page's pictures stand (the camera pictures, D30). In the app's window
 // the pictures helper draws the pictures itself, in a layer over the page, and the page
 // is the one authority for what is where: it measures its own layout and says the bay's
-// box, each picture's box and part, its aids and where the loupe looks, and what it draws
-// over a picture (a small picture's chip, a message, a tooltip, a menu, a popover), which
-// the helper leaves clear. The design system says what floats (`floatingLayers`): every
+// box, each picture's box, corner radius and part, its aids and where the loupe looks,
+// and what it draws over a picture (a small picture's chip, a message, a tooltip, a menu,
+// a popover), which the helper leaves clear. The design system says what floats (`floatingLayers`): every
 // menu, list, tooltip and element of the floating layer, each counted once, and never a
 // dialog. While a dialog is open (the page's own lists and typed values are popovers since
 // 2026-10-05, so none of them is one), or more stands over the pictures than the helper
@@ -30,6 +30,8 @@ const SAY_AGAIN_MS = 1000;
 export interface MeasuredPicture {
   camera: PictureCamera;
   box: PlaceRect;
+  /** Its corners' radius in CSS pixels: its place's (`data-radius`). */
+  radius: number;
   part: PlaceRect;
   smooth: boolean;
   guides: boolean;
@@ -78,6 +80,7 @@ export function buildPlaces(measured: MeasuredPlaces): PicturePlaces {
     .map((picture) => ({
       camera: picture.camera,
       at: picture.box,
+      radius: picture.radius,
       part: whole(picture.part),
       smooth: picture.smooth,
       guides: picture.guides,
@@ -109,6 +112,12 @@ function partOf(text: string | undefined): PlaceRect | null {
 
 const isCamera = (value: number): value is PictureCamera => value === 1 || value === 2 || value === 3;
 
+/** A corner radius as `data-radius` says it, in CSS pixels: square without one, or with one that is no number of them. */
+function radiusOf(text: string | undefined): number {
+  const radius = Number(text);
+  return Number.isFinite(radius) && radius > 0 ? radius : 0;
+}
+
 /** The bay's layout as it stands now: its pictures (`data-picture`) and what floats over the page. */
 export function measurePlaces(bay: HTMLElement): MeasuredPlaces {
   const pictures: MeasuredPicture[] = [];
@@ -120,6 +129,7 @@ export function measurePlaces(bay: HTMLElement): MeasuredPlaces {
     pictures.push({
       camera,
       box: boxOf(element),
+      radius: radiusOf(element.dataset.radius),
       part,
       smooth: element.dataset.pixels === undefined,
       guides: aids.includes("guides"),
@@ -157,8 +167,8 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
     };
     const changed = () => say(false);
     // A dialog, a message or a tooltip comes and goes as nodes; a picture's part, camera,
-    // aids and marker are attributes of its place; a floating layer that is placed, flips
-    // or arms an item in place says so in an attribute, and its words change as text.
+    // aids, marker and radius are attributes of its place; a floating layer that is placed,
+    // flips or arms an item in place says so in an attribute, and its words change as text.
     const mutations = new MutationObserver(changed);
     mutations.observe(document.body, {
       childList: true,
@@ -171,6 +181,7 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
         "data-pixels",
         "data-aids",
         "data-marker",
+        "data-radius",
         "data-visible",
         "data-placement",
         "data-side",

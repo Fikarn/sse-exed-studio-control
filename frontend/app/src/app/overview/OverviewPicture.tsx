@@ -27,6 +27,12 @@ import styles from "./OverviewPicture.module.css";
 // its point are the Cameras page's (`usePictureView`); this page offers the
 // guides and the zebras, and the peaking stays on Cameras.
 
+/**
+ * The pictures' corners: their wells' `--radius-control` (`OverviewPicture.module.css`).
+ * The helper's pictures cover the page, so they are told it and rounded to it.
+ */
+const PICTURE_RADIUS = 8;
+
 export interface OverviewPictureProps {
   alert: OverviewAlert | null;
   drawnBy: "page" | "helper";
@@ -72,6 +78,7 @@ function Tile({
             part={WHOLE}
             width={OVERVIEW_TILE.width}
             height={OVERVIEW_TILE.height}
+            radius={PICTURE_RADIUS}
             label={`${camera.tag}, ${camera.picture.detail}`}
             testId={`overview-cam${camera.camera}-picture`}
           />
@@ -192,6 +199,7 @@ export function OverviewPicture({ alert, drawnBy, frames, snapshot, view, onOpen
                   height={OVERVIEW_HERO.height}
                   aids={heroAids}
                   marker={loupe}
+                  radius={PICTURE_RADIUS}
                   label={`${cam1.tag}, ${cam1.picture.detail}`}
                   testId="overview-cam1-picture"
                 />
@@ -236,6 +244,7 @@ export function OverviewPicture({ alert, drawnBy, frames, snapshot, view, onOpen
                       height={OVERVIEW_TILE.height}
                       aids={{ guides: false, zebras: aids.zebras, peaking: false }}
                       pixels
+                      radius={PICTURE_RADIUS}
                       label={`${cam1.tag} at ${zoom}:1`}
                       testId="overview-loupe-picture"
                     />

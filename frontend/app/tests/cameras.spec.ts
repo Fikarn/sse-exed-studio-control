@@ -4,7 +4,14 @@ import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm
 import { FULL_PICTURE, testCardUyvy, uyvyToRgba } from "../../packages/engine-client/src/transports/pictureFrame";
 import { STOP_WINDOW_MS } from "../src/app/cameras/perform";
 import { peakingMask, peakingOverlay, zebraMask, zebraOverlay } from "../src/app/cameras/pictures/pictureAids";
-import { openCameraKeyMenu, openCamerasPlateMenu, openFormat, openLook, openTileMenu } from "./helpers/cameras";
+import {
+  openCameraKeyMenu,
+  openCamerasPlateMenu,
+  openFormat,
+  openLook,
+  openTileMenu,
+  pictureCorners,
+} from "./helpers/cameras";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 
@@ -859,22 +866,30 @@ test.describe("the Cameras page", () => {
     expect(hero).toEqual({
       camera: 1,
       at: await boxOf("cameras-hero-picture"),
+      radius: 4,
       part: whole,
       smooth: true,
       ...noAids,
       marker: loupePart,
     });
     expect(hero!.at).toMatchObject({ width: 1680, height: 945 });
-    expect(tile2).toMatchObject({ camera: 2, part: whole, smooth: true, at: { width: 544, height: 306 }, ...noAids });
-    expect(tile3).toMatchObject({ camera: 3, part: whole, smooth: true, at: { width: 544, height: 306 }, ...noAids });
+    const small = { part: whole, smooth: true, at: { width: 544, height: 306 }, radius: 4, ...noAids };
+    expect(tile2).toMatchObject({ camera: 2, ...small });
+    expect(tile3).toMatchObject({ camera: 3, ...small });
     // The loupe shows each pixel as it is: 284 × 136 of the picture at 2:1, around its centre.
     expect(loupe).toEqual({
       camera: 1,
       at: await boxOf("cameras-loupe-picture"),
+      radius: 4,
       part: loupePart,
       smooth: false,
       ...noAids,
     });
+    // Each picture's corners are its place's, the page's --radius-base: the helper's
+    // picture, drawn over the page in the app's window, is rounded where the page is.
+    expect(await pictureCorners(page)).toEqual(
+      [1, 2, 3, 1].map((camera) => ({ camera, reported: 4, wrapper: [4, 4, 4, 4], fills: true }))
+    );
     // Each small picture's chip is a hole in it.
     expect(first.holes).toHaveLength(2);
     for (const [index, tile] of [tile2!, tile3!].entries()) {

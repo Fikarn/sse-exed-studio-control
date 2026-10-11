@@ -13,8 +13,9 @@ import styles from "./CameraPicture.module.css";
 //
 // In the app's window the page draws nothing here (the camera pictures, D30): the
 // pictures helper draws the picture, its aids and the loupe's marker over this place,
-// which the page reports with the others (`picturePlaces.ts` reads `data-camera`,
-// `data-part`, `data-pixels`, `data-aids` and `data-marker`).
+// with the place's rounded corners, which the page reports with the others
+// (`picturePlaces.ts` reads `data-camera`, `data-part`, `data-pixels`, `data-aids`,
+// `data-marker` and `data-radius`).
 //
 // In a browser the page draws it with WebGL2 (`pictureDrawer.ts`), with the zebras and
 // the peaking laid over by the shader, and the guides and the loupe's marker on a canvas
@@ -44,6 +45,11 @@ export interface CameraPictureProps {
   marker?: Rect | null;
   /** Each of the picture's pixels as it is, without smoothing (the loupe). */
   pixels?: boolean;
+  /**
+   * The corners' radius in CSS pixels: the wrapper's, whose rounding clips the page's own
+   * drawing. The helper's picture covers the page, so it is told the radius to round to.
+   */
+  radius?: number;
   label: string;
   className?: string;
   testId?: string;
@@ -105,6 +111,7 @@ function PicturePlace({
   aids = NO_AIDS,
   marker = null,
   pixels = false,
+  radius = 0,
   label,
   className,
   testId,
@@ -121,6 +128,7 @@ function PicturePlace({
       data-pixels={pixels ? "" : undefined}
       data-aids={aidWords(aids)}
       data-marker={markerWords(marker)}
+      data-radius={radius}
       data-drawn="helper"
       data-testid={testId}
     />
@@ -136,6 +144,7 @@ function DrawnPicture({
   aids = NO_AIDS,
   marker = null,
   pixels = false,
+  radius = 0,
   label,
   className,
   testId,
@@ -221,6 +230,7 @@ function DrawnPicture({
       data-pixels={pixels ? "" : undefined}
       data-aids={aidWords(aids)}
       data-marker={markerWords(marker)}
+      data-radius={radius}
       data-testid={testId}
     >
       <canvas ref={picture} className={styles.picture} width={width} height={height} />

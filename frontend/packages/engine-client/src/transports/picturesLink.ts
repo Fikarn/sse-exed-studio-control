@@ -5,8 +5,9 @@ import type { PictureFrame } from "./pictureFrame";
 // In the app's window the page draws no picture: the pictures helper draws them itself,
 // into a layer the shell puts over the page, and the page only says where each picture
 // stands (`place`). What it says is the page's own layout and nothing else: the bay's
-// box, each picture's box and the part of the picture it shows, and what the page draws
-// over a picture. The page holds no secret and never learns where the pictures come from.
+// box, each picture's box, its corners' radius and the part of the picture it shows, and
+// what the page draws over a picture. The page holds no secret and never learns where the
+// pictures come from.
 //
 // In a browser there is no such layer: the page takes the double's test cards (`next`)
 // and draws them itself, as the page tests see them, and says the same places, which the
@@ -27,6 +28,11 @@ export interface PlacedPicture {
   camera: PictureCamera;
   /** Where it stands in the window. */
   at: PlaceRect;
+  /**
+   * Its corners' radius in CSS pixels: its place's, which rounds the page's own drawing in a
+   * browser. The helper rounds its picture to it, so the room shows at the corners.
+   */
+  radius: number;
   /** The part of the camera's 1920 × 1080 picture it shows, in whole pixels. */
   part: PlaceRect;
   /** Smoothed when scaled; the loupe shows each pixel as it is. */

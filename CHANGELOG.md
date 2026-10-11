@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The camera pictures on the Overview and on Cameras have rounded corners, as the wells around them do; until now they were drawn square over them (#338).
 - The Overview, a new page and the one the app opens on at every start: the worst page's state with its way out, every page's latches, REC and the prompter's take keys, CAM 1 with CAM 2, CAM 3 and a loupe, the glass with the speed as a tape that follows the deck's `SPEED` dial and the cues' times, and the levels with their mutes, in four rooms (#337).
 - Setup's `Publish` and `Back to the Overview` open the Overview. The aids and the loupe set on Cameras or the Overview stand on both until the app closes (#337).
 - Keys and tabs draw their labels as the design system sets them: bold, and a small key's at label size (`Clear all`, `Export backup`, `Paste`). Until now the app drew them in the regular weight of the page around them, because its styles were stacked in the wrong order; the Storybook boards already drew them this way (#336).
