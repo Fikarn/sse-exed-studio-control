@@ -2,14 +2,17 @@
    page keeps a 16 px margin in it, so the tiers have 1648 px: Inputs is the
    40 px scale gutter and 4 strips, Playback the gutter and 6, at 150 px a
    strip and 4 px between, and a hairline between the tiers in 28 px. The
-   strips' rows are declared here once, for the strips and the gutters. */
+   strips' rows are declared here once, for the strips and the gutters (the
+   Console's strip, 2026-10-11, D50: the spaces are rows of their own):
+     name 28 · 8 · M S 48 · 16 · 48 V 28 · 6 · knob 60 · 12 · peak 24 · 4 ·
+     meter and fader · 8 · send 24 */
 
 .tieredMixer {
   --console-strip-width: 150px;
   --console-strip-gap: 4px;
   --console-gutter: 40px;
-  --console-strip-rows: 28px 40px 48px 28px minmax(0, 1fr);
-  --console-strip-row-gap: 8px;
+  --console-strip-rows: 28px 8px 48px 16px 28px 6px 60px 12px 24px 4px minmax(0, 1fr) 8px 24px;
+  --console-strip-row-gap: 0;
   --console-strip-padding: 8px 6px;
 
   position: relative;
@@ -126,7 +129,8 @@
 }
 
 /* The gutter has the strip's rows and box, so its scale stands on the
-   grooves' travel (the groove's travel is 14 px inside its box). */
+   meters' travel (the bars run 4 px inside the meter's box), and the unit
+   heads the peaks' column on their row. */
 .gutter {
   width: var(--console-gutter);
   flex: none;
@@ -137,21 +141,36 @@
   border: 2px solid transparent;
 }
 
+.scaleUnit {
+  grid-row: 9;
+  align-self: center;
+  justify-self: end;
+  padding-right: 2px;
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  white-space: nowrap;
+}
+
 .scale {
-  grid-row: 5;
+  grid-row: 11;
   position: relative;
-  margin: 14px 0;
+  margin: 4px 0;
 }
 
 .scaleMark {
   position: absolute;
   right: 2px;
   transform: translateY(50%);
-  padding: 1px 3px;
   font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   color: var(--text-text3);
   white-space: nowrap;
+}
+
+/* −18 dBFS, the working level: the scale's one bold mark. */
+.scaleMark[data-nominal] {
+  font-weight: 700;
+  color: var(--text-text2);
 }
 
 .lanes {

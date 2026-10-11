@@ -188,6 +188,11 @@ export function audioChannelSupportsGain(channel: AudioChannelEntry | null) {
   return channel?.role === "front-preamp";
 }
 
+/** Where a channel's meter taps, as the hardware link names it: a playback pair its playback, every other channel its input. */
+export function audioChannelMeterPoint(channel: AudioChannelEntry): "input" | "playback" {
+  return channel.role === "playback-pair" ? "playback" : "input";
+}
+
 export function audioChannelSupportsPhantom(channel: AudioChannelEntry | null) {
   return channel?.role === "front-preamp";
 }
@@ -256,7 +261,7 @@ function selectedSourceMeta(
   const sendLevel = selectedChannelSendLevel(channel, selectedMixTargetId);
   const tier =
     channel.role === "playback-pair" ? "Playback bus" : channel.role === "front-preamp" ? "Mic preamp" : "Line input";
-  const meterPoint = channel.role === "playback-pair" ? "tap playback" : "tap input";
+  const meterPoint = `tap ${audioChannelMeterPoint(channel)}`;
   return `${tier} · ${channel.stereo ? "stereo" : "mono"} · ${meterPoint} · ${sendLevel <= 0 ? "no send" : `routed to ${targetName}`}`;
 }
 

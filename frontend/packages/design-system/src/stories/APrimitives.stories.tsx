@@ -462,6 +462,12 @@ const FADER_TICKS = [1, 0.66, 0.5, 0.33, 0.2, 0.1];
 /** A strip's column: the groove grows to the column's height and keeps its 44 px. */
 const strip: CSSProperties = { display: "flex", flexDirection: "column", flex: "none" };
 
+/** The Console's strip (D50): the wide meter, then the compact groove 10 px to its right. */
+const consoleStrip: CSSProperties = { display: "flex", gap: 10, height: "100%", flex: "none" };
+
+/** The wide meter's edge ticks: −6, −12, −24 and −40 dBFS on its −60..0 well. */
+const METER_MARKS = [0.9, 0.8, 0.6, 1 / 3];
+
 function PlotSketch() {
   return (
     <svg
@@ -535,6 +541,38 @@ function WellCards() {
           orientation="horizontal"
           style={{ "--master-meter-height": "24px" } as CSSProperties}
         />
+      </Card>
+      <Card title="Compact groove and wide meter · the Console's strip: mono, stereo in doubt, locked">
+        <div style={{ display: "flex", gap: 24, height: 248 }}>
+          <div style={consoleStrip}>
+            <Meter label="SM7B 3" level={0.68} peak={0.82} form="wide" marks={METER_MARKS} />
+            <Groove
+              label="SM7B 3 fader"
+              value={fader}
+              onChange={setFader}
+              ticks={FADER_TICKS}
+              size="compact"
+              unityLabel="0"
+              take
+            />
+          </div>
+          <div style={consoleStrip}>
+            <Meter
+              label="Windows Out"
+              level={0.7}
+              levelRight={0.68}
+              peak={0.86}
+              peakRight={0.84}
+              form="wide"
+              marks={METER_MARKS}
+            />
+            <Groove label="Doubted fader" value={0.8172} ticks={FADER_TICKS} size="compact" unityLabel="0" doubt />
+          </div>
+          <div style={consoleStrip}>
+            <Meter label="SM7B 2" level={0.6} form="wide" marks={METER_MARKS} empty />
+            <Groove label="Locked fader" value={0.6} ticks={FADER_TICKS} size="compact" unityLabel="0" locked />
+          </div>
+        </div>
       </Card>
       <Card title="Field · a value on a well">
         <Fields>

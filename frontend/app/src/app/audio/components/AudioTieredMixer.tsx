@@ -4,8 +4,8 @@ import { Key, MenuButton, Tooltip, type MenuEntry, type UseArmResult } from "@ss
 
 import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
-import { AUDIO_FADER_SCALE_MARKS } from "../audioFaderScale";
-import { audioLockNote, faderDbToNormalized } from "../audioFormatting";
+import { audioLockNote, dbfsToMeterPercent } from "../audioFormatting";
+import { METER_NOMINAL_DBFS } from "../audioMeterDisplayModel";
 import {
   type AudioChannelGroupSelectionRequest,
   type AudioGroupTierId,
@@ -13,6 +13,7 @@ import {
   type AudioWorkspaceViewModel,
 } from "../audioViewModel";
 import { AudioChannelLane } from "./AudioMixerLane";
+import { METER_SCALE_MARKS } from "./AudioStereoMeter";
 
 // The bay (visual overhaul, the Console): the sources only, Inputs (4 a bank)
 // and Playback (6), side by side; the outputs live in the cluster. Each tier is
@@ -20,7 +21,9 @@ import { AudioChannelLane } from "./AudioMixerLane";
 // lock reason when the console is locked, the group filter's words while one
 // is on, the tier's ⋯), then the scale gutter and the strips. The tiers keep
 // their widths whatever a bank holds, so a strip never moves when the bank
-// changes.
+// changes. The gutter prints the meters' scale (the Console's strip,
+// 2026-10-11, D50): the meter is the strip's hero; the fader names its own
+// unity beside its notch.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 
@@ -185,17 +188,20 @@ function AudioTier({
       </div>
 
       <div className={styles.body}>
-        {/* The fader scale, once per tier, on the strips' rows. */}
+        {/* The meters' scale, once per tier, on the strips' rows: dBFS over
+            the peaks' column, the marks against the meters' travel. */}
         <div className={styles.gutter} aria-hidden="true">
-          <span className={styles.scale} data-fader-scale="">
-            {AUDIO_FADER_SCALE_MARKS.map(([db, mark]) => (
+          <span className={styles.scaleUnit}>dBFS</span>
+          <span className={styles.scale} data-strip-scale="">
+            {METER_SCALE_MARKS.map((mark) => (
               <span
-                key={mark}
+                key={mark.dbfs}
                 className={styles.scaleMark}
-                data-fader-scale-mark={mark}
-                style={{ bottom: `${(faderDbToNormalized(db) * 100).toFixed(2)}%` }}
+                data-strip-scale-mark={mark.label}
+                data-nominal={mark.dbfs === METER_NOMINAL_DBFS ? "" : undefined}
+                style={{ bottom: `${dbfsToMeterPercent(mark.dbfs).toFixed(2)}%` }}
               >
-                {mark}
+                {mark.label}
               </span>
             ))}
           </span>

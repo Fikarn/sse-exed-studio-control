@@ -1,10 +1,13 @@
 /**
- * AudioKnob — reusable SVG rotary control for the audio inspector.
+ * AudioKnob — the Console's rotary control: the preamp's gain on the plate and
+ * on each input's strip.
  *
- * Renders a 270° arc (track + accent fill + indicator + hub) with a caption
- * and a monospace value readout, matching the Claude Design "Console"
- * prototype's knob language. Generalised from AudioStripPreamp so the EQ
- * band controls and the inspector preamp hero knob share one widget.
+ * The drawing (the Console's strip, 2026-10-11, D50): a ring that says how
+ * much (the track, and the light arc from the start to the value), a short
+ * notch across the ring that says where, a clear gap, then the face, a key's
+ * face with its edge, which carries the value and nothing else. Round caps on
+ * every stroke; 0 is the lower left, the maximum the lower right. A doubted
+ * value dashes the face's edge in yellow (DESIGN.md §4).
  *
  * Contract mirrors AudioSliderControl so it slots into the existing
  * draft-store commit plumbing: `onPreview(value)` fires continuously during a
@@ -69,6 +72,9 @@ export interface AudioKnobProps {
       instead of as a small readout below. The `caption` becomes the unit. */
   valueInside?: boolean;
   value: number;
+  /** The desk has not confirmed the value: the face's edge is dashed yellow. */
+  doubt?: boolean;
+  testId?: string;
 }
 
 interface DragState {
@@ -94,6 +100,7 @@ export function AudioKnob({
   defaultLabel,
   defaultValue,
   disabled = false,
+  doubt = false,
   format,
   max,
   min,
@@ -104,6 +111,7 @@ export function AudioKnob({
   onRequestTypedEntry,
   size = 52,
   step,
+  testId,
   valueInside = false,
   value,
 }: AudioKnobProps) {
@@ -125,14 +133,17 @@ export function AudioKnob({
     []
   );
 
-  const radius = size / 2 - 4;
+  // The ring 2 px inside the box, the face 6 px inside the ring; the notch
+  // reaches 3.5 px either side of the ring.
+  const radius = size / 2 - 2;
+  const faceRadius = radius - 6;
   const cx = size / 2;
   const cy = size / 2;
   const arcStart = polar(cx, cy, radius, ARC_START_DEG);
   const arcEnd = polar(cx, cy, radius, ARC_END_DEG);
   const arcCurrent = polar(cx, cy, radius, angle);
-  const indicatorStart = polar(cx, cy, radius * 0.42, angle);
-  const indicatorEnd = polar(cx, cy, radius * 0.92, angle);
+  const notchStart = polar(cx, cy, radius - 3.5, angle);
+  const notchEnd = polar(cx, cy, radius + 3.5, angle);
   const trackPath = `M ${arcStart.x.toFixed(2)} ${arcStart.y.toFixed(2)} A ${radius} ${radius} 0 1 1 ${arcEnd.x.toFixed(2)} ${arcEnd.y.toFixed(2)}`;
 
   let fillPath: string;
@@ -143,7 +154,11 @@ export function AudioKnob({
     fillPath = `M ${center.x.toFixed(2)} ${center.y.toFixed(2)} A ${radius} ${radius} 0 ${large} ${sweepDir} ${arcCurrent.x.toFixed(2)} ${arcCurrent.y.toFixed(2)}`;
   } else {
     const sweep = angle - ARC_START_DEG;
-    fillPath = `M ${arcStart.x.toFixed(2)} ${arcStart.y.toFixed(2)} A ${radius} ${radius} 0 ${sweep > 180 ? 1 : 0} 1 ${arcCurrent.x.toFixed(2)} ${arcCurrent.y.toFixed(2)}`;
+    // At the start the arc is nothing: a zero-length path would still draw its round cap.
+    fillPath =
+      norm > 0.004
+        ? `M ${arcStart.x.toFixed(2)} ${arcStart.y.toFixed(2)} A ${radius} ${radius} 0 ${sweep > 180 ? 1 : 0} 1 ${arcCurrent.x.toFixed(2)} ${arcCurrent.y.toFixed(2)}`
+        : "";
   }
 
   // Snap to the knob's step so a stepped control never emits an off-grid value.
@@ -259,7 +274,12 @@ export function AudioKnob({
   };
 
   return (
-    <div className={styles.knobWrap} data-bipolar={bipolar} data-disabled={disabled || undefined}>
+    <div
+      className={styles.knobWrap}
+      data-bipolar={bipolar}
+      data-disabled={disabled || undefined}
+      data-doubt={doubt || undefined}
+    >
       <div
         aria-disabled={disabled ? true : undefined}
         aria-label={ariaLabel}
@@ -269,6 +289,8 @@ export function AudioKnob({
         aria-valuenow={Number(current.toFixed(5))}
         aria-valuetext={fmt(current)}
         className={styles.knob}
+        data-face={size < 64 ? "small" : undefined}
+        data-testid={testId}
         onDoubleClick={(event) => event.preventDefault()}
         onKeyDown={onKeyDown}
         onPointerCancel={onPointerCancel}
@@ -281,30 +303,24 @@ export function AudioKnob({
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
           <path d={trackPath} fill="none" stroke="var(--material-line2)" strokeWidth="3" strokeLinecap="round" />
-          <path d={fillPath} fill="none" stroke="var(--role-cap-fill)" strokeWidth="3" strokeLinecap="round" />
+          {fillPath ? (
+            <path d={fillPath} fill="none" stroke="var(--role-cap-fill)" strokeWidth="3" strokeLinecap="round" />
+          ) : null}
+          <circle className={styles.face} cx={cx} cy={cy} r={faceRadius} />
           <line
-            x1={indicatorStart.x}
-            y1={indicatorStart.y}
-            x2={indicatorEnd.x}
-            y2={indicatorEnd.y}
+            x1={notchStart.x.toFixed(2)}
+            y1={notchStart.y.toFixed(2)}
+            x2={notchEnd.x.toFixed(2)}
+            y2={notchEnd.y.toFixed(2)}
             stroke="var(--text-text)"
             strokeWidth="2"
             strokeLinecap="round"
           />
-          {valueInside ? null : (
-            <circle
-              cx={cx}
-              cy={cy}
-              r={radius * 0.3}
-              fill="var(--material-key)"
-              stroke="var(--material-line2)"
-              strokeWidth="1"
-            />
-          )}
         </svg>
         {valueInside ? (
+          // A space between the number and its unit, so the text reads "24 dB".
           <span className={styles.valueInside} aria-hidden="true">
-            <span className={styles.valueInsideValue}>{fmt(current)}</span>
+            <span className={styles.valueInsideValue}>{fmt(current)}</span>{" "}
             {caption ? <span className={styles.valueInsideUnit}>{caption}</span> : null}
           </span>
         ) : null}

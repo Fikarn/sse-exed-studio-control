@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import type { AudioSnapshot } from "@sse/engine-client";
 
 import { createFixtureTransport } from "../../packages/engine-client/src/transports/fixtureTransport";
@@ -1068,7 +1068,15 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
 // the same typed entry. Reason: the strip is name, level, M and S, 48 V and the
 // fader; the gain shows on it and is set from the menu and the plate (Atrium,
 // and the operator's review: the screen shows what the deck's GAIN showed).
-test("audio preamp gain shows on the strip and its menu types it", async ({ page }) => {
+// The Console's strip (2026-10-11, D50). Old name: "audio preamp gain shows on
+// the strip and its menu types it"; the strip printed the gain as a value. New:
+// the strip carries the preamp's gain knob, which a drag, the arrows and typed
+// entry ride, and its menu still types it. Reason: the owner asked for the
+// actual gain knob on the strips; the knob is the plate's (AudioKnob), whole dB.
+test("audio preamp gain is a knob on the strip, and its menu types it", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
+  });
   // Visual overhaul A, Slice 4b. Old: "audio preamp gain control responds to
   // pointer drag" — the strip carried a 32 px knob and the test dragged it.
   // New: the strip carries a key that prints the gain the desk reports and
@@ -1084,6 +1092,29 @@ test("audio preamp gain shows on the strip and its menu types it", async ({ page
   await expect(page.getByTestId("audio-strip-audio-input-9").getByRole("button", { name: /preamp gain/ })).toHaveCount(
     0
   );
+  // The knob is the slider the strip names, and answers a drag in whole dB.
+  const stripKnob = page.getByTestId("audio-strip-audio-input-9").getByRole("slider", { name: "Host preamp gain" });
+  await expect(stripKnob).toHaveAttribute("data-testid", "audio-lane-gain-audio-input-9");
+  const before = Number(await stripKnob.getAttribute("aria-valuenow"));
+  const gainWrites = () =>
+    page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.channel.update"] ?? 0);
+  // A press that does not turn it selects the strip and sends nothing.
+  await stripKnob.click();
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "true");
+  expect(await gainWrites()).toBe(0);
+  const box = await stripKnob.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  // 150 px of travel is the whole 75 dB: 20 px up is 10 dB.
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2 - 20, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await stripKnob.getAttribute("aria-valuenow"))).toBe(before + 10);
+  await expect(hostGain).toContainText(`${before + 10} dB`);
+  expect(await gainWrites()).toBe(1);
+  await stripKnob.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect.poll(async () => Number(await stripKnob.getAttribute("aria-valuenow"))).toBe(before + 11);
 
   await page.getByTestId("audio-lane-menu-audio-input-9").click();
   await page.getByTestId("audio-lane-menu-audio-input-9-gain").click();
@@ -1181,7 +1212,9 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   // The visual overhaul's Console pull request. Old: the strip's gain key kept
   // its target height. New: the gain is a value and the strip's M and S are 48
   // px keys (at least 44, the operator's review). Reason: the strip's take
-  // keys are M, S, 48 V and the fader; the gain is set from the menu.
+  // keys are M, S, 48 V and the fader; the gain is set from the menu. The
+  // Console's strip (2026-10-11, D50): the gain is a knob again, on the strip's
+  // axis under 48 V; "the strip's rows" below measures it.
   for (const name of ["Mute Host", "Solo Host"]) {
     const keyBox = await page.getByTestId("audio-strip-audio-input-9").getByRole("button", { name }).boundingBox();
     expect(keyBox, `${name} should have a box`).not.toBeNull();
@@ -1235,6 +1268,67 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
     await expectNoElementOverflow(footerFacts.nth(index), `2560 footer fact ${index + 1}`);
   }
   await expectNoDocumentScroll(page);
+});
+
+// The Console's strip (2026-10-11, D50): the meter is the strip's hero and the
+// fader is secondary. Measured on the studio screen: 48 V as wide as M and S;
+// the gain knob 56 px on the strip's axis; the peak's well the meter's width,
+// right over it; the meter 64 px and the fader's 28 px column 10 px to its
+// right, as tall as the meter; the send under the fader, its right edge on the
+// fader's; the gutter's dBFS on the peaks' row and its −18 on the meters' −18.
+test("the strip's rows: the meter is the hero, the fader beside it, the preamp on the axis", async ({ page }) => {
+  await page.setViewportSize({ width: 2560, height: 1440 });
+  await openFixture(page, "audio-populated");
+  const strip = page.getByTestId("audio-strip-audio-input-9");
+  await expect(strip).toBeVisible();
+  const read = async (locator: Locator, name: string) => {
+    const found = await locator.boundingBox();
+    expect(found, `${name} should have a box`).not.toBeNull();
+    return found!;
+  };
+  const stripBox = await read(strip, "the strip");
+  const mute = await read(strip.getByRole("button", { name: "Mute Host" }), "M");
+  const solo = await read(strip.getByRole("button", { name: "Solo Host" }), "S");
+  const phantom = await read(page.getByTestId("audio-lane-phantom-audio-input-9"), "48 V");
+  const knob = await read(page.getByTestId("audio-lane-gain-audio-input-9"), "the knob");
+  const peak = await read(page.getByTestId("audio-lane-peak-audio-input-9"), "the peak's well");
+  const meter = await read(page.getByTestId("audio-lane-meter-audio-input-9"), "the meter");
+  const fader = await read(strip.getByRole("slider", { name: "Host send level" }), "the fader");
+  const send = await read(page.getByTestId("audio-lane-readout-audio-input-9"), "the send");
+  const near = (actual: number, expected: number, what: string) =>
+    expect(Math.abs(actual - expected), `${what}: ${actual} against ${expected}`).toBeLessThanOrEqual(1);
+
+  near(phantom.x, mute.x, "48 V starts where M does");
+  near(phantom.x + phantom.width, solo.x + solo.width, "48 V ends where S does");
+  near(phantom.height, 28, "48 V is 28 px tall");
+  near(knob.width, 56, "the knob is 56 px");
+  near(knob.height, 56, "the knob is square");
+  near(knob.x + knob.width / 2, stripBox.x + stripBox.width / 2, "the knob is on the strip's axis");
+  expect(knob.y, "the knob is under 48 V").toBeGreaterThan(phantom.y + phantom.height);
+  near(meter.width, 64, "the meter is 64 px");
+  near(fader.width, 28, "the fader's column is 28 px");
+  near(fader.x - (meter.x + meter.width), 10, "the fader stands 10 px right of the meter");
+  near(fader.y, meter.y, "the fader starts with the meter");
+  near(fader.height, meter.height, "the fader is the meter's height");
+  expect(meter.height, "the meter takes the strip's height").toBeGreaterThan(stripBox.height * 0.6);
+  near(peak.x, meter.x, "the peak's well stands over the meter");
+  near(peak.width, meter.width, "the peak's well is the meter's width");
+  near(meter.y - (peak.y + peak.height), 4, "the peak's well is 4 px over the meter");
+  expect(send.y, "the send is under the fader").toBeGreaterThan(fader.y + fader.height);
+  // The send's number, not its box: its right edge on the fader's.
+  const sendTextRight = await page
+    .getByTestId("audio-lane-readout-audio-input-9")
+    .evaluate((node) => (node.firstElementChild ?? node).getBoundingClientRect().right);
+  expect(Math.abs(sendTextRight - (fader.x + fader.width)), "the send ends on the fader's edge").toBeLessThanOrEqual(2);
+
+  // The gutter: the unit heads the peaks' column, the −18 mark on the meters' −18.
+  const tier = page.getByTestId("audio-hardware-inputs-tier");
+  const unit = await read(tier.getByText("dBFS", { exact: true }), "the scale's unit");
+  near(unit.y + unit.height / 2, peak.y + peak.height / 2, "dBFS is centred on the peaks' row");
+  const nominal = await read(tier.locator('[data-strip-scale-mark="−18"]'), "the −18 mark");
+  // The bars run 4 px inside the meter's box; −18 dBFS is 70 % of their travel.
+  const nominalY = meter.y + meter.height - 4 - 0.7 * (meter.height - 8);
+  near(nominal.y + nominal.height / 2, nominalY, "−18 stands on the meter's −18");
 });
 
 // Round-2 close-out (R2-CTX-01): the DS ContextMenu measures itself and

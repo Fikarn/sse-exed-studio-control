@@ -423,19 +423,22 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   // The visual overhaul's Console pull request: the fader scale is printed once
   // per tier, in the gutter beside its first strip (it was beside every strip).
   // The polish (2026-10-05): its marks below unity print the real minus.
+  // The Console's strip (2026-10-11, D50). Old: the gutter printed the fader's
+  // scale ("+6" … "−60", `data-fader-scale-mark`). New: it prints the meters'
+  // dBFS scale ("0" … "−60", `data-strip-scale-mark`), and the fader names its
+  // own unity beside its notch. Reason: the meter is the strip's hero; the
+  // level read is the desk's dBFS, on the same fill.
   const hardwareMeterVars = await page.getByTestId("audio-hardware-inputs-tier").evaluate((tier) => {
     const track = tier.querySelector('[data-testid="audio-strip-audio-input-9"] [data-meter-track]');
     return {
       left: track ? Number.parseFloat(getComputedStyle(track).getPropertyValue("--meter-level")) * 100 : Number.NaN,
-      scaleLabels: Array.from(tier.querySelectorAll("[data-fader-scale-mark]"))
+      scaleLabels: Array.from(tier.querySelectorAll("[data-strip-scale-mark]"))
         .map((entry) => entry.textContent?.trim())
         .filter(Boolean),
     };
   });
   expect(hardwareMeterVars.left).toBeCloseTo(((20 * Math.log10(0.72) + 60) / 60) * 100, 1);
-  expect(hardwareMeterVars.scaleLabels).toEqual(
-    expect.arrayContaining(["+6", "0", "−6", "−12", "−20", "−30", "−40", "−60"])
-  );
+  expect(hardwareMeterVars.scaleLabels).toEqual(["0", "−6", "−12", "−18", "−24", "−40", "−60"]);
 });
 
 test("holds fixture peak markers until the hold window expires", () => {

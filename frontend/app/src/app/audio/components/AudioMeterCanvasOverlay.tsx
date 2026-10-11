@@ -4,10 +4,13 @@ import type { AudioMeterEntry, AudioMeterFrame, ShellStore } from "@sse/engine-c
 import styles from "./AudioMeterCanvasOverlay.module.css";
 import {
   dbfsToMeterPercent,
+  formatPeakWellDbfs,
   METER_FLOOR_DBFS,
+  METER_HOT_DBFS,
   METER_NOMINAL_DBFS,
   meterDisplayTargetFromEntry,
   type MeterDisplayState,
+  peakWellLevel,
   updateMeterDisplayState,
 } from "../audioMeterDisplayModel";
 
@@ -33,6 +36,8 @@ interface StereoMeterGeometry {
 
 interface MiniMeterGeometry {
   kind: "mini";
+  /** The strip's wide meter (D50): its host's peak well carries the clip and the warning. */
+  form: "standard" | "wide";
   meterId: string;
   meterKind: "channel" | "mixTarget";
   orientation: "vertical" | "horizontal";
@@ -42,18 +47,24 @@ interface MiniMeterGeometry {
 
 type MeterGeometry = StereoMeterGeometry | MiniMeterGeometry;
 
+/** A strip's peak well: its number, written here when the whole dB changes. */
+interface PeakWell {
+  element: HTMLElement;
+  meterId: string;
+  meterKind: "channel" | "mixTarget";
+  stereo: boolean;
+  value: HTMLElement;
+}
+
 interface MeterColors {
-  amber: string;
+  /** The well's black: the keyline round a peak tick, the −18 line's tint. */
   bg: string;
-  clip: string;
-  green: string;
+  /** Hot pink: from −3 dBFS, the warning, the over and the clip. */
   hot: string;
-  over: string;
-  overTone: string;
-  peak: string;
-  peakEdge: string;
-  rms: string;
-  zoneAmber: string;
+  /** Ice white: the held peak's line. */
+  hold: string;
+  low: string;
+  mid: string;
 }
 
 type GradientCache = Map<string, CanvasGradient>;
@@ -62,31 +73,25 @@ function cssColor(style: CSSStyleDeclaration, name: string, fallback: string) {
   return style.getPropertyValue(name).trim() || fallback;
 }
 
-// The visual overhaul's Console pull request: the meters draw the design
-// system's signal ramp (DESIGN.md §4): green to −18 dBFS, yellow to −3,
-// coral above, flat and with hard stops, as the design system's Meter does;
-// a 2 px peak tick; a held clip in coral. The names are read from the page's
-// root, where the tokens declare them; the fallbacks are the palette's.
+// The meters' own colours (the Console's strip, 2026-10-11, D50; DESIGN.md
+// §4), used for nothing else: aqua to −18 dBFS, light aqua to −3, hot pink
+// above, flat and with hard stops, as the design system's Meter draws them;
+// the held peak an ice-white line; the warning and a held clip in the hot
+// pink. The names are read from the page's root, where the tokens declare
+// them; the fallbacks are the tokens' values.
 function readColors(root: HTMLElement): MeterColors {
   const style = getComputedStyle(root);
-  const low = cssColor(style, "--signal-meter-low", "#99BA92");
-  const mid = cssColor(style, "--signal-meter-mid", "#F2DE6F");
-  const over = cssColor(style, "--signal-meter-over", "#FF7D55");
-  const well = cssColor(style, "--material-well", "#040706");
   return {
-    amber: mid,
-    bg: well,
-    clip: cssColor(style, "--role-coral-text", over),
-    green: low,
-    hot: mid,
-    over,
-    overTone: over,
-    peak: cssColor(style, "--signal-peak", "#C5C7B9"),
-    peakEdge: well,
-    rms: low,
-    zoneAmber: mid,
+    bg: cssColor(style, "--material-well", "#040706"),
+    hot: cssColor(style, "--signal-meter-over", "#FF4FA3"),
+    hold: cssColor(style, "--signal-peak", "#ECFDFF"),
+    low: cssColor(style, "--signal-meter-low", "#2AA7B6"),
+    mid: cssColor(style, "--signal-meter-mid", "#86E2E9"),
   };
 }
+
+// The peak's segment is the ramp at this strength; its hot zone is never dimmed.
+const PEAK_SEGMENT_ALPHA = 0.36;
 
 function elementRect(element: HTMLElement, canvasRect: DOMRect, scaleX: number, scaleY: number): MeterRect | null {
   const rect = element.getBoundingClientRect();
@@ -136,23 +141,19 @@ function gradientKey(prefix: string, rect: MeterRect, colors: MeterColors) {
     Math.round(rect.y),
     Math.round(rect.width),
     Math.round(rect.height),
-    // DP2: the zone map reads cream (green) → fixed amber → red (over). Key on
-    // exactly those so a theme swap (which moves green/over) rebuilds the cache;
-    // zoneAmber is a constant but included for completeness.
-    colors.green,
-    colors.zoneAmber,
-    colors.over,
+    // The ramp's three colours, so new colours rebuild the cache.
+    colors.low,
+    colors.mid,
+    colors.hot,
   ].join(":");
 }
 
 // DP2 (2026-06-04 Console polish): fixed dBFS colour zones, anchored to the
-// TRACK (absolute level), NOT painted on the moving fill — so red always means
-// "you are clipping", never just "here is the signal head". The gradient spans
-// the full track height/width; drawMeterBody / drawMiniMeter reveal only the lit
-// sub-rect of it, so a given dBFS position keeps the same colour as level moves.
-// Vertical map (top = 0 dBFS): red clip cap in the top ~2 dB, blooming through a
-// fixed amber caution band, into the cream safe zone anchored at the −18 dBFS
-// nominal mark (~30% from top). Mirrors the design's .meterFill stops.
+// TRACK (absolute level), NOT painted on the moving fill — so the hot pink
+// always means "you are near the top", never just "here is the signal head".
+// The gradient spans the full track height/width; the bodies reveal only the
+// lit sub-rect of it, so a given dBFS position keeps the same colour as level
+// moves.
 function meterBodyGradient(
   ctx: CanvasRenderingContext2D,
   rect: MeterRect,
@@ -162,24 +163,21 @@ function meterBodyGradient(
   const key = gradientKey("body", rect, colors);
   const cached = gradients.get(key);
   if (cached) return cached;
-  // Top = 0 dBFS: coral above −3 dBFS (the top 5 %), yellow to −18 (30 %),
-  // green below, hard stops (DESIGN.md §4).
+  // Top = 0 dBFS: hot pink above −3 dBFS (the top 5 %), light aqua to −18
+  // (30 %), aqua below, hard stops (DESIGN.md §4).
   const gradient = ctx.createLinearGradient(0, rect.y, 0, rect.y + rect.height);
-  gradient.addColorStop(0, colors.over);
-  gradient.addColorStop(0.05, colors.over);
-  gradient.addColorStop(0.05, colors.zoneAmber);
-  gradient.addColorStop(0.3, colors.zoneAmber);
-  gradient.addColorStop(0.3, colors.green);
-  gradient.addColorStop(1, colors.green);
+  gradient.addColorStop(0, colors.hot);
+  gradient.addColorStop(0.05, colors.hot);
+  gradient.addColorStop(0.05, colors.mid);
+  gradient.addColorStop(0.3, colors.mid);
+  gradient.addColorStop(0.3, colors.low);
+  gradient.addColorStop(1, colors.low);
   gradients.set(key, gradient);
   return gradient;
 }
 
-// DP2: the horizontal master bar's zone map — the vertical map flipped to read
-// left→right: cream safe through ~−6 dB, a fixed amber caution band across the
-// last few dB, red only in the clip region, blooming (never snapping). Mirrors
-// the design's .masterFill stops (--m-amber = the same fixed zone amber; red =
-// --audio-meter-over / --meter-hi).
+// DP2: the horizontal bar's zone map — the vertical map flipped to read left
+// to right.
 function miniMeterGradient(
   ctx: CanvasRenderingContext2D,
   rect: MeterRect,
@@ -189,14 +187,14 @@ function miniMeterGradient(
   const key = gradientKey("mini", rect, colors);
   const cached = gradients.get(key);
   if (cached) return cached;
-  // Left to right: green to −18 dBFS (70 %), yellow to −3 (95 %), coral above.
+  // Left to right: aqua to −18 dBFS (70 %), light aqua to −3 (95 %), hot pink above.
   const gradient = ctx.createLinearGradient(rect.x, 0, rect.x + rect.width, 0);
-  gradient.addColorStop(0, colors.green);
-  gradient.addColorStop(0.7, colors.green);
-  gradient.addColorStop(0.7, colors.zoneAmber);
-  gradient.addColorStop(0.95, colors.zoneAmber);
-  gradient.addColorStop(0.95, colors.over);
-  gradient.addColorStop(1, colors.over);
+  gradient.addColorStop(0, colors.low);
+  gradient.addColorStop(0.7, colors.low);
+  gradient.addColorStop(0.7, colors.mid);
+  gradient.addColorStop(0.95, colors.mid);
+  gradient.addColorStop(0.95, colors.hot);
+  gradient.addColorStop(1, colors.hot);
   gradients.set(key, gradient);
   return gradient;
 }
@@ -206,36 +204,61 @@ function yForDbfs(rect: MeterRect, dbfs: number) {
   return rect.y + rect.height - rect.height * percent;
 }
 
+// The two layers (the Console's strip, 2026-10-11, D50), as iZotope Insight
+// and Ableton Live draw them: the level, the hardware link's moving body, as
+// the solid bar; the peak as a fainter segment above it, so the headroom
+// shows. The segment's part above −3 dBFS is never dimmed: a peak that
+// reaches the warning shows the hot pink at full strength, as the level would.
 function drawMeterBody(
   ctx: CanvasRenderingContext2D,
   rect: MeterRect,
   dbfs: number,
   colors: MeterColors,
-  gradients: GradientCache
+  gradients: GradientCache,
+  inset = 2,
+  peakDbfs = dbfs
 ) {
-  const inset = 2;
   const x = rect.x + inset;
-  const y = yForDbfs(rect, dbfs);
   const width = Math.max(1, rect.width - inset * 2);
-  const height = Math.max(0, rect.y + rect.height - inset - y);
-  if (height <= 0) return;
-
+  const bottom = rect.y + rect.height - inset;
+  const y = yForDbfs(rect, dbfs);
+  const peakY = Math.min(y, yForDbfs(rect, peakDbfs));
   ctx.fillStyle = meterBodyGradient(ctx, rect, colors, gradients);
-  ctx.fillRect(x, y, width, height);
+  if (peakY < y && peakY < bottom) {
+    const segmentBottom = Math.min(y, bottom);
+    ctx.globalAlpha = PEAK_SEGMENT_ALPHA;
+    ctx.fillRect(x, peakY, width, segmentBottom - peakY);
+    ctx.globalAlpha = 1;
+    const hotY = Math.min(segmentBottom, yForDbfs(rect, METER_HOT_DBFS));
+    if (peakY < hotY) ctx.fillRect(x, peakY, width, hotY - peakY);
+  }
+  if (y >= bottom) return;
+  ctx.fillRect(x, y, width, bottom - y);
 }
 
-function drawPeakLine(ctx: CanvasRenderingContext2D, rect: MeterRect, dbfs: number, colors: MeterColors) {
+function drawPeakLine(
+  ctx: CanvasRenderingContext2D,
+  rect: MeterRect,
+  dbfs: number,
+  colors: MeterColors,
+  form: "standard" | "wide" = "standard"
+) {
   if (!Number.isFinite(dbfs) || dbfs <= METER_FLOOR_DBFS) return;
   const y = Math.max(rect.y + 1, Math.min(rect.y + rect.height - 2, yForDbfs(rect, dbfs)));
+  // The wide meter's line spans its bar, centred on its place, as the board
+  // draws it; it stands on the dark slot or on the peak's faint segment.
+  if (form === "wide") {
+    ctx.fillStyle = colors.hold;
+    ctx.fillRect(rect.x, y - 1, rect.width, 2);
+    return;
+  }
   const x = rect.x + 1;
   const width = Math.max(1, rect.width - 2);
-  // C09(c): the live canvas force-hides the CSS .meterPeak's separating glow,
-  // leaving the cream peak tick at ~1.38:1 on the cream body. Lay a 1px
-  // theme-aware keyline above and below the tick (dark on light bodies, light
-  // on Bone's dark body) so it separates from the body without a new hue.
-  ctx.fillStyle = colors.peakEdge;
+  // C09(c): a 1 px keyline in the well's black above and below the tick, so
+  // the line separates from the body it sits on without a new hue.
+  ctx.fillStyle = colors.bg;
   ctx.fillRect(x, y - 1, width, 4);
-  ctx.fillStyle = colors.peak;
+  ctx.fillStyle = colors.hold;
   ctx.fillRect(x, y, width, 2);
 }
 
@@ -253,18 +276,18 @@ function drawNominalReference(ctx: CanvasRenderingContext2D, rect: MeterRect, co
 }
 
 function drawClipOverlay(ctx: CanvasRenderingContext2D, rect: MeterRect, colors: MeterColors) {
-  ctx.strokeStyle = colors.clip;
+  ctx.strokeStyle = colors.hot;
   ctx.lineWidth = 1;
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, Math.max(1, rect.width - 1), Math.max(1, rect.height - 1));
   ctx.globalAlpha = 0.18;
-  ctx.fillStyle = colors.clip;
+  ctx.fillStyle = colors.hot;
   ctx.fillRect(rect.x + 1, rect.y + 1, Math.max(1, rect.width - 2), Math.max(1, rect.height - 2));
   ctx.globalAlpha = 1;
 }
 
 function drawPeakWarningOverlay(ctx: CanvasRenderingContext2D, rect: MeterRect, colors: MeterColors) {
   ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = colors.amber;
+  ctx.strokeStyle = colors.hot;
   ctx.lineWidth = 1;
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, Math.max(1, rect.width - 1), Math.max(1, rect.height - 1));
   ctx.globalAlpha = 1;
@@ -272,11 +295,9 @@ function drawPeakWarningOverlay(ctx: CanvasRenderingContext2D, rect: MeterRect, 
 
 function drawMeterPointOverIndicator(ctx: CanvasRenderingContext2D, rect: MeterRect, colors: MeterColors) {
   // C09(b): a transient over-sample (meterPointOver) and a latched channel-path
-  // clip used to draw identically (both saturated red) and overlap geometrically.
-  // Render the over band as a thinner desaturated orange-red intermediate
-  // (--meter-over-tone) and offset it a hair below the top edge so it no longer
-  // sits exactly under the 1px clip outline drawn at rect.y + 0.5.
-  ctx.fillStyle = colors.overTone;
+  // clip overlap geometrically: the over is a thin band a hair below the top
+  // edge, so it never sits under the clip's 1 px outline at rect.y + 0.5.
+  ctx.fillStyle = colors.hot;
   ctx.fillRect(rect.x + 2, rect.y + 3, Math.max(1, rect.width - 4), 2);
 }
 
@@ -289,13 +310,23 @@ function drawMiniMeter(
 ) {
   const rect = geometry.rect;
   const bodyDbfs = geometry.side === "left" ? entry.bodyLeftDbfs : entry.bodyRightDbfs;
+  const transientDbfs = geometry.side === "left" ? entry.transientLeftDbfs : entry.transientRightDbfs;
   const peakDbfs = geometry.side === "left" ? entry.peakLeftDbfs : entry.peakRightDbfs;
+
+  // The strip's wide meter (D50): the two layers fill the whole bar and the
+  // held peak's line spans it; the edge ticks are the well's own, and the
+  // peak well over the meter says the warning and the clip.
+  if (geometry.form === "wide" && geometry.orientation === "vertical") {
+    drawMeterBody(ctx, rect, bodyDbfs, colors, gradients, 0, transientDbfs);
+    drawPeakLine(ctx, rect, peakDbfs, colors, "wide");
+    return;
+  }
 
   // Visual overhaul A, Slice 4b: a strip's meter bar runs bottom-to-top, so it
   // is painted with the vertical body, sheen, reference and peak the tall
   // meters already use; the cluster's bar keeps the horizontal treatment below.
   if (geometry.orientation === "vertical") {
-    drawMeterBody(ctx, rect, bodyDbfs, colors, gradients);
+    drawMeterBody(ctx, rect, bodyDbfs, colors, gradients, 2, transientDbfs);
     drawNominalReference(ctx, rect, colors);
     if (Number.isFinite(peakDbfs) && peakDbfs > METER_FLOOR_DBFS) {
       drawPeakLine(ctx, rect, peakDbfs, colors);
@@ -310,8 +341,17 @@ function drawMiniMeter(
   const nominalX = rect.x + rect.width * (dbfsToMeterPercent(METER_NOMINAL_DBFS) / 100);
 
   const width = Math.max(0, rect.width * (dbfsToMeterPercent(bodyDbfs) / 100));
+  const peakWidth = Math.max(width, rect.width * (dbfsToMeterPercent(transientDbfs) / 100));
+  ctx.fillStyle = miniMeterGradient(ctx, rect, colors, gradients);
+  if (peakWidth > width) {
+    // The peak's segment, its hot zone at full strength (see drawMeterBody).
+    ctx.globalAlpha = PEAK_SEGMENT_ALPHA;
+    ctx.fillRect(rect.x + width, rect.y, peakWidth - width, rect.height);
+    ctx.globalAlpha = 1;
+    const hotX = Math.max(rect.x + width, rect.x + rect.width * (dbfsToMeterPercent(METER_HOT_DBFS) / 100));
+    if (rect.x + peakWidth > hotX) ctx.fillRect(hotX, rect.y, rect.x + peakWidth - hotX, rect.height);
+  }
   if (width > 0) {
-    ctx.fillStyle = miniMeterGradient(ctx, rect, colors, gradients);
     ctx.fillRect(rect.x, rect.y, width, rect.height);
   }
 
@@ -325,12 +365,11 @@ function drawMiniMeter(
   if (Number.isFinite(peakDbfs) && peakDbfs > METER_FLOOR_DBFS) {
     const peakX = rect.x + rect.width * (dbfsToMeterPercent(peakDbfs) / 100);
     const tickX = Math.max(rect.x, Math.min(rect.x + rect.width - 2, peakX - 1));
-    // DP2: crisp 2px peak-hold tick with a dark hairline outline so it reads on
-    // both the lit cream bar and the dark trough (mirrors .masterPeak's
-    // box-shadow keyline).
-    ctx.fillStyle = colors.peakEdge;
+    // DP2: a crisp 2 px held-peak tick with a dark hairline outline, so it
+    // reads on the lit bar and on the dark trough alike.
+    ctx.fillStyle = colors.bg;
     ctx.fillRect(tickX - 0.5, rect.y, 3, rect.height);
-    ctx.fillStyle = colors.peak;
+    ctx.fillStyle = colors.hold;
     ctx.fillRect(tickX, rect.y, 2, rect.height);
   }
 
@@ -360,9 +399,17 @@ function drawStereoMeter(
   // only. Otherwise paint the full stereo pair.
   const { left, right } = geometry;
 
-  drawMeterBody(ctx, left, entry.bodyLeftDbfs, colors, gradients);
+  drawMeterBody(ctx, left, entry.bodyLeftDbfs, colors, gradients, 2, entry.transientLeftDbfs);
   if (right) {
-    drawMeterBody(ctx, right, geometry.mirrorRight ? entry.bodyLeftDbfs : entry.bodyRightDbfs, colors, gradients);
+    drawMeterBody(
+      ctx,
+      right,
+      geometry.mirrorRight ? entry.bodyLeftDbfs : entry.bodyRightDbfs,
+      colors,
+      gradients,
+      2,
+      geometry.mirrorRight ? entry.transientLeftDbfs : entry.transientRightDbfs
+    );
   }
   // DP2: glass sheen over each fill, then the nominal line + peak on top so the
   // instrument references stay crisp above the subtle lens highlight.
@@ -443,6 +490,7 @@ function measureGeometry(canvas: HTMLCanvasElement, root: HTMLElement) {
 
     geometry.push({
       kind: "mini",
+      form: meter.dataset.miniMeterForm === "wide" ? "wide" : "standard",
       meterId,
       meterKind,
       orientation,
@@ -451,11 +499,30 @@ function measureGeometry(canvas: HTMLCanvasElement, root: HTMLElement) {
     });
   }
 
+  const wells: PeakWell[] = [];
+  for (const element of root.querySelectorAll<HTMLElement>("[data-peak-well-id]")) {
+    const meterId = element.dataset.peakWellId;
+    const meterKind = element.dataset.peakWellKind === "mixTarget" ? "mixTarget" : "channel";
+    const value = element.querySelector<HTMLElement>("[data-peak-well-value]");
+    if (!meterId || !value) continue;
+    wells.push({ element, meterId, meterKind, stereo: element.dataset.peakWellStereo === "true", value });
+  }
+
   return {
     colors: readColors(root),
     dpr,
     geometry,
+    wells,
   };
+}
+
+// The well's number and its level, written only when they change: the page
+// never renders for them.
+function writePeakWell(well: PeakWell, dbfs: number) {
+  const text = formatPeakWellDbfs(dbfs);
+  if (well.value.textContent !== text) well.value.textContent = text;
+  const level = peakWellLevel(dbfs);
+  if (well.element.dataset.peakLevel !== level) well.element.dataset.peakLevel = level;
 }
 
 export function AudioMeterCanvasOverlay({
@@ -489,6 +556,7 @@ export function AudioMeterCanvasOverlay({
     let colors = readColors(root);
     let dpr = window.devicePixelRatio || 1;
     let geometry: MeterGeometry[] = [];
+    let wells: PeakWell[] = [];
     let latestFrame = store.getAudioMeterFrame();
     let needsMeasure = true;
     let lastPaintedAtMs = performance.now();
@@ -525,6 +593,7 @@ export function AudioMeterCanvasOverlay({
         colors = measured.colors;
         dpr = measured.dpr;
         geometry = measured.geometry;
+        wells = measured.wells;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         gradients.clear();
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -546,6 +615,7 @@ export function AudioMeterCanvasOverlay({
         for (const meterGeometry of geometry) {
           clearMeterGeometry(ctx, meterGeometry);
         }
+        for (const well of wells) writePeakWell(well, Number.NEGATIVE_INFINITY);
         displayStates.clear();
         datasetSet(canvas, "meterBallistics", "gated");
         datasetSet(canvas, "meterPeakHoldEnabled", peakHoldEnabled ? "true" : "false");
@@ -592,6 +662,16 @@ export function AudioMeterCanvasOverlay({
         if (!visibleStateKeys.has(key)) {
           displayStates.delete(key);
         }
+      }
+      // A strip's peak well: the held peak of its meter's bars, as the line shows it.
+      for (const well of wells) {
+        const state = displayStates.get(`${well.meterKind}:${well.meterId}:mini:left`);
+        const dbfs = !state
+          ? Number.NEGATIVE_INFINITY
+          : well.stereo
+            ? Math.max(state.peakLeftDbfs, state.peakRightDbfs)
+            : state.peakLeftDbfs;
+        writePeakWell(well, dbfs);
       }
       datasetSet(canvas, "meterBallistics", "display");
       datasetSet(canvas, "meterPeakHoldEnabled", peakHoldEnabled ? "true" : "false");

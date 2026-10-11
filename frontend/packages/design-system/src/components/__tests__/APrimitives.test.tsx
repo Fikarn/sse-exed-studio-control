@@ -733,6 +733,27 @@ describe("Slider and Groove", () => {
     fireEvent(groove, new MouseEvent("pointerup", { bubbles: true, button: 0, clientY: 50 }));
     expect(onCommit).toHaveBeenLastCalledWith(0.8172);
   });
+
+  // The Console's strip (2026-10-11, D50): the meter is the strip's hero and
+  // the fader is secondary, so the strip's groove is the compact one.
+  it("the compact groove is a 28 px column with a 28 × 12 cap that reads the pointer 6 px from its ends", () => {
+    const onChange = vi.fn();
+    render(<Groove label="Host fader" value={0.3} size="compact" unityLabel="0" onChange={onChange} />);
+    const groove = screen.getByRole("slider", { name: "Host fader" });
+    expect(groove).toHaveAttribute("data-size", "compact");
+    expect(groove).toHaveTextContent("0");
+    groove.setPointerCapture = () => {};
+    groove.releasePointerCapture = () => {};
+    // A 212 px column: 6 px insets and 200 px of travel, so y = 6 + (1 − value) × 200.
+    groove.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, left: 0, top: 0, right: 28, bottom: 212, width: 28, height: 212 }) as DOMRect;
+    fireEvent(groove, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: 106 }));
+    expect(onChange).toHaveBeenLastCalledWith(0.5);
+    const css = cssOf("Slider.module.css");
+    expect(css).toMatch(/\.groove\.compact \{[^}]*width: 28px/);
+    expect(css).toMatch(/\.compact \.grooveCap \{[^}]*width: 28px;\s*height: 12px/);
+    expect(css).toMatch(/\.compact \.travel \{[^}]*top: 6px;\s*bottom: 6px/);
+  });
 });
 
 describe("Meter", () => {
@@ -787,12 +808,15 @@ describe("Meter", () => {
     expect(screen.getByRole("meter")).toHaveAttribute("data-clip");
   });
 
-  it("the ramp is the signal token: green to 70 %, yellow to 95 %, coral above", () => {
+  it("the ramp is the signal token: aqua to 70 %, light aqua to 95 %, hot pink above", () => {
     expect(cssOf("Meter.module.css")).toContain("var(--signal-ramp-v)");
     expect(cssOf("Meter.module.css")).toContain("var(--signal-ramp-h)");
   });
 
-  it("is flat: a slot in each bar, a 2 px peak tick, a coral clip lamp, no glow", () => {
+  // The meters' own colours (2026-10-11, D50). Old: the clip lamp lit in the
+  // coral role fill. New: in the meters' hot pink. Reason: the meters have
+  // colours of their own, used for nothing else, and a clip is the meter's.
+  it("is flat: a slot in each bar, a 2 px peak tick, a hot-pink clip lamp, no glow", () => {
     const css = cssOf("Meter.module.css");
     expect(css).toMatch(
       /\.meter \{[^}]*background: var\(--material-well\);\s*border: 1px solid var\(--material-line\)/
@@ -801,8 +825,31 @@ describe("Meter", () => {
     expect(css).toMatch(/\.peak \{[^}]*background: var\(--signal-peak\)/);
     expect(css).toMatch(/\.vertical \.peak \{[^}]*height: 2px/);
     expect(css).toMatch(/\.horizontal \.peak \{[^}]*width: 2px/);
-    expect(css).toMatch(/\.clipLit \{[^}]*background: var\(--role-coral-fill\)/);
+    expect(css).toMatch(/\.clipLit \{[^}]*background: var\(--signal-meter-over\)/);
     expect(rulesOf("Meter.module.css")).not.toMatch(/box-shadow|blur\(|filter/);
+  });
+
+  // The Console's strip (2026-10-11, D50): the wide form is the strip's hero.
+  it("the wide form is 64 px, ticks its edges, draws the reference through them and has no lamp", () => {
+    const { container } = render(
+      <Meter
+        label="Host"
+        level={0.6}
+        peak={0.7}
+        form="wide"
+        marks={[0.9, 0.8, 0.6, 1 / 3]}
+        meterId="audio-input-9"
+        meterKind="channel"
+      />
+    );
+    const meter = screen.getByRole("meter", { name: "Host" });
+    expect(meter).toHaveAttribute("data-meter-form", "wide");
+    // Four marks and the reference, at both edges.
+    expect(container.querySelectorAll('[class*="edgeTick"]')).toHaveLength(10);
+    expect(container.querySelectorAll("[data-reference]")).toHaveLength(2);
+    expect(container.querySelector('[class*="clip"]')).toBeNull();
+    expect(container.querySelector("[data-mini-meter-kind]")).toHaveAttribute("data-mini-meter-form", "wide");
+    expect(cssOf("Meter.module.css")).toMatch(/\.vertical\.wide,\s*\.vertical\.wide\.stereo \{[^}]*width: 64px/);
   });
 });
 

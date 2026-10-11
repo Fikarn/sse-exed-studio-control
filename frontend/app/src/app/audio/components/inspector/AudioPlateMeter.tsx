@@ -8,7 +8,16 @@ import { AudioStereoMeter } from "../AudioStereoMeter";
 
 // The plate's meter (visual overhaul, the Console): the selection's stereo
 // meter beside its live level and held peak, the meter's menu in the head.
-// The reference marks live in the tooltip; the meter draws them.
+// The reference marks live in the tooltip; the meter draws them. The head says
+// where the meter taps (the Console's strip, 2026-10-11: it said post-fader
+// for every strip, and an input's meter is the input's level before the
+// fader).
+
+const METER_POINT_WORDS = {
+  input: "The input, before its fader",
+  playback: "The playback, before its fader",
+  "post-fader": "Post-fader",
+} as const;
 
 export interface AudioPlateMeterProps {
   arm: UseArmResult;
@@ -18,6 +27,8 @@ export interface AudioPlateMeterProps {
   facts?: ReactNode;
   kind: "channel" | "mixTarget";
   meterId: string;
+  /** Where the meter taps, as the hardware link names it: `input`, `playback` or `post-fader`. */
+  meterPoint: "input" | "playback" | "post-fader";
   name: string;
   left: number;
   right: number;
@@ -44,6 +55,7 @@ export function AudioPlateMeter({
   facts,
   kind,
   meterId,
+  meterPoint,
   name,
   left,
   right,
@@ -83,11 +95,14 @@ export function AudioPlateMeter({
   return (
     <Section
       title={
-        <Tooltip content="Post-fader, in dBFS: the reference at −18 dBFS, the warning from −3 dBFS" placement="left">
+        <Tooltip
+          content={`${METER_POINT_WORDS[meterPoint]}, in dBFS: the reference at −18 dBFS, the warning from −3 dBFS`}
+          placement="left"
+        >
           <span>{title}</span>
         </Tooltip>
       }
-      detail="post-fader"
+      detail={meterPoint}
       actions={
         <MenuButton
           buttonLabel={`${title} menu`}
