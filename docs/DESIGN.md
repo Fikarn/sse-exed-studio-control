@@ -58,13 +58,13 @@ A picture is the exception: the prompter's glass and a camera's picture are mark
 
 ## 4. Colour roles
 
-The surface is the brand's Dark Green pulled almost to black: a trace of hue, not a green screen. The inks are Beige Light, never white. Every colour is defined once, in the palette (`--sse-*`), and every other colour token names it.
+The surface is the brand's Dark Green pulled almost to black: a trace of hue, not a green screen. The inks are Beige Light, never white. Every colour is defined once: the brand's in the palette (`--sse-*`), which every other colour token names, and the meters' own four in the tokens' signal group (below).
 
 | Name        | Hex     | Role                                                                                                                                                               |
 | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | SSE Green   | #99BA92 | **live and ok**: a lit fill (black text) for something running or on; the lamp and word `READY`, `VERIFIED`, `ON`                                                  |
 | Yellow      | #F2DE6F | **engaged and attention**: a lit fill (black text) for the mix target, solo, dim; the lamp and word `NOT VERIFIED`, `ASSUMED`, `UNSAVED`; a latch's keyline; doubt |
-| Coral       | #FF7D55 | **error and hazard**: `OFFLINE`, `UNREACHABLE`, 48 V on, `REC`, a clip; the word and edge of a destructive command                                                 |
+| Coral       | #FF7D55 | **error and hazard**: `OFFLINE`, `UNREACHABLE`, 48 V on, `REC`; the word and edge of a destructive command                                                         |
 | Burgundy    | #671919 | **armed**: the one armed form, a Burgundy fill with Beige text, "press again" and a countdown bar                                                                  |
 | Blue        | #3A87E5 | **information**: `PREVIEW`, a cue in a script                                                                                                                      |
 | Beige       | #EDEBD1 | **selection**: one 2 px keyline on the strip, fixture, script, camera or step, and on a setting's current choice (a frame rate, the view); the tooltip             |
@@ -77,7 +77,7 @@ Hazards are a coral lamp and a word on a dark key, never a coral fill: 48 V on, 
 
 Text pairs that hold 4.5:1 (tested from the token values): the inks on every surface and well; black on Green, Yellow, Coral and Beige Light; Beige on Burgundy; Beige Light and the second ink on Dark Green; the main and the second ink on a platter and on a room's key face. Never coral or the quiet ink on Dark Green, and never the quiet ink on a platter, a room's key face or a list (it is under 4.5:1 there): it stands on a wall, a lintel, a floor or a well.
 
-The meter ramp and the colour-temperature track are signal, not status: green to −18 dBFS, yellow to −3, coral above; warm to cool.
+The meter ramp and the colour-temperature track are signal, not status. The colour-temperature track runs warm to cool. The meters have colours of their own, used for nothing else (D50), so a level in its working range never reads as attention, nor a quiet one as `READY`: aqua (#2AA7B6) to −18 dBFS, light aqua (#86E2E9) to −3, and hot pink (#FF4FA3) above, which is also a meter's warning and its held clip; the held peak is an ice-white line (#ECFDFF). They are defined once, as `--signal-meter-low`, `-mid` and `-over` and `--signal-peak`, so every meter follows: the strips, the outputs, the plate and the Overview. A meter draws two layers: the level, the hardware link's moving body, solid; the peak a fainter segment above it (36 %), so the headroom shows, its part from −3 dBFS never dimmed. The thresholds are the hardware link's: −18 dBFS the working level, −3 the warning.
 
 The operator's colour tags on scenes, groups and palettes are identity, not status: eight quiet tints, `--tag-0` to `--tag-7` (Clay, Ochre, Sand, Olive, Slate, Mist, Plum, Heather), clear of every role colour; Ochre and Mist are the palette's reserve Brown and Sky. A saved tag keeps its slot, and a colour-temperature palette carries none: its temperature colours it.
 
@@ -104,6 +104,8 @@ On the Overview (D47) board 3's forms are the page's: the room; the tray; the on
 
 No gradient except signal (the meter ramp, the colour-temperature track), no glow, no inner highlight but the one-pixel light edge of a platter and of the Overview's raised parts, no shadow except on the floating layer and a tray's soft inner edge. The tooltip is the one light surface (Beige with black text), so it reads as a note. Fader and slider caps are matte and light, so a position reads from 3 m.
 
+On the Console's strip (D50) the meter is the hero and the fader is secondary: the meter 64 px wide, its scale printed once in the tier's gutter; the fader's cap 28 × 12 in a 28 px column beside it (the take-time target), unity named by its notch; the held peak a small number in a well over the meter, 14 px; the preamp's gain a knob on the strip's axis under 48 V.
+
 ## 6. Motion
 
 | Purpose                                       | Duration     | Easing                           |
@@ -127,7 +129,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 - **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys, the page's ⋯ as `menu` at its top right; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, on every page, `Section`, the take-time keys.
 - **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover; it keeps its state, an engaged one in yellow, a live one in green), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
 - **Lamps**: `Lamp`, `LampChip` (header), `LampWord` (rows and tags), `StatusBadge` (a keyline word).
-- **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track, and a ▲ under the track for a value kept elsewhere, a scene's saved level, yellow while the value has left it), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
+- **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track, and a ▲ under the track for a value kept elsewhere, a scene's saved level, yellow while the value has left it), `Groove` (the vertical fader; `size="compact"` is the strip's, a 28 px column, an 8 px well and a 28 × 12 cap, with `unityLabel` beside its notch), `Meter` (with a 2 px peak tick; `form="wide"` is the strip's, 64 px, its bars 4 px inside the well, short ticks at its edges for `marks` and the reference through them, no lamp: its host's peak well says the clip), `Field`, `Screen`.
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
 - **Empty**: `EmptyLine`, an empty list or section: one quiet line in PT Sans body, the explanation as its tooltip, an optional hollow lamp (as the latch slot's "Nothing latched") and at most one key. Pages draw no empty state of their own.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).

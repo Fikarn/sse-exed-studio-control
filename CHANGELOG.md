@@ -8,6 +8,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Console's strips put the meter first: a meter twice as wide, its scale in dBFS beside the row; the held peak a small number over it, `CLIP` while a clip is held; a smaller fader cap beside the meter, the level it sends under it; and the preamp's gain a knob on each preamp strip, under `48 V` on its own line (#339).
+- The meters have colours of their own, used for nothing else: aqua to −18 dBFS, light aqua to −3, hot pink above, the held peak an ice-white line, with the peak a fainter segment over the level. The plate's `METER` says where it reads, `input`, `playback` or `post-fader`; it said `post-fader` for every strip (#339).
 - The camera pictures on the Overview and on Cameras have rounded corners, as the wells around them do; until now they were drawn square over them (#338).
 - The Overview, a new page and the one the app opens on at every start: the worst page's state with its way out, every page's latches, REC and the prompter's take keys, CAM 1 with CAM 2, CAM 3 and a loupe, the glass with the speed as a tape that follows the deck's `SPEED` dial and the cues' times, and the levels with their mutes, in four rooms (#337).
 - Setup's `Publish` and `Back to the Overview` open the Overview. The aids and the loupe set on Cameras or the Overview stand on both until the app closes (#337).
