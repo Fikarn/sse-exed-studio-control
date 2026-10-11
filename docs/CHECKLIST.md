@@ -21,7 +21,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] Every link answering, the state display reads `READY` and no room is outlined. With the Console not yet synced it reads `ASSUMED` with `Console: …` and `Sync from TotalMix`, THE SOUND is outlined amber and its meters wait; one press syncs and wakes them.
 - [ ] `REC` on the Overview starts CAM 1 with one press and stops it with two; the take's length counts, and the header's `REC` lights.
 - [ ] `PLAY`, and the deck's `SPEED` dial: the tape moves one tick a detent and says `turned on the deck`; the glass band matches the Prompter XL's text, its arrow at the reading line; the cue times fall as the knob turns up.
-- [ ] The four pictures and the loupe come; a press on CAM 1 moves the loupe, and Cameras shows the same loupe and aids.
+- [ ] The four pictures and the loupe come, each with rounded corners and the room's colour in them; a press on CAM 1 moves the loupe, and Cameras shows the same loupe and aids, its pictures' corners rounded too (smaller).
 - [ ] The levels move on the bridge, and `M` mutes an input and Main Out as the Console does; a clip held on an input shows in the latch slot with its strip's name, and `Clear` clears it.
 - [ ] With a camera that stops answering, the state display reads its word with `Cameras: …` and `Open Cameras`, and THE PICTURE is outlined coral; `Open Cameras` opens the page.
 

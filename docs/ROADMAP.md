@@ -12,7 +12,7 @@ Built so far: the Teleprompter page and its editor, the prompter and the cameras
 - [x] The Prompter XL's window (#249, #250, #251)
 - [x] The camera pictures (#274 to #279; walked in a studio build on 2026-10-01)
 - [ ] The Pocket 6K Pro over Bluetooth
-- [x] The Overview (D47, D48, D49; below; its pictures' rounded corners are optional)
+- [x] The Overview (D47, D48, D49; below), its pictures' rounded corners too (#338)
 - [ ] The BGH1s over the network (waits on the owner)
 - [ ] The close-out
 - [ ] The visual overhaul (below; it runs beside the cameras' work)
@@ -261,7 +261,7 @@ A new page and the landing page: every page's key facts at once, in four rooms w
 - [x] The hardware link (#334): `overview` is a page the hardware link accepts and keeps (new saved data still opens on the Console until the page is built); the deck's profile turns the deck to PROMPTER on it; `cameras.snapshot` carries CAM 1's takes since local midnight (`takesToday`), and each cue of the glass its seconds ahead at the pace (`secondsAhead`).
 - [x] The header and the footer, on every page: the skylight (D48, #335). `Setup / Support` stands last on the system's platter rather than first as on board 3, so it stays put when a latch comes, goes or changes its word with the page.
 - [x] The page (#337): the rooms, the status card, the take, the pictures, the script, the sound; the landing page (D1 amended); the test data, the page tests and the captures. The latches, the follow loops, REC and the take keys' words were lifted out of the pages so both draw them; the Cameras page and the Overview share the aids and the loupe.
-- [ ] The pictures' rounded corners, in the pictures helper (optional).
+- [x] The pictures' rounded corners, in the pictures helper (#338): each picture's place says its radius (`data-radius`: 8 on the Overview, 4 on Cameras), the report carries it, and the helper rounds the picture to it, so the room's corner shows. A page test holds the report to the CSS.
 
 Then, on the owner's word: `npm run release`, the owner's export of the deck's profile and Full Reset & Import in Companion, the walk with the page's CHECKLIST lines, `release:verified`.
 
