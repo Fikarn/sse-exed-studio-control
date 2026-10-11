@@ -39,8 +39,8 @@ import styles from "./CamerasBay.module.css";
 // aids and the loupe are locked. The camera's own controls still work.
 //
 // In the app's window the pictures helper draws the pictures over the page
-// (D30): the bay says where each picture stands, its aids and where the
-// loupe looks, and what it draws over one, a small picture's chip
+// (D30): the bay says where each picture stands, its corners, its aids and
+// where the loupe looks, and what it draws over one, a small picture's chip
 // (`picturePlaces.ts`). The helper draws the aids and the marker with the
 // page's numbers (`pictureAids.ts`).
 //
@@ -55,6 +55,12 @@ import styles from "./CamerasBay.module.css";
 // the plate's title, and a lock stands in the state display, the plate's
 // connection well and each section's head, so the caption repeats neither.
 // The loupe's head is inset as the caption is.
+
+/**
+ * The pictures' corners: their places' `--radius-base` (`CamerasBay.module.css`). The
+ * helper's pictures cover the page, so they are told it and rounded to it.
+ */
+const PICTURE_RADIUS = 4;
 
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
@@ -153,6 +159,7 @@ function Tile({ camera, drawnBy, frames, menu, arm, onSelect }: TileProps) {
             part={WHOLE}
             width={TILE.width}
             height={TILE.height}
+            radius={PICTURE_RADIUS}
             label={`${camera.tag}, ${camera.picture.detail}`}
           />
         ) : (
@@ -310,6 +317,7 @@ export function CamerasBay({
             height={HERO.height}
             aids={aids}
             marker={view === "whole" ? loupe : null}
+            radius={PICTURE_RADIUS}
             label={`${selected.tag}, ${selected.picture.detail}`}
             testId="cameras-hero-picture"
           />
@@ -381,6 +389,7 @@ export function CamerasBay({
                 height={LOUPE.height}
                 aids={{ guides: false, zebras: aids.zebras, peaking: aids.peaking }}
                 pixels
+                radius={PICTURE_RADIUS}
                 label={`${selected.tag} at ${zoom}:1`}
                 testId="cameras-loupe-picture"
               />

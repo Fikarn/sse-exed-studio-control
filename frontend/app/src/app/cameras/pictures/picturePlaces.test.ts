@@ -19,10 +19,11 @@ const LOUPE = { x: 818, y: 472, width: 284, height: 136 };
 const NO_AIDS = { guides: false, zebras: false, peaking: false, marker: null };
 
 // The big picture with every aid and the loupe's marker, the loupe with zebras and
-// peaking, a small picture with none.
+// peaking, a small picture with none; each rounded at 4, as on the Cameras page.
 const hero: MeasuredPicture = {
   camera: 1,
   box: { x: 444, y: 138, width: 1680, height: 945 },
+  radius: 4,
   part: WHOLE,
   smooth: true,
   guides: true,
@@ -33,6 +34,7 @@ const hero: MeasuredPicture = {
 const tile: MeasuredPicture = {
   camera: 2,
   box: { x: 444, y: 1095, width: 544, height: 306 },
+  radius: 4,
   part: WHOLE,
   smooth: true,
   ...NO_AIDS,
@@ -40,6 +42,7 @@ const tile: MeasuredPicture = {
 const loupe: MeasuredPicture = {
   camera: 1,
   box: { x: 1556, y: 1129, width: 568, height: 272 },
+  radius: 4,
   part: LOUPE,
   smooth: false,
   ...NO_AIDS,
@@ -61,7 +64,7 @@ function layout(over: Partial<MeasuredPlaces> = {}): MeasuredPlaces {
 }
 
 describe("the page's report of its pictures", () => {
-  it("says each picture's box, part, smoothing, aids and marker, and the chip as a hole", () => {
+  it("says each picture's box, corner radius, part, smoothing, aids and marker, and the chip as a hole", () => {
     expect(buildPlaces(layout())).toEqual({
       showing: true,
       scale: 1,
@@ -70,6 +73,7 @@ describe("the page's report of its pictures", () => {
         {
           camera: 1,
           at: hero.box,
+          radius: 4,
           part: WHOLE,
           smooth: true,
           guides: true,
@@ -77,8 +81,8 @@ describe("the page's report of its pictures", () => {
           peaking: true,
           marker: LOUPE,
         },
-        { camera: 2, at: tile.box, part: WHOLE, smooth: true, ...NO_AIDS },
-        { camera: 1, at: loupe.box, part: LOUPE, smooth: false, ...NO_AIDS, zebras: true, peaking: true },
+        { camera: 2, at: tile.box, radius: 4, part: WHOLE, smooth: true, ...NO_AIDS },
+        { camera: 1, at: loupe.box, radius: 4, part: LOUPE, smooth: false, ...NO_AIDS, zebras: true, peaking: true },
       ],
       holes: [chip],
     });
@@ -141,8 +145,14 @@ describe("the page's report of its pictures", () => {
     const source = readFileSync(resolve(here, "../../../../../../native/protocol/rust/src/picture_layer.rs"), "utf8");
     expect(source).toContain(`pub const MAX_PICTURES: usize = ${MAX_PICTURES};`);
     expect(source).toContain(`pub const MAX_HOLES: usize = ${MAX_HOLES};`);
-    // The aids and the marker are read as the page says them.
-    for (const field of ["pub guides: bool,", "pub zebras: bool,", "pub peaking: bool,", "pub marker: Option<Part>,"]) {
+    // The aids, the marker and the corners' radius are read as the page says them.
+    for (const field of [
+      "pub guides: bool,",
+      "pub zebras: bool,",
+      "pub peaking: bool,",
+      "pub marker: Option<Part>,",
+      "pub radius: f64,",
+    ]) {
       expect(source).toContain(field);
     }
   });
@@ -162,6 +172,19 @@ describe("what the page measures", () => {
     const measured = measurePlaces(bay);
     expect(measured.pictures.map((picture) => picture.camera)).toEqual([1, 2]);
     expect(measured.pictures[1]).toMatchObject({ zebras: true, guides: false });
+    bay.remove();
+  });
+
+  it("reads each picture's corner radius, and one missing or no number of CSS pixels as square", () => {
+    const bay = document.createElement("div");
+    bay.innerHTML = ["8", null, "-4", "8px", "Infinity", "", "2.5"]
+      .map(
+        (radius) =>
+          `<div data-picture data-camera="1" data-part="0,0,1920,1080"${radius === null ? "" : ` data-radius="${radius}"`}></div>`
+      )
+      .join("");
+    document.body.append(bay);
+    expect(measurePlaces(bay).pictures.map((picture) => picture.radius)).toEqual([8, 0, 0, 0, 0, 0, 2.5]);
     bay.remove();
   });
 });

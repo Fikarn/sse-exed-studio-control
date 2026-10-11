@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
+import { pictureCorners } from "./helpers/cameras";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 
@@ -174,12 +175,17 @@ test("the four pictures are the helper's four: CAM 1, CAM 2, CAM 3 and CAM 1's l
   const whole = { x: 0, y: 0, width: 1920, height: 1080 };
   // The loupe at 2:1 looks at a small picture's size, 160 × 90, around the centre.
   const loupePart = { x: 880, y: 495, width: 160, height: 90 };
-  expect(hero).toMatchObject({ camera: 1, part: whole, smooth: true, marker: loupePart, peaking: false });
+  expect(hero).toMatchObject({ camera: 1, radius: 8, part: whole, smooth: true, marker: loupePart, peaking: false });
   expect(hero!.at).toMatchObject({ width: 1280, height: 720 });
-  expect(tile2).toMatchObject({ camera: 2, part: whole });
-  expect(tile3).toMatchObject({ camera: 3, part: whole });
+  expect(tile2).toMatchObject({ camera: 2, radius: 8, part: whole });
+  expect(tile3).toMatchObject({ camera: 3, radius: 8, part: whole });
   expect(tile2!.at).toMatchObject({ width: 320, height: 180 });
-  expect(loupe).toMatchObject({ camera: 1, part: loupePart, smooth: false, guides: false });
+  expect(loupe).toMatchObject({ camera: 1, radius: 8, part: loupePart, smooth: false, guides: false });
+  // Each picture's corners are its well's, the page's --radius-control: the helper's
+  // picture, drawn over the page in the app's window, is rounded where the page is.
+  expect(await pictureCorners(page)).toEqual(
+    [1, 2, 3, 1].map((camera) => ({ camera, reported: 8, wrapper: [8, 8, 8, 8], fills: true }))
+  );
 
   // 4:1 looks at half as much; the zebras reach CAM 1 and the loupe, and the Cameras page keeps them.
   await page.getByTestId("overview-zoom-4").click();

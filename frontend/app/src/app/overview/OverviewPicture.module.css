@@ -1,7 +1,9 @@
 /* THE PICTURE (board 3): CAM 1 at 1280 × 720, two thirds of its pixels, and
    beside it CAM 2, CAM 3 and the loupe at 320 × 180, a sixth, each under its
    caption row; the column's last picture ends where CAM 1 does. Content in
-   black, the pictures at 8 inside the room's 12. */
+   black, the pictures at 8 inside the room's 12: in the app's window the
+   helper rounds its pictures to the same (`PICTURE_RADIUS` in
+   `OverviewPicture.tsx`). */
 
 .room {
   flex: none;
