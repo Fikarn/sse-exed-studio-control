@@ -328,26 +328,26 @@
     }
   },
   "signal": {
-    "$description": "Signal, not status: the meter ramp and the colour-temperature track are the only gradients, because they are information.",
+    "$description": "Signal, not status: the meter ramp and the colour-temperature track are the only gradients, because they are information. The meters have colours of their own, used for nothing else (D50).",
     "meterLow": {
-      "$value": "{sse.green}",
-      "$description": "up to -18 dBFS"
+      "$value": "#2AA7B6",
+      "$description": "aqua: up to -18 dBFS"
     },
     "meterMid": {
-      "$value": "{sse.yellow}",
-      "$description": "-18 to -3 dBFS"
+      "$value": "#86E2E9",
+      "$description": "light aqua: -18 to -3 dBFS"
     },
     "meterOver": {
-      "$value": "{sse.coral}",
-      "$description": "above -3 dBFS"
+      "$value": "#FF4FA3",
+      "$description": "hot pink: from -3 dBFS, the warning and the clip"
     },
     "meterHot": {
       "$value": "{signal.meterMid}",
       "$description": "deprecated: the ramp has three colours"
     },
     "peak": {
-      "$value": "{text.text2}",
-      "$description": "the 2 px peak tick"
+      "$value": "#ECFDFF",
+      "$description": "ice white: the held peak's 2 px line"
     },
     "peakBloom": {
       "$value": "transparent",
@@ -355,7 +355,7 @@
     },
     "rampV": {
       "$value": "linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%)",
-      "$description": "on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 95 % (-3), coral above"
+      "$description": "on a 0..100 % well: aqua to 70 % (-18 dBFS), light aqua to 95 % (-3), hot pink above"
     },
     "rampH": {
       "$value": "linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%)"

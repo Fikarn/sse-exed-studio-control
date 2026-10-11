@@ -82,7 +82,7 @@
     background-position: left;
   }
 
-  /* The peak: a 2 px tick, no bloom. */
+  /* The peak: a 2 px line in the meters' own ice white, no bloom. */
   .peak {
     position: absolute;
     background: var(--signal-peak);
@@ -123,7 +123,8 @@
     border-left: 1px solid var(--text-text4);
   }
 
-  /* The clip lamp: hollow at rest, coral when a clip is held; no glow. */
+  /* The clip lamp: hollow at rest, the meters' hot pink when a clip is held;
+     no glow. */
   .clip {
     position: absolute;
     top: 3px;
@@ -137,12 +138,61 @@
   }
 
   .clipLit {
-    background: var(--role-coral-fill);
-    border-color: var(--role-coral-fill);
+    background: var(--signal-meter-over);
+    border-color: var(--signal-meter-over);
   }
 
   .stale .ramp,
   .stale .peak {
     opacity: 0.4;
+  }
+
+  /* ---- the wide form: the Console's strip, its hero (2026-10-11, D50) ----
+     64 px, mono or stereo; the bars 4 px inside the well's outer edge (3 px
+     inside its 1 px edge) and 2 px apart. The reference ticks stand 4 px
+     outside the well, so the well shows what it holds. */
+  .vertical.wide,
+  .vertical.wide.stereo {
+    width: 64px;
+    overflow: visible;
+  }
+
+  .wide .bars {
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    right: 3px;
+  }
+
+  /* On the bars' travel: 4 px from the well's outer edge at either end. */
+  .edgeTick {
+    position: absolute;
+    bottom: calc(3px + var(--meter-tick, 0) * (100% - 6px));
+    width: 3px;
+    height: 1px;
+    transform: translateY(50%);
+    background: var(--text-text4);
+    pointer-events: none;
+  }
+
+  .edgeTick[data-side="left"] {
+    left: 0;
+  }
+
+  .edgeTick[data-side="right"] {
+    right: 0;
+  }
+
+  .edgeTick[data-reference] {
+    width: 8px;
+    background: var(--text-text3);
+  }
+
+  .edgeTick[data-reference][data-side="left"] {
+    left: -5px;
+  }
+
+  .edgeTick[data-reference][data-side="right"] {
+    right: -5px;
   }
 }

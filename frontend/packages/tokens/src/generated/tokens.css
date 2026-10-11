@@ -49,8 +49,12 @@
   --display-bloom-green: transparent;
   --display-bloom-coral: transparent;
   --display-bloom-blue: transparent;
+  --signal-meter-low: #2AA7B6; /** aqua: up to -18 dBFS */
+  --signal-meter-mid: #86E2E9; /** light aqua: -18 to -3 dBFS */
+  --signal-meter-over: #FF4FA3; /** hot pink: from -3 dBFS, the warning and the clip */
+  --signal-peak: #ECFDFF; /** ice white: the held peak's 2 px line */
   --signal-peak-bloom: transparent; /** deprecated: no glow */
-  --signal-ramp-v: linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%); /** on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 95 % (-3), coral above */
+  --signal-ramp-v: linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%); /** on a 0..100 % well: aqua to 70 % (-18 dBFS), light aqua to 95 % (-3), hot pink above */
   --signal-ramp-h: linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%);
   --signal-cct-track: linear-gradient(to right, var(--signal-cct-2700), var(--signal-cct-3800) 30%, var(--signal-cct-5000) 60%, var(--signal-cct-6500)); /** warm (2700 K) to cool (6500 K), the light's own colour */
   --signal-cct-2700: #EF8E5A;
@@ -308,10 +312,7 @@
   --role-primary-ink: var(--sse-black);
   --role-cap-fill2: var(--role-cap-fill); /** deprecated: caps are flat */
   --display-text2: var(--text-text2);
-  --signal-meter-low: var(--sse-green); /** up to -18 dBFS */
-  --signal-meter-mid: var(--sse-yellow); /** -18 to -3 dBFS */
-  --signal-meter-over: var(--sse-coral); /** above -3 dBFS */
-  --signal-peak: var(--text-text2); /** the 2 px peak tick */
+  --signal-meter-hot: var(--signal-meter-mid); /** deprecated: the ramp has three colours */
   --signal-cct-6500: var(--sse-sky);
   --tag-1: var(--sse-brown); /** Ochre, the palette's reserve Brown (was Orange) */
   --tag-5: var(--sse-sky); /** Mist, the palette's reserve Sky (was Cyan) */
@@ -430,7 +431,6 @@
   --display-yellow: var(--role-yellow-text);
   --display-coral: var(--role-coral-text);
   --display-blue: var(--role-blue-text);
-  --signal-meter-hot: var(--signal-meter-mid); /** deprecated: the ramp has three colours */
   --elevation-key-lit-yellow-fill: var(--role-yellow-fill); /** deprecated: engaged */
   --elevation-key-lit-green-fill: var(--role-green-fill); /** deprecated: live */
   --font-size-name: var(--font-size-body); /** deprecated: use body */

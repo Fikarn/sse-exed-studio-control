@@ -111,6 +111,7 @@
 
   .locked .unity,
   .locked .grooveUnity,
+  .locked .grooveUnityLabel,
   .locked .grooveTick {
     opacity: 0.4;
   }
@@ -209,5 +210,57 @@
     height: 2px;
     margin-top: -1px;
     background: var(--role-cap-line);
+  }
+
+  /* ---- compact: the Console's strip (2026-10-11, D50) ----
+     A 28 px column, the take-time target; an 8 px well down its middle with
+     no groove line; short ticks in the well; the unity notch across the
+     column, named beside it; the cap 28 × 12. */
+  .groove.compact {
+    width: 28px;
+    min-width: 28px;
+    max-width: 28px;
+  }
+
+  .compact .grooveWell {
+    left: 10px;
+    right: 10px;
+  }
+
+  .compact .travel {
+    top: 6px;
+    bottom: 6px;
+  }
+
+  .compact .slot {
+    display: none;
+  }
+
+  .compact .grooveTick {
+    left: 11px;
+    right: 11px;
+  }
+
+  .compact .grooveUnity {
+    left: 3px;
+    right: 3px;
+  }
+
+  .compact .grooveCap {
+    width: 28px;
+    height: 12px;
+    margin-left: -14px;
+  }
+
+  .grooveUnityLabel {
+    position: absolute;
+    left: calc(100% + 4px);
+    bottom: calc(var(--slider-unity, 0.8172) * 100%);
+    transform: translateY(50%);
+    font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-text3);
+    white-space: nowrap;
+    pointer-events: none;
   }
 }

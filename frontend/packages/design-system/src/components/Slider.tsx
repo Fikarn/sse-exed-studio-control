@@ -243,6 +243,13 @@ export interface GrooveProps extends SliderBaseProps {
   /** The travel height; the groove fills its host when omitted. */
   height?: number;
   /**
+   * `compact` (the Console's strip, 2026-10-11, D50): a 28 px column, an 8 px
+   * well and a 28 × 12 cap, the fader secondary to the meter beside it.
+   */
+  size?: "standard" | "compact";
+  /** Printed beside the unity notch, outside the column (`0`). */
+  unityLabel?: string;
+  /**
    * Scale ticks along the travel, 0..1 from the bottom (the fader law's
    * marks, e.g. +6, −6, −12 … dB). Short 1 px marks in the well; unity draws
    * its own longer tick, so leave it out. Omit for none.
@@ -251,19 +258,41 @@ export interface GrooveProps extends SliderBaseProps {
 }
 
 // The vertical fader: a 44 px target column with an 18 px well, a 2 px groove
-// line, the ticks and the cap with its index line across the middle.
+// line, the ticks and the cap with its index line across the middle. The
+// compact one keeps the column's whole height as its target and the cap's
+// centre 6 px from either end (half its 12 px), where the standard one keeps
+// 14 (half its 22 and a little).
 export function Groove(props: GrooveProps) {
-  const { value, unity = 0.8172, locked, doubt, take, height, ticks, testId, className } = props;
+  const {
+    value,
+    unity = 0.8172,
+    locked,
+    doubt,
+    take,
+    height,
+    ticks,
+    size = "standard",
+    unityLabel,
+    testId,
+    className,
+  } = props;
+  const inset = size === "compact" ? 6 : 14;
   const handlers = useSliderInteraction(props, (element, event) => {
     const rect = element.getBoundingClientRect();
-    const inset = 14;
     return 1 - (event.clientY - rect.top - inset) / Math.max(1, rect.height - inset * 2);
   });
   return (
     <div
-      className={[styles.groove, locked ? styles.locked : "", doubt ? styles.doubt : "", className]
+      className={[
+        styles.groove,
+        size === "compact" ? styles.compact : "",
+        locked ? styles.locked : "",
+        doubt ? styles.doubt : "",
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
+      data-size={size === "compact" ? "compact" : undefined}
       data-take={take ? "" : undefined}
       data-locked={locked ? "" : undefined}
       data-doubt={doubt ? "" : undefined}
@@ -280,6 +309,7 @@ export function Groove(props: GrooveProps) {
           <span key={tick} className={styles.grooveTick} data-tick="" style={{ bottom: `${clamp01(tick) * 100}%` }} />
         ))}
         <span className={styles.grooveUnity} />
+        {unityLabel ? <span className={styles.grooveUnityLabel}>{unityLabel}</span> : null}
         <span className={styles.grooveCap} data-material="cap" />
       </span>
     </div>
