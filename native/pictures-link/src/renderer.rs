@@ -12,9 +12,11 @@
 //! the aids the page asked for over it (`aids.rs`, the page's numbers):
 //! zebras and peaking worked out at the picture's pixel under each of the
 //! surface's, as the page's shader does, and the guides and the loupe's
-//! marker as lines in the picture's pixels. Holes are cleared again, and
-//! everything else in the surface stays clear, so the page shows through
-//! around the pictures. One present shows them all.
+//! marker as lines in the picture's pixels. Each place's corners are rounded
+//! at the radius the page gave it, as the page rounds the place. Holes are
+//! cleared again, and everything else in the surface stays clear, outside
+//! the rounded corners too, so the page shows through around the pictures.
+//! One present shows them all.
 //!
 //! The shell does no work per frame, and no picture leaves this process.
 
@@ -63,7 +65,9 @@ fn shaders() -> String {
 /// the aids over it: zebras and peaking from the picture's pixel under each
 /// of the surface's, as `pictureDrawer.ts` does; then the guides and the
 /// marker, each the share of the surface's pixel that its line covers, as a
-/// canvas strokes them.
+/// canvas strokes them. Last it rounds the place's corners at `radius`: each
+/// pixel is the share of it inside the rounded rectangle, premultiplied, as
+/// the surface is, so the page shows where a corner is cut away.
 const SHADERS: &str = r"
 cbuffer Constants : register(b0) {
     float4 whole;
@@ -72,7 +76,7 @@ cbuffer Constants : register(b0) {
     float2 source;
     float2 taps;
     uint aids;
-    uint spare;
+    float radius;
 };
 static const float2 PICTURE = float2(1920.0, 1080.0);
 static const uint GUIDES = 1;
@@ -144,6 +148,14 @@ float marker_cover(float2 at, float2 reach) {
         * dash(2.0 * marker.z + marker.w + bottom - at.y));
     return shown;
 }
+// The share of the pixel at `p`, in the place's own pixels, inside the place
+// with its corners rounded at `radius`: every pixel whole at a radius of 0.
+float corner_cover(float2 p) {
+    float r = min(radius, 0.5 * min(view.x, view.y));
+    float2 q = abs(p - 0.5 * view) - (0.5 * view - r);
+    float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+    return saturate(0.5 - d);
+}
 float4 ps_place(Out i) : SV_Target {
     float2 at = whole.xy + i.uv * whole.zw;
     float3 rgb = frame.Sample(how, at / PICTURE).rgb;
@@ -186,7 +198,8 @@ float4 ps_place(Out i) : SV_Target {
     if ((aids & MARKER) != 0) {
         rgb = lerp(rgb, (float3)1.0, marker_cover(at, reach));
     }
-    return float4(rgb, 1);
+    float a = corner_cover(i.uv * view);
+    return float4(rgb * a, a);
 }
 float4 ps_clear(Out i) : SV_Target {
     return float4(0, 0, 0, 0);
@@ -215,7 +228,8 @@ struct Constants {
     taps: [f32; 2],
     /// The aids drawn over the place (`aid_bits`).
     aids: u32,
-    spare: u32,
+    /// The place's corner radius, in the surface's pixels.
+    radius: f32,
 }
 
 /// A place's aids as the shader reads them: 1 the guides, 2 the zebras, 4
@@ -773,9 +787,10 @@ fn convert(renderer: &Renderer, source: &Source, converted: &Converted, picture:
     }
 }
 
-/// Draws the scene's places from the cameras' pictures, with their aids,
-/// into `target`, and clears its holes. A place whose camera was not drawn
-/// this time stays clear.
+/// Draws the scene's places from the cameras' pictures, with their aids and
+/// their rounded corners, into `target`, and clears its holes. A place whose
+/// camera was not drawn this time stays clear. Nothing is blended: each
+/// pixel of a place replaces the cleared one, premultiplied.
 #[allow(unsafe_code)]
 fn compose(renderer: &Renderer, target: &ID3D11RenderTargetView, scene: &Scene, drawn: &[bool; 3]) {
     let context = &renderer.context;
@@ -805,6 +820,7 @@ fn compose(renderer: &Renderer, target: &ID3D11RenderTargetView, scene: &Scene, 
                 marker: placed.marker.as_ref().map_or([0.0; 4], rect),
                 view: [placed.at.width as f32, placed.at.height as f32],
                 aids: aid_bits(placed),
+                radius: placed.radius as f32,
                 ..Constants::default()
             };
             context.UpdateSubresource(
@@ -1049,7 +1065,7 @@ mod tests {
     }
 
     /// Draws `scene` from CAM 1's test card on Windows' software device:
-    /// RGB, row by row.
+    /// RGB, or BGRA with the coverage, row by row.
     struct Card {
         renderer: Renderer,
         target: Offscreen,
@@ -1069,6 +1085,14 @@ mod tests {
         }
 
         fn draw(&mut self, scene: &Scene) -> Vec<[u8; 3]> {
+            self.draw_bgra(scene)
+                .into_iter()
+                .map(|[b, g, r, _]| [r, g, b])
+                .collect()
+        }
+
+        /// What the surface would hold: premultiplied by the coverage.
+        fn draw_bgra(&mut self, scene: &Scene) -> Vec<[u8; 4]> {
             let frame = Picture {
                 uyvy: &self.card,
                 width: 1920,
@@ -1080,7 +1104,7 @@ mod tests {
                 .draw_offscreen(scene, &[Some(frame), None, None], &self.target)
                 .unwrap_or_else(|why| panic!("{why}"))
                 .chunks_exact(4)
-                .map(|bgra| [bgra[2], bgra[1], bgra[0]])
+                .map(|bgra| [bgra[0], bgra[1], bgra[2], bgra[3]])
                 .collect()
         }
     }
@@ -1187,6 +1211,109 @@ mod tests {
         assert!(unmoved(900, 540));
     }
 
+    // A place's corners are rounded at its radius, as the page rounds the
+    // place: a corner's pixel is left clear, so the page under it shows; a
+    // pixel the arc crosses is the picture's own times the share of it
+    // inside, premultiplied as the surface is; the edges and the middle are
+    // whole. A radius of 0 leaves every pixel whole, the corners too.
+    #[test]
+    fn a_place_s_corners_are_rounded_at_its_radius() {
+        let mut card = Card::open();
+        let mut scene = one_to_one(false, false, false, None);
+        let square = card.draw_bgra(&scene);
+        assert!(
+            square.iter().all(|pixel| pixel[3] == 255),
+            "a radius of 0 covers every pixel"
+        );
+        scene.pictures[0].radius = 16;
+        let rounded = card.draw_bgra(&scene);
+        let at = |pixels: &[[u8; 4]], x: usize, y: usize| pixels[y * 1920 + x];
+        for (x, y) in [
+            (0, 0),
+            (1919, 0),
+            (0, 1079),
+            (1919, 1079),
+            (3, 3),
+            (1916, 1076),
+        ] {
+            assert_eq!(at(&rounded, x, y), [0; 4], "the corner at x {x}, y {y}");
+        }
+        for (x, y) in [
+            (960, 0),
+            (0, 540),
+            (1919, 540),
+            (960, 1079),
+            (960, 540),
+            (16, 0),
+            (0, 16),
+        ] {
+            assert_eq!(
+                at(&rounded, x, y),
+                at(&square, x, y),
+                "whole at x {x}, y {y}"
+            );
+        }
+        let mut crossed = 0;
+        for y in 0..16 {
+            for x in 0..16 {
+                let pixel = at(&rounded, x, y);
+                let alpha = pixel[3];
+                if alpha == 0 || alpha == 255 {
+                    continue;
+                }
+                crossed += 1;
+                let own = at(&square, x, y);
+                for channel in 0..3 {
+                    assert!(
+                        pixel[channel] <= alpha,
+                        "premultiplied at x {x}, y {y}: {pixel:?}"
+                    );
+                    let share = f64::from(own[channel]) * f64::from(alpha) / 255.0;
+                    assert!(
+                        (f64::from(pixel[channel]) - share).abs() <= 1.5,
+                        "the picture's own times its share at x {x}, y {y}: {pixel:?} of {own:?}"
+                    );
+                }
+            }
+        }
+        assert!(
+            crossed >= 16,
+            "the arc crosses {crossed} pixels of the corner"
+        );
+
+        // A small place: its corners are its own, where the scene puts it.
+        scene.pictures[0].at = PictureRect {
+            x: 100,
+            y: 50,
+            width: 320,
+            height: 180,
+        };
+        scene.pictures[0].radius = 8;
+        let small = card.draw_bgra(&scene);
+        for (x, y) in [
+            (100, 50),
+            (101, 51),
+            (419, 50),
+            (100, 229),
+            (419, 229),
+            (99, 50),
+            (420, 230),
+        ] {
+            assert_eq!(at(&small, x, y)[3], 0, "clear at x {x}, y {y}");
+        }
+        for (x, y) in [
+            (108, 50),
+            (100, 58),
+            (103, 53),
+            (260, 50),
+            (100, 140),
+            (260, 140),
+            (411, 229),
+        ] {
+            assert_eq!(at(&small, x, y)[3], 255, "whole at x {x}, y {y}");
+        }
+    }
+
     #[test]
     fn a_place_s_aids_are_told_to_the_shader_as_bits() {
         let mut placed = one_to_one(true, false, true, None).pictures[0];
@@ -1225,8 +1352,8 @@ mod tests {
 
     #[test]
     fn the_shaders_constants_are_the_size_the_shader_declares() {
-        // `cbuffer Constants`: two float4, then two float2, then a float2
-        // and two uint: four registers of 16 bytes.
+        // `cbuffer Constants`: two float4, then two float2, then a float2,
+        // a uint and a float: four registers of 16 bytes.
         assert_eq!(size_of::<Constants>(), 64);
     }
 }
