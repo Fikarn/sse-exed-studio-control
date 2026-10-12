@@ -272,20 +272,40 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
     !tabsDisabled && !operatorModeUnlocked ? ["overview", "lighting", "audio", "cameras", "teleprompter"] : [];
   // The lamps, the chips and the latches: what the header shows, and what the
   // Overview ranks to find the worst page (D47), so the two never disagree.
-  const monitorItems = buildMonitorItems(
-    shellState.healthSnapshot,
-    // The prompter's latch counts down, so it shows only while the hardware
-    // link answers: after it stops, the prompter comes back paused.
-    { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
-    shellExperience === "ready" ? workspaceTones : undefined,
-    now.getTime(),
-    // Before ready a check never read is quiet: `pending` while the app
-    // starts, `not read` after a failed start (the recovery plate's word).
-    shellExperience === "ready" ? undefined : shellState.startupFailure ? "not read" : "pending"
+  // Kept between renders (the audit of 2026-10-12): the Overview takes the
+  // lamps as a prop, and the page roots are memoised, so a fresh array at
+  // every render of the shell would render the Overview at every store change.
+  const ready = shellExperience === "ready";
+  const monitorItems = useMemo(
+    () =>
+      buildMonitorItems(
+        shellState.healthSnapshot,
+        // The prompter's latch counts down, so it shows only while the hardware
+        // link answers: after it stops, the prompter comes back paused.
+        { lightingSceneDrift, audioSolo, prompterPlaying: ready ? prompterPlaying : null },
+        ready ? workspaceTones : undefined,
+        now.getTime(),
+        // Before ready a check never read is quiet: `pending` while the app
+        // starts, `not read` after a failed start (the recovery plate's word).
+        ready ? undefined : shellState.startupFailure ? "not read" : "pending"
+      ),
+    [
+      audioSolo,
+      lightingSceneDrift,
+      now,
+      prompterPlaying,
+      ready,
+      shellState.healthSnapshot,
+      shellState.startupFailure,
+      workspaceTones,
+    ]
   );
   // The shell (overhaul 3): the page's own latches stay off the header while
   // it is open, and the REC tally has its own slot (`headerItems`).
-  const header = headerItems(monitorItems, shellExperience === "ready" ? activeWorkspace : "");
+  const header = useMemo(
+    () => headerItems(monitorItems, ready ? activeWorkspace : ""),
+    [activeWorkspace, monitorItems, ready]
+  );
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
   // footer regions. The shell (overhaul 3): one plate for every page — the

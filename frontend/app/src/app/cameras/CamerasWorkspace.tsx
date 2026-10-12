@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import { ShellRegion } from "@sse/design-system";
 import {
@@ -62,7 +62,7 @@ export interface CamerasWorkspaceProps {
   store: ShellStore;
 }
 
-export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: CamerasWorkspaceProps) {
+function CamerasWorkspaceRoot({ camerasSnapshot, pictures = null, store }: CamerasWorkspaceProps) {
   const arm = useCamerasArming();
   const [view, setView] = useState<BigView>("whole");
   const { view: pictureView, toggleAid, setZoom, setPoint } = usePictureView(store);
@@ -280,3 +280,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
     </div>
   );
 }
+
+// The page root is memoised (the audit of 2026-10-12): the shell renders at
+// every store change, and a page whose props have not changed is left alone.
+export const CamerasWorkspace = memo(CamerasWorkspaceRoot);

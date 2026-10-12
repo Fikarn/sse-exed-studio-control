@@ -1,3 +1,5 @@
+import { memo, useEffect } from "react";
+
 import styles from "./LightingWorkspace.module.css";
 import { LightingClusterRegion } from "./regions/LightingClusterRegion";
 import { LightingBayRegion } from "./regions/LightingBayRegion";
@@ -7,11 +9,13 @@ import { LightingFooter } from "./components/LightingFooter";
 import { LightingDialogs } from "./regions/LightingDialogs";
 import type { LightingWorkspaceSurfaceProps } from "./lightingWorkspaceModel";
 import { useLightingEditor } from "./useLightingEditor";
+import { countRender } from "../shared/renderCounts";
 
 /** The Lighting workspace. It assembles; it owns nothing. State and handlers
  *  live in `useLightingEditor`, the regions under `regions/` draw them. */
-export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
+function LightingWorkspaceSurfaceRoot(props: LightingWorkspaceSurfaceProps) {
   const editor = useLightingEditor(props);
+  useEffect(() => countRender("lightingWorkspace"));
   const { lightingSnapshot, lightingDmxMonitorSnapshot } = props;
   const { bridgeUniverse, fixturesPatched, liveFixtureEntries, previewMode } = editor.rig;
   const { effectiveSceneModified, lastSavedLabel } = editor.sceneEditor;
@@ -53,3 +57,7 @@ export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
     </div>
   );
 }
+
+// The page root is memoised (the audit of 2026-10-12): the shell renders at
+// every store change, and a page whose props have not changed is left alone.
+export const LightingWorkspaceSurface = memo(LightingWorkspaceSurfaceRoot);

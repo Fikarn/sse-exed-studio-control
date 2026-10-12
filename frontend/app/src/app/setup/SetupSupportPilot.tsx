@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import styles from "./SetupSupportPilot.module.css";
 import { LampWord, ShellRegion } from "@sse/design-system";
 import { SetupCluster } from "./components/SetupCluster";
@@ -17,7 +19,7 @@ import { useSetupPilot } from "./useSetupPilot";
 /** Setup / Support. It assembles; it owns nothing. State and handlers live in
  *  `useSetupPilot`; the runner's steps are under `steps/`, Support's and the
  *  cameras' screens under `support/`. */
-export function SetupSupportPilot(props: SetupSupportPilotProps) {
+function SetupSupportPilotRoot(props: SetupSupportPilotProps) {
   const editor = useSetupPilot(props);
   const { store } = props;
   const { busyAction, canReturnToConsole, checks, mode, feedback, recommendedStepId, runnerSteps, stepIndex, isReady } =
@@ -112,3 +114,7 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
     </div>
   );
 }
+
+// The page root is memoised (the audit of 2026-10-12): the shell renders at
+// every store change, and a page whose props have not changed is left alone.
+export const SetupSupportPilot = memo(SetupSupportPilotRoot);

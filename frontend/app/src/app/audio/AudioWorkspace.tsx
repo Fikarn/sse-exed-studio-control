@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
 import { ShellRegion } from "@sse/design-system";
@@ -24,6 +24,7 @@ import { AudioInspector } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { type SnapshotRecord } from "../shellData";
+import { countRender } from "../shared/renderCounts";
 import { useLiveCallback } from "../shared/useLiveCallback";
 
 interface AudioWorkspaceProps {
@@ -35,17 +36,6 @@ interface AudioWorkspaceProps {
 interface AudioWorkspaceFeedback {
   message: string;
   tone: AudioFeedbackTone;
-}
-
-declare global {
-  interface Window {
-    __SSE_TEST_RENDER_COUNTS__?: {
-      audioInspector?: number;
-      audioRail?: number;
-      audioSignalCanvas?: number;
-      audioWorkspace?: number;
-    };
-  }
 }
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
@@ -61,7 +51,7 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
 // every message that reports one names it.
 const SYNC_HINT = "Press Sync from TotalMix to pull the current state.";
 
-export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
+function AudioWorkspaceRoot({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
   const [activeChannelGroups, setActiveChannelGroups] =
     useState<AudioChannelGroupSelections>(EMPTY_CHANNEL_GROUP_SELECTIONS);
   const [bankIndex, setBankIndex] = useState(0);
@@ -77,12 +67,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
 
-  useEffect(() => {
-    if (!window.__SSE_TEST_RENDER_COUNTS__) {
-      return;
-    }
-    window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace = (window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace ?? 0) + 1;
-  });
+  useEffect(() => countRender("audioWorkspace"));
 
   const { audioSnapshotForView, applyOptimistic, clearOptimistic } = useAudioOptimisticSettings(audioSnapshot);
 
@@ -451,3 +436,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     </div>
   );
 }
+
+// The page root is memoised (the audit of 2026-10-12): the shell renders at
+// every store change, and a page whose props have not changed is left alone.
+export const AudioWorkspace = memo(AudioWorkspaceRoot);

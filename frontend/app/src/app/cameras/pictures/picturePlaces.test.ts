@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   MAX_HOLES,
   MAX_PICTURES,
+  PLACES_WATCH,
   buildPlaces,
   measurePlaces,
+  usePicturePlaces,
   type MeasuredPicture,
   type MeasuredPlaces,
 } from "./picturePlaces";
@@ -186,5 +189,90 @@ describe("what the page measures", () => {
     document.body.append(bay);
     expect(measurePlaces(bay).pictures.map((picture) => picture.radius)).toEqual([8, 0, 0, 0, 0, 0, 2.5]);
     bay.remove();
+  });
+});
+
+// What makes the page measure its places again (the audit of 2026-10-12): a node
+// that comes or goes and the places' attributes, never words. The meters' peak
+// numbers change as text at every frame on the Overview, and the page used to
+// measure itself for each of them.
+describe("what makes the page measure its places again", () => {
+  // jsdom measures nothing: the hook asks for a ResizeObserver it never needs here.
+  beforeEach(() => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    document.body.replaceChildren();
+  });
+
+  const box = (element: HTMLElement, rect: () => { x: number; y: number; width: number; height: number }) => {
+    element.getBoundingClientRect = () => {
+      const { x, y, width, height } = rect();
+      return { x, y, width, height, left: x, top: y, right: x + width, bottom: y + height, toJSON: () => ({}) };
+    };
+  };
+  const delivered = () => act(async () => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+
+  it("watches nodes and the places' attributes, not words", () => {
+    expect(PLACES_WATCH.childList).toBe(true);
+    expect(PLACES_WATCH.subtree).toBe(true);
+    expect(PLACES_WATCH.attributes).toBe(true);
+    expect(PLACES_WATCH.characterData).toBeUndefined();
+    for (const attribute of ["data-part", "data-camera", "data-aids", "data-marker", "data-radius", "data-visible"]) {
+      expect(PLACES_WATCH.attributeFilter).toContain(attribute);
+    }
+  });
+
+  it("says its places again for a layer that comes, not for words that change", async () => {
+    const bay = document.createElement("div");
+    box(bay, () => ({ x: 0, y: 0, width: 1000, height: 600 }));
+    const picture = document.createElement("div");
+    picture.dataset.picture = "";
+    picture.dataset.camera = "1";
+    picture.dataset.part = "0,0,1920,1080";
+    box(picture, () => ({ x: 10, y: 10, width: 480, height: 270 }));
+    bay.append(picture);
+    document.body.append(bay);
+    const place = vi.fn();
+    const hook = renderHook(() => usePicturePlaces({ current: bay }, place));
+    await delivered();
+    expect(place).toHaveBeenCalledTimes(1);
+    expect(place.mock.calls[0][0].showing).toBe(true);
+
+    // A menu stands over the picture, its width that of its words: measured, said.
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    menu.textContent = "Rename";
+    box(menu, () => ({ x: 20, y: 20, width: 10 * (menu.textContent?.length ?? 0), height: 40 }));
+    document.body.append(menu);
+    await delivered();
+    expect(place).toHaveBeenCalledTimes(2);
+    expect(place.mock.calls[1][0].holes).toEqual([{ x: 20, y: 20, width: 60, height: 40 }]);
+
+    // Its words change, and with them its width: not watched, so not said now
+    // (the page says itself again once a second, and when the layer's motion ends).
+    (menu.firstChild as Text).nodeValue = "Delete for good";
+    await delivered();
+    expect(place).toHaveBeenCalledTimes(2);
+
+    // A node inside it comes: measured again, and the new width is said.
+    menu.append(document.createElement("i"));
+    await delivered();
+    expect(place).toHaveBeenCalledTimes(3);
+    expect(place.mock.calls[2][0].holes).toEqual([{ x: 20, y: 20, width: 150, height: 40 }]);
+
+    hook.unmount();
+    expect(place).toHaveBeenCalledTimes(4);
+    expect(place.mock.calls[3][0].showing).toBe(false);
   });
 });
