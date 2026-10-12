@@ -43,15 +43,19 @@ pub(crate) const TEXTS_KEPT_FOR: Duration = Duration::from_millis(250);
 /// so `STOP?` lapses as `STOP_SHOWN_FOR` counts on.
 pub(crate) const DISPLAYS_TEXTS_KEPT_FOR: Duration = Duration::from_millis(900);
 
-/// A PROMPTER display asked for while a key of the page is on its way waits
-/// for the key this long at most, then answers from the prompter as it is
-/// (the review of #288: Companion asks for a dial's displays as it sends the
-/// detent, and the strip showed the pace from before it until the next poll).
+/// A display asked for while a key of its page is on its way waits for the
+/// key this long at most, then answers from the page as it is (the review of
+/// #288: Companion asks for a dial's displays as it sends the detent, and the
+/// strip showed the pace from before it until the next poll). The CAMERAS
+/// page's keys since the audit of 2026-10-12 (H1): a key that presses a
+/// camera waits for it up to 2 s with the cameras' lock let go, and the
+/// displays asked for meanwhile read the cameras as they are after this wait
+/// rather than wait the key out.
 pub(crate) const KEY_WAITED_FOR: Duration = Duration::from_millis(100);
 
-/// The PROMPTER keys on their way, by saved data.
+/// The keys on their way, by saved data and page.
 struct KeysOnTheirWay {
-    count: Mutex<HashMap<PathBuf, u32>>,
+    count: Mutex<HashMap<(PathBuf, Page), u32>>,
     done: Condvar,
 }
 
@@ -63,21 +67,23 @@ fn keys_on_their_way() -> &'static KeysOnTheirWay {
     })
 }
 
-/// A PROMPTER key on its way, from before it takes the prompter's lock to
-/// after the prompter published what it did.
+/// A key on its way: a PROMPTER key from before it takes the prompter's lock
+/// to after the prompter published what it did; a CAMERAS key from before its
+/// first spell under the cameras' lock to after its displays are kept.
 struct KeyOnItsWay<'a> {
     db_path: &'a Path,
+    page: Page,
 }
 
-fn key_on_its_way(db_path: &Path) -> KeyOnItsWay<'_> {
+fn key_on_its_way(db_path: &Path, page: Page) -> KeyOnItsWay<'_> {
     let keys = keys_on_their_way();
     *keys
         .count
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .entry(db_path.to_path_buf())
+        .entry((db_path.to_path_buf(), page))
         .or_insert(0) += 1;
-    KeyOnItsWay { db_path }
+    KeyOnItsWay { db_path, page }
 }
 
 impl Drop for KeyOnItsWay<'_> {
@@ -87,7 +93,7 @@ impl Drop for KeyOnItsWay<'_> {
             .count
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if let Some(on_their_way) = count.get_mut(self.db_path) {
+        if let Some(on_their_way) = count.get_mut(&(self.db_path.to_path_buf(), self.page)) {
             *on_their_way = on_their_way.saturating_sub(1);
         }
         drop(count);
@@ -95,17 +101,18 @@ impl Drop for KeyOnItsWay<'_> {
     }
 }
 
-/// Waits, `KEY_WAITED_FOR` at most, until no PROMPTER key of this saved data
-/// is on its way.
-fn wait_for_keys(db_path: &Path) {
+/// Waits, `KEY_WAITED_FOR` at most, until no key of this page of this saved
+/// data is on its way.
+fn wait_for_keys(db_path: &Path, page: Page) {
     let keys = keys_on_their_way();
     let until = Instant::now() + KEY_WAITED_FOR;
+    let key = (db_path.to_path_buf(), page);
     let mut count = keys
         .count
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     while count
-        .get(db_path)
+        .get(&key)
         .is_some_and(|on_their_way| *on_their_way > 0)
     {
         let now = Instant::now();
@@ -219,7 +226,7 @@ pub(crate) fn page_texts(
 /// The PROMPTER page's displays, once no key of the page is on its way, or
 /// `KEY_WAITED_FOR` on.
 fn prompter_texts(db_path: &Path) -> Result<Texts, ControlSurfaceError> {
-    wait_for_keys(db_path);
+    wait_for_keys(db_path, Page::Prompter);
     crate::prompter::deck::deck_texts(db_path).map_err(prompter_error)
 }
 
@@ -232,6 +239,11 @@ fn camera_texts(
     at: Instant,
     all_at_once: bool,
 ) -> Result<Texts, ControlSurfaceError> {
+    // A key on its way answers the displays with its own read when it is
+    // quick; one that waits on a camera does not hold them (the audit of
+    // 2026-10-12, H1): after `KEY_WAITED_FOR` the cameras are read as they
+    // are, which costs no wait, since a press waits with the lock let go.
+    wait_for_keys(db_path, Page::Cameras);
     let kept = kept(db_path, Page::Cameras);
     // Held while the texts are read: the other displays of the same poll
     // wait for this read instead of making their own.
@@ -292,11 +304,14 @@ pub(crate) struct PageAnswer {
 /// (`did`). The deck's `REC` counts its dwell and its 3 s from `at`; the
 /// prompter reads its own clock.
 ///
-/// The CAMERAS page's kept texts are held from before the key to after it: a
-/// display that is asked for meanwhile waits for the key, and is answered as
-/// the key left the page, from the key's own read. The PROMPTER page keeps
-/// none: its displays read the frame the prompter publishes as the key lets
-/// go of the prompter's lock.
+/// A CAMERAS key is on its way from before its first spell under the cameras'
+/// lock to after its displays are kept: a display asked for meanwhile waits
+/// `KEY_WAITED_FOR` for the key's own read, then reads the cameras as they
+/// are (the key may be waiting on a camera, with the lock let go; the audit
+/// of 2026-10-12, H1). The kept texts' lock is taken only to put the key's
+/// texts in place, never across the wait. The PROMPTER page keeps none: its
+/// displays read the frame the prompter publishes as the key lets go of the
+/// prompter's lock.
 pub(crate) fn handle_page_action(
     db_path: &Path,
     cameras_simulated: bool,
@@ -310,9 +325,11 @@ pub(crate) fn handle_page_action(
         CAMERA_ROUTE => {}
         _ => return None,
     }
+    let on_its_way = key_on_its_way(db_path, Page::Cameras);
+    let handled = cameras_key(db_path, cameras_simulated, action, value, at);
     let kept = kept(db_path, Page::Cameras);
     let mut guard = lock(&kept);
-    let handled = cameras_key(db_path, cameras_simulated, action, value, at);
+    drop(on_its_way);
     Some(match handled {
         Ok((answer, events, texts)) => {
             *guard = Some(KeptTexts { at, texts });
@@ -336,7 +353,7 @@ fn prompter_key(
     action: &str,
     value: Option<&str>,
 ) -> Result<PageAnswer, ControlSurfaceError> {
-    let on_its_way = key_on_its_way(db_path);
+    let on_its_way = key_on_its_way(db_path, Page::Prompter);
     let reply = crate::prompter::deck::handle_deck_action(db_path, action, value)
         .map_err(prompter_error)?;
     drop(on_its_way);

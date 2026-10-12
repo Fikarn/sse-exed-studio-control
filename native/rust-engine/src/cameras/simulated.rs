@@ -12,7 +12,9 @@
 //! desk would.
 
 use crate::cameras::model::{model, AutoKind, Setting, CAMERA_NUMBERS};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use crate::cameras::sending::{SendTicket, Sending};
+use std::sync::mpsc::channel;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// The PIN the simulated CAM 1 shows when Setup pairs it (2026-10-06): the
 /// page tests and the fixture double type the same.
@@ -223,6 +225,9 @@ pub(crate) struct SimulatedCamera {
     /// Reports its settings when read; `false` reads as a connection that
     /// has brought no setting yet (a test hook, finding 19).
     reporting: bool,
+    /// Answers a press this long after taking it, on a thread of its own,
+    /// as a real link's camera would (a test hook); `None` answers at once.
+    answer_delay: Option<Duration>,
     /// Everything it was sent, oldest first.
     sent: Vec<CameraCommand>,
     /// The time of day its timecode reads; `None` runs it from this PC's
@@ -283,6 +288,7 @@ impl SimulatedCamera {
             values,
             answering: true,
             reporting: true,
+            answer_delay: None,
             sent: Vec::new(),
             clock: None,
         }
@@ -375,10 +381,41 @@ impl SimulatedCameras {
         })
     }
 
-    /// Sends the commands in order; `false` when the camera does not answer.
-    pub(crate) fn send(&mut self, camera: u8, commands: &[CameraCommand]) -> bool {
+    /// Begins a press: the camera takes the commands in order, at once. Its
+    /// answer comes at once too, or, with `delay_answers` (a test hook), on
+    /// a thread after the delay, as a real link's camera's would, so the
+    /// tests can hold that a press waits with the cameras' lock let go
+    /// (`sending.rs`). A camera that does not answer never got the press.
+    pub(crate) fn begin_send(
+        &mut self,
+        camera: u8,
+        commands: &[CameraCommand],
+        deadline: Instant,
+    ) -> Sending {
         let target = self.camera_mut(camera);
-        commands.iter().all(|command| target.receive(command))
+        let taken = commands.iter().all(|command| target.receive(command));
+        let Some(delay) = target.answer_delay else {
+            return Sending::done(taken);
+        };
+        let (reply, answer) = channel();
+        let _ = std::thread::Builder::new()
+            .name(String::from("simulated-camera-answer"))
+            .spawn(move || {
+                std::thread::sleep(delay);
+                let _ = reply.send(if taken {
+                    Ok(())
+                } else {
+                    Err(String::from("The simulated camera does not answer."))
+                });
+            });
+        Sending::Waiting(SendTicket::new(answer, deadline))
+    }
+
+    /// The camera answers a press `delay` after taking it (test hook);
+    /// `None` answers at once again.
+    #[cfg(test)]
+    pub(crate) fn delay_answers(&mut self, camera: u8, delay: Option<Duration>) {
+        self.camera_mut(camera).answer_delay = delay;
     }
 
     /// Everything camera `camera` was sent, oldest first.

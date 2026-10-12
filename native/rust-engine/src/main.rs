@@ -38,7 +38,7 @@ mod storage;
 mod storage_backups;
 mod support;
 
-use crate::app::EngineApp;
+use crate::app::{EngineApp, EngineReply};
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::{
     refresh_audio_snapshot_metering, AudioChannelSnapshot, AudioMixTargetSnapshot, AudioSnapshot,
@@ -52,7 +52,7 @@ use crate::diagnostics::{append_log, init_log, log_event, LogLevel};
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BACKUPS, SUBSYSTEM_OSC};
 use crate::liveness::{Lifetime, Spec};
 use crate::protocol::{
-    event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
+    error_response, event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
 use crate::storage::list_settings_by_prefix;
 use crate::storage_backups::{
@@ -62,8 +62,10 @@ use crate::storage_backups::{
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -328,9 +330,12 @@ impl SimulatedAudioMeterCache {
 }
 
 /// The request loop: one JSON request per line on stdin until the shell
-/// closes it, each answered through the output writer.
+/// closes it, each answered through the output writer. A camera press, which
+/// may wait on a camera (the audit of 2026-10-12, H1), runs on a thread of its
+/// own and answers through the same writer, so the loop serves the next
+/// request meanwhile; every other request is answered here, in turn.
 fn serve_requests(
-    app: &EngineApp,
+    app: &Arc<EngineApp>,
     reader: &mut impl BufRead,
     output_sender: &Sender<Value>,
 ) -> io::Result<()> {
@@ -354,15 +359,58 @@ fn serve_requests(
             }
         };
 
-        let reply = app.handle_request(request);
-        send_output(
-            output_sender,
-            serde_json::to_value(&reply.response)
-                .map_err(|error| io::Error::other(error.to_string()))?,
-        )?;
-        for event in reply.events {
-            send_output(output_sender, event)?;
+        if cameras::is_press_method(&request.method) {
+            spawn_press(Arc::clone(app), request, output_sender.clone());
+            continue;
         }
+        send_reply(output_sender, app.handle_request(request))?;
+    }
+}
+
+/// The response, then its events, through the output writer.
+fn send_reply(output_sender: &Sender<Value>, reply: EngineReply) -> io::Result<()> {
+    send_output(
+        output_sender,
+        serde_json::to_value(&reply.response)
+            .map_err(|error| io::Error::other(error.to_string()))?,
+    )?;
+    for event in reply.events {
+        send_output(output_sender, event)?;
+    }
+    Ok(())
+}
+
+/// The sentence a press is refused with when its thread could not run it.
+const PRESS_FAILED: &str =
+    "The press did not finish inside the hardware link. Press it again; the log says what happened.";
+
+/// Runs a camera press on a thread of its own and answers it through the
+/// output writer. A press that panics is refused rather than left unanswered
+/// (the hook has logged the panic), so the page is not held to the shell's
+/// timeout; a thread that cannot start refuses it the same way.
+fn spawn_press(app: Arc<EngineApp>, request: RequestEnvelope, sender: Sender<Value>) {
+    let id = request.id.clone();
+    let refusal = |id: Value| EngineReply {
+        response: error_response(id, "CAMERA_PRESS_FAILED", String::from(PRESS_FAILED)),
+        events: Vec::new(),
+    };
+    let thread_sender = sender.clone();
+    let thread_id = id.clone();
+    let spawned = thread::Builder::new()
+        .name(String::from("cameras-press"))
+        .spawn(move || {
+            let reply = match catch_unwind(AssertUnwindSafe(|| app.handle_request(request))) {
+                Ok(reply) => reply,
+                Err(_) => refusal(thread_id),
+            };
+            let _ = send_reply(&thread_sender, reply);
+        });
+    if let Err(error) = spawned {
+        log_event(
+            LogLevel::Error,
+            &format!("A camera press could not start its thread: {error}."),
+        );
+        let _ = send_reply(&sender, refusal(id));
     }
 }
 
@@ -588,7 +636,7 @@ fn main() -> io::Result<()> {
     }
 
     let app = match EngineApp::bootstrap() {
-        Ok(app) => app,
+        Ok(app) => Arc::new(app),
         Err(error) => {
             // A typed failure (a corrupt or un-upgradable database, Slice 3)
             // keeps its own code; everything else is BOOTSTRAP_FAILED.
@@ -622,7 +670,7 @@ fn main() -> io::Result<()> {
                 // requests, until the shell restarts it into the restored
                 // database.
                 drop(writer);
-                let app = EngineApp::recovery(&planned_paths);
+                let app = Arc::new(EngineApp::recovery(&planned_paths));
                 let (output_sender, output_receiver) = mpsc::channel::<Value>();
                 spawn_output_writer(output_receiver);
                 serve_requests(&app, &mut reader, &output_sender)?;
@@ -733,6 +781,16 @@ mod tests {
     use super::*;
     use crate::audio::read_audio_snapshot;
     use std::collections::HashMap;
+
+    // The refusal a press gets when its thread could not run it holds the words rule.
+    #[test]
+    fn a_press_that_could_not_run_is_refused_in_the_operators_words() {
+        crate::operator_words::assert_operator_words(PRESS_FAILED);
+        for method in cameras::commands::PRESS_METHODS {
+            assert!(cameras::is_press_method(method));
+        }
+        assert!(!cameras::is_press_method("cameras.snapshot"));
+    }
 
     #[test]
     fn compact_channel_meter_payload_separates_rms_body_from_held_peak() {

@@ -777,3 +777,142 @@ fn a_reading_saved_before_the_status_fields_loads_as_the_last_read() {
     );
     assert_eq!(cam1["recording"]["cardTimeLeft"], "17 h 00 min");
 }
+
+// The audit of 2026-10-12 (H1): a press waits for the camera's answer with
+// the cameras' lock let go, so the page's reads and the deck's displays
+// follow meanwhile instead of waiting the camera's 2 s; the camera's answer
+// is the press's, and the camera took the press before it answered.
+#[test]
+fn a_press_waits_for_the_camera_with_the_lock_let_go() {
+    use std::time::{Duration, Instant};
+
+    let cameras = TestCameras::set_up("press-off-the-lock");
+    cameras.answers_late(1, Duration::from_millis(600));
+    let db_path = cameras.db_path.clone();
+    let simulated = cameras.simulated;
+    let press = std::thread::spawn(move || {
+        let started = Instant::now();
+        let reply = crate::cameras::handle_cameras_request(
+            &db_path,
+            simulated,
+            "cameras.set",
+            &json!({ "camera": 1, "setting": "iso", "value": "800" }),
+        );
+        (reply, started.elapsed())
+    });
+
+    // The press is on its way (the camera took it at once; its thread waits
+    // for the answer): a read and the deck's displays go through at once,
+    // and show what the camera took.
+    let waited = Instant::now();
+    while cameras.sent(1).is_empty() {
+        assert!(
+            waited.elapsed() < Duration::from_secs(5),
+            "the press never reached the camera"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let started = Instant::now();
+    let snapshot = cameras.snapshot();
+    let read_took = started.elapsed();
+    assert!(
+        read_took < Duration::from_millis(300),
+        "the read waited {read_took:?} on the press"
+    );
+    assert_eq!(
+        snapshot["cameras"][0]["values"]["iso"]["value"], "800",
+        "the camera took the press at once"
+    );
+    let started = Instant::now();
+    let displays = crate::cameras::deck::deck_texts(cameras.path(), cameras.simulated)
+        .expect("the displays read");
+    assert!(
+        started.elapsed() < Duration::from_millis(300),
+        "the displays waited on the press"
+    );
+    assert!(displays
+        .iter()
+        .any(|(key, text)| *key == "camera_key_1" && text == "CAM 1\\nHELD"));
+
+    let (reply, took) = press.join().expect("the press ends");
+    let reply = reply.expect("the press succeeds");
+    assert_eq!(reply.result["value"], "800");
+    assert_eq!(reply.event, Some(("setting", Some(1))));
+    assert!(
+        took >= Duration::from_millis(550),
+        "the press waited for the camera's answer, {took:?}"
+    );
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::Set(
+            Setting::Iso,
+            CameraValue::Text(String::from("800"))
+        )]
+    );
+}
+
+// With the lock let go, two quick presses to one camera still run one after
+// the other (the press gate): the second plans from what the camera reported
+// after the first, so two steps step twice and never send one value twice.
+#[test]
+fn two_quick_presses_to_one_camera_run_one_after_the_other() {
+    use std::time::Duration;
+
+    let cameras = TestCameras::set_up("press-gate");
+    cameras.answers_late(1, Duration::from_millis(300));
+    let options = crate::cameras::model::model(1)
+        .options(Setting::Iso)
+        .expect("CAM 1 offers ISO values");
+    let at = options
+        .iter()
+        .position(|option| *option == "400")
+        .expect("board 2's ISO is on the list");
+    let (next, after_next) = (options[at + 1], options[at + 2]);
+
+    let step = |label: &str| {
+        let db_path = cameras.db_path.clone();
+        let simulated = cameras.simulated;
+        std::thread::Builder::new()
+            .name(String::from(label))
+            .spawn(move || {
+                crate::cameras::handle_cameras_request(
+                    &db_path,
+                    simulated,
+                    "cameras.step",
+                    &json!({ "camera": 1, "setting": "iso", "step": 1 }),
+                )
+            })
+            .expect("the thread starts")
+    };
+    let first = step("first-press");
+    let waited = std::time::Instant::now();
+    while cameras.sent(1).is_empty() {
+        assert!(
+            waited.elapsed() < Duration::from_secs(5),
+            "the first press never reached the camera"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let second = step("second-press");
+
+    let first = first
+        .join()
+        .expect("the press ends")
+        .expect("the press succeeds");
+    let second = second
+        .join()
+        .expect("the press ends")
+        .expect("the press succeeds");
+    assert_eq!(first.result["value"], next);
+    assert_eq!(
+        second.result["value"], after_next,
+        "stepped from the first's answer"
+    );
+    assert_eq!(
+        cameras.sent(1),
+        vec![
+            CameraCommand::Set(Setting::Iso, CameraValue::Text(String::from(next))),
+            CameraCommand::Set(Setting::Iso, CameraValue::Text(String::from(after_next))),
+        ]
+    );
+}
