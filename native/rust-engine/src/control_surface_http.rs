@@ -503,7 +503,7 @@ fn spawn_minute_line(context: Arc<BridgeContext>) {
     // more often than that.
     let _ = crate::liveness::spawn_watched(
         Spec {
-            job: "deck's bridge's minute line",
+            job: "deck's bridge minute line",
             name: String::from("control-surface-minute"),
             subsystem: SUBSYSTEM_BRIDGE,
             allowance: None,

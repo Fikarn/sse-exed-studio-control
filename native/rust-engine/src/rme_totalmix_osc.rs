@@ -699,12 +699,14 @@ pub fn spawn_rme_totalmix_audio_metering(
 ) {
     let state = shared_meter_state();
     // Watched (`liveness`): a panic, an end or a poll that stops beating puts
-    // the `osc` entry at `error`.
+    // the `osc` entry at `error`. A pass may wait the database's 5 s busy
+    // timeout twice (the settings read, the link's flush) and resolve the
+    // console's name once, so the allowance is wide.
     let spec = Spec {
         job: "console's metering",
         name: String::from("rme-metering"),
         subsystem: SUBSYSTEM_OSC,
-        allowance: Some(Duration::from_secs(10)),
+        allowance: Some(Duration::from_secs(20)),
         lifetime: Lifetime::Process,
     };
     let _ = crate::liveness::spawn_watched(spec, move |beat| {

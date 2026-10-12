@@ -36,6 +36,9 @@ pub(crate) const SUBSYSTEM_RESTORE: &str = "restore";
 /// (`liveness`, the audit of 2026-10-12).
 pub(crate) const SUBSYSTEM_PICTURES: &str = "pictures";
 pub(crate) const SUBSYSTEM_PROMPTER: &str = "prompter";
+/// The lighting bridge's watch has an entry of its own: a fault of the watch
+/// is not `no output`, which the page reads off `sacn`.
+pub(crate) const SUBSYSTEM_LIGHTING_WATCH: &str = "lighting-watch";
 /// A last database backup older than this reads `warning`.
 pub(crate) const BACKUP_WARNING_AGE_SECS: u64 = 48 * 60 * 60;
 /// The `app.changed` reason a health transition carries.
@@ -457,6 +460,14 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
         &audio_summary,
         &control_surface_summary,
     );
+    // The audit of 2026-10-12 (H2): a thread of the hardware link that
+    // stopped or stalled is part of the whole status, and the summary Setup /
+    // Support shows names it, since no lamp reads most of the entries. It
+    // comes before the prompter's and the cameras' sentences, which end the
+    // summary.
+    let health_summary = problems.values().fold(health_summary, |summary, problem| {
+        format!("{summary} Hardware link: {}", problem.detail)
+    });
     // Slice 5a: when the Prompter XL or NOT UPDATED is part of the whole
     // status, the summary Setup / Support shows says so.
     let health_summary = match prompter
@@ -475,12 +486,6 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
         Some(sentence) => format!("{health_summary} Cameras: {sentence}"),
         None => health_summary,
     };
-    // The audit of 2026-10-12 (H2): a thread of the hardware link that
-    // stopped or stalled is part of the whole status, and the summary Setup /
-    // Support shows names it, since no lamp reads most of the entries.
-    let health_summary = problems.values().fold(health_summary, |summary, problem| {
-        format!("{summary} Hardware link: {}", problem.detail)
-    });
     Ok(json!({
         "status": status,
         "startupPhase": "storage-bootstrap",

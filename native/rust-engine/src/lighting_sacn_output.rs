@@ -306,6 +306,10 @@ impl SendTally {
             self.line_from = Some(now);
             let failed = std::mem::take(&mut self.failed);
             let sent = std::mem::take(&mut self.sent);
+            if failed.saturating_add(sent) == 0 {
+                // A minute with no send at all (nothing to send) has no line.
+                return None;
+            }
             return Some(SendReport::StillFailing {
                 log: format!(
                     "Lighting sACN output: {failed} of {} packet(s) to {target} could not be sent in the last minute ({}).",
@@ -410,6 +414,9 @@ impl SacnOutput {
                     if let Some(previous_bridge) = self.active_bridge {
                         let all: Vec<u16> = self.universes.keys().copied().collect();
                         self.terminate_universes(previous_bridge, all);
+                        // The stream to the old bridge is over, its failed
+                        // sends with it: the new bridge's are counted afresh.
+                        self.forget_sends(log_file_path, "the stream moved to another bridge");
                     }
                     self.active_bridge = Some(state.bridge_ip);
                     let _ = append_log(
@@ -454,19 +461,27 @@ impl SacnOutput {
         self.settle_sends(log_file_path);
     }
 
+    /// The stream to a bridge is over (held, idle, another bridge): a failing
+    /// spell is forgotten, and the entry reads the output's own word again.
+    fn forget_sends(&mut self, log_file_path: &Path, why: &str) {
+        if self.sends.reset() {
+            report_health(SUBSYSTEM_SACN, SubsystemState::Ok, self.detail());
+            let _ = append_log(
+                log_file_path,
+                "INFO",
+                &format!(
+                    "Lighting sACN output: {why} while its packets could not be sent; the entry reads the output's own state again."
+                ),
+            );
+        }
+    }
+
     /// What this tick's sends mean for the entry: a stream that ended forgets
     /// its failures and the entry reads the output's own word; a stream that
     /// runs reads the tally's.
     fn settle_sends(&mut self, log_file_path: &Path) {
         if self.active_bridge.is_none() {
-            if self.sends.reset() {
-                report_health(SUBSYSTEM_SACN, SubsystemState::Ok, self.detail());
-                let _ = append_log(
-                    log_file_path,
-                    "INFO",
-                    "Lighting sACN output: the stream ended while its packets could not be sent; the entry reads the output's own state again.",
-                );
-            }
+            self.forget_sends(log_file_path, "the stream ended");
             return;
         }
         match self.sends.report(Instant::now()) {
@@ -1044,10 +1059,11 @@ mod tests {
         for _ in 0..3 {
             output.tick(&armed, &log);
         }
+        let text = std::fs::read_to_string(&log).expect("the log is written");
         assert_eq!(
             text.matches("could not be sent").count(),
             1,
-            "a failing stream is said once, not at every tick"
+            "a failing stream is said once, not at every tick: {text}"
         );
 
         output.tick(&output_settings(Some(false)), &log);

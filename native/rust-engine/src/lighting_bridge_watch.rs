@@ -33,7 +33,7 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::cameras::runtime::utc_text;
 use crate::diagnostics::append_log;
-use crate::health::SUBSYSTEM_SACN;
+use crate::health::SUBSYSTEM_LIGHTING_WATCH;
 use crate::lighting::lighting_watched_bridge;
 use crate::lighting_sacn_output::{simulated_lights_requested, LIGHTS_SIMULATED_ENV};
 use crate::liveness::{Beat, Lifetime, Spec};
@@ -240,12 +240,14 @@ pub fn spawn_lighting_bridge_watch(db_path: PathBuf, log_file_path: PathBuf) {
         return;
     }
     // Watched (`liveness`): a panic, an end or a look that stops beating is
-    // laid on the `sacn` entry, since the watch is the lighting's.
+    // laid on an entry of the watch's own, never on `sacn`: the page reads
+    // `no output` off that one, and a watch that stopped keeps no packet from
+    // the rig.
     let _ = crate::liveness::spawn_watched(
         Spec {
             job: "lighting bridge's watch",
             name: String::from("bridge-watch"),
-            subsystem: SUBSYSTEM_SACN,
+            subsystem: SUBSYSTEM_LIGHTING_WATCH,
             allowance: Some(STALL_ALLOWANCE),
             lifetime: Lifetime::Process,
         },

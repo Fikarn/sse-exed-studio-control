@@ -463,7 +463,7 @@ fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
     // at the stop, and that is no fault.
     let _ = liveness::spawn_watched(
         Spec {
-            job: "the console's simulated meters",
+            job: "console's simulated meters",
             name: String::from("simulated-meters"),
             subsystem: SUBSYSTEM_OSC,
             allowance: Some(Duration::from_secs(10)),
@@ -681,6 +681,9 @@ fn main() -> io::Result<()> {
     prompter::start(db_path.clone());
 
     let served = serve_requests(&app, &mut reader, &output_sender);
+    // From here on a watched thread that ends, ends with the hardware link
+    // (`liveness`): the metering stops when the output writer has gone.
+    liveness::mark_stopping();
     // The pictures helper is asked to stop now, and waited for after the
     // backup: the shell gives this whole stop two seconds.
     if let Some(helper) = &pictures_helper {
