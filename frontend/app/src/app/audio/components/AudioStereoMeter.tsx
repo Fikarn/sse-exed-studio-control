@@ -70,11 +70,9 @@ function resolveMeterValues({
 
 export function AudioStereoMeter({
   clip,
-  clipHold,
   left,
   meterId,
   meterKind,
-  over,
   peak,
   peakLeft,
   peakRight,
@@ -86,12 +84,10 @@ export function AudioStereoMeter({
   showScale = false,
 }: {
   clip?: boolean;
-  clipHold?: boolean;
   left: number;
   meterId: string;
   meterKind: "channel" | "mixTarget";
   mirrorRight?: boolean;
-  over?: boolean;
   peak?: number;
   peakLeft?: number;
   peakRight?: number;
@@ -101,8 +97,8 @@ export function AudioStereoMeter({
   showReadout?: boolean;
   showScale?: boolean;
 }) {
-  const channelPathClip = clip === true || clipHold === true;
-  const meterPointOver = over === true;
+  // The console's held clip (the audit of 2026-10-12: a `clipHold` alias went).
+  const channelPathClip = clip === true;
   const { leftPeak, liveClip, liveLeft, liveRight, rightPeak } = resolveMeterValues({
     clip: channelPathClip,
     fallbackLeft: left,
@@ -127,7 +123,6 @@ export function AudioStereoMeter({
       className={styles.stereoMeter}
       data-clip={liveClip === true}
       data-channel-path-clip={channelPathClip}
-      data-meter-point-over={meterPointOver}
       data-peak-warning={peakWarning === true}
       data-meter-component="stereo"
       data-meter-id={meterId}

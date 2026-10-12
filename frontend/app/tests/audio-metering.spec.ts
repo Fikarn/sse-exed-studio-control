@@ -589,10 +589,13 @@ test("maps audio meters to the documented dBFS scale", () => {
   expect(meterTone(meterNormalizedForDbfs(-3))).toBe("red");
 });
 
-test("prefers live-console level fields in compact audio meter entries", () => {
+// The frame's fields are each one fact (the audit of 2026-10-12): the level in
+// dBFS, the held peaks, the console's over marks and its held clip. The aliases
+// the frame used to carry beside them (`rms*Dbfs`, `over*`, `clipHold`,
+// `channelPathClip*`) are gone from the frame, the store and the pages.
+test("reads live-console level fields in compact audio meter entries, and no alias", () => {
   const entry = audioMeterEntryFromRecord({
-    clip: false,
-    clipHold: true,
+    clip: true,
     id: "audio-input-9",
     levelLeftDbfs: -18,
     levelRightDbfs: -24,
@@ -602,28 +605,21 @@ test("prefers live-console level fields in compact audio meter entries", () => {
     meterPointOverLeft: false,
     meterPointOverRight: true,
     meterRight: 0.3,
-    over: true,
-    overLeft: false,
-    overRight: true,
     peakHoldLeft: 0.8,
     peakHoldRight: 0.5,
     peakWarning: true,
-    rmsLeftDbfs: -40,
-    rmsRightDbfs: -45,
   });
 
   expect(entry).not.toBeNull();
   expect(entry?.levelLeftDbfs).toBe(-18);
   expect(entry?.levelRightDbfs).toBe(-24);
-  expect(entry?.rmsLeftDbfs).toBe(-40);
   expect(entry?.meterPoint).toBe("input");
   expect(entry?.peakWarning).toBe(true);
   expect(entry?.meterPointOver).toBe(true);
   expect(entry?.meterPointOverLeft).toBe(false);
   expect(entry?.meterPointOverRight).toBe(true);
-  expect(entry?.over).toBe(true);
-  expect(entry?.overLeft).toBe(false);
-  expect(entry?.overRight).toBe(true);
-  expect(entry?.channelPathClip).toBe(true);
-  expect(entry?.clipHold).toBe(true);
+  expect(entry?.clip).toBe(true);
+  for (const alias of ["rmsLeftDbfs", "rmsRightDbfs", "over", "overLeft", "overRight", "clipHold", "channelPathClip"]) {
+    expect(entry, alias).not.toHaveProperty(alias);
+  }
 });

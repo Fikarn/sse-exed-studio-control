@@ -243,10 +243,11 @@ fn compact_rme_meter_payload_separates_current_body_from_held_peak() {
     let payload = channel_meter_payload(&channel);
 
     assert!(
-        (payload["rmsLeftDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.25)).abs() < 0.001
+        (payload["levelLeftDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.25)).abs()
+            < 0.001
     );
     assert!(
-        (payload["rmsRightDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.10)).abs()
+        (payload["levelRightDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.10)).abs()
             < 0.001
     );
     assert!(
@@ -291,11 +292,22 @@ fn compact_rme_meter_payload_exposes_console_meter_fields() {
     assert_eq!(payload["meterPointOver"], false);
     assert_eq!(payload["meterPointOverLeft"], false);
     assert_eq!(payload["meterPointOverRight"], false);
-    assert_eq!(payload["channelPathClip"], true);
-    assert_eq!(payload["over"], false);
-    assert_eq!(payload["overLeft"], false);
-    assert_eq!(payload["overRight"], false);
-    assert_eq!(payload["clipHold"], true);
+    assert_eq!(payload["clip"], true);
+    // Each fact has one field (the audit of 2026-10-12): none of the aliases
+    // the frame used to carry beside it.
+    for alias in [
+        "rmsLeftDbfs",
+        "rmsRightDbfs",
+        "over",
+        "overLeft",
+        "overRight",
+        "clipHold",
+        "channelPathClip",
+        "channelPathClipHold",
+        "peakHold",
+    ] {
+        assert!(payload.get(alias).is_none(), "{alias} is an alias");
+    }
 }
 
 #[test]

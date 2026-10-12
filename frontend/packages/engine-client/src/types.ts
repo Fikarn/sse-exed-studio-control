@@ -472,11 +472,16 @@ export interface EngineTransport {
   dispose?(): Promise<void>;
 }
 
+/**
+ * One meter of a frame, as the store reads it from the hardware link's or the
+ * test double's record. Each fact has one field (the audit of 2026-10-12: the
+ * frame used to carry `rms*Dbfs` for `level*Dbfs`, `over*` for
+ * `meterPointOver*`, and `clipHold`, `channelPathClip` and
+ * `channelPathClipHold` for `clip`, 30 times a second).
+ */
 export interface AudioMeterEntry {
-  channelPathClip?: boolean;
-  channelPathClipHold?: boolean;
+  /** The console's clip, held until `audio.clip.clear`. */
   clip?: boolean;
-  clipHold?: boolean;
   levelLeftDbfs: number;
   levelRightDbfs: number;
   lufs?: number | null;
@@ -484,16 +489,11 @@ export interface AudioMeterEntry {
   meterPointOverLeft?: boolean;
   meterPointOverRight?: boolean;
   meterPoint?: string | null;
-  over?: boolean;
-  overLeft?: boolean;
-  overRight?: boolean;
   peakHoldLeftDbfs: number;
   peakHoldRightDbfs: number;
   peakLeftDbfs: number;
   peakRightDbfs: number;
   peakWarning?: boolean;
-  rmsLeftDbfs: number;
-  rmsRightDbfs: number;
   meterLeft: number;
   meterLevel?: number;
   meterRight: number;

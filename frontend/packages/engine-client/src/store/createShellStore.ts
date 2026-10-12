@@ -289,26 +289,16 @@ export function audioMeterEntryFromRecord(value: unknown): AudioMeterEntry | nul
   const peakHoldRight = numberOrZero(record.peakHoldRight);
   const fallbackPeakLeft = Math.max(peakHoldLeft, meterLeft);
   const fallbackPeakRight = Math.max(peakHoldRight, meterRight);
-  const levelLeftDbfs =
-    numberOrNull(record.levelLeftDbfs) ?? numberOrNull(record.rmsLeftDbfs) ?? normalizedToDbfs(meterLeft);
-  const levelRightDbfs =
-    numberOrNull(record.levelRightDbfs) ?? numberOrNull(record.rmsRightDbfs) ?? normalizedToDbfs(meterRight);
-  const clipHold = booleanOrUndefined(record.clipHold);
-  const clip = booleanOrUndefined(record.clip) ?? clipHold;
-  const meterPointOverLeft = booleanOrUndefined(record.meterPointOverLeft) ?? booleanOrUndefined(record.overLeft);
-  const meterPointOverRight = booleanOrUndefined(record.meterPointOverRight) ?? booleanOrUndefined(record.overRight);
+  const levelLeftDbfs = numberOrNull(record.levelLeftDbfs) ?? normalizedToDbfs(meterLeft);
+  const levelRightDbfs = numberOrNull(record.levelRightDbfs) ?? normalizedToDbfs(meterRight);
+  const clip = booleanOrUndefined(record.clip);
+  const meterPointOverLeft = booleanOrUndefined(record.meterPointOverLeft);
+  const meterPointOverRight = booleanOrUndefined(record.meterPointOverRight);
   const meterPointOver =
-    booleanOrUndefined(record.meterPointOver) ??
-    booleanOrUndefined(record.over) ??
-    (meterPointOverLeft === true || meterPointOverRight === true);
-  const channelPathClipHold = booleanOrUndefined(record.channelPathClipHold) ?? clipHold;
-  const channelPathClip = booleanOrUndefined(record.channelPathClip) ?? channelPathClipHold ?? clip;
+    booleanOrUndefined(record.meterPointOver) ?? (meterPointOverLeft === true || meterPointOverRight === true);
 
   return {
-    channelPathClip,
-    channelPathClipHold,
     clip,
-    clipHold,
     levelLeftDbfs,
     levelRightDbfs,
     lufs:
@@ -322,9 +312,6 @@ export function audioMeterEntryFromRecord(value: unknown): AudioMeterEntry | nul
     meterPointOverLeft,
     meterPointOverRight,
     meterRight,
-    over: booleanOrUndefined(record.over) ?? meterPointOver,
-    overLeft: booleanOrUndefined(record.overLeft) ?? meterPointOverLeft,
-    overRight: booleanOrUndefined(record.overRight) ?? meterPointOverRight,
     peakHoldLeft,
     peakHoldRight,
     peakHoldLeftDbfs: numberOrNull(record.peakHoldLeftDbfs) ?? normalizedToDbfs(peakHoldLeft),
@@ -332,8 +319,6 @@ export function audioMeterEntryFromRecord(value: unknown): AudioMeterEntry | nul
     peakLeftDbfs: numberOrNull(record.peakLeftDbfs) ?? normalizedToDbfs(fallbackPeakLeft),
     peakRightDbfs: numberOrNull(record.peakRightDbfs) ?? normalizedToDbfs(fallbackPeakRight),
     peakWarning: booleanOrUndefined(record.peakWarning),
-    rmsLeftDbfs: numberOrNull(record.rmsLeftDbfs) ?? levelLeftDbfs,
-    rmsRightDbfs: numberOrNull(record.rmsRightDbfs) ?? levelRightDbfs,
   };
 }
 
