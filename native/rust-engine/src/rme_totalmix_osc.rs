@@ -4,6 +4,7 @@ use crate::audio::{
 };
 use crate::diagnostics::{append_log, log_event, LogLevel};
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_OSC};
+use crate::liveness::{Lifetime, Spec};
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use rosc::{encoder, OscMessage, OscPacket, OscType};
@@ -697,7 +698,18 @@ pub fn spawn_rme_totalmix_audio_metering(
     log_file_path: PathBuf,
 ) {
     let state = shared_meter_state();
-    thread::spawn(move || {
+    // Watched (`liveness`): a panic, an end or a poll that stops beating puts
+    // the `osc` entry at `error`. A pass may wait the database's 5 s busy
+    // timeout twice (the settings read, the link's flush) and resolve the
+    // console's name once, so the allowance is wide.
+    let spec = Spec {
+        job: "console's metering",
+        name: String::from("rme-metering"),
+        subsystem: SUBSYSTEM_OSC,
+        allowance: Some(Duration::from_secs(20)),
+        lifetime: Lifetime::Process,
+    };
+    let _ = crate::liveness::spawn_watched(spec, move |beat| {
         // One kept read connection for this thread's settings reads
         // (2026-09 production readiness, Slice 10 — F18).
         enable_thread_read_connection();
@@ -718,6 +730,7 @@ pub fn spawn_rme_totalmix_audio_metering(
 
         loop {
             let now = Instant::now();
+            beat.beat();
             let should_refresh_settings = last_settings_refresh_at
                 .map(|last| now.duration_since(last) >= SETTINGS_REFRESH_INTERVAL)
                 .unwrap_or(true);

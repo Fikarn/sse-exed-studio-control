@@ -50,6 +50,7 @@ use crate::cameras::store::read_setup;
 use crate::diagnostics::append_log;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
 use crate::health::APP_CHANGED_REASON_HEALTH;
+use crate::liveness::{Beat, Lifetime, Spec};
 use crate::storage::open_connection;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -550,9 +551,18 @@ fn start_supervisor(
     {
         let db_path = db_path.clone();
         let to_supervisor = to_supervisor.clone();
-        let _ = thread::Builder::new()
-            .name(String::from("pictures-helper"))
-            .spawn(move || {
+        // Watched (`liveness`) as a task: it ends at the stop, by design; a
+        // panic, or a pass that stops beating, is laid on the `pictures`
+        // entry.
+        let _ = crate::liveness::spawn_watched(
+            Spec {
+                job: "pictures helper's supervisor",
+                name: String::from("pictures-helper"),
+                subsystem: crate::health::SUBSYSTEM_PICTURES,
+                allowance: Some(Duration::from_secs(10)),
+                lifetime: Lifetime::Task,
+            },
+            move |beat| {
                 Supervisor {
                     db_path,
                     log_file_path,
@@ -569,9 +579,10 @@ fn start_supervisor(
                     running: None,
                     generation: 0,
                 }
-                .run(&messages);
+                .run(&messages, &beat);
                 let _ = say_ended.send(());
-            });
+            },
+        );
     }
     PicturesHelper {
         db_path,
@@ -629,10 +640,11 @@ struct Supervisor {
 }
 
 impl Supervisor {
-    fn run(mut self, messages: &Receiver<Message>) {
+    fn run(mut self, messages: &Receiver<Message>, beat: &Beat) {
         self.wanted = self.saved_inputs();
         self.start();
         loop {
+            beat.beat();
             match messages.recv_timeout(TICK) {
                 Ok(Message::Line(generation, line)) if self.is_current(generation) => {
                     self.hear(&line);

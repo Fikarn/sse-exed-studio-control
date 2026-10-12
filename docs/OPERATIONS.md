@@ -16,7 +16,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 **Header.** The SSE logotype at the left; then the pages on one platter, `Overview`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`, the open one in dark green. Each page's tab carries that page's lamp with its worst state as a word: green is fine, amber wants attention, red is a fault. The Overview's tab carries none, since the page shows every page, and the open page's tab carries none, because its state display says it, but keeps the room of it, so no tab moves when the page changes. Before the app is ready the lamps are hollow and read `pending`, or `not read` after a start that failed. At the right, on a second platter, the deck's lamp `Surface`, the backup and the latches, and `Setup / Support` last; pressing a lamp opens Setup / Support. Then `REC` on a platter of its own, and the clock. The product's name ends the footer.
 
-- `Lighting`. `ready`: the bridge passed its last probe, and answers during the session. `not answering`: it has stopped answering (the app looks every 5 s); nothing is locked. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `unreachable`: the probe has not passed. `no output`: the light output could not open its port, so nothing reaches the rig; arming does not help, restarting the hardware link does.
+- `Lighting`. `ready`: the bridge passed its last probe, and answers during the session. `not answering`: it has stopped answering (the app looks every 5 s); nothing is locked. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `unreachable`: the probe has not passed. `no output`: the light output could not open its port, its packets cannot leave the PC (no route to the bridge), or the output itself stopped, so nothing reaches the rig; arming does not help, restarting the hardware link does, and `engine.log` says which it was.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
 - `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
 - `Teleprompter`. `ready`: the Prompter XL shows Studio Control's window. `playing` and the time left while the prompter scrolls. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`, which wins over `playing`.
@@ -210,28 +210,29 @@ On a published setup, a step, `Back to …` and `Run all probes` read `press twi
 
 ## When something goes wrong
 
-| You see                      | It means                    | Do this                               |
-| ---------------------------- | --------------------------- | ------------------------------------- |
-| `SAVED DATA DAMAGED`         | The saved data is damaged   | `Restore latest…` on that screen      |
-| `LINK STOPPED`               | It stopped in the session   | Wait; after 4 stops, `Retry startup`  |
-| `ALREADY OPEN`               | The app runs already        | Use the window that is open           |
-| Another word at the start    | The link did not start      | `Export diagnostics`, `Retry startup` |
-| `AUDIO STOPPED` and the like | A page failed to draw       | `Reload this area`                    |
-| A device does not follow     | The link may be stuck       | `Restart the hardware link…`          |
-| Lighting `held`              | Nothing reaches the rig     | `Light outputs` to `ARMED`            |
-| Lighting `no output`         | The output's port is taken  | `Restart the hardware link…`          |
-| `Backup failed` or `overdue` | No automatic backup written | `Export backup`; check disk space     |
-| Lighting `unreachable`       | Its probe has not passed    | Run it in Setup, then publish         |
-| Lighting `not answering`     | The bridge went silent      | Check its power and network cable     |
-| Rig dark, Lighting `ready`   | The rig does not follow     | Check the fixtures, patch, routing    |
-| Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |
-| Cameras amber or red         | A camera is not `HELD`      | Use the key on its state display      |
-| Surface `unavailable`        | The deck's port is taken    | Close what holds it, restart the link |
-| Surface `no deck`            | Companion stopped asking    | Start Companion; import the profile   |
-| The deck does nothing        | Companion is closed         | Start Companion                       |
-| `401` in Companion's log     | The profile is refused      | Import the profile again              |
-| Wrong display                | It opened where it was last | `Reset the window layout`             |
-| Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
+| You see                                                                       | It means                                                                  | Do this                                                                     |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `SAVED DATA DAMAGED`                                                          | The saved data is damaged                                                 | `Restore latest…` on that screen                                            |
+| `LINK STOPPED`                                                                | It stopped in the session                                                 | Wait; after 4 stops, `Retry startup`                                        |
+| `ALREADY OPEN`                                                                | The app runs already                                                      | Use the window that is open                                                 |
+| Another word at the start                                                     | The link did not start                                                    | `Export diagnostics`, `Retry startup`                                       |
+| `AUDIO STOPPED` and the like                                                  | A page failed to draw                                                     | `Reload this area`                                                          |
+| A device does not follow                                                      | The link may be stuck                                                     | `Restart the hardware link…`                                                |
+| Lighting `held`                                                               | Nothing reaches the rig                                                   | `Light outputs` to `ARMED`                                                  |
+| Lighting `no output`                                                          | The output's port is taken, or its packets cannot leave the PC (no route) | `Restart the hardware link…`; check both network cables and the PC's routes |
+| `Hardware link: … stopped` or `… has not run for` in Setup / Support's health | A part of the link stopped or hangs                                       | `Restart the hardware link…`                                                |
+| `Backup failed` or `overdue`                                                  | No automatic backup written                                               | `Export backup`; check disk space                                           |
+| Lighting `unreachable`                                                        | Its probe has not passed                                                  | Run it in Setup, then publish                                               |
+| Lighting `not answering`                                                      | The bridge went silent                                                    | Check its power and network cable                                           |
+| Rig dark, Lighting `ready`                                                    | The rig does not follow                                                   | Check the fixtures, patch, routing                                          |
+| Audio amber or red                                                            | Console not `VERIFIED`                                                    | Use the key on its state display                                            |
+| Cameras amber or red                                                          | A camera is not `HELD`                                                    | Use the key on its state display                                            |
+| Surface `unavailable`                                                         | The deck's port is taken                                                  | Close what holds it, restart the link                                       |
+| Surface `no deck`                                                             | Companion stopped asking                                                  | Start Companion; import the profile                                         |
+| The deck does nothing                                                         | Companion is closed                                                       | Start Companion                                                             |
+| `401` in Companion's log                                                      | The profile is refused                                                    | Import the profile again                                                    |
+| Wrong display                                                                 | It opened where it was last                                               | `Reset the window layout`                                                   |
+| Tabs locked                                                                   | The setup is not published                                                | `Publish setup` in Setup / Support                                          |
 
 The hardware link restarts by itself after a stop, three times in five minutes; the Console then reads `ASSUMED` until `Sync from TotalMix`. At the recovery screen only a database backup restores: `Restore latest…`, which takes the newest database backup, or press one in the list and `Restore path…` (an archive there is locked, and the screen says why). It asks first. The link restarts into it, with the light outputs held.
 

@@ -31,6 +31,14 @@ pub(crate) const SUBSYSTEM_SACN: &str = "sacn";
 pub(crate) const SUBSYSTEM_BACKUPS: &str = "backups";
 pub(crate) const SUBSYSTEM_STORAGE: &str = "storage";
 pub(crate) const SUBSYSTEM_RESTORE: &str = "restore";
+/// The pictures helper's supervision and the prompter's clock have no entry
+/// of their own: these are the ids a thread problem of theirs is laid on
+/// (`liveness`, the audit of 2026-10-12).
+pub(crate) const SUBSYSTEM_PICTURES: &str = "pictures";
+pub(crate) const SUBSYSTEM_PROMPTER: &str = "prompter";
+/// The lighting bridge's watch has an entry of its own: a fault of the watch
+/// is not `no output`, which the page reads off `sacn`.
+pub(crate) const SUBSYSTEM_LIGHTING_WATCH: &str = "lighting-watch";
 /// A last database backup older than this reads `warning`.
 pub(crate) const BACKUP_WARNING_AGE_SECS: u64 = 48 * 60 * 60;
 /// The `app.changed` reason a health transition carries.
@@ -70,12 +78,65 @@ pub(crate) struct SubsystemStatus {
 
 pub(crate) type HealthEntries = BTreeMap<&'static str, SubsystemStatus>;
 
+/// What went wrong with one of the hardware link's threads (`liveness`, the
+/// audit of 2026-10-12): it stopped, or it has not run for its allowance.
+/// Laid over its subsystem's entry by `effective_entries`, so the thread
+/// that owns the entry keeps its own word for when the problem clears.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ThreadProblem {
+    pub(crate) subsystem: &'static str,
+    pub(crate) detail: String,
+    /// Unix seconds: when it was noted.
+    pub(crate) at: u64,
+}
+
+/// The thread problems, by the thread's name: two threads of one subsystem
+/// never clear each other's.
+pub(crate) type ThreadProblems = BTreeMap<String, ThreadProblem>;
+
 #[derive(Default)]
 pub(crate) struct HealthRegistry {
     entries: HealthEntries,
+    problems: ThreadProblems,
 }
 
 impl HealthRegistry {
+    /// Notes a thread's problem and says whether the shell should hear about
+    /// it: a new problem, or one whose sentence changed.
+    pub(crate) fn note_thread_problem(
+        &mut self,
+        name: &str,
+        subsystem: &'static str,
+        detail: String,
+        at: u64,
+    ) -> bool {
+        let problem = ThreadProblem {
+            subsystem,
+            detail,
+            at,
+        };
+        match self.problems.get(name) {
+            Some(known)
+                if known.subsystem == problem.subsystem && known.detail == problem.detail =>
+            {
+                false
+            }
+            _ => {
+                self.problems.insert(String::from(name), problem);
+                true
+            }
+        }
+    }
+
+    /// Clears a thread's problem; true when there was one to clear.
+    pub(crate) fn clear_thread_problem(&mut self, name: &str) -> bool {
+        self.problems.remove(name).is_some()
+    }
+
+    pub(crate) fn problems(&self) -> &ThreadProblems {
+        &self.problems
+    }
+
     /// Records the state and says whether the shell should hear about it: a
     /// change of state, or a first report that is not `ok`.
     pub(crate) fn report(
@@ -156,15 +217,52 @@ pub(crate) fn registry_entries() -> HealthEntries {
         .clone()
 }
 
+pub(crate) fn registry_problems() -> ThreadProblems {
+    registry()
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .problems()
+        .clone()
+}
+
+/// Notes a problem with one of the hardware link's threads (`liveness`): the
+/// entry of `subsystem` reads `error` with `detail` until it clears. A new
+/// problem, or a changed sentence, raises `app.changed`.
+pub(crate) fn thread_problem(name: &str, subsystem: &'static str, detail: impl Into<String>) {
+    let changed = registry()
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .note_thread_problem(name, subsystem, detail.into(), unix_now_secs());
+    if changed {
+        emit_app_changed(APP_CHANGED_REASON_HEALTH);
+    }
+}
+
+/// The thread runs again: its problem clears, and its entry reads the word
+/// its owner last gave it.
+pub(crate) fn thread_problem_cleared(name: &str) {
+    let changed = registry()
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clear_thread_problem(name);
+    if changed {
+        emit_app_changed(APP_CHANGED_REASON_HEALTH);
+    }
+}
+
 /// The entries as `checks.engine` shows them: a backups entry whose last
 /// success is older than [`BACKUP_WARNING_AGE_SECS`] reads `warning`, counted
-/// from `started_at` at the earliest (the hardware link's start).
+/// from `started_at` at the earliest (the hardware link's start); a subsystem
+/// with a thread problem reads `error` with the problem's sentence, its own
+/// detail after it when that was a fault too, and a subsystem nothing ever
+/// reported gets an entry for the problem.
 pub(crate) fn effective_entries(
     entries: &HealthEntries,
+    problems: &ThreadProblems,
     now: u64,
     started_at: u64,
 ) -> HealthEntries {
-    entries
+    let mut effective: HealthEntries = entries
         .iter()
         .map(|(id, status)| {
             let mut status = status.clone();
@@ -183,7 +281,41 @@ pub(crate) fn effective_entries(
             }
             (*id, status)
         })
-        .collect()
+        .collect();
+    let mut by_subsystem: BTreeMap<&'static str, Vec<&ThreadProblem>> = BTreeMap::new();
+    for problem in problems.values() {
+        by_subsystem
+            .entry(problem.subsystem)
+            .or_default()
+            .push(problem);
+    }
+    for (subsystem, problems) in by_subsystem {
+        let sentences = problems
+            .iter()
+            .map(|problem| problem.detail.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let at = problems
+            .iter()
+            .map(|problem| problem.at)
+            .max()
+            .unwrap_or(now);
+        let detail = match entries.get(subsystem) {
+            Some(own) if own.state != SubsystemState::Ok && !own.detail.is_empty() => {
+                format!("{sentences} Before that: {}", own.detail)
+            }
+            _ => sentences,
+        };
+        effective.insert(
+            subsystem,
+            SubsystemStatus {
+                state: SubsystemState::Error,
+                detail,
+                at,
+            },
+        );
+    }
+    effective
 }
 
 /// The whole status with the Prompter XL's part (the new pages program's
@@ -257,7 +389,13 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
     let audio = build_audio_health_check(&app_settings);
     let control_surface = build_control_surface_health_check(runtime);
     let sqlite_version = read_sqlite_version(&runtime.db_path)?;
-    let engine = effective_entries(&registry_entries(), unix_now_secs(), process_started_at());
+    let problems = registry_problems();
+    let engine = effective_entries(
+        &registry_entries(),
+        &problems,
+        unix_now_secs(),
+        process_started_at(),
+    );
     // The Teleprompter's lamp (Slice 5a). A check that cannot be read is
     // `null` and a `WARN` line, never a failed snapshot: a fault of the
     // prompter's alone must not stop Studio Control's start (review of the
@@ -322,6 +460,14 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
         &audio_summary,
         &control_surface_summary,
     );
+    // The audit of 2026-10-12 (H2): a thread of the hardware link that
+    // stopped or stalled is part of the whole status, and the summary Setup /
+    // Support shows names it, since no lamp reads most of the entries. It
+    // comes before the prompter's and the cameras' sentences, which end the
+    // summary.
+    let health_summary = problems.values().fold(health_summary, |summary, problem| {
+        format!("{summary} Hardware link: {}", problem.detail)
+    });
     // Slice 5a: when the Prompter XL or NOT UPDATED is part of the whole
     // status, the summary Setup / Support shows says so.
     let health_summary = match prompter
@@ -386,8 +532,10 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
 mod tests {
     use super::{
         derive_status, effective_entries, format_health_summary, read_health_snapshot,
-        HealthEntries, HealthRegistry, SubsystemState, SubsystemStatus, BACKUP_WARNING_AGE_SECS,
-        SUBSYSTEM_BACKUPS, SUBSYSTEM_BRIDGE, SUBSYSTEM_OSC, SUBSYSTEM_SACN, SUBSYSTEM_STORAGE,
+        thread_problem, thread_problem_cleared, HealthEntries, HealthRegistry, SubsystemState,
+        SubsystemStatus, ThreadProblems, BACKUP_WARNING_AGE_SECS, SUBSYSTEM_BACKUPS,
+        SUBSYSTEM_BRIDGE, SUBSYSTEM_OSC, SUBSYSTEM_PICTURES, SUBSYSTEM_PROMPTER, SUBSYSTEM_SACN,
+        SUBSYSTEM_STORAGE,
     };
     use crate::bootstrap::RuntimeContext;
     use crate::control_surface::ControlSurfaceBridgeInfo;
@@ -513,7 +661,8 @@ mod tests {
                 now - BACKUP_WARNING_AGE_SECS - 3_600,
             ),
         );
-        let effective = effective_entries(&late, now, 0);
+        let no_problems = ThreadProblems::new();
+        let effective = effective_entries(&late, &no_problems, now, 0);
         let backups = &effective[SUBSYSTEM_BACKUPS];
         assert_eq!(backups.state, SubsystemState::Warning);
         assert!(backups
@@ -532,7 +681,7 @@ mod tests {
             ),
         );
         assert_eq!(
-            derive_status(&effective_entries(&recent, now, 0), true),
+            derive_status(&effective_entries(&recent, &no_problems, now, 0), true),
             "ok"
         );
         assert_eq!(derive_status(&HealthEntries::new(), true), "ok");
@@ -541,14 +690,111 @@ mod tests {
         // backup has not had its turn yet (2026-09-28). Overdue counts from
         // the start, and reads so two days after it.
         assert_eq!(
-            effective_entries(&late, now, now - 300)[SUBSYSTEM_BACKUPS].state,
+            effective_entries(&late, &no_problems, now, now - 300)[SUBSYSTEM_BACKUPS].state,
             SubsystemState::Ok
         );
         assert_eq!(
-            effective_entries(&late, now, now - BACKUP_WARNING_AGE_SECS - 60)[SUBSYSTEM_BACKUPS]
+            effective_entries(&late, &no_problems, now, now - BACKUP_WARNING_AGE_SECS - 60)
+                [SUBSYSTEM_BACKUPS]
                 .state,
             SubsystemState::Warning
         );
+    }
+
+    // The audit of 2026-10-12 (H2): a thread's problem lays `error` over its
+    // subsystem's entry, keeps the entry's own word after it when that was a
+    // fault, makes an entry for a subsystem nothing reported, and clears
+    // without a trace.
+    #[test]
+    fn a_thread_problem_reads_error_on_its_entry_until_it_clears() {
+        let now = 1_757_000_000;
+        let stopped = "The hardware link's lighting output stopped.";
+        let mut registry = HealthRegistry::default();
+        assert!(registry.note_thread_problem(
+            "sacn-output",
+            SUBSYSTEM_SACN,
+            String::from(stopped),
+            now
+        ));
+        assert!(
+            !registry.note_thread_problem(
+                "sacn-output",
+                SUBSYSTEM_SACN,
+                String::from(stopped),
+                now + 1
+            ),
+            "the same sentence again is no change"
+        );
+        assert!(registry.note_thread_problem(
+            "pictures-helper",
+            SUBSYSTEM_PICTURES,
+            String::from("The hardware link's pictures helper's supervisor stopped."),
+            now
+        ));
+
+        let mut entries = all_ok(now);
+        let effective = effective_entries(&entries, registry.problems(), now, 0);
+        assert_eq!(effective[SUBSYSTEM_SACN].state, SubsystemState::Error);
+        assert_eq!(effective[SUBSYSTEM_SACN].detail, stopped);
+        assert_eq!(
+            effective[SUBSYSTEM_PICTURES].state,
+            SubsystemState::Error,
+            "an entry is made for a subsystem nothing reported"
+        );
+        assert_eq!(derive_status(&effective, true), "error");
+
+        // An entry that was a fault keeps its own word after the problem's.
+        entries.insert(
+            SUBSYSTEM_SACN,
+            entry(
+                SubsystemState::Attention,
+                "could not allocate a UDP socket",
+                now,
+            ),
+        );
+        let effective = effective_entries(&entries, registry.problems(), now, 0);
+        assert_eq!(
+            effective[SUBSYSTEM_SACN].detail,
+            format!("{stopped} Before that: could not allocate a UDP socket")
+        );
+
+        assert!(registry.clear_thread_problem("sacn-output"));
+        assert!(!registry.clear_thread_problem("sacn-output"));
+        let effective = effective_entries(&entries, registry.problems(), now, 0);
+        assert_eq!(
+            effective[SUBSYSTEM_SACN].state,
+            SubsystemState::Attention,
+            "its own word again"
+        );
+        assert!(effective.contains_key(SUBSYSTEM_PICTURES));
+    }
+
+    // The summary Setup / Support shows names a thread's problem, since no
+    // lamp reads most of the entries; cleared, it says nothing of it.
+    #[test]
+    fn the_summary_names_a_thread_problem_while_it_stands() {
+        let test_dir = TestDir::new("thread-problem");
+        let runtime = runtime_for(&test_dir, true);
+        let detail = "The hardware link's prompter's clock stopped. Restart the hardware link in Setup / Support.";
+        thread_problem("health-test-prompter-clock", SUBSYSTEM_PROMPTER, detail);
+        let snapshot = read_health_snapshot(&runtime).expect("snapshot");
+        assert_eq!(snapshot["status"], Value::String(String::from("error")));
+        let summary = snapshot["summary"].as_str().expect("summary");
+        assert!(
+            summary.contains(&format!("Hardware link: {detail}")),
+            "{summary}"
+        );
+        assert_eq!(
+            snapshot["checks"]["engine"][SUBSYSTEM_PROMPTER]["state"],
+            Value::String(String::from("error"))
+        );
+
+        thread_problem_cleared("health-test-prompter-clock");
+        let snapshot = read_health_snapshot(&runtime).expect("snapshot");
+        assert!(!snapshot["summary"]
+            .as_str()
+            .expect("summary")
+            .contains("prompter's clock"));
     }
 
     // A transition is a change of state — a first `ok` is not one, a first

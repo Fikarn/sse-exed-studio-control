@@ -90,7 +90,7 @@ The four PB12s run Aputure's DMX profile 1, `CCT & RGB` (read in a bar's menu on
 - The bridge must route that universe to its DMX/CRMX output. Each fixture's DMX address, mode and universe must match its patch on the Lighting page.
 - The stream has priority `100` and the source name `SSE ExEd Studio Control`.
 
-`Held` means nothing is sent: no frame, no keep-alive. It is not a blackout: the rig keeps its last look. The DMX monitor shows what would be sent, the header's Lighting lamp reads `held`, and so does the Lighting page (`HELD`). A light output that could not open its port reads `no output`, red.
+`Held` means nothing is sent: no frame, no keep-alive. It is not a blackout: the rig keeps its last look. The DMX monitor shows what would be sent, the header's Lighting lamp reads `held`, and so does the Lighting page (`HELD`). A light output that could not open its port, whose packets cannot leave the PC (no route), or that stopped reads `no output`, red.
 
 `Armed` means the rig follows the app. Arming sends the current state within 40 ms.
 

@@ -24,6 +24,7 @@ mod lighting;
 mod lighting_backend;
 mod lighting_bridge_watch;
 mod lighting_sacn_output;
+mod liveness;
 #[cfg(test)]
 mod operator_words;
 mod pictures_helper;
@@ -48,7 +49,8 @@ use crate::bootstrap::{
     STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
 };
 use crate::diagnostics::{append_log, init_log, log_event, LogLevel};
-use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BACKUPS};
+use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BACKUPS, SUBSYSTEM_OSC};
+use crate::liveness::{Lifetime, Spec};
 use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
@@ -396,9 +398,16 @@ fn write_database_backup(
 /// writer of dailies, and its sleep does not follow the wall clock, so a
 /// clock set back cannot hold the next one off.
 fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
-    let _ = thread::Builder::new()
-        .name(String::from("database-backup"))
-        .spawn(move || {
+    // Watched for its end only (`liveness`): it sleeps a day between copies.
+    let _ = liveness::spawn_watched(
+        Spec {
+            job: "daily backups",
+            name: String::from("database-backup"),
+            subsystem: SUBSYSTEM_BACKUPS,
+            allowance: None,
+            lifetime: Lifetime::Process,
+        },
+        move |_beat| {
             thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
             sleep_until_daily_backup_due(&backups_dir, &log_file_path);
             loop {
@@ -410,7 +419,8 @@ fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_pat
                 );
                 thread::sleep(DAILY_BACKUP_INTERVAL);
             }
-        });
+        },
+    );
 }
 
 /// Sleeps until the newest daily backup on disk is 24 h old, looking again
@@ -449,23 +459,35 @@ fn daily_backup_wait_line(wait: Duration, newest_daily: &str) -> String {
 }
 
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
-    thread::spawn(move || {
-        let mut cache = SimulatedAudioMeterCache::new();
-        let metering_started_at = Instant::now();
-        let mut sequence = 0_u64;
+    // A task (`liveness`): it ends by itself when the output writer has gone,
+    // at the stop, and that is no fault.
+    let _ = liveness::spawn_watched(
+        Spec {
+            job: "console's simulated meters",
+            name: String::from("simulated-meters"),
+            subsystem: SUBSYSTEM_OSC,
+            allowance: Some(Duration::from_secs(10)),
+            lifetime: Lifetime::Task,
+        },
+        move |beat| {
+            let mut cache = SimulatedAudioMeterCache::new();
+            let metering_started_at = Instant::now();
+            let mut sequence = 0_u64;
 
-        loop {
-            thread::sleep(SIMULATED_AUDIO_METER_INTERVAL);
-            sequence = sequence.saturating_add(1);
-            let event = event_message(
-                EVENT_AUDIO_METERS,
-                cache.tick_payload(&db_path, sequence, metering_started_at),
-            );
-            if sender.send(event).is_err() {
-                break;
+            loop {
+                thread::sleep(SIMULATED_AUDIO_METER_INTERVAL);
+                beat.beat();
+                sequence = sequence.saturating_add(1);
+                let event = event_message(
+                    EVENT_AUDIO_METERS,
+                    cache.tick_payload(&db_path, sequence, metering_started_at),
+                );
+                if sender.send(event).is_err() {
+                    break;
+                }
             }
-        }
-    });
+        },
+    );
 }
 
 /// What build this engine is, kept in its file for the shell, which reads it
@@ -523,6 +545,8 @@ fn main() -> io::Result<()> {
     // names. Everything below logs through it, the recovery mode included.
     let (log_level, log_level_warning) = LogLevel::from_env();
     init_log(&planned_paths.log_file_path, log_level);
+    // Every panic, on any thread, in the log with its place (`liveness`).
+    liveness::install_panic_hook();
     if let Some(warning) = log_level_warning {
         log_event(LogLevel::Warn, &warning);
     }
@@ -618,6 +642,10 @@ fn main() -> io::Result<()> {
     spawn_output_writer(output_receiver);
     control_surface::register_control_surface_event_sender(output_sender.clone());
     send_output(&output_sender, app.ready_event())?;
+    // The watch over the threads started below: a loop that stops beating for
+    // its allowance, or a thread that stops, becomes a health error
+    // (`liveness`, the audit of 2026-10-12).
+    liveness::spawn_stall_watch();
     lighting_sacn_output::spawn_lighting_sacn_output(
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
@@ -653,6 +681,9 @@ fn main() -> io::Result<()> {
     prompter::start(db_path.clone());
 
     let served = serve_requests(&app, &mut reader, &output_sender);
+    // From here on a watched thread that ends, ends with the hardware link
+    // (`liveness`): the metering stops when the output writer has gone.
+    liveness::mark_stopping();
     // The pictures helper is asked to stop now, and waited for after the
     // backup: the shell gives this whole stop two seconds.
     if let Some(helper) = &pictures_helper {

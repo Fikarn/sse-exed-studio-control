@@ -15,6 +15,7 @@ use crate::control_surface_minute::{BridgeMinute, Kind};
 use crate::control_surface_pool::{Next, Pool};
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
+use crate::liveness::{Lifetime, Spec};
 use overflow::{accept, spawn_overflow};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -147,9 +148,20 @@ pub fn start_control_surface_bridge(
                 .keeping_read_connections(),
             );
             spawn_minute_line(Arc::clone(&context));
-            thread::spawn(move || {
-                run_control_surface_bridge(listener, context, WORKER_COUNT, QUEUE_CAPACITY)
-            });
+            // Watched for its end (`liveness`): it waits on the listener and
+            // cannot beat. A panic or an end is laid on the `bridge` entry.
+            let _ = crate::liveness::spawn_watched(
+                Spec {
+                    job: "deck's bridge",
+                    name: String::from("control-surface-acceptor"),
+                    subsystem: SUBSYSTEM_BRIDGE,
+                    allowance: None,
+                    lifetime: Lifetime::Process,
+                },
+                move |_beat| {
+                    run_control_surface_bridge(listener, context, WORKER_COUNT, QUEUE_CAPACITY)
+                },
+            );
             crate::deck_heard::spawn_deck_quiet_watch(db_path.to_path_buf());
 
             ControlSurfaceBridgeInfo {
@@ -338,16 +350,19 @@ fn run_control_surface_bridge(
     for index in 0..worker_count.max(1) {
         let worker_pool = Arc::clone(&pool);
         let worker_context = Arc::clone(&context);
-        let spawned = thread::Builder::new()
-            .name(format!("control-surface-worker-{index}"))
-            .spawn(move || serve_queued_connections(&worker_pool, &worker_context));
-        if let Err(error) = spawned {
-            let _ = append_log(
-                context.log_file_path.as_path(),
-                "ERROR",
-                &format!("Control-surface bridge could not start worker {index}: {error}"),
-            );
-        }
+        // Watched (`liveness`) as a task: a worker ends when the pool closes.
+        // A panic outside a handler's `catch_unwind`, or a worker that could
+        // not start, is laid on the `bridge` entry.
+        let _ = crate::liveness::spawn_watched(
+            Spec {
+                job: "deck's bridge",
+                name: format!("control-surface-worker-{index}"),
+                subsystem: SUBSYSTEM_BRIDGE,
+                allowance: None,
+                lifetime: Lifetime::Task,
+            },
+            move |_beat| serve_queued_connections(&worker_pool, &worker_context),
+        );
     }
     let overflow = spawn_overflow(Arc::clone(&pool), Arc::clone(&context));
 
@@ -484,26 +499,25 @@ fn answer_connection(
 /// minute that had a refusal, a timeout or a slow request, and for every
 /// minute in which the prompter played.
 fn spawn_minute_line(context: Arc<BridgeContext>) {
-    let spawned = thread::Builder::new()
-        .name(String::from("control-surface-minute"))
-        .spawn({
-            let context = Arc::clone(&context);
-            move || loop {
-                let from = Instant::now();
-                thread::sleep(MINUTE_EVERY);
-                let minute = std::mem::take(&mut *context.minute());
-                if minute.worth_a_line(crate::prompter::minute::played_since(from)) {
-                    let _ = append_log(context.log_file_path.as_path(), "INFO", &minute.line());
-                }
+    // Watched for its end (`liveness`): it sleeps the minute, and cannot beat
+    // more often than that.
+    let _ = crate::liveness::spawn_watched(
+        Spec {
+            job: "deck's bridge minute line",
+            name: String::from("control-surface-minute"),
+            subsystem: SUBSYSTEM_BRIDGE,
+            allowance: None,
+            lifetime: Lifetime::Process,
+        },
+        move |_beat| loop {
+            let from = Instant::now();
+            thread::sleep(MINUTE_EVERY);
+            let minute = std::mem::take(&mut *context.minute());
+            if minute.worth_a_line(crate::prompter::minute::played_since(from)) {
+                let _ = append_log(context.log_file_path.as_path(), "INFO", &minute.line());
             }
-        });
-    if let Err(error) = spawned {
-        let _ = append_log(
-            context.log_file_path.as_path(),
-            "ERROR",
-            &format!("Control-surface bridge could not start its minute line: {error}"),
-        );
-    }
+        },
+    );
 }
 
 /// Authorization runs before anything in the request is interpreted: an

@@ -248,6 +248,29 @@ pub fn log_event(level: LogLevel, message: &str) {
     eprintln!("{}", format_line(level, message).trim_end());
 }
 
+/// Logs one line without waiting for the writer's lock: for the panic hook
+/// (`liveness`), which may run on the very thread that holds it, inside the
+/// writer. A line that cannot be written at once goes to stderr, as
+/// `log_event`'s fallback does.
+pub fn log_event_without_waiting(level: LogLevel, message: &str) {
+    if let Some(writer) = LOG_WRITER.get() {
+        let guard = match writer.try_lock() {
+            Ok(guard) => Some(guard),
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => None,
+        };
+        if let Some(mut writer) = guard {
+            if level < writer.level() {
+                return;
+            }
+            if writer.write(level, message).is_ok() {
+                return;
+            }
+        }
+    }
+    eprintln!("{}", format_line(level, message).trim_end());
+}
+
 /// Appends one line to `log_file_path`. When that is the process-wide
 /// writer's file the line goes through the writer (rotation and the level
 /// filter apply); any other path — the engine's tests, which each read their
