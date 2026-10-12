@@ -25,6 +25,7 @@ use crate::cameras::model::{
     STARTED_RECORDING, STOPPED_RECORDING, VMIX_INPUT_MAX, VMIX_INPUT_MIN,
 };
 use crate::cameras::pocket::pairing::{parse_pin, NOT_WANTED};
+use crate::cameras::real_link::LinkFailure;
 use crate::cameras::runtime::{with_cameras, Cameras};
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
 use crate::cameras::snapshot::{
@@ -45,6 +46,25 @@ pub(super) type Handled = Result<(Value, Option<(&'static str, Option<u8>)>), Ca
 /// the page's list holds.
 pub(crate) const CAMERAS_RECENT_LIMIT: usize = 5;
 
+/// The methods that send a camera a press and wait for its answer (the audit
+/// of 2026-10-12, H1). They run as `press_request` runs them: two spells
+/// under the cameras' lock with the camera's answer waited for between them,
+/// the lock let go; and the request loop hands each to a thread of its own
+/// (`main.rs`), so no page and no display waits on a camera.
+pub(crate) const PRESS_METHODS: [&str; 7] = [
+    "cameras.set",
+    "cameras.step",
+    "cameras.auto",
+    "cameras.format.set",
+    "cameras.look.set",
+    "cameras.record.start",
+    "cameras.record.stop",
+];
+
+pub(crate) fn is_press_method(method: &str) -> bool {
+    PRESS_METHODS.contains(&method)
+}
+
 /// Answers one `cameras.*` request. `simulated` is `SSE_CAMERAS_SIMULATED`,
 /// read at the start.
 pub(crate) fn handle_cameras_request(
@@ -53,6 +73,9 @@ pub(crate) fn handle_cameras_request(
     method: &str,
     params: &Value,
 ) -> Result<CamerasReply, CameraError> {
+    if is_press_method(method) {
+        return press_request(db_path, simulated, method, params);
+    }
     with_cameras(db_path, simulated, |cameras, bodies, now| {
         let before = cameras.health_check();
         let (result, event) = match method {
@@ -65,13 +88,6 @@ pub(crate) fn handle_cameras_request(
             }
             "cameras.select" => select_request(cameras, params)?,
             "cameras.bank.set" => bank_request(cameras, params)?,
-            "cameras.set" => set_request(cameras, bodies, params, now)?,
-            "cameras.step" => step_request(cameras, bodies, params, now)?,
-            "cameras.auto" => auto_request(cameras, bodies, params, now)?,
-            "cameras.format.set" => format_request(cameras, bodies, params, now)?,
-            "cameras.look.set" => look_request(cameras, bodies, params, now)?,
-            "cameras.record.start" => record_request(cameras, bodies, params, now, true)?,
-            "cameras.record.stop" => record_request(cameras, bodies, params, now, false)?,
             "cameras.release" => release_request(cameras, params)?,
             "cameras.connect" => connect_request(cameras, bodies, params, now)?,
             "cameras.setup.update" => setup_update_request(db_path, cameras, bodies, params, now)?,
@@ -278,19 +294,193 @@ fn reported(reading: &CameraReading, setting: Setting) -> Value {
     }
 }
 
-/// Sends the press and reads the camera back: the answer is what it reports
-/// (the camera wins, D12).
-fn press(
+// ---------------------------------------------------------------------------
+// A press, in two spells under the lock
+// ---------------------------------------------------------------------------
+
+/// A press as the checks settled it: what goes to which camera, and how the
+/// camera's answer becomes the request's.
+pub(super) struct Plan {
+    pub(super) camera: u8,
+    pub(super) commands: Vec<CameraCommand>,
+    answer: Answer,
+}
+
+/// How a press answers, from what the camera reports after it.
+enum Answer {
+    /// `{ camera, setting, value }`, the value as the camera now reports it;
+    /// `cameras.changed { reason: "setting" }`.
+    Setting(Setting),
+    /// `{ camera, sentence }` with the change; `format`.
+    Format {
+        resolution: Option<String>,
+        frame_rate: Option<String>,
+        old_resolution: String,
+        old_frame_rate: String,
+    },
+    /// `{ camera, sentence }` with the change; `look`.
+    Look {
+        dynamic_range: bool,
+        display_lut: bool,
+        display_lut_on: bool,
+        before: CameraReading,
+    },
+    /// `{ camera, recording, sentence }`; `record`.
+    Record { start: bool },
+}
+
+impl Plan {
+    /// The request's answer from what the camera reports after the press
+    /// (the camera wins, D12).
+    fn answer(
+        self,
+        cameras: &mut Cameras,
+        after: &CameraReading,
+    ) -> (Value, Option<(&'static str, Option<u8>)>) {
+        let camera = self.camera;
+        let tag = model(camera).tag;
+        match self.answer {
+            Answer::Setting(setting) => (
+                json!({ "camera": camera, "setting": setting.key(), "value": reported(after, setting) }),
+                Some(("setting", Some(camera))),
+            ),
+            Answer::Format {
+                resolution,
+                frame_rate,
+                old_resolution,
+                old_frame_rate,
+            } => {
+                let now_resolution = after.resolution.clone().unwrap_or_default();
+                let now_frame_rate = after.frame_rate.clone().unwrap_or_default();
+                let change = match (resolution.is_some(), frame_rate.is_some()) {
+                    (true, true) => format!(
+                        "{old_resolution} {old_frame_rate}p → {now_resolution} {now_frame_rate}p"
+                    ),
+                    (true, false) => format!("{old_resolution} → {now_resolution}"),
+                    _ => format!("{old_frame_rate}p → {now_frame_rate}p"),
+                };
+                (
+                    json!({ "camera": camera, "sentence": format!("{tag}: {change}.") }),
+                    Some(("format", Some(camera))),
+                )
+            }
+            Answer::Look {
+                dynamic_range,
+                display_lut,
+                display_lut_on,
+                before,
+            } => {
+                let text = |reading: &CameraReading, setting| {
+                    reading.text(setting).unwrap_or("").to_string()
+                };
+                let mut parts = Vec::new();
+                if dynamic_range {
+                    parts.push(format!(
+                        "dynamic range {} → {}",
+                        text(&before, Setting::DynamicRange),
+                        text(after, Setting::DynamicRange)
+                    ));
+                }
+                if display_lut {
+                    parts.push(format!(
+                        "display LUT {} → {}",
+                        text(&before, Setting::DisplayLut),
+                        text(after, Setting::DisplayLut)
+                    ));
+                }
+                if display_lut_on {
+                    parts.push(format!(
+                        "display LUT {}",
+                        if after.display_lut_on == Some(true) {
+                            "on"
+                        } else {
+                            "off"
+                        }
+                    ));
+                }
+                (
+                    json!({ "camera": camera, "sentence": format!("{tag}: {}.", parts.join("; ")) }),
+                    Some(("look", Some(camera))),
+                )
+            }
+            Answer::Record { start } => {
+                // A take that starts ends the deck's armed stop: nobody armed
+                // the stop of the new take. A take that stops leaves the arm,
+                // and spends it (the read after the press counts the change,
+                // `take_changes`): the deck's next press within its 3 s was
+                // the stop's second, and starts no take (`deck::rec`).
+                if start {
+                    cameras.stop_arm = None;
+                }
+                let sentence = if start {
+                    STARTED_RECORDING
+                } else {
+                    STOPPED_RECORDING
+                };
+                (
+                    json!({
+                        "camera": camera,
+                        "recording": after.recording == Some(true),
+                        "sentence": sentence,
+                    }),
+                    Some(("record", Some(camera))),
+                )
+            }
+        }
+    }
+}
+
+/// A press (the audit of 2026-10-12, H1): the checks and the plan under the
+/// cameras' lock, the camera's answer waited for with the lock let go
+/// (`sending.rs`), then the answer read back from the camera under the lock
+/// again. A press the checks refuse sends nothing and takes one spell.
+fn press_request(
+    db_path: &Path,
+    simulated: bool,
+    method: &str,
+    params: &Value,
+) -> Result<CamerasReply, CameraError> {
+    let (before, plan, sending) = with_cameras(db_path, simulated, |cameras, bodies, _| {
+        let before = cameras.health_check();
+        let plan = match method {
+            "cameras.set" => set_plan(cameras, params)?,
+            "cameras.step" => step_plan(cameras, params)?,
+            "cameras.auto" => auto_plan(cameras, params)?,
+            "cameras.format.set" => format_plan(cameras, params)?,
+            "cameras.look.set" => look_plan(cameras, params)?,
+            "cameras.record.start" => record_plan(cameras, params, true)?,
+            "cameras.record.stop" => record_plan(cameras, params, false)?,
+            other => return Err(CameraError::Invalid(format!("Unsupported method: {other}"))),
+        };
+        let sending = cameras.begin_send(plan.camera, bodies, &plan.commands)?;
+        Ok((before, plan, sending))
+    })?;
+    let outcome = sending.wait();
+    with_cameras(db_path, simulated, |cameras, bodies, now| {
+        let (result, event) = settle_press(cameras, bodies, now, plan, outcome)?;
+        Ok(CamerasReply {
+            result,
+            event,
+            health_changed: cameras.health_check() != before,
+        })
+    })
+}
+
+/// The second spell, under the lock: the camera's answer or its silence
+/// taken, the camera read back (what it reports now is the answer: the camera
+/// wins, D12), and the request's answer made. The deck's keys end here too.
+pub(super) fn settle_press(
     cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    camera: u8,
-    commands: &[CameraCommand],
+    bodies: &SimulatedCameras,
     now: SystemTime,
-) -> Result<CameraReading, CameraError> {
-    cameras.send(camera, bodies, commands)?;
-    cameras.read_back(camera, bodies, now);
-    held(cameras, camera)?;
-    Ok(reading(cameras, camera))
+    plan: Plan,
+    outcome: Result<(), LinkFailure>,
+) -> Handled {
+    cameras.finish_send(plan.camera, outcome)?;
+    cameras.read_back(plan.camera, bodies, now);
+    held(cameras, plan.camera)?;
+    let after = reading(cameras, plan.camera);
+    Ok(plan.answer(cameras, &after))
 }
 
 // ---------------------------------------------------------------------------
@@ -335,12 +525,7 @@ pub(super) fn set_bank(
 
 /// `cameras.set { camera, setting, value }`: a choice's value from its
 /// options, or a level's number in its range, on its step.
-fn set_request(
-    cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    params: &Value,
-    now: SystemTime,
-) -> Handled {
+fn set_plan(cameras: &mut Cameras, params: &Value) -> Result<Plan, CameraError> {
     let camera = camera_param(params)?;
     let setting = setting_param(params)?;
     let raw = params.get("value").cloned().unwrap_or(Value::Null);
@@ -379,29 +564,18 @@ fn set_request(
         }
         CameraValue::Switch(_) => unreachable!("a press sets no switch"),
     };
-    let after = press(
-        cameras,
-        bodies,
+    Ok(Plan {
         camera,
-        &[CameraCommand::Set(setting, value)],
-        now,
-    )?;
-    Ok((
-        json!({ "camera": camera, "setting": setting.key(), "value": reported(&after, setting) }),
-        Some(("setting", Some(camera))),
-    ))
+        commands: vec![CameraCommand::Set(setting, value)],
+        answer: Answer::Setting(setting),
+    })
 }
 
 /// `cameras.step { camera, setting, step }`: the deck's dials and the page's
 /// steppers, in the camera's own steps, stopping at the ends. Focus on a
 /// camera with `focusSteps` moves nearer (`-`) or farther (`+`) without a
 /// position, and answers no value.
-pub(super) fn step_request(
-    cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    params: &Value,
-    now: SystemTime,
-) -> Handled {
+pub(super) fn step_plan(cameras: &mut Cameras, params: &Value) -> Result<Plan, CameraError> {
     let camera = camera_param(params)?;
     let setting = setting_param(params)?;
     let step = step_param(params)?;
@@ -425,21 +599,16 @@ pub(super) fn step_request(
             .map_err(|from| not_allowed(model.step_refusal(setting, &from)))?;
         CameraCommand::Set(setting, CameraValue::Text(String::from(options[target])))
     };
-    let after = press(cameras, bodies, camera, &[command], now)?;
-    Ok((
-        json!({ "camera": camera, "setting": setting.key(), "value": reported(&after, setting) }),
-        Some(("setting", Some(camera))),
-    ))
+    Ok(Plan {
+        camera,
+        commands: vec![command],
+        answer: Answer::Setting(setting),
+    })
 }
 
 /// `cameras.auto { camera, what }`: a one-shot autofocus, auto white balance
 /// or auto iris the camera offers; the answer is the value it settles on.
-pub(super) fn auto_request(
-    cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    params: &Value,
-    now: SystemTime,
-) -> Handled {
+pub(super) fn auto_plan(cameras: &mut Cameras, params: &Value) -> Result<Plan, CameraError> {
     let camera = camera_param(params)?;
     let auto = params
         .get("what")
@@ -452,12 +621,11 @@ pub(super) fn auto_request(
     if !model(camera).offers(auto) {
         return Err(unsupported(model(camera).auto_refusal(auto)));
     }
-    let after = press(cameras, bodies, camera, &[CameraCommand::Auto(auto)], now)?;
-    let setting = auto.setting();
-    Ok((
-        json!({ "camera": camera, "setting": setting.key(), "value": reported(&after, setting) }),
-        Some(("setting", Some(camera))),
-    ))
+    Ok(Plan {
+        camera,
+        commands: vec![CameraCommand::Auto(auto)],
+        answer: Answer::Setting(auto.setting()),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -465,12 +633,7 @@ pub(super) fn auto_request(
 // ---------------------------------------------------------------------------
 
 /// `cameras.format.set { camera, resolution?, frameRate?, confirm }`.
-fn format_request(
-    cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    params: &Value,
-    now: SystemTime,
-) -> Handled {
+fn format_plan(cameras: &mut Cameras, params: &Value) -> Result<Plan, CameraError> {
     let camera = camera_param(params)?;
     let resolution = optional_text(params, "resolution")?;
     let frame_rate = optional_text(params, "frameRate")?;
@@ -519,31 +682,21 @@ fn format_request(
             CameraValue::Text(String::from(frame_rate)),
         ));
     }
-    let after = press(cameras, bodies, camera, &commands, now)?;
-    let now_resolution = after.resolution.clone().unwrap_or_default();
-    let now_frame_rate = after.frame_rate.clone().unwrap_or_default();
-    let change = match (resolution, frame_rate) {
-        (Some(_), Some(_)) => {
-            format!("{old_resolution} {old_frame_rate}p → {now_resolution} {now_frame_rate}p")
-        }
-        (Some(_), None) => format!("{old_resolution} → {now_resolution}"),
-        _ => format!("{old_frame_rate}p → {now_frame_rate}p"),
-    };
-    let sentence = format!("{}: {change}.", model.tag);
-    Ok((
-        json!({ "camera": camera, "sentence": sentence }),
-        Some(("format", Some(camera))),
-    ))
+    Ok(Plan {
+        camera,
+        commands,
+        answer: Answer::Format {
+            resolution: resolution.map(str::to_string),
+            frame_rate: frame_rate.map(str::to_string),
+            old_resolution,
+            old_frame_rate,
+        },
+    })
 }
 
 /// `cameras.look.set { camera, dynamicRange?, displayLut?, displayLutOn?,
 /// confirm }`: the picture profile and the display LUT.
-fn look_request(
-    cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    params: &Value,
-    now: SystemTime,
-) -> Handled {
+fn look_plan(cameras: &mut Cameras, params: &Value) -> Result<Plan, CameraError> {
     let camera = camera_param(params)?;
     let dynamic_range = optional_text(params, "dynamicRange")?;
     let display_lut = optional_text(params, "displayLut")?;
@@ -605,38 +758,16 @@ fn look_request(
             CameraValue::Switch(on),
         ));
     }
-    let after = press(cameras, bodies, camera, &commands, now)?;
-    let text = |reading: &CameraReading, setting| reading.text(setting).unwrap_or("").to_string();
-    let mut parts = Vec::new();
-    if dynamic_range.is_some() {
-        parts.push(format!(
-            "dynamic range {} → {}",
-            text(&before, Setting::DynamicRange),
-            text(&after, Setting::DynamicRange)
-        ));
-    }
-    if display_lut.is_some() {
-        parts.push(format!(
-            "display LUT {} → {}",
-            text(&before, Setting::DisplayLut),
-            text(&after, Setting::DisplayLut)
-        ));
-    }
-    if display_lut_on.is_some() {
-        parts.push(format!(
-            "display LUT {}",
-            if after.display_lut_on == Some(true) {
-                "on"
-            } else {
-                "off"
-            }
-        ));
-    }
-    let sentence = format!("{}: {}.", model.tag, parts.join("; "));
-    Ok((
-        json!({ "camera": camera, "sentence": sentence }),
-        Some(("look", Some(camera))),
-    ))
+    Ok(Plan {
+        camera,
+        commands,
+        answer: Answer::Look {
+            dynamic_range: dynamic_range.is_some(),
+            display_lut: display_lut.is_some(),
+            display_lut_on: display_lut_on.is_some(),
+            before,
+        },
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -645,13 +776,11 @@ fn look_request(
 
 /// `cameras.record.start` (one press) and `cameras.record.stop { confirm }`
 /// (armed).
-pub(super) fn record_request(
+pub(super) fn record_plan(
     cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
     params: &Value,
-    now: SystemTime,
     start: bool,
-) -> Handled {
+) -> Result<Plan, CameraError> {
     let confirm = if start { true } else { confirm_param(params)? };
     let camera = RECORDING_CAMERA;
     held(cameras, camera)?;
@@ -676,28 +805,11 @@ pub(super) fn record_request(
     } else {
         CameraCommand::RecordStop
     };
-    let after = press(cameras, bodies, camera, &[command], now)?;
-    // A take that starts ends the deck's armed stop: nobody armed the stop
-    // of the new take. A take that stops leaves the arm, and spends it (the
-    // read after the press counts the change, `take_changes`): the deck's
-    // next press within its 3 s was the stop's second, and starts no take
-    // (`deck::rec`).
-    if start {
-        cameras.stop_arm = None;
-    }
-    let sentence = if start {
-        STARTED_RECORDING
-    } else {
-        STOPPED_RECORDING
-    };
-    Ok((
-        json!({
-            "camera": camera,
-            "recording": after.recording == Some(true),
-            "sentence": sentence,
-        }),
-        Some(("record", Some(camera))),
-    ))
+    Ok(Plan {
+        camera,
+        commands: vec![command],
+        answer: Answer::Record { start },
+    })
 }
 
 // ---------------------------------------------------------------------------

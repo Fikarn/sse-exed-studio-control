@@ -777,3 +777,68 @@ fn a_reading_saved_before_the_status_fields_loads_as_the_last_read() {
     );
     assert_eq!(cam1["recording"]["cardTimeLeft"], "17 h 00 min");
 }
+
+// The audit of 2026-10-12 (H1): a press waits for the camera's answer with
+// the cameras' lock let go, so the page's reads and the deck's displays
+// follow meanwhile instead of waiting the camera's 2 s; the camera's answer
+// is the press's, and the camera took the press before it answered.
+#[test]
+fn a_press_waits_for_the_camera_with_the_lock_let_go() {
+    use std::time::{Duration, Instant};
+
+    let cameras = TestCameras::set_up("press-off-the-lock");
+    cameras.answers_late(1, Duration::from_millis(600));
+    let db_path = cameras.db_path.clone();
+    let simulated = cameras.simulated;
+    let press = std::thread::spawn(move || {
+        let started = Instant::now();
+        let reply = crate::cameras::handle_cameras_request(
+            &db_path,
+            simulated,
+            "cameras.set",
+            &json!({ "camera": 1, "setting": "iso", "value": "800" }),
+        );
+        (reply, started.elapsed())
+    });
+
+    // The press is on its way: a read and the deck's displays go through
+    // at once, and show what the camera took.
+    std::thread::sleep(Duration::from_millis(100));
+    let started = Instant::now();
+    let snapshot = cameras.snapshot();
+    let read_took = started.elapsed();
+    assert!(
+        read_took < Duration::from_millis(300),
+        "the read waited {read_took:?} on the press"
+    );
+    assert_eq!(
+        snapshot["cameras"][0]["values"]["iso"]["value"], "800",
+        "the camera took the press at once"
+    );
+    let started = Instant::now();
+    let displays = crate::cameras::deck::deck_texts(cameras.path(), cameras.simulated)
+        .expect("the displays read");
+    assert!(
+        started.elapsed() < Duration::from_millis(300),
+        "the displays waited on the press"
+    );
+    assert!(displays
+        .iter()
+        .any(|(key, text)| *key == "camera_key_1" && text == "CAM 1\\nHELD"));
+
+    let (reply, took) = press.join().expect("the press ends");
+    let reply = reply.expect("the press succeeds");
+    assert_eq!(reply.result["value"], "800");
+    assert_eq!(reply.event, Some(("setting", Some(1))));
+    assert!(
+        took >= Duration::from_millis(550),
+        "the press waited for the camera's answer, {took:?}"
+    );
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::Set(
+            Setting::Iso,
+            CameraValue::Text(String::from("800"))
+        )]
+    );
+}

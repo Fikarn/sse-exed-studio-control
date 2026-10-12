@@ -204,6 +204,15 @@ impl TestCameras {
             bodies.set_clock(camera, time_of_day);
         });
     }
+
+    /// The camera takes a press at once and answers it `delay` later, as a
+    /// real link's camera would: the press waits with the cameras' lock let
+    /// go (the audit of 2026-10-12, H1).
+    pub(crate) fn answers_late(&self, camera: u8, delay: std::time::Duration) {
+        runtime::with_bodies_unnoticed(&self.db_path, |bodies| {
+            bodies.delay_answers(camera, Some(delay));
+        });
+    }
 }
 
 impl Drop for TestCameras {

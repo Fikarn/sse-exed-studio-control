@@ -20,15 +20,19 @@
 //! A display never reads a camera by itself. The cameras are read once for
 //! all the displays of a poll, as the open page reads them once a second,
 //! and once for a key, whose own read answers its displays
-//! (`control_surface_pages`).
+//! (`control_surface_pages`). A key that sends a camera a press waits for
+//! the camera with the cameras' lock let go, as the page's presses do (the
+//! audit of 2026-10-12, H1; `sending.rs`): the displays of a poll meanwhile
+//! read what the cameras last reported.
 
 use crate::cameras::commands::{
-    auto_request, held, reading, record_request, select_request, set_bank, step_request, Handled,
+    auto_plan, held, reading, record_plan, select_request, set_bank, settle_press, step_plan, Plan,
 };
 use crate::cameras::model::{model, Setting, RECORDING_CAMERA};
 use crate::cameras::runtime::{with_cameras, Cameras, StopArm};
-use crate::cameras::simulated::{CameraReading, SimulatedCameras};
-use crate::cameras::snapshot::CameraState;
+use crate::cameras::sending::Sending;
+use crate::cameras::simulated::CameraReading;
+use crate::cameras::snapshot::{CameraState, CamerasHealthCheck};
 use crate::cameras::{CameraError, CamerasReply};
 use serde_json::{json, Value};
 use std::path::Path;
@@ -110,16 +114,18 @@ pub(crate) fn handle_deck_action_at(
     value: Option<&str>,
     at: Instant,
 ) -> Result<(CamerasReply, DeckTexts), CameraError> {
-    with_cameras(db_path, simulated, |cameras, bodies, now| {
+    // The first spell under the cameras' lock: a key that sends nothing is
+    // answered here, with its displays; a press is planned and begun.
+    let begun = with_cameras(db_path, simulated, |cameras, bodies, now| {
         let before = cameras.health_check();
-        let (result, event) = match action {
+        let step = match action {
             "select" => {
                 let camera = value
                     .and_then(|value| value.parse::<u8>().ok())
                     .ok_or_else(|| invalid("select needs the camera: 1, 2 or 3."))?;
-                select_request(cameras, &json!({ "camera": camera }))?
+                Step::Answered(select_request(cameras, &json!({ "camera": camera }))?)
             }
-            "bank" => set_bank(cameras, cameras.bank.next()),
+            "bank" => Step::Answered(set_bank(cameras, cameras.bank.next())),
             "dial" => {
                 let (dial, direction) = value
                     .and_then(|value| value.split_once(':'))
@@ -131,12 +137,13 @@ pub(crate) fn handle_deck_action_at(
                     _ => return Err(invalid("A dial turns up or down.")),
                 };
                 let setting = dial_setting(cameras, dial)?;
-                step_request(
-                    cameras,
-                    bodies,
-                    &json!({ "camera": cameras.selected, "setting": setting.key(), "step": step }),
-                    now,
-                )?
+                Step::Press(
+                    Box::new(step_plan(
+                        cameras,
+                        &json!({ "camera": cameras.selected, "setting": setting.key(), "step": step }),
+                    )?),
+                    After::Nothing,
+                )
             }
             "dialPush" => {
                 let dial =
@@ -150,27 +157,114 @@ pub(crate) fn handle_deck_action_at(
                         ),
                     ));
                 }
-                auto_request(
-                    cameras,
-                    bodies,
-                    &json!({ "camera": cameras.selected, "what": "focus" }),
-                    now,
-                )?
+                Step::Press(
+                    Box::new(auto_plan(
+                        cameras,
+                        &json!({ "camera": cameras.selected, "what": "focus" }),
+                    )?),
+                    After::Nothing,
+                )
             }
-            "rec" => rec(cameras, bodies, now, at)?,
+            "rec" => rec(cameras, at)?,
             other => {
                 return Err(CameraError::Invalid(format!(
                     "Unsupported CAMERAS key: {other}"
                 )))
             }
         };
-        let reply = CamerasReply {
-            result,
-            event,
-            health_changed: cameras.health_check() != before,
-        };
-        Ok((reply, texts(cameras, at, now)))
+        match step {
+            Step::Answered((result, event)) => Ok(Begun::Answered(
+                reply(cameras, &before, result, event),
+                texts(cameras, at, now),
+            )),
+            Step::Press(plan, after) => {
+                let sending = cameras.begin_send(plan.camera, bodies, &plan.commands)?;
+                Ok(Begun::Sending {
+                    before,
+                    plan,
+                    after,
+                    sending,
+                })
+            }
+        }
+    })?;
+    let (before, plan, after, sending) = match begun {
+        Begun::Answered(reply, texts) => return Ok((reply, texts)),
+        Begun::Sending {
+            before,
+            plan,
+            after,
+            sending,
+        } => (before, plan, after, sending),
+    };
+    // The camera is waited for with the lock let go.
+    let outcome = sending.wait();
+    // The second spell: the camera's answer, what the key does after it, and
+    // the displays.
+    with_cameras(db_path, simulated, |cameras, bodies, now| {
+        let (result, event) = settle_press(cameras, bodies, now, *plan, outcome)?;
+        let result = after.apply(cameras, result, at);
+        Ok((
+            reply(cameras, &before, result, event),
+            texts(cameras, at, now),
+        ))
     })
+}
+
+/// What a key came to under the first spell: answered, or a press begun (its
+/// plan boxed: a key's answer is small, a plan is not).
+enum Step {
+    Answered((Value, Option<(&'static str, Option<u8>)>)),
+    Press(Box<Plan>, After),
+}
+
+/// The first spell's outcome.
+enum Begun {
+    Answered(CamerasReply, DeckTexts),
+    Sending {
+        before: CamerasHealthCheck,
+        plan: Box<Plan>,
+        after: After,
+        sending: Sending,
+    },
+}
+
+/// What a key does once its press was taken.
+enum After {
+    Nothing,
+    /// `REC` started or stopped a take: the dwell counts from the press, and
+    /// a stop spends the arm. The answer's `did` says which.
+    Rec {
+        did: &'static str,
+    },
+}
+
+impl After {
+    fn apply(self, cameras: &mut Cameras, mut result: Value, at: Instant) -> Value {
+        if let After::Rec { did } = self {
+            if did == "stopped" {
+                cameras.stop_arm = None;
+            }
+            cameras.deck_rec_at = Some(at);
+            if let Some(result) = result.as_object_mut() {
+                result.insert(String::from("did"), json!(did));
+            }
+        }
+        result
+    }
+}
+
+fn reply(
+    cameras: &Cameras,
+    before: &CamerasHealthCheck,
+    result: Value,
+    event: Option<(&'static str, Option<u8>)>,
+) -> CamerasReply {
+    CamerasReply {
+        result,
+        event,
+        health_changed: cameras.health_check() != *before,
+    }
 }
 
 /// What dial `dial` sets in the bank the dials are on.
@@ -213,33 +307,26 @@ fn stop_armed(cameras: &Cameras, at: Instant) -> bool {
 ///
 /// The deck's own stop ends the arm, so that one press after the dwell
 /// starts the next take (D11).
-fn rec(
-    cameras: &mut Cameras,
-    bodies: &mut SimulatedCameras,
-    now: SystemTime,
-    at: Instant,
-) -> Handled {
+///
+/// What the key decides is decided here, under the lock; a start or a stop
+/// is a press, waited for with the lock let go, and `After::Rec` does the
+/// rest once the camera took it.
+fn rec(cameras: &mut Cameras, at: Instant) -> Result<Step, CameraError> {
     let camera = RECORDING_CAMERA;
     held(cameras, camera)?;
     let recording = reading(cameras, camera).recording == Some(true);
-    let kept = |recording: bool| -> Handled {
-        Ok((
+    let kept = |recording: bool| {
+        Step::Answered((
             json!({ "camera": camera, "recording": recording, "did": "kept" }),
             None,
         ))
-    };
-    let did = |did: &str, (mut result, event): (Value, Option<(&'static str, Option<u8>)>)| {
-        if let Some(result) = result.as_object_mut() {
-            result.insert(String::from("did"), json!(did));
-        }
-        (result, event)
     };
 
     if cameras
         .deck_rec_at
         .is_some_and(|acted| at.saturating_duration_since(acted) < STOP_ARM_DWELL)
     {
-        return kept(recording);
+        return Ok(kept(recording));
     }
     if let Some(arm) = cameras.stop_arm {
         let since = at.saturating_duration_since(arm.at);
@@ -247,34 +334,31 @@ fn rec(
         if since <= STOP_ARM_WINDOW {
             if !its_take_runs {
                 cameras.stop_arm = None;
-                return kept(recording);
+                return Ok(kept(recording));
             }
             if since < STOP_ARM_DWELL {
-                return kept(true);
+                return Ok(kept(true));
             }
-            let stopped = record_request(cameras, bodies, &json!({ "confirm": true }), now, false)?;
-            cameras.stop_arm = None;
-            cameras.deck_rec_at = Some(at);
-            return Ok(did("stopped", stopped));
+            let plan = record_plan(cameras, &json!({ "confirm": true }), false)?;
+            return Ok(Step::Press(Box::new(plan), After::Rec { did: "stopped" }));
         }
         if since <= STOP_SHOWN_FOR && !recording {
             cameras.stop_arm = None;
-            return kept(false);
+            return Ok(kept(false));
         }
     }
     if !recording {
-        let started = record_request(cameras, bodies, &json!({}), now, true)?;
-        cameras.deck_rec_at = Some(at);
-        return Ok(did("started", started));
+        let plan = record_plan(cameras, &json!({}), true)?;
+        return Ok(Step::Press(Box::new(plan), After::Rec { did: "started" }));
     }
     cameras.stop_arm = Some(StopArm {
         at,
         take: cameras.take_changes,
     });
-    Ok((
+    Ok(Step::Answered((
         json!({ "camera": camera, "recording": true, "did": "armed" }),
         None,
-    ))
+    )))
 }
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ pub(crate) mod pocket;
 pub(crate) mod real_link;
 pub(crate) mod report;
 pub(crate) mod runtime;
+pub(crate) mod sending;
 pub(crate) mod simulated;
 pub(crate) mod snapshot;
 pub(crate) mod store;
@@ -38,7 +39,9 @@ mod tests_setup;
 
 use serde_json::Value;
 
-pub(crate) use commands::{after_archive_restore, cameras_health_check, handle_cameras_request};
+pub(crate) use commands::{
+    after_archive_restore, cameras_health_check, handle_cameras_request, is_press_method,
+};
 
 /// `SSE_CAMERAS_SIMULATED=1` asks for the simulated cameras; nothing else
 /// does. The lanes set it and refuse to start without it

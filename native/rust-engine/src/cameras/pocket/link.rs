@@ -20,10 +20,11 @@ use crate::cameras::pocket::state::{
 };
 use crate::cameras::pocket::timecode::timecode_text;
 use crate::cameras::real_link::{BluetoothAddress, LinkFailure};
+use crate::cameras::sending::SendTicket;
 use crate::cameras::simulated::{CameraCommand, CameraReading, LinkReading};
 use crate::diagnostics::{log_event, LogLevel};
 use std::fmt;
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -342,17 +343,19 @@ impl PocketLink {
         })
     }
 
-    /// Sends a press: its messages are made from the commands and what the
-    /// camera last reported, written by the thread, and waited for at most
-    /// `SEND_TIMEOUT`, after which the thread does not send it either. A
-    /// press the protocol cannot carry is refused before anything is sent
-    /// (`NotCarried`); a camera that does not answer in time reads as
+    /// Begins a press: its messages are made from the commands and what the
+    /// camera last reported, and handed to the thread, which writes them
+    /// before the ticket's deadline (`SEND_TIMEOUT` from now) and not after,
+    /// withdrawing a write that is still under way then. A press the
+    /// protocol cannot carry is refused before anything is sent
+    /// (`NotCarried`). The ticket is waited for with the cameras' lock let
+    /// go (`sending.rs`); a camera that does not answer in time reads as
     /// unreachable.
-    pub(crate) fn send(
+    pub(crate) fn begin_send(
         &self,
         commands: &[CameraCommand],
         current: &CameraReading,
-    ) -> Result<(), LinkFailure> {
+    ) -> Result<SendTicket, LinkFailure> {
         let messages = encode_commands(commands, current).map_err(LinkFailure::NotCarried)?;
         let (reply, answer) = channel();
         let deadline = Instant::now() + SEND_TIMEOUT;
@@ -365,13 +368,17 @@ impl PocketLink {
             // The thread is gone: the state says why.
             return Err(self.read().err().unwrap_or(LinkFailure::NoAnswer));
         }
-        match answer.recv_timeout(SEND_TIMEOUT) {
-            Ok(Ok(())) => Ok(()),
-            Ok(Err(sentence)) => Err(LinkFailure::Bluetooth(sentence)),
-            Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => {
-                Err(LinkFailure::NoAnswer)
-            }
-        }
+        Ok(SendTicket::new(answer, deadline))
+    }
+
+    /// Begins a press and waits for it: the tests' short form.
+    #[cfg(test)]
+    pub(crate) fn send(
+        &self,
+        commands: &[CameraCommand],
+        current: &CameraReading,
+    ) -> Result<(), LinkFailure> {
+        self.begin_send(commands, current)?.wait()
     }
 
     /// Lets the camera go: the thread disconnects and ends.

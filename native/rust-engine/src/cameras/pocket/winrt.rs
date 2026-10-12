@@ -314,7 +314,7 @@ fn serve(
                         .as_ref()
                         .and_then(|subscribed| subscribed.characteristic(Writable::OutgoingControl))
                     {
-                        Some(outgoing) => write_all(outgoing, &messages),
+                        Some(outgoing) => write_all(outgoing, &messages, deadline),
                         None => Err(String::from("CAM 1 is not connected over Bluetooth.")),
                     }
                 };
@@ -415,7 +415,7 @@ fn fill(
     // it; one that lacks the characteristic did not get this far.
     subscribed.writable.push((Writable::DeviceName, found.name));
     if let Some(name) = subscribed.characteristic(Writable::DeviceName) {
-        if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes()) {
+        if let Err(sentence) = write(name, CONTROLLER_NAME.as_bytes(), Instant::now() + RETRY) {
             log_event(
                 LogLevel::Warn,
                 &format!("CAM 1 did not take Studio Control's name: {sentence}"),
@@ -539,23 +539,69 @@ fn bytes_of(buffer: &IBuffer) -> windows::core::Result<Vec<u8>> {
 }
 
 /// Writes the messages, one after another, to the one characteristic a
-/// press goes to.
-fn write_all(outgoing: &GattCharacteristic, messages: &[Vec<u8>]) -> Result<(), String> {
+/// press goes to, each before `deadline` (the press's, `SEND_TIMEOUT` from
+/// the press): the runtime has stopped waiting after it and told the operator
+/// the camera did not answer, so a write that is not done by then is
+/// withdrawn rather than left to land later (the audit of 2026-10-12, H1).
+fn write_all(
+    outgoing: &GattCharacteristic,
+    messages: &[Vec<u8>],
+    deadline: Instant,
+) -> Result<(), String> {
     for message in messages {
-        write(outgoing, message)?;
+        write(outgoing, message, deadline)?;
     }
     Ok(())
 }
 
+/// How often a write that is under way is looked at.
+const WRITE_LOOK: Duration = Duration::from_millis(5);
+/// Windows' words for an operation under way and one that is done
+/// (`AsyncStatus::Started`, `AsyncStatus::Completed`), as the numbers the
+/// status carries: the type itself lives in a crate this one reaches only
+/// through the `windows` crate's operations.
+const ASYNC_STARTED: i32 = 0;
+const ASYNC_COMPLETED: i32 = 1;
+
 /// The one write in this module. It is handed a characteristic from
-/// `Subscribed::characteristic`, which knows only the writable ones.
-fn write(characteristic: &GattCharacteristic, bytes: &[u8]) -> Result<(), String> {
+/// `Subscribed::characteristic`, which knows only the writable ones. The
+/// write is waited for until `deadline` and cancelled then: Windows' own
+/// wait has no end of its own, and a camera out of reach could hold the
+/// link's thread for tens of seconds while the runtime had given the press
+/// up. A write the radio had already carried may still reach the camera;
+/// what the camera then reports is the truth, as always (D12).
+fn write(
+    characteristic: &GattCharacteristic,
+    bytes: &[u8],
+    deadline: Instant,
+) -> Result<(), String> {
     let writer = DataWriter::new().map_err(text)?;
     writer.WriteBytes(bytes).map_err(text)?;
     let buffer = writer.DetachBuffer().map_err(text)?;
-    let status = characteristic
+    let pending = characteristic
         .WriteValueWithResultAsync(&buffer)
-        .and_then(|pending| pending.get())
+        .map_err(text)?;
+    loop {
+        let status = pending.Status().map_err(text)?.0;
+        if status == ASYNC_COMPLETED {
+            break;
+        }
+        if status != ASYNC_STARTED {
+            return Err(match pending.GetResults() {
+                Err(error) => format!("The write to CAM 1 failed: {}", error.message()),
+                Ok(_) => String::from("The write to CAM 1 did not complete."),
+            });
+        }
+        if Instant::now() >= deadline {
+            let _ = pending.Cancel();
+            return Err(String::from(
+                "CAM 1 did not take the message in time; the write was withdrawn.",
+            ));
+        }
+        std::thread::sleep(WRITE_LOOK);
+    }
+    let status = pending
+        .GetResults()
         .and_then(|result| result.Status())
         .map_err(text)?;
     if status == GattCommunicationStatus::Success {

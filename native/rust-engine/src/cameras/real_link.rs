@@ -16,6 +16,7 @@ use crate::cameras::model::{model, RECORDING_CAMERA};
 use crate::cameras::pocket::link::PocketLink;
 use crate::cameras::pocket::pairing::{PairingStep, PocketPairing};
 use crate::cameras::runtime::notice;
+use crate::cameras::sending::SendTicket;
 use crate::cameras::simulated::{CameraCommand, CameraReading, LinkReading};
 use crate::cameras::store::StoredSetup;
 use std::path::{Path, PathBuf};
@@ -275,16 +276,17 @@ impl RealLinks {
         }
     }
 
-    /// Sends the operator's press to a held camera, with what it last
+    /// Begins the operator's press to a held camera, with what it last
     /// reported (a press that sets half a parameter carries the other half).
-    pub(crate) fn send(
-        &mut self,
+    /// The ticket is waited for with the cameras' lock let go.
+    pub(crate) fn begin_send(
+        &self,
         setup: &StoredSetup,
         commands: &[CameraCommand],
         current: &CameraReading,
-    ) -> Result<(), LinkFailure> {
+    ) -> Result<SendTicket, LinkFailure> {
         match (&self.pocket, setup.camera) {
-            (Some(pocket), RECORDING_CAMERA) => pocket.send(commands, current),
+            (Some(pocket), RECORDING_CAMERA) => pocket.begin_send(commands, current),
             _ => Err(no_link_yet(setup)),
         }
     }

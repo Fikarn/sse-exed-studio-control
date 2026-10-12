@@ -20,11 +20,16 @@
 //! comes back as `cameras.changed { reason: "reported" }`, a held camera that
 //! stops answering as `unreachable` and one that answers again as
 //! `reachable` — with `app.changed { reason: "health" }` after them when the
-//! health check changed — whoever noticed first.
+//! health check changed — whoever noticed first. A press alone waits for
+//! the camera between two spells under the lock, with the lock let go
+//! (`begin_send`, `finish_send`; `sending.rs`), so no display and no other
+//! request waits on a camera.
 
 use crate::cameras::model::{model, Setting, CAMERA_NUMBERS, RECORDING_CAMERA};
+use crate::cameras::pocket::link::SEND_TIMEOUT;
 use crate::cameras::pocket::pairing::{PairingStep, PIN_REFUSED, STOPPED};
 use crate::cameras::real_link::{self, BluetoothAddress, LinkFailure, RealLinks};
+use crate::cameras::sending::Sending;
 use crate::cameras::simulated::{
     CameraCommand, CameraReading, LinkReading, SimulatedCameras, SIMULATED_PIN,
 };
@@ -766,15 +771,17 @@ impl Cameras {
         }
     }
 
-    /// Sends the operator's press to a held camera. A camera that does not
-    /// take it reads `UNREACHABLE` at once (announced), and the request is
-    /// refused with its sentence.
-    pub(crate) fn send(
+    /// Begins the operator's press to a held camera, under the cameras'
+    /// lock: the checks, and the press handed to the link. Its answer is
+    /// waited for with the lock let go (`Sending::wait`), then given to
+    /// `finish_send`. A press the protocol cannot carry is refused here, and
+    /// nothing is sent.
+    pub(crate) fn begin_send(
         &mut self,
         camera: u8,
         bodies: &mut SimulatedCameras,
         commands: &[CameraCommand],
-    ) -> Result<(), CameraError> {
+    ) -> Result<Sending, CameraError> {
         // While its values are the last read, a press that sets half a
         // parameter would carry the other half from the kept reading, which
         // the camera has not reported in this connection: never a guess
@@ -796,25 +803,32 @@ impl Cameras {
                 }
             }
         }
-        let failure = if !self.simulated {
-            let runtime = self.camera(camera);
-            let setup = runtime.setup.clone();
-            let current = runtime.reading.clone().unwrap_or_default();
-            match self.links.send(&setup, commands, &current) {
-                Ok(()) => None,
-                // The protocol cannot carry the press: nothing was sent,
-                // and the camera is as reachable as before.
-                Err(LinkFailure::NotCarried(sentence)) => {
-                    return Err(CameraError::Refused("CAMERA_VALUE_NOT_ALLOWED", sentence));
-                }
-                Err(failure) => Some(failure),
+        if self.simulated {
+            return Ok(bodies.begin_send(camera, commands, Instant::now() + SEND_TIMEOUT));
+        }
+        let runtime = self.camera(camera);
+        let setup = runtime.setup.clone();
+        let current = runtime.reading.clone().unwrap_or_default();
+        match self.links.begin_send(&setup, commands, &current) {
+            Ok(ticket) => Ok(Sending::Waiting(ticket)),
+            // The protocol cannot carry the press: nothing was sent, and
+            // the camera is as reachable as before.
+            Err(LinkFailure::NotCarried(sentence)) => {
+                Err(CameraError::Refused("CAMERA_VALUE_NOT_ALLOWED", sentence))
             }
-        } else if bodies.send(camera, commands) {
-            None
-        } else {
-            Some(LinkFailure::NoAnswer)
-        };
-        let Some(failure) = failure else {
+            Err(failure) => Ok(Sending::Done(Err(failure))),
+        }
+    }
+
+    /// Takes the camera's answer to a press, under the lock again. A camera
+    /// that did not take it reads `UNREACHABLE` at once (announced), and the
+    /// request is refused with its sentence.
+    pub(crate) fn finish_send(
+        &mut self,
+        camera: u8,
+        outcome: Result<(), LinkFailure>,
+    ) -> Result<(), CameraError> {
+        let Err(failure) = outcome else {
             return Ok(());
         };
         let before = self.health_check();
