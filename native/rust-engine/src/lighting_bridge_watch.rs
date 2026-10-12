@@ -33,8 +33,10 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::cameras::runtime::utc_text;
 use crate::diagnostics::append_log;
+use crate::health::SUBSYSTEM_SACN;
 use crate::lighting::lighting_watched_bridge;
 use crate::lighting_sacn_output::{simulated_lights_requested, LIGHTS_SIMULATED_ENV};
+use crate::liveness::{Beat, Lifetime, Spec};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
@@ -237,14 +239,28 @@ pub fn spawn_lighting_bridge_watch(db_path: PathBuf, log_file_path: PathBuf) {
     if simulated {
         return;
     }
-    let _ = thread::Builder::new()
-        .name(String::from("bridge-watch"))
-        .spawn(move || run_watch(&db_path, &log_file_path));
+    // Watched (`liveness`): a panic, an end or a look that stops beating is
+    // laid on the `sacn` entry, since the watch is the lighting's.
+    let _ = crate::liveness::spawn_watched(
+        Spec {
+            job: "lighting bridge's watch",
+            name: String::from("bridge-watch"),
+            subsystem: SUBSYSTEM_SACN,
+            allowance: Some(STALL_ALLOWANCE),
+            lifetime: Lifetime::Process,
+        },
+        move |beat| run_watch(&db_path, &log_file_path, &beat),
+    );
 }
 
-fn run_watch(db_path: &Path, log_file_path: &Path) {
+/// A look waits `BRIDGE_LOOK_TIMEOUT` at most and the watch sleeps
+/// `WATCH_INTERVAL` between looks: a pass this late is a stall.
+const STALL_ALLOWANCE: Duration = Duration::from_secs(30);
+
+fn run_watch(db_path: &Path, log_file_path: &Path, beat: &Beat) {
     enable_thread_read_connection();
     loop {
+        beat.beat();
         // A read that fails leaves the watch as it was, and is tried again.
         if let Ok(settings) = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX) {
             let target = lighting_watched_bridge(&settings);

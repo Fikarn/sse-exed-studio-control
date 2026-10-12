@@ -20,6 +20,20 @@ Built so far: the Teleprompter page and its editor, the prompter and the cameras
 
 A schema change brings a migration test that starts from schema 7, the studio data's, and makes the whole jump in one start.
 
+### The audit of 2026-10-12
+
+A read-only audit of the whole program, six reviewers and the lead, on `main` after #339; the report is kept with the owner's plans, outside the repository. Nothing in it was a crash: the risks were stalls on the one request thread and faults that ended in silence. Its findings are worked in this order, each a small pull request, on the owner's word:
+
+- [x] Liveness: a thread of the hardware link that panics, ends or stalls is a health error with its sentence in Setup / Support, every panic is in the log with its place, and a sACN send that fails is said and read as `no output` (#TBD)
+- [ ] The cameras' lock: a CAM 1 press and the deck's display read no longer wait on each other for the camera's 2 s, and a Pocket write is cancelled at its deadline
+- [ ] The store's audio suppression: a deck press during a local edit is no longer dropped
+- [ ] The engine's idle cost: a cheap TotalMix liveness request in place of the full dump, the parsed lighting state cached by generation, the meter stream trimmed and bounded, the writer stopping at the stop (which also ends the false ERROR at every close)
+- [ ] The pages' hot loops: the test bridge's clone gated on its config, the meter and picture-place observers scoped, the page roots memoised
+- [ ] Setup's probes: an audio probe that waits for TotalMix's reply, unicast-only addresses, no OSC write before the probe passes (device I/O: a review)
+- [ ] Saved data: recovery mode for a newer schema, a log line on a blob that fails to parse, fsync for the archives, a confirm on deleting a script for good
+- [ ] The shell: the engine's stdin written outside the mutex, a rebuilt picture layer after a lost device, a forced close after an unanswered confirm
+- [ ] The documents: the five sentences that contradict the code (`AGENTS.md` on backups, `ARCHITECTURE.md` on the token, `HARDWARE.md` on writes before the probe, `v1.md`'s method list, a comment in `storage.rs`); a test holding `v1.md` to the contract
+
 ### The visual overhaul (2026-10-03)
 
 The owner asked on 2026-10-03 for the pages to look and work as one premium instrument in SSE's brand, with more context menus. The direction is Atrium (`docs/DESIGN.md`), built in eleven pull requests. The new look reaches the studio at the next `npm run release`, and the deck's at the owner's Full Reset & Import in Companion.

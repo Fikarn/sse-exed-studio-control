@@ -210,28 +210,29 @@ On a published setup, a step, `Back to …` and `Run all probes` read `press twi
 
 ## When something goes wrong
 
-| You see                      | It means                    | Do this                               |
-| ---------------------------- | --------------------------- | ------------------------------------- |
-| `SAVED DATA DAMAGED`         | The saved data is damaged   | `Restore latest…` on that screen      |
-| `LINK STOPPED`               | It stopped in the session   | Wait; after 4 stops, `Retry startup`  |
-| `ALREADY OPEN`               | The app runs already        | Use the window that is open           |
-| Another word at the start    | The link did not start      | `Export diagnostics`, `Retry startup` |
-| `AUDIO STOPPED` and the like | A page failed to draw       | `Reload this area`                    |
-| A device does not follow     | The link may be stuck       | `Restart the hardware link…`          |
-| Lighting `held`              | Nothing reaches the rig     | `Light outputs` to `ARMED`            |
-| Lighting `no output`         | The output's port is taken  | `Restart the hardware link…`          |
-| `Backup failed` or `overdue` | No automatic backup written | `Export backup`; check disk space     |
-| Lighting `unreachable`       | Its probe has not passed    | Run it in Setup, then publish         |
-| Lighting `not answering`     | The bridge went silent      | Check its power and network cable     |
-| Rig dark, Lighting `ready`   | The rig does not follow     | Check the fixtures, patch, routing    |
-| Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |
-| Cameras amber or red         | A camera is not `HELD`      | Use the key on its state display      |
-| Surface `unavailable`        | The deck's port is taken    | Close what holds it, restart the link |
-| Surface `no deck`            | Companion stopped asking    | Start Companion; import the profile   |
-| The deck does nothing        | Companion is closed         | Start Companion                       |
-| `401` in Companion's log     | The profile is refused      | Import the profile again              |
-| Wrong display                | It opened where it was last | `Reset the window layout`             |
-| Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
+| You see                                                                       | It means                                                                  | Do this                                                                     |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `SAVED DATA DAMAGED`                                                          | The saved data is damaged                                                 | `Restore latest…` on that screen                                            |
+| `LINK STOPPED`                                                                | It stopped in the session                                                 | Wait; after 4 stops, `Retry startup`                                        |
+| `ALREADY OPEN`                                                                | The app runs already                                                      | Use the window that is open                                                 |
+| Another word at the start                                                     | The link did not start                                                    | `Export diagnostics`, `Retry startup`                                       |
+| `AUDIO STOPPED` and the like                                                  | A page failed to draw                                                     | `Reload this area`                                                          |
+| A device does not follow                                                      | The link may be stuck                                                     | `Restart the hardware link…`                                                |
+| Lighting `held`                                                               | Nothing reaches the rig                                                   | `Light outputs` to `ARMED`                                                  |
+| Lighting `no output`                                                          | The output's port is taken, or its packets cannot leave the PC (no route) | `Restart the hardware link…`; check both network cables and the PC's routes |
+| `Hardware link: … stopped` or `… has not run for` in Setup / Support's health | A part of the link stopped or hangs                                       | `Restart the hardware link…`                                                |
+| `Backup failed` or `overdue`                                                  | No automatic backup written                                               | `Export backup`; check disk space                                           |
+| Lighting `unreachable`                                                        | Its probe has not passed                                                  | Run it in Setup, then publish                                               |
+| Lighting `not answering`                                                      | The bridge went silent                                                    | Check its power and network cable                                           |
+| Rig dark, Lighting `ready`                                                    | The rig does not follow                                                   | Check the fixtures, patch, routing                                          |
+| Audio amber or red                                                            | Console not `VERIFIED`                                                    | Use the key on its state display                                            |
+| Cameras amber or red                                                          | A camera is not `HELD`                                                    | Use the key on its state display                                            |
+| Surface `unavailable`                                                         | The deck's port is taken                                                  | Close what holds it, restart the link                                       |
+| Surface `no deck`                                                             | Companion stopped asking                                                  | Start Companion; import the profile                                         |
+| The deck does nothing                                                         | Companion is closed                                                       | Start Companion                                                             |
+| `401` in Companion's log                                                      | The profile is refused                                                    | Import the profile again                                                    |
+| Wrong display                                                                 | It opened where it was last                                               | `Reset the window layout`                                                   |
+| Tabs locked                                                                   | The setup is not published                                                | `Publish setup` in Setup / Support                                          |
 
 The hardware link restarts by itself after a stop, three times in five minutes; the Console then reads `ASSUMED` until `Sync from TotalMix`. At the recovery screen only a database backup restores: `Restore latest…`, which takes the newest database backup, or press one in the list and `Restore path…` (an archive there is locked, and the screen says why). It asks first. The link restarts into it, with the light outputs held.
 

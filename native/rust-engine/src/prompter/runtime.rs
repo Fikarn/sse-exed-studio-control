@@ -21,6 +21,7 @@
 
 use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::emit_prompter_changed;
+use crate::liveness::{Beat, Lifetime, Spec};
 use crate::prompter::clock::{GlassClock, PrompterAnchor, PrompterPlace};
 use crate::prompter::deck::DeckFrame;
 use crate::prompter::look::PrompterLook;
@@ -506,16 +507,27 @@ pub(crate) fn saver_of(db_path: &Path) -> Arc<Saver> {
 pub(crate) fn start(db_path: PathBuf) {
     let entry = entry(&db_path);
     entry.saver.start();
-    let _ = thread::Builder::new()
-        .name(String::from("prompter-clock"))
-        .spawn(move || run_clock(&db_path, &entry));
+    // Watched (`liveness`): a panic, an end or a pass that stops beating is
+    // laid on a `prompter` entry of the hardware link's health. The clock
+    // sleeps `IDLE_WAIT` at most, so a pass twice that late is a stall.
+    let _ = crate::liveness::spawn_watched(
+        Spec {
+            job: "prompter's clock",
+            name: String::from("prompter-clock"),
+            subsystem: crate::health::SUBSYSTEM_PROMPTER,
+            allowance: Some(IDLE_WAIT * 2 + Duration::from_secs(30)),
+            lifetime: Lifetime::Process,
+        },
+        move |beat| run_clock(&db_path, &entry, &beat),
+    );
 }
 
-fn run_clock(db_path: &Path, entry: &Entry) {
+fn run_clock(db_path: &Path, entry: &Entry, beat: &Beat) {
     let mut minute_from = Instant::now();
     let mut played = false;
     let mut loaded_once = false;
     loop {
+        beat.beat();
         let mut held = hold(entry, "clock");
         let now = Instant::now();
         if !loaded_once {

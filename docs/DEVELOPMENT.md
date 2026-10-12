@@ -126,6 +126,7 @@ The engine:
 - **Tests never bind the real ports.** TotalMix's `7001` to `7010` and sACN's `5568` are never bound or sent to by a test; test builds drop datagrams aimed at TotalMix.
 - **One log writer.** `diagnostics::log_event` writes `<logs>/engine.log`, which rotates at 5 MiB. `SSE_ENGINE_LOG_LEVEL=DEBUG` adds one line per request. The shell keeps the engine's stderr in `<logs>/shell.log`.
 - **Health reports changes of state, not attempts:** `health::report(subsystem, state, detail)`.
+- **A long-lived thread is started with `liveness::spawn_watched`,** named, with its subsystem and its lifetime. A panic, and the end of a `Process` thread, is a health error (`health::thread_problem`, laid over the subsystem's entry, so the thread's own word comes back when it clears) and an ERROR line. A loop beats once a pass (`Beat::beat`); a beat older than its allowance is a stall, reported the same way and cleared at the next beat. A thread that waits on a socket or sleeps a day has no allowance and is watched for its end only. Every panic, on any thread, is in `engine.log` with its place (the hook): read it before concluding that a thread hangs.
 - **No file over 2,000 lines.** `npm run file:health` fails on one. Split before a file gets there.
 
 The shell:

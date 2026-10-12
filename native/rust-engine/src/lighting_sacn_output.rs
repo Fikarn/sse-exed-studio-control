@@ -32,6 +32,7 @@ use crate::lighting::{
     lighting_output_armed, lighting_render_generation, read_lighting_sacn_output_state,
     LightingUniverseFrame, LIGHTING_OUTPUT_ARMED_KEY,
 };
+use crate::liveness::{Beat, Lifetime, Spec};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
@@ -43,6 +44,13 @@ pub const SACN_PORT: u16 = 5568;
 const OUTPUT_TICK: Duration = Duration::from_millis(40);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(800);
 const SETTINGS_SAFETY_REREAD: Duration = Duration::from_secs(2);
+/// A tick that is this late is a stall of the output's thread (`liveness`): a
+/// settings read may wait the database's 5 s busy timeout, and no more.
+const STALL_ALLOWANCE: Duration = Duration::from_secs(10);
+/// While the sends fail, the log gets one line with the counts this often.
+const FAILING_LINE_EVERY: Duration = Duration::from_secs(60);
+/// A second without a failed send, and a send that went: the sends resumed.
+const RESUMED_AFTER: Duration = Duration::from_secs(1);
 const STREAM_TERMINATED_SENDS: usize = 3;
 const E131_PRIORITY: u8 = 100;
 const E131_PACKET_LEN: usize = 638;
@@ -65,7 +73,18 @@ pub(crate) fn simulated_lights_requested(value: &str) -> bool {
 pub fn spawn_lighting_sacn_output(db_path: PathBuf, log_file_path: PathBuf) {
     let simulated =
         std::env::var(LIGHTS_SIMULATED_ENV).is_ok_and(|value| simulated_lights_requested(&value));
-    thread::spawn(move || run_output_loop(&db_path, &log_file_path, simulated));
+    // Watched (`liveness`): a panic, an end or a tick that stops beating puts
+    // the `sacn` entry at `error`, and the Lighting lamp reads `no output`.
+    let _ = crate::liveness::spawn_watched(
+        Spec {
+            job: "lighting output",
+            name: String::from("sacn-output"),
+            subsystem: SUBSYSTEM_SACN,
+            allowance: Some(STALL_ALLOWANCE),
+            lifetime: Lifetime::Process,
+        },
+        move |beat| run_output_loop(&db_path, &log_file_path, simulated, &beat),
+    );
 }
 
 struct UniverseTx {
@@ -117,7 +136,7 @@ impl RenderSettingsCache {
     }
 }
 
-fn run_output_loop(db_path: &Path, log_file_path: &Path, simulated: bool) {
+fn run_output_loop(db_path: &Path, log_file_path: &Path, simulated: bool, beat: &Beat) {
     let socket = match UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) {
         Ok(socket) => socket,
         Err(error) => {
@@ -157,6 +176,7 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path, simulated: bool) {
 
     loop {
         thread::sleep(OUTPUT_TICK);
+        beat.beat();
 
         // The generation is read before the settings, so a change that lands
         // between the two costs one more read and is never missed.
@@ -191,6 +211,144 @@ struct SacnOutput {
     held: bool,
     /// `SSE_LIGHTS_SIMULATED`: everything runs, and no packet leaves.
     simulated: bool,
+    /// How the sends go: a failed one is said, and read on the entry.
+    sends: SendTally,
+}
+
+/// How the sends to the bridge go (the audit of 2026-10-12, H2). Until then a
+/// `send_to` that failed was swallowed, and the rig could hold its last look
+/// under a green lamp. A send that fails puts the entry at `attention` at
+/// once (the Lighting lamp reads `no output`); while they fail the log gets
+/// one line a minute with the counts; a second without a failure, with a send
+/// that went, gives the entry its own word back.
+///
+/// What a failed send catches is a socket with no route: both of this PC's
+/// networks down, or its routes changed. A bridge that is unplugged fails no
+/// send, since the PC's other default route takes the packet
+/// (`docs/HARDWARE.md`); that is the bridge watch's to say (`not answering`).
+#[derive(Default)]
+struct SendTally {
+    /// The entry reads `attention` for the sends.
+    failing: bool,
+    /// Since the last line or report.
+    failed: u64,
+    sent: u64,
+    /// Sends that went since the last failure.
+    sent_since_failure: u64,
+    last_error: String,
+    target: Option<SocketAddrV4>,
+    last_failure_at: Option<Instant>,
+    /// When the minute of the next line began.
+    line_from: Option<Instant>,
+}
+
+/// What a tick's sends mean for the entry and the log.
+enum SendReport {
+    /// The first failure: the entry goes to `attention`.
+    Failing { detail: String, log: String },
+    /// A minute of failing: a line with the counts.
+    StillFailing { log: String },
+    /// A second without a failure, and a send that went: the entry reads its
+    /// own word again.
+    Resumed { log: String },
+}
+
+impl SendTally {
+    fn sent(&mut self) {
+        self.sent = self.sent.saturating_add(1);
+        self.sent_since_failure = self.sent_since_failure.saturating_add(1);
+    }
+
+    fn failed(&mut self, target: SocketAddrV4, error: &std::io::Error, now: Instant) {
+        self.failed = self.failed.saturating_add(1);
+        self.sent_since_failure = 0;
+        self.last_error = error.to_string();
+        self.target = Some(target);
+        self.last_failure_at = Some(now);
+    }
+
+    /// What this tick's sends mean, if anything.
+    fn report(&mut self, now: Instant) -> Option<SendReport> {
+        let target = self.target?;
+        if !self.failing {
+            if self.failed == 0 {
+                return None;
+            }
+            self.failing = true;
+            self.line_from = Some(now);
+            let failed = std::mem::take(&mut self.failed);
+            self.sent = 0;
+            return Some(SendReport::Failing {
+                detail: format!(
+                    "Light output: packets to the lighting bridge at {target} are not sent ({}); the rig does not follow until they are. Check the lighting network and the PC's routes.",
+                    self.last_error
+                ),
+                log: format!(
+                    "Lighting sACN output: {failed} packet(s) to {target} could not be sent ({}).",
+                    self.last_error
+                ),
+            });
+        }
+        let quiet_for = self
+            .last_failure_at
+            .map(|at| now.saturating_duration_since(at))
+            .unwrap_or_default();
+        if quiet_for >= RESUMED_AFTER && self.sent_since_failure > 0 {
+            *self = Self::default();
+            return Some(SendReport::Resumed {
+                log: format!("Lighting sACN output: packets to {target} are sent again."),
+            });
+        }
+        let line_due = self
+            .line_from
+            .is_some_and(|from| now.saturating_duration_since(from) >= FAILING_LINE_EVERY);
+        if line_due {
+            self.line_from = Some(now);
+            let failed = std::mem::take(&mut self.failed);
+            let sent = std::mem::take(&mut self.sent);
+            return Some(SendReport::StillFailing {
+                log: format!(
+                    "Lighting sACN output: {failed} of {} packet(s) to {target} could not be sent in the last minute ({}).",
+                    failed.saturating_add(sent),
+                    self.last_error
+                ),
+            });
+        }
+        None
+    }
+
+    /// The stream ended (held, idle, another bridge): what failed is
+    /// forgotten. True when the entry read `attention` for it.
+    fn reset(&mut self) -> bool {
+        let was_failing = self.failing;
+        *self = Self::default();
+        was_failing
+    }
+}
+
+/// One packet to the bridge, counted by the tally; the simulated lights
+/// count it as sent and put nothing on the wire.
+fn send_packet(
+    socket: &UdpSocket,
+    simulated: bool,
+    sends: &mut SendTally,
+    packet: &[u8],
+    target: SocketAddrV4,
+    now: Instant,
+) -> bool {
+    if simulated {
+        return true;
+    }
+    match socket.send_to(packet, target) {
+        Ok(_) => {
+            sends.sent();
+            true
+        }
+        Err(error) => {
+            sends.failed(target, &error, now);
+            false
+        }
+    }
 }
 
 impl SacnOutput {
@@ -202,6 +360,7 @@ impl SacnOutput {
             universes: HashMap::new(),
             held: false,
             simulated: false,
+            sends: SendTally::default(),
         }
     }
 
@@ -292,36 +451,77 @@ impl SacnOutput {
                 }
             }
         }
+        self.settle_sends(log_file_path);
+    }
+
+    /// What this tick's sends mean for the entry: a stream that ended forgets
+    /// its failures and the entry reads the output's own word; a stream that
+    /// runs reads the tally's.
+    fn settle_sends(&mut self, log_file_path: &Path) {
+        if self.active_bridge.is_none() {
+            if self.sends.reset() {
+                report_health(SUBSYSTEM_SACN, SubsystemState::Ok, self.detail());
+                let _ = append_log(
+                    log_file_path,
+                    "INFO",
+                    "Lighting sACN output: the stream ended while its packets could not be sent; the entry reads the output's own state again.",
+                );
+            }
+            return;
+        }
+        match self.sends.report(Instant::now()) {
+            Some(SendReport::Failing { detail, log }) => {
+                let _ = append_log(log_file_path, "ERROR", &log);
+                report_health(SUBSYSTEM_SACN, SubsystemState::Attention, detail);
+            }
+            Some(SendReport::StillFailing { log }) => {
+                let _ = append_log(log_file_path, "WARN", &log);
+            }
+            Some(SendReport::Resumed { log }) => {
+                let _ = append_log(log_file_path, "INFO", &log);
+                report_health(SUBSYSTEM_SACN, SubsystemState::Ok, self.detail());
+            }
+            None => {}
+        }
     }
 
     fn send_frame(&mut self, bridge_ip: Ipv4Addr, frame: &LightingUniverseFrame) {
         let target = SocketAddrV4::new(bridge_ip, self.port);
+        let now = Instant::now();
         let entry = self
             .universes
             .entry(frame.universe)
             .or_insert_with(|| UniverseTx {
                 sequence: 0,
                 last_slots: [0_u8; 512],
-                last_sent_at: Instant::now() - KEEPALIVE_INTERVAL,
+                last_sent_at: now.checked_sub(KEEPALIVE_INTERVAL).unwrap_or(now),
             });
 
         let changed = entry.last_slots != frame.slots;
-        if !changed && entry.last_sent_at.elapsed() < KEEPALIVE_INTERVAL {
+        if !changed && now.saturating_duration_since(entry.last_sent_at) < KEEPALIVE_INTERVAL {
             return;
         }
 
         let packet = build_e131_data_packet(frame.universe, entry.sequence, false, &frame.slots);
         // The simulated lights count every packet as sent, so sequences and
         // keep-alives run as they do on the rig.
-        if self.simulated || self.socket.send_to(&packet, target).is_ok() {
+        if send_packet(
+            &self.socket,
+            self.simulated,
+            &mut self.sends,
+            &packet,
+            target,
+            now,
+        ) {
             entry.sequence = entry.sequence.wrapping_add(1);
             entry.last_slots = frame.slots;
-            entry.last_sent_at = Instant::now();
+            entry.last_sent_at = now;
         }
     }
 
     fn terminate_universes(&mut self, bridge_ip: Ipv4Addr, targets: Vec<u16>) {
         let target_addr = SocketAddrV4::new(bridge_ip, self.port);
+        let now = Instant::now();
         for universe in targets {
             let Some(mut entry) = self.universes.remove(&universe) else {
                 continue;
@@ -329,9 +529,14 @@ impl SacnOutput {
             for _ in 0..STREAM_TERMINATED_SENDS {
                 let packet =
                     build_e131_data_packet(universe, entry.sequence, true, &entry.last_slots);
-                if !self.simulated {
-                    let _ = self.socket.send_to(&packet, target_addr);
-                }
+                send_packet(
+                    &self.socket,
+                    self.simulated,
+                    &mut self.sends,
+                    &packet,
+                    target_addr,
+                    now,
+                );
                 entry.sequence = entry.sequence.wrapping_add(1);
             }
         }
@@ -726,6 +931,132 @@ mod tests {
             UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).expect("sender should bind"),
             port,
         )
+    }
+
+    // The audit of 2026-10-12 (H2): a send that fails is said at once, not
+    // again inside the minute, by the minute with its counts while it lasts,
+    // and its return once, a second after the last failure.
+    #[test]
+    fn failed_sends_are_said_once_then_by_the_minute_and_their_return_once() {
+        let target = SocketAddrV4::new(Ipv4Addr::new(10, 1, 0, 9), SACN_PORT);
+        let error = std::io::Error::other("no route to host");
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut tally = SendTally::default();
+        assert!(tally.report(at(0)).is_none(), "nothing has failed");
+
+        tally.sent();
+        tally.failed(target, &error, at(0));
+        tally.failed(target, &error, at(0));
+        match tally.report(at(0)) {
+            Some(SendReport::Failing { detail, log }) => {
+                assert!(
+                    detail.starts_with("Light output: packets to the lighting bridge at 10.1.0.9:5568 are not sent (no route to host);"),
+                    "{detail}"
+                );
+                crate::operator_words::assert_operator_words(&detail);
+                assert_eq!(
+                    log,
+                    "Lighting sACN output: 2 packet(s) to 10.1.0.9:5568 could not be sent (no route to host)."
+                );
+            }
+            _ => panic!("the first failure is said"),
+        }
+        tally.failed(target, &error, at(40));
+        assert!(
+            tally.report(at(80)).is_none(),
+            "a failing stream is not said again inside the minute"
+        );
+
+        tally.sent();
+        assert!(
+            tally.report(at(500)).is_none(),
+            "a send that went is not the return until a second has passed without a failure"
+        );
+        match tally.report(at(1_100)) {
+            Some(SendReport::Resumed { log }) => {
+                assert_eq!(
+                    log,
+                    "Lighting sACN output: packets to 10.1.0.9:5568 are sent again."
+                );
+            }
+            _ => panic!("the return is said"),
+        }
+        assert!(!tally.failing);
+        assert!(tally.report(at(1_200)).is_none(), "said once");
+
+        // A new spell of failing is said again, and by the minute while it
+        // lasts, with the counts since the last line.
+        tally.failed(target, &error, at(2_000));
+        assert!(matches!(
+            tally.report(at(2_000)),
+            Some(SendReport::Failing { .. })
+        ));
+        tally.sent();
+        tally.failed(target, &error, at(30_000));
+        tally.failed(target, &error, at(61_900));
+        match tally.report(at(62_000)) {
+            Some(SendReport::StillFailing { log }) => assert_eq!(
+                log,
+                "Lighting sACN output: 2 of 3 packet(s) to 10.1.0.9:5568 could not be sent in the last minute (no route to host)."
+            ),
+            _ => panic!("the minute's line"),
+        }
+        assert!(tally.reset(), "the stream's end forgets a failing spell");
+        assert!(!tally.reset());
+    }
+
+    // A send that fails on the wire (here a broadcast address, which the
+    // socket has no leave to send to) puts the entry at `attention` and the
+    // failure in the log; a hold ends the stream, and the entry reads its own
+    // word again. The registry is process-wide, so the entry is read through
+    // the tally and the log, which are this output's alone.
+    #[test]
+    fn a_failed_send_reads_attention_until_the_stream_ends() {
+        use crate::control_surface::test_support::TestDir;
+
+        let test_dir = TestDir::new("sacn-failed-send");
+        let log = test_dir.path().join("engine.log");
+        let (_wire, port) = Wire::open();
+        let mut output = test_output(port);
+        let mut armed = output_settings(Some(true));
+        armed.insert(
+            String::from(LIGHTING_BRIDGE_IP_KEY),
+            String::from("255.255.255.255"),
+        );
+        assert!(
+            read_lighting_sacn_output_state(&armed).is_some(),
+            "the premise: this rig streams to the address as it was typed"
+        );
+
+        output.tick(&armed, &log);
+        assert!(
+            output.sends.failing,
+            "a broadcast address without the socket's leave fails the send"
+        );
+        let text = std::fs::read_to_string(&log).expect("the log is written");
+        assert!(
+            text.contains("ERROR Lighting sACN output: ")
+                && text.contains("to 255.255.255.255:")
+                && text.contains("could not be sent"),
+            "{text}"
+        );
+        for _ in 0..3 {
+            output.tick(&armed, &log);
+        }
+        assert_eq!(
+            text.matches("could not be sent").count(),
+            1,
+            "a failing stream is said once, not at every tick"
+        );
+
+        output.tick(&output_settings(Some(false)), &log);
+        assert!(!output.sends.failing, "a hold forgets the failing spell");
+        let text = std::fs::read_to_string(&log).expect("the log is written");
+        assert!(
+            text.contains("the entry reads the output's own state again"),
+            "{text}"
+        );
     }
 
     // A launch that starts held puts nothing on the wire — not a frame, not a

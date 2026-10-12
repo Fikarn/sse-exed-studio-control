@@ -79,19 +79,29 @@ pub(crate) fn deck_quiet_sentence(db_path: &Path, now: Instant) -> String {
 /// Watches whether the deck went quiet or was heard again, once a second,
 /// and announces each change so the header's lamp follows.
 pub(crate) fn spawn_deck_quiet_watch(db_path: PathBuf) {
-    let _ = thread::Builder::new()
-        .name(String::from("deck-quiet-watch"))
-        .spawn(move || {
+    // Watched (`liveness`): a panic, an end or a pass that stops beating is
+    // laid on the `bridge` entry.
+    let _ = crate::liveness::spawn_watched(
+        crate::liveness::Spec {
+            job: "deck's quiet watch",
+            name: String::from("deck-quiet-watch"),
+            subsystem: crate::health::SUBSYSTEM_BRIDGE,
+            allowance: Some(Duration::from_secs(10)),
+            lifetime: crate::liveness::Lifetime::Process,
+        },
+        move |beat| {
             let mut heard = deck_heard_lately(&db_path, Instant::now());
             loop {
                 thread::sleep(QUIET_WATCH_INTERVAL);
+                beat.beat();
                 let now_heard = deck_heard_lately(&db_path, Instant::now());
                 if now_heard != heard {
                     heard = now_heard;
                     emit_app_changed(APP_CHANGED_REASON_HEALTH);
                 }
             }
-        });
+        },
+    );
 }
 
 #[cfg(test)]
