@@ -360,7 +360,7 @@ impl Plan {
                     _ => format!("{old_frame_rate}p → {now_frame_rate}p"),
                 };
                 (
-                    json!({ "camera": camera, "sentence": format!("{tag}: {change}.") }),
+                    json!({ "camera": camera, "sentence": format!("{}: {change}.", tag) }),
                     Some(("format", Some(camera))),
                 )
             }
@@ -399,7 +399,7 @@ impl Plan {
                     ));
                 }
                 (
-                    json!({ "camera": camera, "sentence": format!("{tag}: {}.", parts.join("; ")) }),
+                    json!({ "camera": camera, "sentence": format!("{}: {}.", tag, parts.join("; ")) }),
                     Some(("look", Some(camera))),
                 )
             }
