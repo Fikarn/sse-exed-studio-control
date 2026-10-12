@@ -856,25 +856,34 @@ pub fn spawn_rme_totalmix_audio_metering(
                 last_link_flush_at = Some(now);
             }
 
-            let state_snapshot = state
-                .lock()
-                .map(|state| state.clone())
-                .unwrap_or_else(|_| RmeTotalMixMeterState::new());
-            let status = state_snapshot.status_at(now_ms);
-            let publish_interval = if status == RmeMeteringState::Live {
-                PUBLISH_INTERVAL
-            } else {
-                STATUS_PUBLISH_INTERVAL
+            // The meter state is copied out of its lock only for a frame
+            // that is published; a poll that publishes nothing reads the
+            // status alone (the audit of 2026-10-12).
+            let frame = match state.lock() {
+                Ok(state) => {
+                    let status = state.status_at(now_ms);
+                    let publish_interval = if status == RmeMeteringState::Live {
+                        PUBLISH_INTERVAL
+                    } else {
+                        STATUS_PUBLISH_INTERVAL
+                    };
+                    let due = last_publish_at
+                        .map(|last| now.duration_since(last) >= publish_interval)
+                        .unwrap_or(true)
+                        || (status != RmeMeteringState::Live
+                            && last_status_publish_at
+                                .map(|last| now.duration_since(last) >= STATUS_PUBLISH_INTERVAL)
+                                .unwrap_or(true));
+                    // A writer that holds two frames already is handed none;
+                    // the frame is tried again at the next poll
+                    // (`engine_events`).
+                    (due && crate::engine_events::meter_frame_room())
+                        .then(|| (state.clone(), status))
+                }
+                Err(_) => None,
             };
-            let should_publish = last_publish_at
-                .map(|last| now.duration_since(last) >= publish_interval)
-                .unwrap_or(true)
-                || (status != RmeMeteringState::Live
-                    && last_status_publish_at
-                        .map(|last| now.duration_since(last) >= STATUS_PUBLISH_INTERVAL)
-                        .unwrap_or(true));
 
-            if should_publish {
+            if let Some((state_snapshot, status)) = frame {
                 if let Some(snapshot) = cached_snapshot.as_ref() {
                     let mut snapshot = snapshot.clone();
                     state_snapshot.apply_to_snapshot(&mut snapshot, now_ms);
@@ -887,7 +896,9 @@ pub fn spawn_rme_totalmix_audio_metering(
                         now_ms,
                     );
                     let event = event_message(EVENT_AUDIO_CHANGED, payload);
-                    if sender.send(event).is_err() {
+                    if crate::engine_events::offer_meter_frame(&sender, event)
+                        == crate::engine_events::MeterOffer::WriterGone
+                    {
                         break;
                     }
                     last_publish_at = Some(now);
@@ -1513,18 +1524,27 @@ impl FlushFailureLog {
     }
 }
 
-/// Re-primes the Global OSC remote when its level stream is silent. TotalMix
-/// only transmits deltas, so a fresh engine (or a static console) needs a
-/// `/sendall` to start receiving values; the send also doubles as the
-/// activity nudge that keeps the remote alive. Returns whether a request went
-/// out (not with no TotalMix address): an unanswered one counts towards
-/// TotalMix being out of touch.
+/// Nudges the Global OSC remote when nothing has come on it for a while. The
+/// send keeps the remote alive, and TotalMix's answer is how it is known to
+/// be in touch. While TotalMix has not been heard since the slot was bound,
+/// or has gone quiet, the nudge is the console pull: TotalMix only transmits
+/// deltas, so the values are asked for whole (`/sendall 2`). Once it has been
+/// heard the nudge is `/sendstate` alone, which TotalMix always answers and
+/// which costs it a handful of status values, not the dump's 3,100 to 3,500
+/// (the audit of 2026-10-12: on a still desk the dump went out every 4 s).
+/// Returns whether a request went out (not with no TotalMix address): an
+/// unanswered one counts towards TotalMix being out of touch.
 fn refresh_global_slot(slot: &GlobalOscSlot, send_host: &str) -> bool {
     let host = send_host.trim();
     if host.is_empty() {
         return false;
     }
-    for (address, value) in console_pull_messages() {
+    let messages = if slot.quiet.values_wanted() {
+        console_pull_messages()
+    } else {
+        vec![console_state_message()]
+    };
+    for (address, value) in messages {
         let Ok(bytes) = encoder::encode(&OscPacket::Message(OscMessage {
             addr: address,
             args: vec![value],
@@ -1541,8 +1561,13 @@ fn refresh_global_slot(slot: &GlobalOscSlot, send_host: &str) -> bool {
 pub(crate) fn console_pull_messages() -> Vec<(String, OscType)> {
     vec![
         (String::from("/sendall"), OscType::Float(2.0)),
-        (String::from("/sendstate"), OscType::Float(1.0)),
+        console_state_message(),
     ]
+}
+
+/// `/sendstate 1`: the status messages alone, the liveness request.
+fn console_state_message() -> (String, OscType) {
+    (String::from("/sendstate"), OscType::Float(1.0))
 }
 
 /// Asks TotalMix for a full dump over the Global OSC remote (`send_port + 3`).
@@ -1899,7 +1924,7 @@ fn audio_meter_tick_payload(
 ) -> Value {
     let diagnostics = state.diagnostics();
     json!({
-        "reason": "metering-tick",
+        "reason": crate::engine_events::METER_TICK_REASON,
         "sequence": sequence,
         "monotonicTimestampMs": metering_started_at.elapsed().as_secs_f64() * 1000.0,
         "cadenceHz": 30.0,

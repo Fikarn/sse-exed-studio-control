@@ -2,9 +2,11 @@
 //! studio walk of 2026-10-01).
 //!
 //! While nothing has come on the Global slot for 3 s, the metering loop asks
-//! TotalMix for its values (`/sendall 2` and `/sendstate`) once a second, and
-//! TotalMix always answers `/sendstate`. A desk that is merely still answers
-//! the first request, so it is never quiet here. Two requests in a row left
+//! TotalMix once a second: for its status alone (`/sendstate`) once it has
+//! been heard, for its values whole (`/sendall 2` and `/sendstate`) before
+//! that and during a quiet (`values_wanted`). TotalMix always answers
+//! `/sendstate`. A desk that is merely still answers the first request, so it
+//! is never quiet here. Two requests in a row left
 //! unanswered mean TotalMix is out of touch: remote 4 switched off, or
 //! TotalMix closed. The first datagram after that ends the quiet, and the
 //! Console then reads assumed until a Sync: on the walk a fader moved with
@@ -101,12 +103,12 @@ impl GlobalQuiet {
         let unanswered = self.unanswered - 1;
         Some(match self.last_heard_at {
             Some(heard) => format!(
-                "TotalMix went quiet on remote 4 (port {}): nothing heard for {}, and {unanswered} requests for its values went unanswered. They go on once a second.",
+                "TotalMix went quiet on remote 4 (port {}): nothing heard for {}, and {unanswered} requests went unanswered. They go on once a second, asking for its values.",
                 self.port,
                 seconds(now.saturating_duration_since(heard))
             ),
             None => format!(
-                "TotalMix has not been heard on remote 4 (port {}) since the link began listening {} ago, and {} requests for its values went unanswered. They go on once a second.",
+                "TotalMix has not been heard on remote 4 (port {}) since the link began listening {} ago, and {} requests went unanswered. They go on once a second, asking for its values.",
                 self.port,
                 seconds(now.saturating_duration_since(self.listening_since)),
                 self.requests_since_heard - 1
@@ -145,7 +147,7 @@ impl GlobalQuiet {
             quiet_for,
             since_start: since.is_none(),
             line: format!(
-                "TotalMix heard on remote 4 (port {}) {when}; {requests} requests for its values went out meanwhile, the last {last_request} before.",
+                "TotalMix heard on remote 4 (port {}) {when}; {requests} requests went out meanwhile, the last {last_request} before.",
                 self.port
             ),
         })
@@ -155,6 +157,15 @@ impl GlobalQuiet {
     #[cfg(test)]
     pub(super) fn is_quiet(&self) -> bool {
         self.quiet
+    }
+
+    /// Whether the next request should ask for TotalMix's values whole, not
+    /// its status alone: while TotalMix has not been heard since the link
+    /// began listening, and during a quiet. TotalMix sends deltas, so the
+    /// values are asked for once at the first contact, and again after a
+    /// quiet, when they may have moved unheard.
+    pub(super) fn values_wanted(&self) -> bool {
+        self.last_heard_at.is_none() || self.quiet
     }
 
     /// Counts what TotalMix sent while the count after a quiet is open:
@@ -219,7 +230,7 @@ mod tests {
         assert_eq!(
             quiet.request_sent(at(start, 5_000)),
             Some(String::from(
-                "TotalMix went quiet on remote 4 (port 9004): nothing heard for 5.0 s, and 2 requests for its values went unanswered. They go on once a second."
+                "TotalMix went quiet on remote 4 (port 9004): nothing heard for 5.0 s, and 2 requests went unanswered. They go on once a second, asking for its values."
             ))
         );
         for second in 6..=30 {
@@ -240,7 +251,7 @@ mod tests {
         assert_eq!(
             quiet.request_sent(at(start, 5_000)),
             Some(String::from(
-                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 5 requests for its values went unanswered. They go on once a second."
+                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 5 requests went unanswered. They go on once a second, asking for its values."
             ))
         );
         let back = quiet.heard(at(start, 31_400)).expect("heard after a quiet");
@@ -280,7 +291,7 @@ mod tests {
         assert!(!back.since_start);
         assert_eq!(
             back.line,
-            "TotalMix heard on remote 4 (port 9004) again after 31.4 s quiet; 28 requests for its values went out meanwhile, the last 0.6 s before."
+            "TotalMix heard on remote 4 (port 9004) again after 31.4 s quiet; 28 requests went out meanwhile, the last 0.6 s before."
         );
         assert_eq!(quiet.heard(at(start, 31_450)), None, "once per quiet");
 

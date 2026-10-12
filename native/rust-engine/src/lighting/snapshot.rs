@@ -3,12 +3,49 @@ use std::net::Ipv4Addr;
 use std::str::FromStr;
 
 use super::editor_state::*;
-use super::fade::apply_active_fade_sample;
+use super::fade::{apply_active_fade_sample, LightingFadeRuntimeStatus};
 use super::helpers::*;
 use super::*;
+use crate::lighting_backend::{LightingBackendConfig, LightingBackendInventory};
+
+/// The lighting state as the settings hold it, parsed once: the rig's
+/// configuration, the inventory it names and the editor state (the JSON under
+/// `LIGHTING_EDITOR_STATE_KEY`, normalised). The snapshot and the sACN output
+/// both render from one of these. The output keeps its own between ticks and
+/// parses again only when the render generation has moved
+/// (`lighting_sacn_output`): parsing at every tick, 25 times a second, was a
+/// share of an idle engine's cost (the audit of 2026-10-12). The clock's part
+/// (a running fade, an identify burst) is not in here: it is read at each
+/// render, so a kept state renders a later moment.
+pub struct ParsedLightingState {
+    config: LightingBackendConfig,
+    inventory: LightingBackendInventory,
+    editor_state: LightingEditorState,
+}
+
+impl ParsedLightingState {
+    pub fn read(settings: &HashMap<String, String>) -> Self {
+        let config = resolve_lighting_config(settings);
+        let inventory = read_lighting_editor_inventory(&config);
+        let editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
+        Self {
+            config,
+            inventory,
+            editor_state,
+        }
+    }
+}
 
 pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSnapshot {
-    let config = resolve_lighting_config(settings);
+    read_lighting_snapshot_from(settings, &ParsedLightingState::read(settings))
+}
+
+/// The snapshot from a state parsed earlier, from these same settings.
+pub fn read_lighting_snapshot_from(
+    settings: &HashMap<String, String>,
+    parsed: &ParsedLightingState,
+) -> LightingSnapshot {
+    let config = &parsed.config;
     let check_status = lighting_check_status(settings);
     let enabled = config.enabled;
     let reachable = enabled && check_status == "passed";
@@ -19,7 +56,6 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     } else {
         None
     };
-    let inventory = read_lighting_editor_inventory(&config);
     let last_recalled_scene_id =
         read_optional_setting(settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY);
     let last_scene_recall_at = read_optional_setting(settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY);
@@ -29,7 +65,7 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let last_action_message = read_optional_setting(settings, LIGHTING_LAST_ACTION_MESSAGE_KEY);
     let grand_master = read_lighting_grand_master(settings);
     let now_ms = current_unix_ms();
-    let mut editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
+    let mut editor_state = parsed.editor_state.clone();
     // Whether the rig holds the live scene: the last recalled, else the
     // selected one. Decided on the rig as stored, before a running fade is
     // sampled: a scene being faded in is the rig's (`scene_state`).
@@ -46,42 +82,11 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         last_recalled_scene_id.as_deref(),
         false,
     ));
-    let fade_status = apply_active_fade_sample(&mut editor_state, now_ms);
-    let active_burst_ids = active_identify_burst_ids(settings, now_ms);
-    let overrides = read_output_overrides(settings);
-    let solo_active = overrides.solo_active();
-    let fixtures = editor_state
-        .fixtures
-        .iter()
-        .cloned()
-        .map(lighting_fixture_snapshot_from_state)
-        .map(|mut fixture| {
-            // Output-overrides overlay. Three modes compose with strict
-            // precedence so the operator can never see a fixture in two
-            // overlay states at once: burst (transient flash) > highlight
-            // (sustained 100 % at neutral CCT) > solo-mask (everything
-            // else dimmed). Stored state is never mutated — the overlay
-            // is applied at snapshot read time so downstream DMX
-            // rendering and UI both reflect the override consistently.
-            if active_burst_ids.contains(&fixture.id) {
-                let (_, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
-                fixture.intensity = 100;
-                fixture.on = true;
-                fixture.cct = max_cct;
-                show_white_light_under_overlay(&mut fixture);
-            } else if overrides.highlight_ids.contains(&fixture.id) {
-                let (min_cct, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
-                fixture.intensity = 100;
-                fixture.on = true;
-                fixture.cct = NEUTRAL_HIGHLIGHT_CCT.clamp(min_cct, max_cct);
-                show_white_light_under_overlay(&mut fixture);
-            } else if solo_active && !overrides.solo_ids.contains(&fixture.id) {
-                fixture.intensity = 0;
-                fixture.on = false;
-            }
-            fixture
-        })
-        .collect::<Vec<_>>();
+    let FixturesNow {
+        fixtures,
+        fade_status,
+        overrides,
+    } = fixtures_now(settings, &mut editor_state, now_ms);
     // Emit groups in display order following group_order; orphans (groups
     // that exist on the editor state but not in group_order, e.g. legacy
     // state mid-migration) tail-pad in editor_state.groups order.
@@ -201,8 +206,8 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
             last_action_message: last_action_message.as_deref(),
         }),
         status,
-        adapter_mode: inventory.adapter_mode,
-        bridge_ip: config.bridge_ip,
+        adapter_mode: parsed.inventory.adapter_mode.clone(),
+        bridge_ip: config.bridge_ip.clone(),
         universe: config.universe,
         enabled,
         grand_master,
@@ -235,11 +240,72 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     }
 }
 
+/// The fixtures as the rig shows them at one moment, with what was read to
+/// draw them.
+struct FixturesNow {
+    fixtures: Vec<LightingFixtureSnapshot>,
+    fade_status: Option<LightingFadeRuntimeStatus>,
+    overrides: OutputOverrides,
+}
+
+/// Draws the fixtures as the rig shows them at `now_ms` from the stored
+/// state: the running fade sampled, then the output overrides laid over each
+/// fixture. The snapshot and the sACN output both read through here, so UI
+/// and wire cannot drift. `editor_state` is the caller's copy: the sample
+/// moves its fixtures, and ends its fade when the fade is over.
+fn fixtures_now(
+    settings: &HashMap<String, String>,
+    editor_state: &mut LightingEditorState,
+    now_ms: i64,
+) -> FixturesNow {
+    let fade_status = apply_active_fade_sample(editor_state, now_ms);
+    let active_burst_ids = active_identify_burst_ids(settings, now_ms);
+    let overrides = read_output_overrides(settings);
+    let solo_active = overrides.solo_active();
+    let fixtures = editor_state
+        .fixtures
+        .iter()
+        .cloned()
+        .map(lighting_fixture_snapshot_from_state)
+        .map(|mut fixture| {
+            // Output-overrides overlay. Three modes compose with strict
+            // precedence so the operator can never see a fixture in two
+            // overlay states at once: burst (transient flash) > highlight
+            // (sustained 100 % at neutral CCT) > solo-mask (everything
+            // else dimmed). Stored state is never mutated — the overlay
+            // is applied at snapshot read time so downstream DMX
+            // rendering and UI both reflect the override consistently.
+            if active_burst_ids.contains(&fixture.id) {
+                let (_, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
+                fixture.intensity = 100;
+                fixture.on = true;
+                fixture.cct = max_cct;
+                show_white_light_under_overlay(&mut fixture);
+            } else if overrides.highlight_ids.contains(&fixture.id) {
+                let (min_cct, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
+                fixture.intensity = 100;
+                fixture.on = true;
+                fixture.cct = NEUTRAL_HIGHLIGHT_CCT.clamp(min_cct, max_cct);
+                show_white_light_under_overlay(&mut fixture);
+            } else if solo_active && !overrides.solo_ids.contains(&fixture.id) {
+                fixture.intensity = 0;
+                fixture.on = false;
+            }
+            fixture
+        })
+        .collect::<Vec<_>>();
+    FixturesNow {
+        fixtures,
+        fade_status,
+        overrides,
+    }
+}
+
 pub fn read_lighting_dmx_monitor_snapshot(
     settings: &HashMap<String, String>,
 ) -> LightingDmxMonitorSnapshot {
     let snapshot = read_lighting_snapshot(settings);
-    let channel_data = compute_dmx_channel_data(&snapshot);
+    let channel_data = compute_dmx_channel_data(&snapshot.fixtures, snapshot.grand_master);
     let mut channels = Vec::new();
     for fixture in &snapshot.fixtures {
         let profile = fixture_profile_for_snapshot(fixture);
@@ -284,18 +350,43 @@ pub struct LightingSacnOutputState {
 /// disabled, no valid commissioned bridge address, or nothing patched. The
 /// slot values are the same numbers the operator sees in the DMX monitor —
 /// both read through `compute_dmx_channel_data`, so UI and wire cannot drift.
+/// The tests' read, parsing and rendering in one; the output itself renders
+/// from a kept `ParsedLightingState` (`read_lighting_sacn_output_state_from`).
+#[cfg(test)]
 pub fn read_lighting_sacn_output_state(
     settings: &HashMap<String, String>,
 ) -> Option<LightingSacnOutputState> {
-    let snapshot = read_lighting_snapshot(settings);
-    if !snapshot.enabled || snapshot.fixtures.is_empty() {
+    read_lighting_sacn_output_state_from(settings, &ParsedLightingState::read(settings))
+}
+
+/// The frames from a state parsed earlier, from these same settings, at this
+/// moment: what the sACN output renders at each tick.
+pub fn read_lighting_sacn_output_state_from(
+    settings: &HashMap<String, String>,
+    parsed: &ParsedLightingState,
+) -> Option<LightingSacnOutputState> {
+    read_lighting_sacn_output_state_at(settings, parsed, current_unix_ms())
+}
+
+/// The frames at `now_ms`: the moment is a parameter so that a test can
+/// render a running fade at two moments from one kept state.
+pub(crate) fn read_lighting_sacn_output_state_at(
+    settings: &HashMap<String, String>,
+    parsed: &ParsedLightingState,
+    now_ms: i64,
+) -> Option<LightingSacnOutputState> {
+    if !parsed.config.enabled {
         return None;
     }
-    let bridge_ip = Ipv4Addr::from_str(snapshot.bridge_ip.trim()).ok()?;
+    let bridge_ip = Ipv4Addr::from_str(parsed.config.bridge_ip.trim()).ok()?;
+    let mut editor_state = parsed.editor_state.clone();
+    let fixtures = fixtures_now(settings, &mut editor_state, now_ms).fixtures;
+    if fixtures.is_empty() {
+        return None;
+    }
 
-    let channel_data = compute_dmx_channel_data(&snapshot);
-    let mut universes: Vec<i64> = snapshot
-        .fixtures
+    let channel_data = compute_dmx_channel_data(&fixtures, read_lighting_grand_master(settings));
+    let mut universes: Vec<i64> = fixtures
         .iter()
         .map(|fixture| fixture.universe)
         .filter(|universe| (1..=63999).contains(universe))
@@ -357,7 +448,7 @@ fn show_white_light_under_overlay(fixture: &mut LightingFixtureSnapshot) {
     let profile = fixture_profile_for_snapshot(fixture);
     let definition =
         resolve_fixture_definition(Some(profile.definition_id.as_str()), None, None, "");
-    let mode = resolve_fixture_mode(&definition, Some(profile.mode_id.as_str()));
+    let mode = resolve_fixture_mode(definition, Some(profile.mode_id.as_str()));
     if mode
         .channels
         .iter()
@@ -369,11 +460,16 @@ fn show_white_light_under_overlay(fixture: &mut LightingFixtureSnapshot) {
     }
 }
 
-fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), i64> {
+/// Every patched slot's value, by universe and channel, from the fixtures as
+/// the rig shows them and the grand master in per cent.
+fn compute_dmx_channel_data(
+    fixtures: &[LightingFixtureSnapshot],
+    grand_master: i64,
+) -> HashMap<(i64, i64), i64> {
     let mut channel_data = HashMap::new();
-    let grand_master = (snapshot.grand_master as f64 / 100.0).clamp(0.0, 1.0);
+    let grand_master = (grand_master as f64 / 100.0).clamp(0.0, 1.0);
 
-    for fixture in &snapshot.fixtures {
+    for fixture in fixtures {
         let address = fixture.dmx_start_address;
         let profile = fixture_profile_for_snapshot(fixture);
         let dimmer = if fixture.on {
@@ -384,9 +480,9 @@ fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), 
         let (cct_min, cct_max) = fixture_cct_range_from_profile(&profile);
         let definition =
             resolve_fixture_definition(Some(profile.definition_id.as_str()), None, None, "");
-        let mode = resolve_fixture_mode(&definition, Some(profile.mode_id.as_str()));
+        let mode = resolve_fixture_mode(definition, Some(profile.mode_id.as_str()));
 
-        for channel in mode.channels {
+        for channel in &mode.channels {
             let value = match channel.control_id.as_str() {
                 "intensity" => dimmer,
                 "cct" => cct_to_dmx(fixture.cct, cct_min, cct_max),

@@ -646,24 +646,44 @@ fn test_guard_drops_sends_to_real_totalmix_ports_only() {
     assert_eq!(received[0].0, "/input/8/mute");
 }
 
+// The nudge on the Global slot (the audit of 2026-10-12): the whole pull
+// while TotalMix has not been heard, `/sendstate` alone once it has, and the
+// whole pull again during a quiet, when the desk may have moved unheard.
 #[test]
-fn refresh_global_slot_sends_sendall_and_sendstate_to_the_slot_port() {
+fn refresh_global_slot_asks_for_the_values_until_heard_then_for_the_status_alone() {
     let (receiver, port) = bind_test_receiver();
     let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("global slot socket should bind");
-    let slot = super::GlobalOscSlot::new(port, socket, LOOPBACK);
+    let mut slot = super::GlobalOscSlot::new(port, socket, LOOPBACK);
+    let pull = vec![
+        (String::from("/sendall"), Some(2.0)),
+        (String::from("/sendstate"), Some(1.0)),
+    ];
+    let state = vec![(String::from("/sendstate"), Some(1.0))];
 
-    super::refresh_global_slot(&slot, "127.0.0.1");
+    // Not heard since the slot was bound: `/sendall 2` asks for every
+    // parameter with mix nodes above -65 dB (RME protocol table), and
+    // `/sendstate 1` adds the status messages.
+    assert!(super::refresh_global_slot(&slot, "127.0.0.1"));
+    assert_eq!(receive_messages(&receiver, 2), pull);
 
-    // `/sendall 2` asks for every parameter with mix nodes above -65 dB
-    // (RME protocol table); `/sendstate 1` adds the status messages.
-    let received = receive_messages(&receiver, 2);
-    assert_eq!(
-        received,
-        vec![
-            (String::from("/sendall"), Some(2.0)),
-            (String::from("/sendstate"), Some(1.0)),
-        ]
-    );
+    // Heard: the status alone, the cheap request a still desk answers.
+    slot.quiet.heard(Instant::now());
+    assert!(super::refresh_global_slot(&slot, "127.0.0.1"));
+    assert_eq!(receive_messages(&receiver, 1), state);
+
+    // Quiet: the values again, so that what moved unheard comes with the
+    // first answer.
+    slot.declare_quiet_for_test();
+    assert!(super::refresh_global_slot(&slot, "127.0.0.1"));
+    assert_eq!(receive_messages(&receiver, 2), pull);
+
+    // Heard again: the status alone.
+    slot.quiet.heard(Instant::now());
+    assert!(super::refresh_global_slot(&slot, "127.0.0.1"));
+    assert_eq!(receive_messages(&receiver, 1), state);
+
+    // No TotalMix address: nothing goes out, and nothing counts.
+    assert!(!super::refresh_global_slot(&slot, "  "));
 }
 
 #[test]

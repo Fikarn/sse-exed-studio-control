@@ -29,8 +29,8 @@ use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_SACN};
 use crate::lighting::{
-    lighting_output_armed, lighting_render_generation, read_lighting_sacn_output_state,
-    LightingUniverseFrame, LIGHTING_OUTPUT_ARMED_KEY,
+    lighting_output_armed, lighting_render_generation, read_lighting_sacn_output_state_from,
+    LightingSacnOutputState, LightingUniverseFrame, ParsedLightingState, LIGHTING_OUTPUT_ARMED_KEY,
 };
 use crate::liveness::{Beat, Lifetime, Spec};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
@@ -93,31 +93,50 @@ struct UniverseTx {
     last_sent_at: Instant,
 }
 
-/// The settings the output renders from (2026-09 production readiness,
-/// Slice 10 — F18). The database is read when the lighting render generation
-/// has moved since the last read, and otherwise once per
-/// `SETTINGS_SAFETY_REREAD` for a writer that does not advance it; every
-/// other tick renders from what is kept here. Settings are kept, never
-/// frames: a fade and an identify burst are timestamps inside the settings
-/// and move with the clock, so each tick still renders them anew.
+/// What one tick renders from: the settings, and the lighting state parsed
+/// from them once (`ParsedLightingState`).
+struct RenderInput {
+    settings: HashMap<String, String>,
+    parsed: ParsedLightingState,
+}
+
+impl RenderInput {
+    fn from_settings(settings: HashMap<String, String>) -> Self {
+        let parsed = ParsedLightingState::read(&settings);
+        Self { settings, parsed }
+    }
+
+    /// The frames for the wire at this moment, from the kept state.
+    fn output_state(&self) -> Option<LightingSacnOutputState> {
+        read_lighting_sacn_output_state_from(&self.settings, &self.parsed)
+    }
+}
+
+/// What the output renders from (2026-09 production readiness, Slice 10 —
+/// F18; the audit of 2026-10-12). The database is read, and the lighting
+/// state parsed from it, when the lighting render generation has moved since
+/// the last read, and otherwise once per `SETTINGS_SAFETY_REREAD` for a
+/// writer that does not advance it; every other tick renders from what is
+/// kept here. The parsed state is kept, never frames: a fade and an identify
+/// burst are timestamps inside the settings and move with the clock, so each
+/// tick still renders them anew.
 #[derive(Default)]
 struct RenderSettingsCache {
-    settings: Option<HashMap<String, String>>,
+    input: Option<RenderInput>,
     generation: Option<u64>,
     read_at: Option<Instant>,
 }
 
 impl RenderSettingsCache {
-    /// The settings for this tick; `read` runs only when they are due. A
-    /// read that fails keeps the last good settings — the wire keeps its
-    /// keep-alives through storage contention — and is tried again on the
-    /// next tick.
-    fn settings_for_tick(
+    /// The input for this tick; `read` runs only when it is due. A read that
+    /// fails keeps the last good input — the wire keeps its keep-alives
+    /// through storage contention — and is tried again on the next tick.
+    fn input_for_tick(
         &mut self,
         generation: u64,
         now: Instant,
         read: impl FnOnce() -> Option<HashMap<String, String>>,
-    ) -> Option<&HashMap<String, String>> {
+    ) -> Option<&RenderInput> {
         let due = match (self.generation, self.read_at) {
             (Some(seen), Some(read_at)) => {
                 seen != generation
@@ -127,12 +146,12 @@ impl RenderSettingsCache {
         };
         if due {
             if let Some(settings) = read() {
-                self.settings = Some(settings);
+                self.input = Some(RenderInput::from_settings(settings));
                 self.generation = Some(generation);
                 self.read_at = Some(now);
             }
         }
-        self.settings.as_ref()
+        self.input.as_ref()
     }
 }
 
@@ -181,14 +200,14 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path, simulated: bool, beat: 
         // The generation is read before the settings, so a change that lands
         // between the two costs one more read and is never missed.
         let generation = lighting_render_generation();
-        let Some(settings) = render_settings.settings_for_tick(generation, Instant::now(), || {
+        let Some(input) = render_settings.input_for_tick(generation, Instant::now(), || {
             list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX).ok()
         }) else {
             // Nothing read yet (storage contention at start); retry next tick.
             continue;
         };
 
-        output.tick(settings, log_file_path);
+        output.tick(input, log_file_path);
     }
 }
 
@@ -379,9 +398,9 @@ impl SacnOutput {
         }
     }
 
-    /// One pass of the output from this tick's settings.
-    fn tick(&mut self, settings: &HashMap<String, String>, log_file_path: &Path) {
-        let held = !lighting_output_armed(settings);
+    /// One pass of the output from this tick's input.
+    fn tick(&mut self, input: &RenderInput, log_file_path: &Path) {
+        let held = !lighting_output_armed(&input.settings);
         if held != self.held {
             self.held = held;
             report_health(SUBSYSTEM_SACN, SubsystemState::Ok, self.detail());
@@ -403,11 +422,7 @@ impl SacnOutput {
 
         // Held is the same as ineligible as far as the wire goes: whatever
         // was streaming ends with stream-terminated packets, then silence.
-        let state = if held {
-            None
-        } else {
-            read_lighting_sacn_output_state(settings)
-        };
+        let state = if held { None } else { input.output_state() };
         match state {
             Some(state) => {
                 if self.active_bridge != Some(state.bridge_ip) {
@@ -612,6 +627,7 @@ fn flags_and_length(pdu_length: usize) -> [u8; 2] {
 mod tests {
     use super::*;
     use crate::commissioning::LIGHTING_BRIDGE_IP_KEY;
+    use crate::lighting::read_lighting_sacn_output_state;
     use std::collections::HashMap;
 
     #[test]
@@ -737,24 +753,24 @@ mod tests {
         // The first tick reads; the next second of ticks does not.
         assert_eq!(
             cache
-                .settings_for_tick(7, tick(0), read)
-                .map(|s| s["app.test.read"].clone()),
+                .input_for_tick(7, tick(0), read)
+                .map(|input| input.settings["app.test.read"].clone()),
             Some(String::from("1"))
         );
         for ticks in 1..=25 {
-            assert!(cache.settings_for_tick(7, tick(ticks), read).is_some());
+            assert!(cache.input_for_tick(7, tick(ticks), read).is_some());
         }
         assert_eq!(reads.get(), 1, "a second of ticks, one read");
 
         // One state change, one read — however many ticks follow it.
         for ticks in 26..=45 {
-            cache.settings_for_tick(8, tick(ticks), read);
+            cache.input_for_tick(8, tick(ticks), read);
         }
         assert_eq!(reads.get(), 2, "one read per state change");
         assert_eq!(
             cache
-                .settings_for_tick(8, tick(46), read)
-                .map(|s| s["app.test.read"].clone()),
+                .input_for_tick(8, tick(46), read)
+                .map(|input| input.settings["app.test.read"].clone()),
             Some(String::from("2")),
             "the ticks in between render from what was read"
         );
@@ -763,11 +779,11 @@ mod tests {
         // due two seconds after the last read, and not before.
         let last_read = tick(26);
         let almost = last_read + SETTINGS_SAFETY_REREAD - Duration::from_millis(1);
-        cache.settings_for_tick(8, almost, read);
+        cache.input_for_tick(8, almost, read);
         assert_eq!(reads.get(), 2);
-        cache.settings_for_tick(8, last_read + SETTINGS_SAFETY_REREAD, read);
+        cache.input_for_tick(8, last_read + SETTINGS_SAFETY_REREAD, read);
         assert_eq!(reads.get(), 3, "the safety read");
-        cache.settings_for_tick(8, last_read + SETTINGS_SAFETY_REREAD + OUTPUT_TICK, read);
+        cache.input_for_tick(8, last_read + SETTINGS_SAFETY_REREAD + OUTPUT_TICK, read);
         assert_eq!(reads.get(), 3);
 
         // A read that fails keeps the last good settings and is tried again
@@ -779,24 +795,24 @@ mod tests {
         };
         assert_eq!(
             cache
-                .settings_for_tick(9, later, failing)
-                .map(|s| s["app.test.read"].clone()),
+                .input_for_tick(9, later, failing)
+                .map(|input| input.settings["app.test.read"].clone()),
             Some(String::from("3")),
             "the wire keeps its last good settings through a failed read"
         );
         assert_eq!(reads.get(), 4);
-        cache.settings_for_tick(9, later + OUTPUT_TICK, read);
+        cache.input_for_tick(9, later + OUTPUT_TICK, read);
         assert_eq!(
             reads.get(),
             5,
             "the failed read is retried on the next tick"
         );
-        cache.settings_for_tick(9, later + OUTPUT_TICK * 2, read);
+        cache.input_for_tick(9, later + OUTPUT_TICK * 2, read);
         assert_eq!(reads.get(), 5);
 
         // Nothing read yet and the read fails: nothing to render from.
         let mut empty = RenderSettingsCache::default();
-        assert!(empty.settings_for_tick(1, started, || None).is_none());
+        assert!(empty.input_for_tick(1, started, || None).is_none());
     }
 
     // The frames rendered from the kept settings are the frames a fresh read
@@ -842,20 +858,18 @@ mod tests {
 
         let mut cache = RenderSettingsCache::default();
         let started = Instant::now();
-        let first = read_lighting_sacn_output_state(
-            cache
-                .settings_for_tick(1, started, read)
-                .expect("the first tick reads"),
-        )
-        .expect("frames from the kept settings");
-        let later = read_lighting_sacn_output_state(
-            cache
-                .settings_for_tick(1, started + OUTPUT_TICK * 10, || {
-                    panic!("an unchanged generation must not read")
-                })
-                .expect("the kept settings"),
-        )
-        .expect("frames from the kept settings");
+        let first = cache
+            .input_for_tick(1, started, read)
+            .expect("the first tick reads")
+            .output_state()
+            .expect("frames from the kept state");
+        let later = cache
+            .input_for_tick(1, started + OUTPUT_TICK * 10, || {
+                panic!("an unchanged generation must not read")
+            })
+            .expect("the kept state")
+            .output_state()
+            .expect("frames from the kept state");
 
         assert_eq!(fresh.bridge_ip, Ipv4Addr::LOCALHOST);
         assert_eq!(fresh.frames.len(), 1);
@@ -881,6 +895,98 @@ mod tests {
         assert!(
             slots[slot_of("fixture-key-right") + 1] > 0,
             "its colour temperature slot still carries its value"
+        );
+    }
+
+    // The kept state is the state as stored; the clock's part is read at
+    // each render. A fade running in the stored state renders its moment
+    // from one kept state: dark at its start, half way at its middle, full at
+    // its end — and the kept state itself is left as stored, so the next tick
+    // renders from it again.
+    #[test]
+    fn a_running_fade_renders_its_moment_from_the_kept_state() {
+        use crate::control_surface::test_support::TestDir;
+        use crate::lighting::{
+            load_lighting_editor_state, parse_lighting_fixture_update_request,
+            update_lighting_fixture, LightingEditorFadeState, LightingEditorSceneFixtureState,
+        };
+        use crate::storage::{initialize_test_database, set_settings_owned};
+
+        let test_dir = TestDir::new("sacn-fade");
+        let db_path = test_dir.db_path();
+        initialize_test_database(db_path.as_path()).expect("database should initialize");
+        set_settings_owned(
+            db_path.as_path(),
+            &[(
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("127.0.0.1"),
+            )],
+        )
+        .expect("bridge address should persist");
+        update_lighting_fixture(
+            db_path.as_path(),
+            &parse_lighting_fixture_update_request(&serde_json::json!({
+                "fixtureId": "fixture-key-left",
+                "on": true,
+                "intensity": 0,
+            }))
+            .expect("the update should parse"),
+        )
+        .expect("the fixture should update");
+
+        // The stored state with a fade of one second from dark to full,
+        // started at a moment of the test's choosing.
+        let mut settings =
+            list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).expect("settings");
+        let mut state = load_lighting_editor_state(&settings);
+        let fixture_state = |intensity: i64| LightingEditorSceneFixtureState {
+            fixture_id: String::from("fixture-key-left"),
+            intensity,
+            cct: 5_600,
+            on: true,
+            control_values: HashMap::new(),
+        };
+        let started_at_ms = 1_700_000_000_000;
+        state.active_fade = Some(LightingEditorFadeState {
+            scene_id: String::from("scene-full"),
+            started_at_ms,
+            duration_ms: 1_000,
+            origin_fixture_states: vec![fixture_state(0)],
+            target_fixture_states: vec![fixture_state(100)],
+        });
+        settings.insert(
+            String::from("app.lighting.editor.state"),
+            serde_json::to_string(&state).expect("the state serialises"),
+        );
+
+        let input = RenderInput::from_settings(settings);
+        let slot_at = |now_ms: i64| {
+            let rendered = crate::lighting::read_lighting_sacn_output_state_at(
+                &input.settings,
+                &input.parsed,
+                now_ms,
+            )
+            .expect("a commissioned rig renders frames");
+            let snapshot = crate::lighting::read_lighting_snapshot(&input.settings);
+            let fixture = snapshot
+                .fixtures
+                .iter()
+                .find(|fixture| fixture.id == "fixture-key-left")
+                .expect("the fixture is patched");
+            rendered.frames[0].slots[(fixture.dmx_start_address - 1) as usize]
+        };
+
+        assert_eq!(slot_at(started_at_ms), 0, "dark at the fade's start");
+        assert_eq!(
+            slot_at(started_at_ms + 500),
+            127,
+            "half way at its middle: 50 % is DMX 127"
+        );
+        assert_eq!(slot_at(started_at_ms + 1_000), 255, "full at its end");
+        assert_eq!(
+            slot_at(started_at_ms + 500),
+            127,
+            "the kept state is left as stored: its middle renders again"
         );
     }
 
@@ -925,6 +1031,13 @@ mod tests {
                 .send_to(b"marker", target)
                 .expect("marker should send");
             assert_eq!(self.next(), b"marker", "the wire should be silent {when}");
+        }
+    }
+
+    impl SacnOutput {
+        /// One pass from settings alone, parsed here: the tests' tick.
+        fn tick_settings(&mut self, settings: &HashMap<String, String>, log_file_path: &Path) {
+            self.tick(&RenderInput::from_settings(settings.clone()), log_file_path);
         }
     }
 
@@ -1044,7 +1157,7 @@ mod tests {
             "the premise: this rig streams to the address as it was typed"
         );
 
-        output.tick(&armed, &log);
+        output.tick_settings(&armed, &log);
         assert!(
             output.sends.failing,
             "a broadcast address without the socket's leave fails the send"
@@ -1057,7 +1170,7 @@ mod tests {
             "{text}"
         );
         for _ in 0..3 {
-            output.tick(&armed, &log);
+            output.tick_settings(&armed, &log);
         }
         let text = std::fs::read_to_string(&log).expect("the log is written");
         assert_eq!(
@@ -1066,7 +1179,7 @@ mod tests {
             "a failing stream is said once, not at every tick: {text}"
         );
 
-        output.tick(&output_settings(Some(false)), &log);
+        output.tick_settings(&output_settings(Some(false)), &log);
         assert!(!output.sends.failing, "a hold forgets the failing spell");
         let text = std::fs::read_to_string(&log).expect("the log is written");
         assert!(
@@ -1096,12 +1209,12 @@ mod tests {
         );
 
         for _ in 0..50 {
-            output.tick(&held, &log);
+            output.tick_settings(&held, &log);
         }
         wire.assert_silent("while held from the start");
         assert!(output.universes.is_empty() && output.active_bridge.is_none());
 
-        output.tick(&armed, &log);
+        output.tick_settings(&armed, &log);
         let first = wire.next();
         assert_eq!(first.len(), E131_PACKET_LEN);
         assert_eq!(first[111], 0, "the first packet ever sent is sequence 0");
@@ -1121,7 +1234,7 @@ mod tests {
 
         // (No second armed tick here: the keep-alive runs on the real clock,
         // and a stalled runner must not be able to slip one in.)
-        output.tick(&held, &log);
+        output.tick_settings(&held, &log);
         for expected_sequence in 1..=3_u8 {
             let packet = wire.next();
             assert_eq!(packet[112], E131_OPTIONS_STREAM_TERMINATED);
@@ -1133,13 +1246,13 @@ mod tests {
             );
         }
         for _ in 0..50 {
-            output.tick(&held, &log);
+            output.tick_settings(&held, &log);
         }
         wire.assert_silent("after the stream was terminated");
         assert!(output.universes.is_empty() && output.active_bridge.is_none());
 
         // Armed again: the stream starts over.
-        output.tick(&armed, &log);
+        output.tick_settings(&armed, &log);
         let resumed = wire.next();
         assert_eq!((resumed[111], resumed[112]), (0, 0x00));
 
@@ -1147,7 +1260,7 @@ mod tests {
         // is what it was.
         let (default_wire, default_port) = Wire::open();
         let mut default_output = test_output(default_port);
-        default_output.tick(&output_settings(None), &log);
+        default_output.tick_settings(&output_settings(None), &log);
         assert_eq!(default_wire.next()[112], 0x00);
 
         let logged = std::fs::read_to_string(&log).expect("the log should exist");
@@ -1184,7 +1297,7 @@ mod tests {
         assert_eq!(output.detail(), SIMULATED_DETAIL);
 
         for _ in 0..50 {
-            output.tick(&armed, &log);
+            output.tick_settings(&armed, &log);
         }
         wire.assert_silent("while armed and simulated");
         assert_eq!(
@@ -1194,7 +1307,7 @@ mod tests {
         );
         assert_eq!(output.universes.len(), 1);
 
-        output.tick(&held, &log);
+        output.tick_settings(&held, &log);
         wire.assert_silent("when the simulated stream ends");
         assert!(output.universes.is_empty() && output.active_bridge.is_none());
         assert_eq!(output.detail(), HELD_DETAIL);
@@ -1202,7 +1315,7 @@ mod tests {
         // The same output with the wire back sends at once: the switch is
         // what kept it silent.
         output.simulated = false;
-        output.tick(&armed, &log);
+        output.tick_settings(&armed, &log);
         assert_eq!(wire.next()[112], 0x00);
     }
 
@@ -1243,11 +1356,10 @@ mod tests {
         let started = Instant::now();
 
         let generation = lighting_render_generation();
-        let settings = cache
-            .settings_for_tick(generation, started, read)
-            .expect("the first tick reads")
-            .clone();
-        output.tick(&settings, &log);
+        let input = cache
+            .input_for_tick(generation, started, read)
+            .expect("the first tick reads");
+        output.tick(input, &log);
         assert_eq!(wire.next()[112], 0x00, "streaming");
 
         with_lighting_state(|| {
@@ -1262,16 +1374,15 @@ mod tests {
         assert_ne!(moved, generation, "the hold advanced the render generation");
 
         let reads_before = reads.get();
-        let settings = cache
-            .settings_for_tick(moved, started + OUTPUT_TICK, read)
-            .expect("the kept settings")
-            .clone();
+        let input = cache
+            .input_for_tick(moved, started + OUTPUT_TICK, read)
+            .expect("the kept state");
         assert_eq!(
             reads.get(),
             reads_before + 1,
             "the next tick reads because the generation moved"
         );
-        output.tick(&settings, &log);
+        output.tick(input, &log);
         assert_eq!(wire.next()[112], E131_OPTIONS_STREAM_TERMINATED);
     }
 }

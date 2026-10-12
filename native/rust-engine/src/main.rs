@@ -102,12 +102,25 @@ fn write_json<W: Write, T: Serialize>(writer: &mut W, message: &T) -> io::Result
     Ok(())
 }
 
+/// The one writer of the engine's stdout. It ends at the stop
+/// (`liveness::mark_stopping`): the app has closed its end by then, and the
+/// frames and events still queued would only fail to write (the false ERROR
+/// at every close, the audit of 2026-10-12). A write that fails while the
+/// engine runs is a fault, said once; the writer then ends and every sender
+/// finds it gone.
 fn spawn_output_writer(receiver: Receiver<Value>) {
     thread::spawn(move || {
         let stdout = io::stdout();
         let mut writer = stdout.lock();
         for message in receiver {
-            if let Err(error) = write_json(&mut writer, &message) {
+            if liveness::stopping() {
+                break;
+            }
+            let written = write_json(&mut writer, &message);
+            if engine_events::is_meter_frame(&message) {
+                engine_events::meter_frame_written();
+            }
+            if let Err(error) = written {
                 log_event(
                     LogLevel::Error,
                     &format!("The hardware link could not answer the app: {error}"),
@@ -226,7 +239,7 @@ fn audio_meter_tick_payload(
     metering_started_at: Instant,
 ) -> Value {
     json!({
-        "reason": "metering-tick",
+        "reason": engine_events::METER_TICK_REASON,
         "sequence": sequence,
         "monotonicTimestampMs": metering_started_at.elapsed().as_secs_f64() * 1000.0,
         "cadenceHz": SIMULATED_AUDIO_METER_CADENCE_HZ,
@@ -300,7 +313,7 @@ impl SimulatedAudioMeterCache {
         if self.should_refresh_snapshot() {
             if let Err(error) = self.refresh_snapshot(db_path) {
                 return json!({
-                    "reason": "metering-tick",
+                    "reason": engine_events::METER_TICK_REASON,
                     "sequence": sequence,
                     "monotonicTimestampMs": metering_started_at.elapsed().as_secs_f64() * 1000.0,
                     "cadenceHz": SIMULATED_AUDIO_METER_CADENCE_HZ,
@@ -316,7 +329,7 @@ impl SimulatedAudioMeterCache {
         match self.snapshot.as_ref() {
             Some(snapshot) => audio_meter_tick_payload(snapshot, sequence, metering_started_at),
             None => json!({
-                "reason": "metering-tick",
+                "reason": engine_events::METER_TICK_REASON,
                 "sequence": sequence,
                 "monotonicTimestampMs": metering_started_at.elapsed().as_secs_f64() * 1000.0,
                 "cadenceHz": SIMULATED_AUDIO_METER_CADENCE_HZ,
@@ -525,12 +538,19 @@ fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
             loop {
                 thread::sleep(SIMULATED_AUDIO_METER_INTERVAL);
                 beat.beat();
+                // A writer that holds two frames already is handed none: the
+                // next tick's levels are as good (`engine_events`).
+                if !engine_events::meter_frame_room() {
+                    continue;
+                }
                 sequence = sequence.saturating_add(1);
                 let event = event_message(
                     EVENT_AUDIO_METERS,
                     cache.tick_payload(&db_path, sequence, metering_started_at),
                 );
-                if sender.send(event).is_err() {
+                if engine_events::offer_meter_frame(&sender, event)
+                    == engine_events::MeterOffer::WriterGone
+                {
                     break;
                 }
             }
