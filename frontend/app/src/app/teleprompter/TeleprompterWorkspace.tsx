@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { ShellRegion } from "@sse/design-system";
 import type {
@@ -77,7 +77,7 @@ function sentenceOf(result: JsonValue): string | null {
     : null;
 }
 
-export function TeleprompterWorkspace({
+function TeleprompterWorkspaceRoot({
   healthSnapshot,
   prompterSnapshot,
   prompterGlassSnapshot,
@@ -351,3 +351,7 @@ export function TeleprompterWorkspace({
     </div>
   );
 }
+
+// The page root is memoised (the audit of 2026-10-12): the shell renders at
+// every store change, and a page whose props have not changed is left alone.
+export const TeleprompterWorkspace = memo(TeleprompterWorkspaceRoot);

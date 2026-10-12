@@ -517,12 +517,28 @@ function measureGeometry(canvas: HTMLCanvasElement, root: HTMLElement) {
 }
 
 // The well's number and its level, written only when they change: the page
-// never renders for them.
-function writePeakWell(well: PeakWell, dbfs: number) {
+// never renders for them. The number goes into the well's text node once it
+// has one, never through `textContent`, which would replace the node: a
+// replaced node is a child-list mutation, and the observers of the page (this
+// loop's own, the pictures' places) would measure the page again at every
+// frame of a moving peak (the audit of 2026-10-12). A text node's value is a
+// character-data mutation, which neither watches.
+export function writePeakWell(well: Pick<PeakWell, "element" | "value">, dbfs: number) {
   const text = formatPeakWellDbfs(dbfs);
-  if (well.value.textContent !== text) well.value.textContent = text;
+  const node = well.value.firstChild;
+  if (node instanceof Text && node.nextSibling === null) {
+    if (node.nodeValue !== text) node.nodeValue = text;
+  } else if (well.value.textContent !== text) {
+    well.value.textContent = text;
+  }
   const level = peakWellLevel(dbfs);
   if (well.element.dataset.peakLevel !== level) well.element.dataset.peakLevel = level;
+}
+
+/** Whether a mutation is this loop's own writing: a peak well's number. */
+export function isPeakWellWrite(target: Node): boolean {
+  const element = target instanceof Element ? target : target.parentElement;
+  return element?.closest("[data-peak-well-id]") != null;
 }
 
 export function AudioMeterCanvasOverlay({
@@ -559,6 +575,8 @@ export function AudioMeterCanvasOverlay({
     let wells: PeakWell[] = [];
     let latestFrame = store.getAudioMeterFrame();
     let needsMeasure = true;
+    // Gated meters are cleared once, not at every frame.
+    let clearedWhileGated = false;
     let lastPaintedAtMs = performance.now();
     const gradients: GradientCache = new Map();
     const displayStates = new Map<string, MeterDisplayState>();
@@ -579,7 +597,11 @@ export function AudioMeterCanvasOverlay({
     const resizeObserver = new ResizeObserver(requestMeasure);
     resizeObserver.observe(paintRoot);
 
-    const mutationObserver = new MutationObserver(requestMeasure);
+    // The loop's own writes, the peak wells' numbers, are no reason to
+    // measure the page again.
+    const mutationObserver = new MutationObserver((records) => {
+      if (records.some((record) => !isPeakWellWrite(record.target))) requestMeasure();
+    });
     mutationObserver.observe(paintRoot, {
       attributeFilter: ["data-view-mode", "data-selected"],
       attributes: true,
@@ -598,6 +620,7 @@ export function AudioMeterCanvasOverlay({
         gradients.clear();
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
         needsMeasure = false;
+        clearedWhileGated = false;
       }
 
       const nowMs = performance.now();
@@ -612,11 +635,17 @@ export function AudioMeterCanvasOverlay({
       // without invalidating the rAF loop.
       const gated = root.dataset.canvasMetering === "false";
       if (gated) {
-        for (const meterGeometry of geometry) {
-          clearMeterGeometry(ctx, meterGeometry);
+        // Cleared once; the frames after that only watch for the gate to lift
+        // (the audit of 2026-10-12: the loop cleared every meter at every
+        // frame while gated).
+        if (!clearedWhileGated) {
+          for (const meterGeometry of geometry) {
+            clearMeterGeometry(ctx, meterGeometry);
+          }
+          for (const well of wells) writePeakWell(well, Number.NEGATIVE_INFINITY);
+          displayStates.clear();
+          clearedWhileGated = true;
         }
-        for (const well of wells) writePeakWell(well, Number.NEGATIVE_INFINITY);
-        displayStates.clear();
         datasetSet(canvas, "meterBallistics", "gated");
         datasetSet(canvas, "meterPeakHoldEnabled", peakHoldEnabled ? "true" : "false");
         datasetSet(canvas, "meterPeakHoldResetToken", String(peakHoldResetToken));
@@ -625,6 +654,7 @@ export function AudioMeterCanvasOverlay({
         animationFrame = window.requestAnimationFrame(paint);
         return;
       }
+      clearedWhileGated = false;
 
       for (const meterGeometry of geometry) {
         clearMeterGeometry(ctx, meterGeometry);

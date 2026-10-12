@@ -149,6 +149,34 @@ export function measurePlaces(bay: HTMLElement): MeasuredPlaces {
 }
 
 /**
+ * What the page watches for a change of its places (`usePicturePlaces`), on the whole
+ * document: a dialog, a message or a tooltip comes and goes as nodes; a picture's part,
+ * camera, aids, marker and radius are attributes of its place; a floating layer that is
+ * placed, flips or arms an item in place says so in an attribute. Words are not watched:
+ * the meters' peak numbers change as text at every frame on the Overview, and every text
+ * change used to measure the whole page again (the audit of 2026-10-12). A floating layer
+ * whose words change while it stands over a picture is measured again when its motion
+ * ends, and once a second (`SAY_AGAIN_MS`).
+ */
+export const PLACES_WATCH: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: [
+    "data-part",
+    "data-camera",
+    "data-pixels",
+    "data-aids",
+    "data-marker",
+    "data-radius",
+    "data-visible",
+    "data-placement",
+    "data-side",
+    "data-armed",
+  ],
+};
+
+/**
  * Says the bay's places to `place` for as long as the calling page is mounted: at every
  * change of the page, and once a second. When the page goes, it says that it shows no
  * picture. Nothing is said without `place` (a window with no pictures).
@@ -166,28 +194,8 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
       place(places);
     };
     const changed = () => say(false);
-    // A dialog, a message or a tooltip comes and goes as nodes; a picture's part, camera,
-    // aids, marker and radius are attributes of its place; a floating layer that is placed,
-    // flips or arms an item in place says so in an attribute, and its words change as text.
     const mutations = new MutationObserver(changed);
-    mutations.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: [
-        "data-part",
-        "data-camera",
-        "data-pixels",
-        "data-aids",
-        "data-marker",
-        "data-radius",
-        "data-visible",
-        "data-placement",
-        "data-side",
-        "data-armed",
-      ],
-    });
+    mutations.observe(document.body, PLACES_WATCH);
     const sizes = new ResizeObserver(changed);
     sizes.observe(element);
     document.addEventListener("visibilitychange", changed);

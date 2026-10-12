@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { invoke } from "@tauri-apps/api/core";
 import type { JsonValue, ShellState, ShellStore } from "@sse/engine-client";
@@ -295,12 +295,23 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
     };
   }, []);
 
-  const statusPayload = useMemo(
-    () => ({
+  // The status file, rewritten at every change of the shell state and at the
+  // heartbeat. The whole shell state is serialised for it, every snapshot and
+  // the glass's text included, so that work happens only under a lane's
+  // status path: until the audit of 2026-10-12 it ran in the app too, at
+  // every store change, for a file nothing read.
+  const commandPath = config?.commandPath ?? null;
+  const statusPath = config?.statusPath ?? null;
+  useEffect(() => {
+    if (!statusPath || !tauriAvailable()) {
+      return;
+    }
+
+    const status = {
       capturedAt: new Date().toISOString(),
       shellState: serializeShellState(shellState),
       testBridge: {
-        commandPath: config?.commandPath ?? null,
+        commandPath,
         cspViolations,
         // 2026-09 production readiness, Slice 5 (finding F09): the engine's
         // process id and launch number, so a lane can end the process from
@@ -311,23 +322,13 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
         engineSummary: toJsonValue(engineSummary),
         heartbeat,
         lastCommand,
-        statusPath: config?.statusPath ?? null,
+        statusPath,
       },
-    }),
-    [config?.commandPath, config?.statusPath, cspViolations, engineSummary, heartbeat, lastCommand, shellState]
-  );
-
-  useEffect(() => {
-    if (!config?.statusPath || !tauriAvailable()) {
-      return;
-    }
-
-    void invoke("shell_test_bridge_write_status", {
-      status: statusPayload,
-    }).catch(() => {
+    };
+    void invoke("shell_test_bridge_write_status", { status }).catch(() => {
       // Ignore missing bridge writes outside explicit qualification runs.
     });
-  }, [config?.statusPath, statusPayload]);
+  }, [commandPath, cspViolations, engineSummary, heartbeat, lastCommand, shellState, statusPath]);
 
   useEffect(() => {
     if (!config?.commandPath || !tauriAvailable()) {

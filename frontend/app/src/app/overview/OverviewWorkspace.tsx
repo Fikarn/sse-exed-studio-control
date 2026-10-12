@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import { ShellRegion } from "@sse/design-system";
 import type {
@@ -23,6 +23,7 @@ import { usePictureFrames } from "../cameras/pictures/pictureFrames";
 import { usePictureView } from "../cameras/pictures/pictureViewMemory";
 import { useCamerasFollow, useCamerasPerform, useCamerasReadAgain, useRecPress } from "../cameras/useCamerasActions";
 import { camerasArmedWords, STOP_ARM_KEY, useCamerasArming } from "../cameras/useCamerasArming";
+import { countRender } from "../shared/renderCounts";
 import { useToast } from "../shared/toastContext";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { getSupportBackups, formatShortTimestamp, type HeaderItem } from "../shellData";
@@ -82,7 +83,7 @@ function sentenceOf(result: JsonValue): string | null {
     : null;
 }
 
-export function OverviewWorkspace({
+function OverviewWorkspaceRoot({
   appSnapshot,
   audioSnapshot,
   camerasSnapshot,
@@ -96,6 +97,7 @@ export function OverviewWorkspace({
   supportSnapshot,
 }: OverviewWorkspaceProps) {
   const toast = useToast();
+  useEffect(() => countRender("overviewWorkspace"));
 
   // The cameras and the pictures, as the Cameras page follows them.
   const now = useCamerasFollow(store);
@@ -288,3 +290,7 @@ export function OverviewWorkspace({
     </div>
   );
 }
+
+// The page root is memoised (the audit of 2026-10-12): the shell renders at
+// every store change, and a page whose props have not changed is left alone.
+export const OverviewWorkspace = memo(OverviewWorkspaceRoot);
