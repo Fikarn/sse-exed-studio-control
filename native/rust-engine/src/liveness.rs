@@ -202,7 +202,8 @@ pub(crate) fn mark_stopping() {
     STOPPING.store(true, Ordering::Relaxed);
 }
 
-fn stopping() -> bool {
+/// Whether the stop is under way; the output writer ends at it.
+pub(crate) fn stopping() -> bool {
     STOPPING.load(Ordering::Relaxed)
 }
 

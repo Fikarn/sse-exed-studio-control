@@ -250,15 +250,18 @@ pub(super) fn resolve_fixture_profile(
     }
 }
 
+/// The catalog's definition these name, the default's when the catalog has
+/// none by the id they resolve to. Borrowed from the catalog: the sACN output
+/// resolves every fixture's definition 25 times a second, and a copy each
+/// time was a share of an idle engine's cost (the audit of 2026-10-12).
 pub(super) fn resolve_fixture_definition(
     definition_id: Option<&str>,
     fixture_type: Option<&str>,
     legacy_kind: Option<&str>,
     fixture_id: &str,
-) -> LightingFixtureDefinitionSnapshot {
+) -> &'static LightingFixtureDefinitionSnapshot {
     find_fixture_definition(definition_id, fixture_type, legacy_kind, fixture_id)
         .unwrap_or_else(default_definition)
-        .clone()
 }
 
 /// The catalog's definition these name, borrowed; `None` when the catalog has
@@ -282,10 +285,15 @@ fn find_fixture_definition(
         .find(|definition| definition.id == requested_id)
 }
 
-pub(super) fn resolve_fixture_mode(
-    definition: &LightingFixtureDefinitionSnapshot,
+/// The definition's mode by its id, else its default mode, else its first;
+/// for a definition with no mode at all, the one mode with no DMX profile.
+/// Borrowed, as the definition is.
+pub(super) fn resolve_fixture_mode<'a>(
+    definition: &'a LightingFixtureDefinitionSnapshot,
     mode_id: Option<&str>,
-) -> LightingFixtureModeSnapshot {
+) -> &'a LightingFixtureModeSnapshot {
+    static NO_DMX_MODE: LazyLock<LightingFixtureModeSnapshot> =
+        LazyLock::new(|| no_dmx_mode(DEFAULT_MODE_ID, "No DMX profile"));
     let requested = mode_id
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -301,8 +309,7 @@ pub(super) fn resolve_fixture_mode(
                 .find(|mode| mode.id == definition.default_mode_id)
         })
         .or_else(|| definition.modes.first())
-        .cloned()
-        .unwrap_or_else(|| no_dmx_mode(DEFAULT_MODE_ID, "No DMX profile"))
+        .unwrap_or_else(|| &NO_DMX_MODE)
 }
 
 pub(super) fn normalized_catalog_id(value: &str) -> Option<String> {

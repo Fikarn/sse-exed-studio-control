@@ -210,9 +210,9 @@ pub(super) fn normalize_fixture_control_values(
 ) -> HashMap<String, i64> {
     let definition =
         resolve_fixture_definition(Some(profile.definition_id.as_str()), None, None, "");
-    let mode = resolve_fixture_mode(&definition, Some(profile.mode_id.as_str()));
+    let mode = resolve_fixture_mode(definition, Some(profile.mode_id.as_str()));
     let mut normalized = HashMap::new();
-    for control in mode.controls {
+    for control in &mode.controls {
         if matches!(control.id.as_str(), "intensity" | "cct") {
             continue;
         }
@@ -220,7 +220,10 @@ pub(super) fn normalize_fixture_control_values(
             .get(control.id.as_str())
             .copied()
             .unwrap_or(control.default_value);
-        normalized.insert(control.id, clamp_i64(value, control.min, control.max));
+        normalized.insert(
+            control.id.clone(),
+            clamp_i64(value, control.min, control.max),
+        );
     }
     normalized
 }

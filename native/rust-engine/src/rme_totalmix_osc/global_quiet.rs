@@ -2,9 +2,11 @@
 //! studio walk of 2026-10-01).
 //!
 //! While nothing has come on the Global slot for 3 s, the metering loop asks
-//! TotalMix for its values (`/sendall 2` and `/sendstate`) once a second, and
-//! TotalMix always answers `/sendstate`. A desk that is merely still answers
-//! the first request, so it is never quiet here. Two requests in a row left
+//! TotalMix once a second: for its status alone (`/sendstate`) once it has
+//! been heard, for its values whole (`/sendall 2` and `/sendstate`) before
+//! that and during a quiet (`values_wanted`). TotalMix always answers
+//! `/sendstate`. A desk that is merely still answers the first request, so it
+//! is never quiet here. Two requests in a row left
 //! unanswered mean TotalMix is out of touch: remote 4 switched off, or
 //! TotalMix closed. The first datagram after that ends the quiet, and the
 //! Console then reads assumed until a Sync: on the walk a fader moved with
@@ -101,12 +103,12 @@ impl GlobalQuiet {
         let unanswered = self.unanswered - 1;
         Some(match self.last_heard_at {
             Some(heard) => format!(
-                "TotalMix went quiet on remote 4 (port {}): nothing heard for {}, and {unanswered} requests for its values went unanswered. They go on once a second.",
+                "TotalMix went quiet on remote 4 (port {}): nothing heard for {}, and {unanswered} requests went unanswered. They go on once a second, asking for its values.",
                 self.port,
                 seconds(now.saturating_duration_since(heard))
             ),
             None => format!(
-                "TotalMix has not been heard on remote 4 (port {}) since the link began listening {} ago, and {} requests for its values went unanswered. They go on once a second.",
+                "TotalMix has not been heard on remote 4 (port {}) since the link began listening {} ago, and {} requests went unanswered. They go on once a second, asking for its values.",
                 self.port,
                 seconds(now.saturating_duration_since(self.listening_since)),
                 self.requests_since_heard - 1
@@ -145,7 +147,7 @@ impl GlobalQuiet {
             quiet_for,
             since_start: since.is_none(),
             line: format!(
-                "TotalMix heard on remote 4 (port {}) {when}; {requests} requests for its values went out meanwhile, the last {last_request} before.",
+                "TotalMix heard on remote 4 (port {}) {when}; {requests} requests went out meanwhile, the last {last_request} before.",
                 self.port
             ),
         })
@@ -155,6 +157,19 @@ impl GlobalQuiet {
     #[cfg(test)]
     pub(super) fn is_quiet(&self) -> bool {
         self.quiet
+    }
+
+    /// Whether the next request should ask for TotalMix's values whole, not
+    /// its status alone: while TotalMix has not been heard since the link
+    /// began listening, from the request that declares a quiet (the one
+    /// after two unanswered), and during the quiet. TotalMix sends deltas,
+    /// so the values are asked for once at the first contact, and again
+    /// once a quiet is on, when they may have moved unheard: the request
+    /// whose answer ends the quiet is itself a request for the values, so
+    /// what moved comes with that answer. A still desk answers each request
+    /// and never reaches two unanswered, so it is asked for its status alone.
+    pub(super) fn values_wanted(&self) -> bool {
+        self.last_heard_at.is_none() || self.quiet || self.unanswered >= UNANSWERED_FOR_QUIET
     }
 
     /// Counts what TotalMix sent while the count after a quiet is open:
@@ -219,7 +234,7 @@ mod tests {
         assert_eq!(
             quiet.request_sent(at(start, 5_000)),
             Some(String::from(
-                "TotalMix went quiet on remote 4 (port 9004): nothing heard for 5.0 s, and 2 requests for its values went unanswered. They go on once a second."
+                "TotalMix went quiet on remote 4 (port 9004): nothing heard for 5.0 s, and 2 requests went unanswered. They go on once a second, asking for its values."
             ))
         );
         for second in 6..=30 {
@@ -240,7 +255,7 @@ mod tests {
         assert_eq!(
             quiet.request_sent(at(start, 5_000)),
             Some(String::from(
-                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 5 requests for its values went unanswered. They go on once a second."
+                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 5 requests went unanswered. They go on once a second, asking for its values."
             ))
         );
         let back = quiet.heard(at(start, 31_400)).expect("heard after a quiet");
@@ -280,7 +295,7 @@ mod tests {
         assert!(!back.since_start);
         assert_eq!(
             back.line,
-            "TotalMix heard on remote 4 (port 9004) again after 31.4 s quiet; 28 requests for its values went out meanwhile, the last 0.6 s before."
+            "TotalMix heard on remote 4 (port 9004) again after 31.4 s quiet; 28 requests went out meanwhile, the last 0.6 s before."
         );
         assert_eq!(quiet.heard(at(start, 31_450)), None, "once per quiet");
 
@@ -312,6 +327,36 @@ mod tests {
         );
         quiet.count(3_000, 0);
         assert_eq!(quiet.count_closed_at(at(start, 9_000)), None);
+    }
+
+    // Which request asks for the values whole (the audit of 2026-10-12): the
+    // ones before TotalMix is first heard, the one that declares a quiet and
+    // the ones during it; a desk that answers is asked for its status alone.
+    #[test]
+    fn the_values_are_wanted_until_heard_and_from_the_request_that_declares_a_quiet() {
+        let start = Instant::now();
+        let mut quiet = GlobalQuiet::new(start, PORT);
+        assert!(quiet.values_wanted(), "not heard since the link began");
+        quiet.request_sent(at(start, 1_000));
+        assert!(quiet.values_wanted(), "still not heard");
+
+        quiet.heard(at(start, 1_200));
+        assert!(!quiet.values_wanted(), "heard: the status alone");
+        quiet.request_sent(at(start, 4_200));
+        assert!(!quiet.values_wanted(), "one unanswered: the status alone");
+        quiet.request_sent(at(start, 5_200));
+        assert!(
+            quiet.values_wanted(),
+            "two unanswered: the request that would declare the quiet asks for the values"
+        );
+        assert!(
+            quiet.request_sent(at(start, 6_200)).is_some(),
+            "the third unanswered declares the quiet"
+        );
+        assert!(quiet.values_wanted(), "during the quiet");
+
+        quiet.heard(at(start, 6_300));
+        assert!(!quiet.values_wanted(), "heard again: the status alone");
         // The count starts again from the last time TotalMix was heard.
         assert_eq!(quiet.request_sent(at(start, 7_200)), None);
         assert_eq!(quiet.request_sent(at(start, 8_200)), None);

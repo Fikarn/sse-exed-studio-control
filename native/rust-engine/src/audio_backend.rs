@@ -75,231 +75,7 @@ pub struct RmeTotalMixOscBackend;
 
 impl AudioBackend for SimulatedAudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory {
-        if config.send_host.trim().is_empty() || config.send_port <= 0 || config.receive_port <= 0 {
-            return AudioBackendInventory {
-                adapter_mode: String::from("simulated"),
-                channels: Vec::new(),
-                mix_targets: Vec::new(),
-            };
-        }
-
-        AudioBackendInventory {
-            adapter_mode: String::from("simulated"),
-            channels: vec![
-                simulated_channel(
-                    "audio-input-9",
-                    "Host",
-                    "HOST",
-                    "front-preamp",
-                    false,
-                    34,
-                    0.78,
-                ),
-                simulated_channel(
-                    "audio-input-10",
-                    "Guest",
-                    "GST",
-                    "front-preamp",
-                    false,
-                    34,
-                    0.78,
-                ),
-                simulated_channel(
-                    "audio-input-11",
-                    "Boom",
-                    "BOOM",
-                    "front-preamp",
-                    false,
-                    32,
-                    0.76,
-                ),
-                simulated_channel(
-                    "audio-input-12",
-                    "Guitar DI",
-                    "GTR DI",
-                    "front-preamp",
-                    false,
-                    32,
-                    0.76,
-                ),
-                simulated_channel(
-                    "audio-input-1",
-                    "Line 1",
-                    "L 1",
-                    "rear-line",
-                    false,
-                    0,
-                    0.68,
-                ),
-                simulated_channel(
-                    "audio-input-2",
-                    "Line 2",
-                    "L 2",
-                    "rear-line",
-                    false,
-                    0,
-                    0.68,
-                ),
-                simulated_channel(
-                    "audio-input-3",
-                    "Remote A",
-                    "REM A",
-                    "rear-line",
-                    false,
-                    0,
-                    0.66,
-                ),
-                simulated_channel(
-                    "audio-input-4",
-                    "Remote B",
-                    "REM B",
-                    "rear-line",
-                    false,
-                    0,
-                    0.66,
-                ),
-                simulated_channel(
-                    "audio-input-5",
-                    "Line 5",
-                    "L 5",
-                    "rear-line",
-                    false,
-                    0,
-                    0.64,
-                ),
-                simulated_channel(
-                    "audio-input-6",
-                    "Line 6",
-                    "L 6",
-                    "rear-line",
-                    false,
-                    0,
-                    0.64,
-                ),
-                simulated_channel(
-                    "audio-input-7",
-                    "Line 7",
-                    "L 7",
-                    "rear-line",
-                    false,
-                    0,
-                    0.62,
-                ),
-                simulated_channel(
-                    "audio-input-8",
-                    "Line 8",
-                    "L 8",
-                    "rear-line",
-                    false,
-                    0,
-                    0.62,
-                ),
-                simulated_channel(
-                    "audio-playback-1-2",
-                    "Program 1/2",
-                    "PGM",
-                    "playback-pair",
-                    true,
-                    0,
-                    0.58,
-                ),
-                simulated_channel(
-                    "audio-playback-3-4",
-                    "FX 3/4",
-                    "FX",
-                    "playback-pair",
-                    true,
-                    0,
-                    0.56,
-                ),
-                simulated_channel(
-                    "audio-playback-5-6",
-                    "N-1 5/6",
-                    "N-1",
-                    "playback-pair",
-                    true,
-                    0,
-                    0.54,
-                ),
-                simulated_channel(
-                    "audio-playback-7-8",
-                    "Music 7/8",
-                    "MUS",
-                    "playback-pair",
-                    true,
-                    0,
-                    0.52,
-                ),
-                simulated_channel(
-                    "audio-playback-9-10",
-                    "Playback 9/10",
-                    "PB 9/10",
-                    "playback-pair",
-                    true,
-                    0,
-                    0.52,
-                ),
-                simulated_channel(
-                    "audio-playback-11-12",
-                    "Playback 11/12",
-                    "PB 11/12",
-                    "playback-pair",
-                    true,
-                    0,
-                    0.50,
-                ),
-            ],
-            mix_targets: vec![
-                AudioMixTargetSnapshot {
-                    id: String::from("audio-mix-main"),
-                    name: String::from("Main Out"),
-                    short_name: String::from("MAIN"),
-                    role: String::from("main-out"),
-                    volume: 0.82,
-                    meter_left: 0.0,
-                    meter_right: 0.0,
-                    meter_level: 0.0,
-                    peak_hold: 0.0,
-                    peak_hold_left: 0.0,
-                    peak_hold_right: 0.0,
-                    mute: false,
-                    dim: false,
-                    mono: false,
-                },
-                AudioMixTargetSnapshot {
-                    id: String::from("audio-mix-phones-a"),
-                    name: String::from("Phones 1"),
-                    short_name: String::from("HP 1"),
-                    role: String::from("phones-a"),
-                    volume: 0.64,
-                    meter_left: 0.0,
-                    meter_right: 0.0,
-                    meter_level: 0.0,
-                    peak_hold: 0.0,
-                    peak_hold_left: 0.0,
-                    peak_hold_right: 0.0,
-                    mute: false,
-                    dim: false,
-                    mono: false,
-                },
-                AudioMixTargetSnapshot {
-                    id: String::from("audio-mix-phones-b"),
-                    name: String::from("Phones 2"),
-                    short_name: String::from("HP 2"),
-                    role: String::from("phones-b"),
-                    volume: 0.71,
-                    meter_left: 0.0,
-                    meter_right: 0.0,
-                    meter_level: 0.0,
-                    peak_hold: 0.0,
-                    peak_hold_left: 0.0,
-                    peak_hold_right: 0.0,
-                    mute: false,
-                    dim: false,
-                    mono: false,
-                },
-            ],
-        }
+        build_inventory(config, SIMULATED_AUDIO_SOURCE, true)
     }
 
     fn update_channel(
@@ -427,15 +203,7 @@ impl AudioBackend for SimulatedAudioBackend {
 
 impl AudioBackend for RmeTotalMixOscBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory {
-        let mut inventory = SimulatedAudioBackend.read_inventory(config);
-        inventory.adapter_mode = String::from(RME_TOTALMIX_OSC_SOURCE);
-        for channel in &mut inventory.channels {
-            clear_channel_meter(channel);
-        }
-        for mix_target in &mut inventory.mix_targets {
-            clear_mix_target_meter(mix_target);
-        }
-        inventory
+        build_inventory(config, RME_TOTALMIX_OSC_SOURCE, false)
     }
 
     fn update_channel(
@@ -534,6 +302,263 @@ fn bool_label(value: bool) -> &'static str {
     }
 }
 
+/// The console's channels and mix targets: the one inventory the simulated
+/// console and TotalMix's share, with the studio's names, roles, gains and
+/// faders. `meters`: whether the simulated meter curves are computed for it.
+/// The simulated console has them; TotalMix's starts from silence and hears
+/// its levels from the desk (the audit of 2026-10-12: it used to compute the
+/// curves and clear them, twice a second).
+fn build_inventory(
+    config: &AudioBackendConfig,
+    adapter_mode: &str,
+    meters: bool,
+) -> AudioBackendInventory {
+    if config.send_host.trim().is_empty() || config.send_port <= 0 || config.receive_port <= 0 {
+        return AudioBackendInventory {
+            adapter_mode: String::from(adapter_mode),
+            channels: Vec::new(),
+            mix_targets: Vec::new(),
+        };
+    }
+
+    AudioBackendInventory {
+        adapter_mode: String::from(adapter_mode),
+        channels: vec![
+            simulated_channel(
+                "audio-input-9",
+                "Host",
+                "HOST",
+                "front-preamp",
+                false,
+                34,
+                0.78,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-10",
+                "Guest",
+                "GST",
+                "front-preamp",
+                false,
+                34,
+                0.78,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-11",
+                "Boom",
+                "BOOM",
+                "front-preamp",
+                false,
+                32,
+                0.76,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-12",
+                "Guitar DI",
+                "GTR DI",
+                "front-preamp",
+                false,
+                32,
+                0.76,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-1",
+                "Line 1",
+                "L 1",
+                "rear-line",
+                false,
+                0,
+                0.68,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-2",
+                "Line 2",
+                "L 2",
+                "rear-line",
+                false,
+                0,
+                0.68,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-3",
+                "Remote A",
+                "REM A",
+                "rear-line",
+                false,
+                0,
+                0.66,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-4",
+                "Remote B",
+                "REM B",
+                "rear-line",
+                false,
+                0,
+                0.66,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-5",
+                "Line 5",
+                "L 5",
+                "rear-line",
+                false,
+                0,
+                0.64,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-6",
+                "Line 6",
+                "L 6",
+                "rear-line",
+                false,
+                0,
+                0.64,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-7",
+                "Line 7",
+                "L 7",
+                "rear-line",
+                false,
+                0,
+                0.62,
+                meters,
+            ),
+            simulated_channel(
+                "audio-input-8",
+                "Line 8",
+                "L 8",
+                "rear-line",
+                false,
+                0,
+                0.62,
+                meters,
+            ),
+            simulated_channel(
+                "audio-playback-1-2",
+                "Program 1/2",
+                "PGM",
+                "playback-pair",
+                true,
+                0,
+                0.58,
+                meters,
+            ),
+            simulated_channel(
+                "audio-playback-3-4",
+                "FX 3/4",
+                "FX",
+                "playback-pair",
+                true,
+                0,
+                0.56,
+                meters,
+            ),
+            simulated_channel(
+                "audio-playback-5-6",
+                "N-1 5/6",
+                "N-1",
+                "playback-pair",
+                true,
+                0,
+                0.54,
+                meters,
+            ),
+            simulated_channel(
+                "audio-playback-7-8",
+                "Music 7/8",
+                "MUS",
+                "playback-pair",
+                true,
+                0,
+                0.52,
+                meters,
+            ),
+            simulated_channel(
+                "audio-playback-9-10",
+                "Playback 9/10",
+                "PB 9/10",
+                "playback-pair",
+                true,
+                0,
+                0.52,
+                meters,
+            ),
+            simulated_channel(
+                "audio-playback-11-12",
+                "Playback 11/12",
+                "PB 11/12",
+                "playback-pair",
+                true,
+                0,
+                0.50,
+                meters,
+            ),
+        ],
+        mix_targets: vec![
+            AudioMixTargetSnapshot {
+                id: String::from("audio-mix-main"),
+                name: String::from("Main Out"),
+                short_name: String::from("MAIN"),
+                role: String::from("main-out"),
+                volume: 0.82,
+                meter_left: 0.0,
+                meter_right: 0.0,
+                meter_level: 0.0,
+                peak_hold: 0.0,
+                peak_hold_left: 0.0,
+                peak_hold_right: 0.0,
+                mute: false,
+                dim: false,
+                mono: false,
+            },
+            AudioMixTargetSnapshot {
+                id: String::from("audio-mix-phones-a"),
+                name: String::from("Phones 1"),
+                short_name: String::from("HP 1"),
+                role: String::from("phones-a"),
+                volume: 0.64,
+                meter_left: 0.0,
+                meter_right: 0.0,
+                meter_level: 0.0,
+                peak_hold: 0.0,
+                peak_hold_left: 0.0,
+                peak_hold_right: 0.0,
+                mute: false,
+                dim: false,
+                mono: false,
+            },
+            AudioMixTargetSnapshot {
+                id: String::from("audio-mix-phones-b"),
+                name: String::from("Phones 2"),
+                short_name: String::from("HP 2"),
+                role: String::from("phones-b"),
+                volume: 0.71,
+                meter_left: 0.0,
+                meter_right: 0.0,
+                meter_level: 0.0,
+                peak_hold: 0.0,
+                peak_hold_left: 0.0,
+                peak_hold_right: 0.0,
+                mute: false,
+                dim: false,
+                mono: false,
+            },
+        ],
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn simulated_channel(
     id: &str,
     name: &str,
@@ -542,8 +567,13 @@ fn simulated_channel(
     stereo: bool,
     gain: i64,
     fader: f64,
+    meters: bool,
 ) -> AudioChannelSnapshot {
-    let meter_frame = simulated_meter_frame(id, role, stereo);
+    let meter_frame = if meters {
+        simulated_meter_frame(id, role, stereo)
+    } else {
+        AudioMeterFrame::silent()
+    };
 
     AudioChannelSnapshot {
         id: String::from(id),
@@ -572,23 +602,20 @@ fn simulated_channel(
     }
 }
 
-fn clear_channel_meter(channel: &mut AudioChannelSnapshot) {
-    channel.meter_left = 0.0;
-    channel.meter_right = 0.0;
-    channel.meter_level = 0.0;
-    channel.peak_hold = 0.0;
-    channel.peak_hold_left = 0.0;
-    channel.peak_hold_right = 0.0;
-    channel.clip = false;
-}
-
-fn clear_mix_target_meter(mix_target: &mut AudioMixTargetSnapshot) {
-    mix_target.meter_left = 0.0;
-    mix_target.meter_right = 0.0;
-    mix_target.meter_level = 0.0;
-    mix_target.peak_hold = 0.0;
-    mix_target.peak_hold_left = 0.0;
-    mix_target.peak_hold_right = 0.0;
+impl AudioMeterFrame {
+    /// No level, no held peak, no clip: a console whose levels come from the
+    /// desk starts here.
+    fn silent() -> Self {
+        Self {
+            meter_left: 0.0,
+            meter_right: 0.0,
+            meter_level: 0.0,
+            peak_hold: 0.0,
+            peak_hold_left: 0.0,
+            peak_hold_right: 0.0,
+            clip: false,
+        }
+    }
 }
 
 fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame {
