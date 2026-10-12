@@ -1538,3 +1538,146 @@ describe("createShellStore the Teleprompter", () => {
     ).toBe(false);
   });
 });
+
+// The audit of 2026-10-12: an audio event that arrives during a local edit (a
+// request in flight, or the 250 ms after one the store patched itself) is not
+// dropped, as it was (a deck press during a fader drag went unseen until some
+// later event), but folded into one refresh once the edit is over. A burst of
+// edits costs one read; a console echo is refreshed at the edit's end at once.
+describe("createShellStore audio events during a local edit", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date", "performance"],
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** The fixture double, with its requests logged, its events tapped for the
+   *  test to add to, and one request the test can hold back. */
+  function tappedTransport(inner: EngineTransport, log: string[], hold: string | null = null) {
+    const listeners = new Set<(event: EventEnvelope<EventName>) => void>();
+    let release: (() => void) | null = null;
+    const transport: EngineTransport = {
+      initialize: () => inner.initialize?.() ?? Promise.resolve(),
+      request: async (method, params) => {
+        log.push(method);
+        if (method === hold) {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return inner.request(method, params);
+      },
+      subscribe: (listener) => {
+        listeners.add(listener);
+        const unsubscribe = inner.subscribe(listener);
+        return () => {
+          listeners.delete(listener);
+          unsubscribe();
+        };
+      },
+      dispose: () => inner.dispose?.() ?? Promise.resolve(),
+    };
+    const emit = (reason: string) => {
+      for (const listener of listeners) {
+        listener({ type: "event", event: "audio.changed", payload: { reason } });
+      }
+    };
+    return {
+      transport,
+      emit,
+      release: () => {
+        release?.();
+        release = null;
+      },
+    };
+  }
+
+  async function readyStore(log: string[], hold: string | null = null) {
+    const tapped = tappedTransport(createFixtureTransport(getFixtureScenario("audio-populated")), log, hold);
+    const store = createShellStore(tapped.transport);
+    const initializing = store.initialize();
+    await settle(() => store.getSnapshot().lifecycle === "ready");
+    await initializing;
+    // Console writes need a passed audio probe.
+    await store.runCommissioningCheck({
+      target: "audio",
+      sendHost: "127.0.0.1",
+      sendPort: 7001,
+      receivePort: 9001,
+    });
+    const channelId = store.getSnapshot().audioSnapshot?.channels[0]?.id;
+    if (!channelId) {
+      throw new Error("the scenario has a channel");
+    }
+    log.length = 0;
+    return { store, channelId, ...tapped };
+  }
+
+  const reads = (log: string[]) => log.filter((method) => method === "audio.snapshot").length;
+
+  it("folds a deck press during a local edit into one refresh after it", async () => {
+    const log: string[] = [];
+    const { store, channelId, emit } = await readyStore(log);
+
+    await store.updateAudioChannel({ channelId, mute: true });
+    expect(log).toEqual(["audio.channel.update"]);
+    // The deck's MUTE, twice, within the 250 ms after the edit: not dropped,
+    // not read at once either.
+    emit("control-surface");
+    emit("control-surface");
+    expect(reads(log)).toBe(0);
+    await vi.advanceTimersByTimeAsync(240);
+    expect(reads(log)).toBe(0);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(reads(log)).toBe(1);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(reads(log)).toBe(1);
+  });
+
+  it("costs a burst of edits one read, after the last of them", async () => {
+    const log: string[] = [];
+    const { store, channelId } = await readyStore(log);
+
+    for (const mute of [true, false, true, false]) {
+      await store.updateAudioChannel({ channelId, mute });
+      await vi.advanceTimersByTimeAsync(80);
+    }
+    expect(log.filter((method) => method === "audio.channel.update")).toHaveLength(4);
+    expect(reads(log)).toBe(0);
+    await vi.advanceTimersByTimeAsync(260);
+    expect(reads(log)).toBe(1);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(reads(log)).toBe(1);
+  });
+
+  it("refreshes a console echo at once when the request it arrived during is over", async () => {
+    const log: string[] = [];
+    const { store, channelId, emit, release } = await readyStore(log, "audio.channel.update");
+
+    const edit = store.updateAudioChannel({ channelId, mute: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(log).toEqual(["audio.channel.update"]);
+    emit("console-echo");
+    emit("control-surface");
+    expect(reads(log)).toBe(0);
+    release();
+    await edit;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads(log)).toBe(1);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(reads(log)).toBe(1);
+  });
+
+  it("refreshes an audio event outside any edit at once", async () => {
+    const log: string[] = [];
+    const { emit } = await readyStore(log);
+
+    emit("control-surface");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads(log)).toBe(1);
+  });
+});

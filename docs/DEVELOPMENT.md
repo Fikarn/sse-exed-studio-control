@@ -111,6 +111,7 @@ Pages and their tests:
 - **A 24 px target without moving the layout:** grow the element, pay it back with a matching negative margin, and paint the visible part on `::before`. `ScrubSlider` is the worked example.
 - **Tokens are kebab-case.** `--size-compactControlHeight` silently gives nothing; the name is `--size-compact-control-height`.
 - **Test ids are extended, never renamed.**
+- **The store drops no audio event.** During a local edit (a request in flight, or the 250 ms after one the store patched itself) an `audio.changed` is owed one refresh once the edit is over (`deferAudioRefresh` in `createShellStore.ts`): the edit's own event and whatever the deck or the console did meanwhile are then one read of `audio.snapshot`; a `console-echo` is refreshed at the edit's end at once. Until the audit of 2026-10-12 such an event was dropped, and a deck press during a fader drag went unseen.
 
 The engine:
 

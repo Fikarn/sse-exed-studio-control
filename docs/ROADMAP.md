@@ -26,7 +26,7 @@ A read-only audit of the whole program, six reviewers and the lead, on `main` af
 
 - [x] Liveness: a thread of the hardware link that panics, ends or stalls is a health error with its sentence in Setup / Support, every panic is in the log with its place, and a sACN send that fails is said and read as `no output` (#340)
 - [x] The cameras' lock: a CAM 1 press and the deck's display read no longer wait on each other for the camera's 2 s, the page's presses run off the request loop, and a Pocket write is cancelled at its deadline (#341)
-- [ ] The store's audio suppression: a deck press during a local edit is no longer dropped
+- [x] The store's audio suppression: an audio event during a local edit is folded into one refresh after it, never dropped, so a deck press during a fader drag is seen (#342)
 - [ ] The engine's idle cost: a cheap TotalMix liveness request in place of the full dump, the parsed lighting state cached by generation, the meter stream trimmed and bounded, the writer stopping at the stop (which also ends the false ERROR at every close)
 - [ ] The pages' hot loops: the test bridge's clone gated on its config, the meter and picture-place observers scoped, the page roots memoised
 - [ ] Setup's probes: an audio probe that waits for TotalMix's reply, unicast-only addresses, no OSC write before the probe passes (device I/O: a review)

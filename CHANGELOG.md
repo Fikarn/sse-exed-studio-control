@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Console follows a Stream Deck key pressed during a change made on screen: a deck `MUTE` within a fader drag, or a quarter second after a click, used to go unseen until something else changed the Console. The screen now reads the Console once the change on screen is over, and shows both (#342).
 - A camera that does not answer no longer holds the other pages and the Stream Deck for 2 s at every press: a press waits for the camera on its own, the screen and the deck's displays follow meanwhile, and a Pocket that takes too long is not written to late (the write is withdrawn at the press's deadline) (#341).
 - The header's `Lighting` lamp reads `no output` when the lighting output's packets cannot leave the PC (no route to the bridge), with the reason in `engine.log` once and then once a minute, and `ready` again a second after they go. Until now a send that failed was swallowed, and the rig could hold its last look under a green lamp (#340).
 - A part of the hardware link that stops or hangs (the lighting output, the console's metering, the daily backups, the pictures helper's supervision, the deck's bridge, the prompter's clock) shows in Setup / Support's health as `Hardware link: … stopped` or `… has not run for N s`, with `Restart the hardware link` as the way out; every such fault is in `engine.log` with its place. Until now it ended in silence and the lamps kept their last word (#340).

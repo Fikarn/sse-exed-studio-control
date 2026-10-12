@@ -573,9 +573,13 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   let audioMeterSequence = 0;
   let audioLocalMutationDepth = 0;
   let audioRefreshSuppressUntilMs = 0;
-  // A console echo (TotalMix reporting a change, or an unconfirmed send) that
-  // arrived while a local mutation was in flight; replayed once it finishes.
-  let audioEchoRefreshPending = false;
+  // An audio event that arrived during a local edit (`deferAudioRefresh`):
+  // one refresh is owed once the edit is over. `audioEchoPending` when a
+  // console echo (TotalMix reporting a change, an adjusted or unconfirmed
+  // send) is among them: that one is refreshed at the edit's end at once.
+  let audioRefreshPending = false;
+  let audioEchoPending = false;
+  let audioRefreshTimerId: number | null = null;
 
   const setState = (nextState: ShellState) => {
     state = nextState;
@@ -981,6 +985,59 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     }
   };
 
+  // An audio event that arrives during a local edit (a request in flight, or
+  // the 250 ms after one the store patched itself) is never dropped (the
+  // audit of 2026-10-12: a deck press during a fader drag went unseen until
+  // some later event): it is folded into one refresh once the edit is over,
+  // so a burst of edits costs one read, and nothing the deck, the console or
+  // Setup did meanwhile is lost.
+  const deferAudioRefresh = (echo: boolean) => {
+    audioRefreshPending = true;
+    audioEchoPending = audioEchoPending || echo;
+    armDeferredAudioRefresh();
+  };
+
+  // The owed refresh, when nothing is in flight: at once for a console echo,
+  // else once the 250 ms are over (they move on with every further edit).
+  const armDeferredAudioRefresh = () => {
+    if (audioLocalMutationDepth > 0 || audioRefreshTimerId !== null) {
+      // The request's end arms it; a timer already set fires in its turn.
+      return;
+    }
+    if (audioEchoPending) {
+      refreshDeferredAudioNow();
+      return;
+    }
+    const wait = Math.max(0, audioRefreshSuppressUntilMs - currentMonotonicTimestampMs());
+    audioRefreshTimerId = window.setTimeout(() => {
+      audioRefreshTimerId = null;
+      if (!audioRefreshPending || audioLocalMutationDepth > 0) {
+        return;
+      }
+      if (currentMonotonicTimestampMs() < audioRefreshSuppressUntilMs) {
+        armDeferredAudioRefresh();
+        return;
+      }
+      refreshDeferredAudioNow();
+    }, wait);
+  };
+
+  const refreshDeferredAudioNow = () => {
+    cancelDeferredAudioRefresh();
+    if (state.lifecycle === "ready") {
+      void refreshAudioSnapshot("audio.changed").catch(inBackground("deferred audio refresh"));
+    }
+  };
+
+  const cancelDeferredAudioRefresh = () => {
+    if (audioRefreshTimerId !== null) {
+      window.clearTimeout(audioRefreshTimerId);
+      audioRefreshTimerId = null;
+    }
+    audioRefreshPending = false;
+    audioEchoPending = false;
+  };
+
   // 2026-09 production readiness, Slice 5 (finding F09): what went wrong in
   // the background — a refresh the engine did not answer, an error nothing
   // caught — is kept, last twenty, for the diagnostics export. It never
@@ -1148,20 +1205,19 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         return;
       }
       if (event.event === "audio.changed") {
-        // 2026-09 audit remediation, Slice 2: a console echo is the console's
-        // truth (an operator move at TotalMix, an adjusted or unconfirmed
-        // send). It must not be swallowed by the 250 ms tail suppression that
-        // protects a local edit from its own event; it only waits for an
-        // in-flight local mutation to finish, then refreshes once.
-        if (payload?.reason === "console-echo") {
-          if (audioLocalMutationDepth > 0) {
-            audioEchoRefreshPending = true;
-            return;
-          }
-          void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
-          return;
-        }
-        if (audioLocalMutationDepth > 0 || currentMonotonicTimestampMs() < audioRefreshSuppressUntilMs) {
+        // During a local edit (a request in flight, or the 250 ms after one
+        // the store patched itself) the event is owed a refresh once the edit
+        // is over, not dropped (`deferAudioRefresh`): the edit's own event
+        // and anything the deck or the console did meanwhile are then one
+        // read. A console echo is the console's truth (2026-09 audit
+        // remediation, Slice 2: an operator move at TotalMix, an adjusted or
+        // unconfirmed send) and does not wait the 250 ms out: only a request
+        // in flight, then it refreshes at once.
+        const echo = payload?.reason === "console-echo";
+        const inLocalEdit =
+          audioLocalMutationDepth > 0 || (!echo && currentMonotonicTimestampMs() < audioRefreshSuppressUntilMs);
+        if (inLocalEdit) {
+          deferAudioRefresh(echo);
           return;
         }
         void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
@@ -1426,9 +1482,10 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return result;
     } finally {
       audioLocalMutationDepth = Math.max(0, audioLocalMutationDepth - 1);
-      if (audioLocalMutationDepth === 0 && audioEchoRefreshPending) {
-        audioEchoRefreshPending = false;
-        void refreshAudioSnapshot("audio.changed").catch(inBackground("console echo refresh"));
+      if (audioLocalMutationDepth === 0 && audioRefreshPending) {
+        // What arrived during the edit: a console echo refreshes at once,
+        // anything else once the 250 ms are over.
+        armDeferredAudioRefresh();
       }
     }
   };
@@ -1808,6 +1865,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     async dispose() {
       cancelAutomaticRestart();
       cancelQueuedRefresh();
+      cancelDeferredAudioRefresh();
       cancelIdentifyRefreshes();
       bootstrapGeneration++;
       initializePromise = null;
