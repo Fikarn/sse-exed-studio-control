@@ -107,12 +107,14 @@ fn write_json<W: Write, T: Serialize>(writer: &mut W, message: &T) -> io::Result
 /// frames and events still queued would only fail to write (the false ERROR
 /// at every close, the audit of 2026-10-12). A write that fails while the
 /// engine runs is a fault, said once; the writer then ends and every sender
-/// finds it gone.
+/// finds it gone. Whichever way it ends, the meter frames it will never
+/// write are given up (`engine_events::meter_frames_abandoned`), so the
+/// metering's next offer reaches the gone writer and the metering ends too.
 fn spawn_output_writer(receiver: Receiver<Value>) {
     thread::spawn(move || {
         let stdout = io::stdout();
         let mut writer = stdout.lock();
-        for message in receiver {
+        while let Ok(message) = receiver.recv() {
             if liveness::stopping() {
                 break;
             }
@@ -121,6 +123,11 @@ fn spawn_output_writer(receiver: Receiver<Value>) {
                 engine_events::meter_frame_written();
             }
             if let Err(error) = written {
+                // A write in flight as the app closed its end, before the
+                // request loop has read the EOF: the stop's, not a fault.
+                if liveness::stopping() {
+                    break;
+                }
                 log_event(
                     LogLevel::Error,
                     &format!("The hardware link could not answer the app: {error}"),
@@ -128,6 +135,10 @@ fn spawn_output_writer(receiver: Receiver<Value>) {
                 break;
             }
         }
+        // The channel closes first, so no frame offered from here on is
+        // queued; then every slot still held is given up.
+        drop(receiver);
+        engine_events::meter_frames_abandoned();
     });
 }
 
@@ -694,6 +705,7 @@ fn main() -> io::Result<()> {
                 let (output_sender, output_receiver) = mpsc::channel::<Value>();
                 spawn_output_writer(output_receiver);
                 serve_requests(&app, &mut reader, &output_sender)?;
+                liveness::mark_stopping();
                 return Ok(());
             }
             return Err(io::Error::other(error));

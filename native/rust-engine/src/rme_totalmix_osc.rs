@@ -858,29 +858,30 @@ pub fn spawn_rme_totalmix_audio_metering(
 
             // The meter state is copied out of its lock only for a frame
             // that is published; a poll that publishes nothing reads the
-            // status alone (the audit of 2026-10-12).
-            let frame = match state.lock() {
-                Ok(state) => {
-                    let status = state.status_at(now_ms);
-                    let publish_interval = if status == RmeMeteringState::Live {
-                        PUBLISH_INTERVAL
-                    } else {
-                        STATUS_PUBLISH_INTERVAL
-                    };
-                    let due = last_publish_at
-                        .map(|last| now.duration_since(last) >= publish_interval)
-                        .unwrap_or(true)
-                        || (status != RmeMeteringState::Live
-                            && last_status_publish_at
-                                .map(|last| now.duration_since(last) >= STATUS_PUBLISH_INTERVAL)
-                                .unwrap_or(true));
-                    // A writer that holds two frames already is handed none;
-                    // the frame is tried again at the next poll
-                    // (`engine_events`).
-                    (due && crate::engine_events::meter_frame_room())
-                        .then(|| (state.clone(), status))
-                }
-                Err(_) => None,
+            // status alone (the audit of 2026-10-12). A poisoned lock (a
+            // panic under it on another thread) still has the state.
+            let frame = {
+                let state = match state.lock() {
+                    Ok(state) => state,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                let status = state.status_at(now_ms);
+                let publish_interval = if status == RmeMeteringState::Live {
+                    PUBLISH_INTERVAL
+                } else {
+                    STATUS_PUBLISH_INTERVAL
+                };
+                let due = last_publish_at
+                    .map(|last| now.duration_since(last) >= publish_interval)
+                    .unwrap_or(true)
+                    || (status != RmeMeteringState::Live
+                        && last_status_publish_at
+                            .map(|last| now.duration_since(last) >= STATUS_PUBLISH_INTERVAL)
+                            .unwrap_or(true));
+                // A writer that holds two frames already is handed none;
+                // the frame is tried again at the next poll
+                // (`engine_events`).
+                (due && crate::engine_events::meter_frame_room()).then(|| (state.clone(), status))
             };
 
             if let Some((state_snapshot, status)) = frame {

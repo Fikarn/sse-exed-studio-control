@@ -196,6 +196,17 @@ pub(crate) fn meter_frame_written() {
     });
 }
 
+/// The writer has ended with frames still queued: every slot is free again.
+/// The writer is the only taker of frames, so none is legitimately held
+/// after it; called once its channel is closed, so no offer that follows
+/// can queue a frame (one that took its slot before the close fails to send
+/// and gives it back itself). Without this a writer that ended would keep
+/// the count at its limit for good, and the metering would skip every frame
+/// without ever offering one and finding the writer gone (the review).
+pub(crate) fn meter_frames_abandoned() {
+    METER_FRAMES_QUEUED.store(0, Ordering::SeqCst);
+}
+
 #[cfg(test)]
 mod meter_backlog_tests {
     use super::*;
@@ -243,6 +254,19 @@ mod meter_backlog_tests {
         // The writer gone: said so, and the slot given back.
         drop(receiver);
         assert_eq!(offer_meter_frame(&sender, frame(5)), MeterOffer::WriterGone);
+        assert_eq!(METER_FRAMES_QUEUED.load(Ordering::SeqCst), 0);
+
+        // A writer that ends with two frames in its hands gives them up, so
+        // the next offer is made, reaches the gone writer, and the metering
+        // learns it (the review's finding).
+        let (sender, receiver) = mpsc::channel::<Value>();
+        assert_eq!(offer_meter_frame(&sender, frame(6)), MeterOffer::Sent);
+        assert_eq!(offer_meter_frame(&sender, frame(7)), MeterOffer::Sent);
+        assert!(!meter_frame_room());
+        drop(receiver);
+        meter_frames_abandoned();
+        assert!(meter_frame_room());
+        assert_eq!(offer_meter_frame(&sender, frame(8)), MeterOffer::WriterGone);
         assert_eq!(METER_FRAMES_QUEUED.load(Ordering::SeqCst), 0);
     }
 
