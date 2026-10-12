@@ -114,6 +114,14 @@ pub(crate) fn handle_deck_action_at(
     value: Option<&str>,
     at: Instant,
 ) -> Result<(CamerasReply, DeckTexts), CameraError> {
+    // A dial, a push or `REC` may press: one press at a time to these
+    // cameras (`runtime::press_gate`), taken before the lock, so a detent
+    // plans from what the camera reported after the detent before it.
+    let gate = crate::cameras::runtime::press_gate(db_path);
+    let _press = matches!(action, "dial" | "dialPush" | "rec").then(|| {
+        gate.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    });
     // The first spell under the cameras' lock: a key that sends nothing is
     // answered here, with its displays; a press is planned and begun.
     let begun = with_cameras(db_path, simulated, |cameras, bodies, now| {

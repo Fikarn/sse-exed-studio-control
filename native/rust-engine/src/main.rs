@@ -782,6 +782,16 @@ mod tests {
     use crate::audio::read_audio_snapshot;
     use std::collections::HashMap;
 
+    // The refusal a press gets when its thread could not run it holds the words rule.
+    #[test]
+    fn a_press_that_could_not_run_is_refused_in_the_operators_words() {
+        crate::operator_words::assert_operator_words(PRESS_FAILED);
+        for method in cameras::commands::PRESS_METHODS {
+            assert!(cameras::is_press_method(method));
+        }
+        assert!(!cameras::is_press_method("cameras.snapshot"));
+    }
+
     #[test]
     fn compact_channel_meter_payload_separates_rms_body_from_held_peak() {
         let mut snapshot = read_audio_snapshot(&HashMap::new());

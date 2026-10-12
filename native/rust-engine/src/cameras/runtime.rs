@@ -937,7 +937,17 @@ struct EntryState {
     bodies: SimulatedCameras,
 }
 
-type Entry = Mutex<EntryState>;
+/// One saved data's cameras: their state under the cameras' lock, and the
+/// press gate (the audit of 2026-10-12, H1), which a press holds across its
+/// two spells and the wait between them. Presses to these cameras run one
+/// after another, as they did under the one lock, so the next plans from
+/// what the camera reported after the one before (two quick steps step
+/// twice); the reads and the displays, which take the cameras' lock alone,
+/// no longer wait on a camera. Taken before the cameras' lock, never under it.
+struct Entry {
+    state: Mutex<EntryState>,
+    press: Arc<Mutex<()>>,
+}
 
 static CAMERAS: OnceLock<Mutex<HashMap<PathBuf, Arc<Entry>>>> = OnceLock::new();
 
@@ -947,17 +957,28 @@ fn entry(db_path: &Path) -> Arc<Entry> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     Arc::clone(registry.entry(db_path.to_path_buf()).or_insert_with(|| {
-        Arc::new(Mutex::new(EntryState {
-            cameras: None,
-            bodies: SimulatedCameras::default(),
-        }))
+        Arc::new(Entry {
+            state: Mutex::new(EntryState {
+                cameras: None,
+                bodies: SimulatedCameras::default(),
+            }),
+            press: Arc::new(Mutex::new(())),
+        })
     }))
 }
 
 fn lock(entry: &Entry) -> MutexGuard<'_, EntryState> {
     entry
+        .state
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The press gate of this saved data's cameras: held by a press from before
+/// its first spell under the cameras' lock to after its second, never taken
+/// under that lock.
+pub(crate) fn press_gate(db_path: &Path) -> Arc<Mutex<()>> {
+    Arc::clone(&entry(db_path).press)
 }
 
 /// Runs `action` on the cameras of this saved data, loaded the first time

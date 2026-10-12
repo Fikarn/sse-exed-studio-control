@@ -716,7 +716,7 @@ fn a_prompter_display_asked_for_during_a_key_follows_the_key() {
         .count
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .get(prompter.path())
+        .get(&(prompter.path().to_path_buf(), super::Page::Prompter))
         .is_none_or(|on_their_way| *on_their_way == 0)
     {
         assert!(Instant::now() < until, "the key is on its way");

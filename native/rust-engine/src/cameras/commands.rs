@@ -440,6 +440,12 @@ fn press_request(
     method: &str,
     params: &Value,
 ) -> Result<CamerasReply, CameraError> {
+    // One press at a time to these cameras (`runtime::press_gate`): the
+    // next plans from what the camera reported after this one.
+    let gate = crate::cameras::runtime::press_gate(db_path);
+    let _press = gate
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let (before, plan, sending) = with_cameras(db_path, simulated, |cameras, bodies, _| {
         let before = cameras.health_check();
         let plan = match method {
