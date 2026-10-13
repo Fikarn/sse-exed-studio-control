@@ -9,6 +9,7 @@ import {
   ensureCommissioningChecks,
   normalizeRunnerStage,
   legacyStageFromRunnerStage,
+  isOneMachineIpv4,
   validateIpv4,
   updateFixtureCheck,
   validatePort,
@@ -40,6 +41,8 @@ interface ExportedArchive {
 }
 const exportedArchives = new WeakMap<MutableFixtureState, Map<string, ExportedArchive>>();
 const ARCHIVE_FORMAT_VERSION = 7;
+/** A bridge that never answers, for the specs that drive the publish gate: a unicast address nothing is at. */
+const UNANSWERING_BRIDGE = "10.255.255.1";
 const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
 
 /** The pages `settings.update` opens (`WORKSPACES` in `native/rust-engine/src/shell_settings.rs`). */
@@ -195,15 +198,22 @@ export function handleFixtureSetupRequest(
           asNumber(asRecord(state.commissioningSnapshot.lighting)?.universe, 1)
         );
         if (!bridgeIp || !validateIpv4(bridgeIp)) {
-          throw new Error("bridgeIp is required and must be a valid IPv4 address");
+          throw new Error("The lighting bridge IP must be four numbers, like 10.1.0.1.");
+        }
+        // The one-machine rule, as the hardware link refuses it (the audit of 2026-10-12).
+        if (!isOneMachineIpv4(bridgeIp)) {
+          throw new Error(
+            "The lighting bridge IP must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address."
+          );
         }
         if (!Number.isInteger(universe) || universe < 1 || universe > 63999) {
           throw new Error("universe must be between 1 and 63999");
         }
         state.commissioningSnapshot.lighting = { bridgeIp, universe };
         // 2026-09 audit Slice 8: a deterministic failure so specs can drive
-        // the publish gate — 0.0.0.0 is never a reachable bridge.
-        if (bridgeIp === "0.0.0.0") {
+        // the publish gate — a bridge at 10.255.255.1 never answers (it was
+        // 0.0.0.0 until the one-machine rule refused that address).
+        if (bridgeIp === UNANSWERING_BRIDGE) {
           updateFixtureCheck(state, "lighting", "failed", `Bridge ${bridgeIp} did not answer the sACN probe.`);
         } else {
           updateFixtureCheck(state, "lighting", "passed", `Bridge probe reached ${bridgeIp} on universe ${universe}.`);
@@ -221,8 +231,13 @@ export function handleFixtureSetupRequest(
           params.receivePort,
           asNumber(asRecord(state.commissioningSnapshot.audio)?.receivePort, 9001)
         );
-        if (!sendHost || (!validateIpv4(sendHost) && sendHost !== "127.0.0.1" && sendHost !== "localhost")) {
-          throw new Error("sendHost must be localhost or a valid IPv4 address");
+        if (!sendHost || (!validateIpv4(sendHost) && sendHost !== "localhost")) {
+          throw new Error("TotalMix's address must be localhost or four numbers, like 127.0.0.1.");
+        }
+        if (sendHost !== "localhost" && !isOneMachineIpv4(sendHost)) {
+          throw new Error(
+            "TotalMix's address must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address."
+          );
         }
         if (!validatePort(sendPort) || !validatePort(receivePort)) {
           throw new Error("sendPort and receivePort must be between 1 and 65535");

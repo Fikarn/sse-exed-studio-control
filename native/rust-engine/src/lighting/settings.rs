@@ -62,10 +62,17 @@ pub fn update_lighting_settings(
             String::from("bridgeIp is required while native lighting output is enabled."),
         ));
     }
-    if !bridge_ip.trim().is_empty() && !is_valid_ipv4(&bridge_ip) {
+    // The one-machine rule (the audit of 2026-10-12): a multicast address
+    // would reach every sACN receiver on the LAN, a broadcast every machine.
+    if !bridge_ip.trim().is_empty() && crate::commissioning::one_machine_ipv4(&bridge_ip).is_none()
+    {
         return Err(LightingCommandError::Rejected(
             "LIGHTING_BRIDGE_INVALID",
-            String::from("bridgeIp must be a valid IPv4 address."),
+            String::from(if is_valid_ipv4(&bridge_ip) {
+                "The bridge address must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address."
+            } else {
+                "The bridge address must be four numbers, like 10.1.0.1."
+            }),
         ));
     }
 

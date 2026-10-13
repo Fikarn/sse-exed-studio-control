@@ -1,14 +1,28 @@
 use crate::app_state::{CommissioningSnapshot, APP_SETTINGS_PREFIX};
 use crate::lighting_bridge_watch::{look_at_bridge, BRIDGE_LOOK_TIMEOUT, BRIDGE_PORT};
-use crate::rme_totalmix_osc;
+use crate::rme_totalmix_osc::{self, ProbeAnswer, ProbeKey, ProbeRefused};
 use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned, EngineResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
+
+/// The one request that runs aside the request loop, on a thread of its own
+/// (`main.rs`): a probe waits on the bridge or on TotalMix for seconds, and
+/// held every page and the deck's displays meanwhile (the audit of 2026-10-12).
+pub(crate) const PROBE_METHOD: &str = "commissioning.check.run";
+
+pub(crate) fn is_probe_method(method: &str) -> bool {
+    method == PROBE_METHOD
+}
+
+/// How long the audio probe waits for TotalMix's answer: the metering loop
+/// re-reads the settings within 500 ms and binds the probe's ports, and a
+/// TotalMix in touch answers `/sendstate` within about 30 ms.
+const AUDIO_PROBE_WAIT: Duration = Duration::from_secs(3);
 
 pub const LIGHTING_BRIDGE_IP_KEY: &str = "app.commissioning.lighting.bridge_ip";
 pub const LIGHTING_UNIVERSE_KEY: &str = "app.commissioning.lighting.universe";
@@ -471,6 +485,15 @@ pub fn run_commissioning_check(
                     "The lighting bridge IP must be four numbers, like 10.1.0.1.",
                 )));
             }
+            // The one-machine rule (the audit of 2026-10-12): a multicast
+            // address would be streamed to every sACN receiver on the LAN,
+            // a broadcast to every machine; the probe refuses them rather
+            // than save them with its answer.
+            if one_machine_ipv4(&bridge_ip).is_none() {
+                return Err(CommissioningCommandError::InvalidParams(String::from(
+                    "The lighting bridge IP must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address.",
+                )));
+            }
             if !(1..=63999).contains(&universe) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
                     "The universe must be between 1 and 63999.",
@@ -529,9 +552,9 @@ pub fn run_commissioning_check(
                     "Enter TotalMix's send host for the audio probe.",
                 )));
             }
-            if !is_valid_osc_host(&send_host) {
+            if let Some(refusal) = crate::audio::totalmix_host_refusal(&send_host) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "TotalMix's send host must be localhost or four numbers, like 127.0.0.1.",
+                    refusal,
                 )));
             }
             if !is_valid_port(send_port) {
@@ -544,13 +567,51 @@ pub fn run_commissioning_check(
                     "TotalMix's receive port must be between 1 and 65535.",
                 )));
             }
+            if let Some(refusal) = crate::audio::totalmix_port_refusal(send_port)
+                .or_else(|| crate::audio::totalmix_port_refusal(receive_port))
+            {
+                return Err(CommissioningCommandError::InvalidParams(String::from(
+                    refusal,
+                )));
+            }
 
-            updates.push((String::from(AUDIO_SEND_HOST_KEY), send_host.clone()));
-            updates.push((String::from(AUDIO_SEND_PORT_KEY), send_port.to_string()));
-            updates.push((
-                String::from(AUDIO_RECEIVE_PORT_KEY),
-                receive_port.to_string(),
-            ));
+            // The typed address and ports are saved first, so that the
+            // metering loop binds to them and the probe asks TotalMix there.
+            // Changed ones are a changed desk: the Console reads unknown
+            // until a Sync, as the audio settings' own change writes it
+            // (until the audit of 2026-10-12 the probe wrote the address
+            // alone, and a saved `aligned` survived a port change).
+            let saved = (
+                app_settings
+                    .get(AUDIO_SEND_HOST_KEY)
+                    .cloned()
+                    .unwrap_or_else(|| String::from(DEFAULT_AUDIO_SEND_HOST)),
+                app_settings
+                    .get(AUDIO_SEND_PORT_KEY)
+                    .and_then(|value| value.parse::<i64>().ok())
+                    .unwrap_or(DEFAULT_AUDIO_SEND_PORT),
+                app_settings
+                    .get(AUDIO_RECEIVE_PORT_KEY)
+                    .and_then(|value| value.parse::<i64>().ok())
+                    .unwrap_or(DEFAULT_AUDIO_RECEIVE_PORT),
+            );
+            let transport_changed = saved != (send_host.clone(), send_port, receive_port);
+            let mut address = vec![
+                (String::from(AUDIO_SEND_HOST_KEY), send_host.clone()),
+                (String::from(AUDIO_SEND_PORT_KEY), send_port.to_string()),
+                (
+                    String::from(AUDIO_RECEIVE_PORT_KEY),
+                    receive_port.to_string(),
+                ),
+            ];
+            if transport_changed {
+                address.extend(crate::audio::console_transport_changed_updates());
+            }
+            {
+                let _state_guard = transport_changed.then(crate::audio::lock_audio_state);
+                set_settings_owned(db_path, &address)
+                    .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
+            }
 
             if crate::audio::audio_metering_is_simulated(&app_settings) {
                 // Simulated input mode has no console to probe. Passing here is
@@ -564,8 +625,18 @@ pub fn run_commissioning_check(
                         "Simulated audio input mode: the audio probe passes without TotalMix (test mode). Metering and console control stay simulated until this mode is turned off.",
                     ),
                 )
+            } else if !crate::audio::audio_osc_enabled(&app_settings) {
+                // With OSC off the metering loop binds nothing, so nobody
+                // would ask TotalMix: said at once, not after the wait.
+                (
+                    AUDIO_CHECK_ID,
+                    String::from("failed"),
+                    String::from(
+                        "OSC is off in the audio settings, so TotalMix was not asked. Turn it on, then run the probe again.",
+                    ),
+                )
             } else {
-                match probe_audio_transport(&send_host, send_port as u16, receive_port as u16) {
+                match probe_audio_console(&send_host, send_port, receive_port) {
                     Ok(summary) => (AUDIO_CHECK_ID, String::from("passed"), summary),
                     Err(summary) => (AUDIO_CHECK_ID, String::from("failed"), summary),
                 }
@@ -731,42 +802,71 @@ fn probe_bridge_reachable(ip: &str) -> bool {
     .answers()
 }
 
-fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Result<String, String> {
-    let send_target = if host == "localhost" {
-        format!("127.0.0.1:{send_port}")
-    } else {
-        format!("{host}:{send_port}")
+/// The audio probe: TotalMix at `host` is asked for its status on remote 4
+/// (the Global OSC remote, `send_port + 3`) by the metering loop, which has
+/// bound the probe's ports, and the probe passes only when TotalMix answers
+/// from that address on that port (the audit of 2026-10-12: the probe used to
+/// pass on levels already arriving from whatever address was bound). The
+/// ports in the sentences are as TotalMix's OSC settings name them: `incoming`
+/// is where TotalMix listens, `outgoing` where it sends.
+fn probe_audio_console(host: &str, send_port: i64, receive_port: i64) -> Result<String, String> {
+    let key = ProbeKey {
+        host: String::from(host.trim()),
+        send_port,
+        receive_port,
     };
+    audio_probe_sentence(
+        host,
+        send_port,
+        receive_port,
+        rme_totalmix_osc::probe_console(key, AUDIO_PROBE_WAIT),
+    )
+}
 
-    let send_socket = UdpSocket::bind(("0.0.0.0", 0)).map_err(|error| {
-        format!(
-            "The audio probe could not open a port to send from: {}",
-            error
-        )
-    })?;
-    send_socket
-        .connect(&send_target)
-        .map_err(|error| format!("The audio probe could not reach {}: {}", send_target, error))?;
-    let _ = send_socket.send(b"/native/probe");
-
-    if rme_totalmix_osc::wait_for_live_metering(Duration::from_millis(1_500)) {
-        Ok(format!(
-            "TotalMix on {} is sending meter data (port incoming {}-{}, port outgoing {}-{}).",
-            host,
-            send_port,
-            send_port.saturating_add(2),
-            receive_port,
-            receive_port.saturating_add(2)
-        ))
-    } else {
-        Err(format!(
-            "No meter data arrived from TotalMix on {} within 1.5 s. In TotalMix Options › Settings › OSC, set remote controllers 1–3 to port outgoing {}-{} and port incoming {}-{}, turn on Send Peak Level Data, keep remote 4 in Global OSC mode, then run this probe again.",
-            host,
-            receive_port,
-            receive_port.saturating_add(2),
-            send_port,
-            send_port.saturating_add(2)
-        ))
+/// What the audio probe says of its outcome, on screen: `Ok` for a pass.
+fn audio_probe_sentence(
+    host: &str,
+    send_port: i64,
+    receive_port: i64,
+    outcome: Result<ProbeAnswer, ProbeRefused>,
+) -> Result<String, String> {
+    let remotes_1_to_3 = format!(
+        "port incoming {}–{} and port outgoing {}–{}",
+        send_port,
+        send_port + 2,
+        receive_port,
+        receive_port + 2
+    );
+    let remote_4 = format!(
+        "port incoming {} and port outgoing {}",
+        send_port + 3,
+        receive_port + 3
+    );
+    match outcome {
+        Ok(ProbeAnswer::Answered) => Ok(format!(
+            "TotalMix at {host} answered on remote 4 ({remote_4}). Remotes 1 to 3 are on {remotes_1_to_3}; their meters follow while Send Peak Level Data is on in TotalMix."
+        )),
+        Ok(ProbeAnswer::SlotUnbound) => Err(format!(
+            "Studio Control could not listen on port {} for TotalMix's answer: another program holds it. Free the port or choose other ports, then run the probe again.",
+            receive_port + 3
+        )),
+        Ok(ProbeAnswer::Unanswered { asked: true }) => Err(format!(
+            "TotalMix at {host} did not answer on remote 4 within {} s. In TotalMix Options › Settings › OSC, set remote controller 4 to Global OSC mode with {remote_4}, and remote controllers 1–3 to {remotes_1_to_3} with Send Peak Level Data on, then run this probe again.",
+            AUDIO_PROBE_WAIT.as_secs()
+        )),
+        // The request never went out: the loop did not bind the probe's
+        // settings in time (a slow database, the address changed under the
+        // probe) — the app's own fault, not TotalMix's to be set up for.
+        Ok(ProbeAnswer::Unanswered { asked: false }) => Err(format!(
+            "The hardware link did not get to ask TotalMix at {host} within {} s. Run the probe again; if it says so again, restart the hardware link.",
+            AUDIO_PROBE_WAIT.as_secs()
+        )),
+        Err(ProbeRefused::NoMetering) => Err(format!(
+            "The console's metering is not running, so TotalMix at {host} was not asked. Restart the hardware link, then run the probe again."
+        )),
+        Err(ProbeRefused::Busy) => Err(String::from(
+            "A probe is still waiting for TotalMix's answer. Wait for it, then run this one again.",
+        )),
     }
 }
 
@@ -778,8 +878,16 @@ fn parse_ipv4(value: &str) -> Option<Ipv4Addr> {
     Ipv4Addr::from_str(value.trim()).ok()
 }
 
-fn is_valid_osc_host(host: &str) -> bool {
-    host == "localhost" || is_valid_ipv4(host)
+/// The one-machine rule for a typed address (the audit of 2026-10-12): the
+/// IPv4 address of one machine, so never `0.0.0.0`, a broadcast or a multicast
+/// address, which the lights would stream to every sACN receiver on the LAN
+/// and the Console would send to every machine. The lighting bridge's and
+/// TotalMix's addresses are held to it in Setup, at their own settings and at
+/// the wire; the cameras' setup has a rule of its own (`cameras::model`).
+pub(crate) fn one_machine_ipv4(value: &str) -> Option<Ipv4Addr> {
+    parse_ipv4(value).filter(|address| {
+        !(address.is_unspecified() || address.is_broadcast() || address.is_multicast())
+    })
 }
 
 fn is_valid_port(port: i64) -> bool {
@@ -824,6 +932,16 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.path);
         }
+    }
+
+    /// The audio probe forgets the shared console link's slot states when the
+    /// address or ports change (`console_transport_changed_updates`); the load
+    /// tests read them back, so the probes that save ports run one at a time
+    /// with them.
+    fn serialize_shared_link() -> std::sync::MutexGuard<'static, ()> {
+        crate::rme_console_link::SHARED_LINK_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     fn runtime_for(test_dir: &TestDir) -> RuntimeContext {
@@ -1078,62 +1196,213 @@ mod tests {
             CommissioningCommandError::InvalidParams(message) => {
                 assert_eq!(
                     message,
-                    "TotalMix's send host must be localhost or four numbers, like 127.0.0.1."
+                    "TotalMix's address must be localhost or four numbers, like 127.0.0.1."
                 );
             }
             other => panic!("unexpected error: {other:?}"),
         }
     }
 
+    // The one-machine rule (the audit of 2026-10-12): an address that is no
+    // machine's is refused before anything is saved, for the bridge and for
+    // TotalMix alike.
     #[test]
-    fn audio_probe_fails_without_live_rme_meter_packets() {
-        crate::rme_totalmix_osc::with_shared_meter_state_for_test(|_| {
-            let test_dir = TestDir::new("commissioning-audio-no-meter-packets");
-            let runtime = runtime_for(&test_dir);
-            initialize_test_database(&runtime.db_path).expect("database should initialize");
+    fn a_probe_refuses_an_address_that_is_not_one_machines() {
+        let test_dir = TestDir::new("commissioning-one-machine");
+        let runtime = runtime_for(&test_dir);
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
+        let refusal = |request: CommissioningCheckRequest| match run_commissioning_check(
+            &runtime.db_path,
+            &request,
+        ) {
+            Err(CommissioningCommandError::InvalidParams(message)) => message,
+            other => panic!("the address should be refused: {other:?}"),
+        };
+        for address in ["0.0.0.0", "255.255.255.255", "239.255.0.1"] {
+            assert_eq!(
+                refusal(CommissioningCheckRequest {
+                    target: CommissioningCheckTarget::Lighting,
+                    lighting_bridge_ip: Some(String::from(address)),
+                    lighting_universe: Some(1),
+                    audio_send_host: None,
+                    audio_send_port: None,
+                    audio_receive_port: None,
+                }),
+                "The lighting bridge IP must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address.",
+                "{address}"
+            );
+            assert_eq!(
+                refusal(CommissioningCheckRequest {
+                    target: CommissioningCheckTarget::Audio,
+                    lighting_bridge_ip: None,
+                    lighting_universe: None,
+                    audio_send_host: Some(String::from(address)),
+                    audio_send_port: Some(7_001),
+                    audio_receive_port: Some(19_001),
+                }),
+                "TotalMix's address must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address.",
+                "{address}"
+            );
+        }
+        let settings = list_settings_by_prefix(&runtime.db_path, APP_SETTINGS_PREFIX)
+            .expect("settings should load");
+        assert_eq!(
+            settings.get(LIGHTING_BRIDGE_IP_KEY).map(String::as_str),
+            Some(""),
+            "nothing saved"
+        );
+        assert_eq!(
+            settings.get(AUDIO_SEND_HOST_KEY).map(String::as_str),
+            Some(DEFAULT_AUDIO_SEND_HOST),
+            "nothing saved"
+        );
+        assert_eq!(
+            one_machine_ipv4("10.1.0.1"),
+            Some(Ipv4Addr::new(10, 1, 0, 1))
+        );
+        assert_eq!(one_machine_ipv4(" 127.0.0.1 "), Some(Ipv4Addr::LOCALHOST));
+        assert_eq!(one_machine_ipv4("224.0.0.1"), None);
+    }
 
-            let snapshot = run_commissioning_check(
+    // Without the metering loop (a test has none) the probe is refused at once
+    // and says so, with the ports as TotalMix names them; the typed address
+    // and ports are saved first all the same, since the loop binds to them.
+    #[test]
+    fn audio_probe_fails_at_once_without_the_metering_loop_and_saves_the_ports() {
+        let _serial = serialize_shared_link();
+        let test_dir = TestDir::new("commissioning-audio-no-metering");
+        let runtime = runtime_for(&test_dir);
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
+
+        let started = std::time::Instant::now();
+        let snapshot = run_commissioning_check(
+            &runtime.db_path,
+            &CommissioningCheckRequest {
+                target: CommissioningCheckTarget::Audio,
+                lighting_bridge_ip: None,
+                lighting_universe: None,
+                audio_send_host: Some(String::from("127.0.0.1")),
+                // A dead send port: nothing of the probe's must reach the
+                // studio's real TotalMix remotes on 7001-7004.
+                audio_send_port: Some(1),
+                audio_receive_port: Some(19_001),
+            },
+        )
+        .expect("audio probe should record failed status, not reject valid params");
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "no wait without a loop"
+        );
+
+        let audio_check = snapshot
+            .checks
+            .iter()
+            .find(|check| check.id == AUDIO_CHECK_ID)
+            .expect("audio check should be present");
+        assert_eq!(audio_check.status, "failed");
+        assert_eq!(
+            audio_check.message,
+            "The console's metering is not running, so TotalMix at 127.0.0.1 was not asked. Restart the hardware link, then run the probe again."
+        );
+        assert_eq!(snapshot.audio.send_host, "127.0.0.1");
+        assert_eq!(snapshot.audio.send_port, 1);
+        assert_eq!(snapshot.audio.receive_port, 19_001);
+    }
+
+    // With OSC off nobody would ask TotalMix: said at once, before any wait.
+    #[test]
+    fn audio_probe_fails_at_once_while_osc_is_off() {
+        let _serial = serialize_shared_link();
+        let test_dir = TestDir::new("commissioning-audio-osc-off");
+        let runtime = runtime_for(&test_dir);
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
+        crate::storage::set_settings_owned(
+            &runtime.db_path,
+            &[(String::from("app.audio.osc_enabled"), String::from("false"))],
+        )
+        .expect("the setting should persist");
+
+        let snapshot = run_commissioning_check(
+            &runtime.db_path,
+            &CommissioningCheckRequest {
+                target: CommissioningCheckTarget::Audio,
+                lighting_bridge_ip: None,
+                lighting_universe: None,
+                audio_send_host: Some(String::from("127.0.0.1")),
+                audio_send_port: Some(1),
+                audio_receive_port: Some(19_001),
+            },
+        )
+        .expect("the probe records a failed status");
+        let audio_check = snapshot
+            .checks
+            .iter()
+            .find(|check| check.id == AUDIO_CHECK_ID)
+            .expect("audio check should be present");
+        assert_eq!(audio_check.status, "failed");
+        assert_eq!(
+            audio_check.message,
+            "OSC is off in the audio settings, so TotalMix was not asked. Turn it on, then run the probe again."
+        );
+    }
+
+    // A probe with another address or other ports is a changed desk: the
+    // Console reads unknown until a Sync, as the audio settings' own change
+    // writes it (the roadmap's open item of 2026-10-01); the same address
+    // probed again leaves what the Console knows.
+    #[test]
+    fn audio_probe_with_other_ports_makes_the_console_unknown() {
+        let _serial = serialize_shared_link();
+        let test_dir = TestDir::new("commissioning-audio-unknown");
+        let runtime = runtime_for(&test_dir);
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
+        let confidence = || {
+            crate::audio::read_audio_snapshot(
+                &list_settings_by_prefix(&runtime.db_path, APP_SETTINGS_PREFIX)
+                    .expect("settings should load"),
+            )
+            .console_state_confidence
+        };
+        let probe = |send_port: i64| {
+            run_commissioning_check(
                 &runtime.db_path,
                 &CommissioningCheckRequest {
                     target: CommissioningCheckTarget::Audio,
                     lighting_bridge_ip: None,
                     lighting_universe: None,
                     audio_send_host: Some(String::from("127.0.0.1")),
-                    // A dead send port: the probe's bus pins must never reach
-                    // the studio's real TotalMix remotes on 7001-7003.
-                    audio_send_port: Some(1),
+                    audio_send_port: Some(send_port),
                     audio_receive_port: Some(19_001),
                 },
             )
-            .expect("audio probe should record failed status, not reject valid params");
+            .expect("the probe records its status");
+        };
+        probe(1);
+        crate::storage::set_settings_owned(
+            &runtime.db_path,
+            &[crate::audio::confidence_setting(
+                crate::audio::ConsoleConfidence::Aligned,
+            )],
+        )
+        .expect("the confidence should persist");
 
-            let audio_check = snapshot
-                .checks
-                .iter()
-                .find(|check| check.id == AUDIO_CHECK_ID)
-                .expect("audio check should be present");
-            assert_eq!(audio_check.status, "failed");
-            assert!(
-                audio_check
-                    .message
-                    .contains("No meter data arrived from TotalMix")
-                    || audio_check
-                        .message
-                        .contains("Audio OSC probe could not allocate a send socket"),
-                "unexpected audio probe message: {}",
-                audio_check.message
-            );
-            if audio_check
-                .message
-                .contains("No meter data arrived from TotalMix")
-            {
-                assert!(audio_check.message.contains("19001-19003"));
-            }
-        });
+        probe(1);
+        assert_eq!(
+            confidence(),
+            "aligned",
+            "the same address and ports leave the Console as it was"
+        );
+        probe(2);
+        assert_eq!(
+            confidence(),
+            "unknown",
+            "other ports make the Console unknown until a Sync"
+        );
     }
 
     #[test]
     fn audio_probe_passes_in_simulated_input_mode() {
+        let _serial = serialize_shared_link();
         // 2026-09 audit remediation, Slice 1: console writes are refused until
         // the audio probe passes, and a test has no TotalMix. Simulated
         // input mode is the honest way through — every audio surface labels
@@ -1209,5 +1478,79 @@ mod tests {
         assert!(!PROBE_CHECKED_BEFORE_THIS_VERSION
             .to_lowercase()
             .contains("planning"));
+    }
+
+    // What the audio probe says of each outcome holds the words rule, names
+    // the ports as TotalMix does, and tells a request that never went out
+    // (the app's own fault) from a TotalMix that did not answer (the review).
+    #[test]
+    fn the_audio_probes_sentences_hold_the_words_rule_and_tell_the_outcomes_apart() {
+        let sentence = |outcome| audio_probe_sentence("10.1.0.20", 7_001, 9_001, outcome);
+        let answered = sentence(Ok(ProbeAnswer::Answered)).expect("a pass");
+        assert!(
+            answered.contains("port incoming 7004 and port outgoing 9004"),
+            "{answered}"
+        );
+        assert!(answered.contains("port incoming 7001–7003 and port outgoing 9001–9003"));
+        let unbound = sentence(Ok(ProbeAnswer::SlotUnbound)).expect_err("a failure");
+        assert!(unbound.contains("port 9004"), "{unbound}");
+        let not_answered =
+            sentence(Ok(ProbeAnswer::Unanswered { asked: true })).expect_err("a failure");
+        assert!(
+            not_answered
+                .starts_with("TotalMix at 10.1.0.20 did not answer on remote 4 within 3 s."),
+            "{not_answered}"
+        );
+        let not_asked =
+            sentence(Ok(ProbeAnswer::Unanswered { asked: false })).expect_err("a failure");
+        assert!(
+            not_asked.starts_with(
+                "The hardware link did not get to ask TotalMix at 10.1.0.20 within 3 s."
+            ),
+            "{not_asked}"
+        );
+        assert!(
+            !not_asked.contains("Options"),
+            "nothing to set up in TotalMix: {not_asked}"
+        );
+        let no_loop = sentence(Err(ProbeRefused::NoMetering)).expect_err("a failure");
+        let busy = sentence(Err(ProbeRefused::Busy)).expect_err("a failure");
+        for text in [
+            &answered,
+            &unbound,
+            &not_answered,
+            &not_asked,
+            &no_loop,
+            &busy,
+        ] {
+            crate::operator_words::assert_operator_words(text);
+        }
+    }
+
+    // TotalMix's ports leave room for remotes 2 to 4 above them (the review).
+    #[test]
+    fn an_audio_probe_with_no_room_for_remote_4_is_refused() {
+        let test_dir = TestDir::new("commissioning-audio-port-room");
+        let runtime = runtime_for(&test_dir);
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
+        let error = run_commissioning_check(
+            &runtime.db_path,
+            &CommissioningCheckRequest {
+                target: CommissioningCheckTarget::Audio,
+                lighting_bridge_ip: None,
+                lighting_universe: None,
+                audio_send_host: Some(String::from("127.0.0.1")),
+                audio_send_port: Some(65_533),
+                audio_receive_port: Some(19_001),
+            },
+        )
+        .expect_err("the port should be refused");
+        match error {
+            CommissioningCommandError::InvalidParams(message) => assert_eq!(
+                message,
+                "TotalMix's ports must leave room for remotes 2 to 4 above them: at most 65532."
+            ),
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 }

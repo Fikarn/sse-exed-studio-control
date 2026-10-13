@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
-use std::str::FromStr;
 
 use super::editor_state::*;
 use super::fade::{apply_active_fade_sample, LightingFadeRuntimeStatus};
@@ -378,7 +377,10 @@ pub(crate) fn read_lighting_sacn_output_state_at(
     if !parsed.config.enabled {
         return None;
     }
-    let bridge_ip = Ipv4Addr::from_str(parsed.config.bridge_ip.trim()).ok()?;
+    // An address that is not one machine's (saved data from before the rule)
+    // is never streamed to: a multicast address would reach every sACN
+    // receiver on the LAN (the audit of 2026-10-12).
+    let bridge_ip = crate::commissioning::one_machine_ipv4(&parsed.config.bridge_ip)?;
     let mut editor_state = parsed.editor_state.clone();
     let fixtures = fixtures_now(settings, &mut editor_state, now_ms).fixtures;
     if fixtures.is_empty() {
@@ -424,7 +426,20 @@ pub fn lighting_watched_bridge(settings: &HashMap<String, String>) -> Option<Ipv
     if !config.enabled {
         return None;
     }
-    Ipv4Addr::from_str(config.bridge_ip.trim()).ok()
+    crate::commissioning::one_machine_ipv4(&config.bridge_ip)
+}
+
+/// The bridge address the wire refuses (the one-machine rule, the audit of
+/// 2026-10-12): an address that is an IPv4 address but no machine's, held by
+/// saved data from before the rule, while lighting is on. The sACN output
+/// says so in the log, once per address; `None` otherwise.
+pub fn lighting_bridge_refused_at_wire(settings: &HashMap<String, String>) -> Option<String> {
+    let config = resolve_lighting_config(settings);
+    let address = config.bridge_ip.trim();
+    (config.enabled
+        && address.parse::<Ipv4Addr>().is_ok()
+        && crate::commissioning::one_machine_ipv4(address).is_none())
+    .then(|| String::from(address))
 }
 
 pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> LightingHealthCheck {

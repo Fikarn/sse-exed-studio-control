@@ -338,9 +338,10 @@ impl SimulatedAudioMeterCache {
 
 /// The request loop: one JSON request per line on stdin until the shell
 /// closes it, each answered through the output writer. A camera press, which
-/// may wait on a camera (the audit of 2026-10-12, H1), runs on a thread of its
-/// own and answers through the same writer, so the loop serves the next
-/// request meanwhile; every other request is answered here, in turn.
+/// may wait on a camera, and a Setup probe, which waits on the bridge or on
+/// TotalMix (the audit of 2026-10-12, H1 and M4), run on a thread of their
+/// own and answer through the same writer (`aside_for`), so the loop serves
+/// the next request meanwhile; every other request is answered here, in turn.
 fn serve_requests(
     app: &Arc<EngineApp>,
     reader: &mut impl BufRead,
@@ -366,8 +367,8 @@ fn serve_requests(
             }
         };
 
-        if cameras::is_press_method(&request.method) {
-            spawn_press(Arc::clone(app), request, output_sender.clone());
+        if let Some(aside) = aside_for(&request.method) {
+            spawn_aside(Arc::clone(app), request, output_sender.clone(), aside);
             continue;
         }
         send_reply(output_sender, app.handle_request(request))?;
@@ -390,21 +391,66 @@ fn send_reply(output_sender: &Sender<Value>, reply: EngineReply) -> io::Result<(
 /// The sentence a press is refused with when its thread could not run it.
 const PRESS_FAILED: &str =
     "The press did not finish inside the hardware link. Press it again; the log says what happened.";
+/// The sentence a probe is refused with when its thread could not run it.
+const PROBE_FAILED: &str =
+    "The probe did not finish inside the hardware link. Run it again; the log says what happened.";
 
-/// Runs a camera press on a thread of its own and answers it through the
-/// output writer. A press that panics is refused rather than left unanswered
-/// (the hook has logged the panic), so the page is not held to the shell's
-/// timeout; a thread that cannot start refuses it the same way.
-fn spawn_press(app: Arc<EngineApp>, request: RequestEnvelope, sender: Sender<Value>) {
+/// A request answered aside the request loop, on a thread of its own, because
+/// it waits on a device (the audit of 2026-10-12, H1 and M4).
+struct Aside {
+    thread: &'static str,
+    /// The refusal's code and sentence when the thread fails or cannot start.
+    code: &'static str,
+    refused: &'static str,
+    could_not_start: &'static str,
+}
+
+/// A camera press, which may wait on a camera for 2 s.
+const CAMERA_PRESS: Aside = Aside {
+    thread: "cameras-press",
+    code: "CAMERA_PRESS_FAILED",
+    refused: PRESS_FAILED,
+    could_not_start: "A camera press could not start its thread",
+};
+
+/// Setup's probes, which wait on the bridge for 1.5 s or on TotalMix for 3 s.
+const SETUP_PROBE: Aside = Aside {
+    thread: "setup-probe",
+    code: "PROBE_FAILED",
+    refused: PROBE_FAILED,
+    could_not_start: "A probe could not start its thread",
+};
+
+/// Which requests run aside the loop; every other request is answered in turn.
+fn aside_for(method: &str) -> Option<&'static Aside> {
+    if cameras::is_press_method(method) {
+        Some(&CAMERA_PRESS)
+    } else if commissioning::is_probe_method(method) {
+        Some(&SETUP_PROBE)
+    } else {
+        None
+    }
+}
+
+/// Runs a request on a thread of its own and answers it through the output
+/// writer. One that panics is refused rather than left unanswered (the hook
+/// has logged the panic), so the page is not held to the shell's timeout; a
+/// thread that cannot start refuses it the same way.
+fn spawn_aside(
+    app: Arc<EngineApp>,
+    request: RequestEnvelope,
+    sender: Sender<Value>,
+    aside: &'static Aside,
+) {
     let id = request.id.clone();
     let refusal = |id: Value| EngineReply {
-        response: error_response(id, "CAMERA_PRESS_FAILED", String::from(PRESS_FAILED)),
+        response: error_response(id, aside.code, String::from(aside.refused)),
         events: Vec::new(),
     };
     let thread_sender = sender.clone();
     let thread_id = id.clone();
     let spawned = thread::Builder::new()
-        .name(String::from("cameras-press"))
+        .name(String::from(aside.thread))
         .spawn(move || {
             let reply = match catch_unwind(AssertUnwindSafe(|| app.handle_request(request))) {
                 Ok(reply) => reply,
@@ -415,7 +461,7 @@ fn spawn_press(app: Arc<EngineApp>, request: RequestEnvelope, sender: Sender<Val
     if let Err(error) = spawned {
         log_event(
             LogLevel::Error,
-            &format!("A camera press could not start its thread: {error}."),
+            &format!("{}: {error}.", aside.could_not_start),
         );
         let _ = send_reply(&sender, refusal(id));
     }
@@ -797,14 +843,27 @@ mod tests {
     use crate::audio::read_audio_snapshot;
     use std::collections::HashMap;
 
-    // The refusal a press gets when its thread could not run it holds the words rule.
+    // The refusal a press or a probe gets when its thread could not run it
+    // holds the words rule, and the requests that run aside the loop are the
+    // seven presses and the probe.
     #[test]
-    fn a_press_that_could_not_run_is_refused_in_the_operators_words() {
+    fn a_press_or_a_probe_that_could_not_run_is_refused_in_the_operators_words() {
         crate::operator_words::assert_operator_words(PRESS_FAILED);
+        crate::operator_words::assert_operator_words(PROBE_FAILED);
         for method in cameras::commands::PRESS_METHODS {
             assert!(cameras::is_press_method(method));
+            assert_eq!(
+                aside_for(method).map(|aside| aside.code),
+                Some("CAMERA_PRESS_FAILED")
+            );
         }
+        assert_eq!(
+            aside_for(commissioning::PROBE_METHOD).map(|aside| aside.code),
+            Some("PROBE_FAILED")
+        );
         assert!(!cameras::is_press_method("cameras.snapshot"));
+        assert!(aside_for("cameras.snapshot").is_none());
+        assert!(aside_for("commissioning.snapshot").is_none());
     }
 
     #[test]

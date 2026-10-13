@@ -192,14 +192,14 @@ describe("the fixture double's health words", () => {
 
     // A probe that failed stored its address too: the rig is on, and needs attention.
     const refusedAtStart = createFixtureTransport(getFixtureScenario("setup-required"));
-    await refusedAtStart.request("commissioning.check.run", { target: "lighting", bridgeIp: "0.0.0.0" });
+    await refusedAtStart.request("commissioning.check.run", { target: "lighting", bridgeIp: "10.255.255.1" });
     expect((await healthChecks(refusedAtStart)).lighting).toBe("attention");
     expect(await rigState(refusedAtStart)).toBe("attention");
     expect(await rigSwitch(refusedAtStart)).toBe(true);
 
     const rig = createFixtureTransport(getFixtureScenario("lighting-populated"));
     expect((await healthChecks(rig)).lighting).toBe("ready");
-    await rig.request("commissioning.check.run", { target: "lighting", bridgeIp: "0.0.0.0" });
+    await rig.request("commissioning.check.run", { target: "lighting", bridgeIp: "10.255.255.1" });
     const refused = await healthChecks(rig);
     expect(refused.lighting).toBe("attention");
     expect(refused.ok.lighting).toBe(false);

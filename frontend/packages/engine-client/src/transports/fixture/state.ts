@@ -965,6 +965,20 @@ export function validateIpv4(value: string) {
   return /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(value.trim());
 }
 
+/**
+ * The one-machine rule, as the hardware link holds it (the audit of 2026-10-12): an IPv4
+ * address that is one machine's, so never 0.0.0.0, the broadcast address or a multicast
+ * address, which the lights would stream to every sACN receiver on the LAN.
+ */
+export function isOneMachineIpv4(value: string) {
+  if (!validateIpv4(value)) return false;
+  const octets = value.trim().split(".").map(Number);
+  const [first] = octets;
+  if (octets.every((octet) => octet === 0)) return false;
+  if (octets.every((octet) => octet === 255)) return false;
+  return !(first !== undefined && first >= 224 && first <= 239);
+}
+
 export function validatePort(value: number) {
   return Number.isInteger(value) && value >= 1 && value <= 65535;
 }

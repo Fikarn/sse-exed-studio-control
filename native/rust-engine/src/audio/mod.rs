@@ -84,7 +84,11 @@ mod types;
 pub use channels::*;
 pub use clips::*;
 pub use console_link::*;
-pub(crate) use helpers::{audio_metering_is_simulated, ensure_audio_action_allowed};
+pub(crate) use helpers::{
+    audio_metering_is_simulated, audio_osc_enabled, ensure_audio_action_allowed, lock_audio_state,
+};
+#[cfg(test)]
+pub(crate) use helpers::{confidence_setting, ConsoleConfidence};
 pub use load::*;
 pub use mix_targets::*;
 pub use parse::*;
@@ -95,6 +99,8 @@ pub use types::*;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_address_rules;
 #[cfg(test)]
 mod tests_console_link;
 #[cfg(test)]

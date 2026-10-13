@@ -29,6 +29,11 @@ mod osc_read;
 mod global_quiet;
 
 use global_quiet::GlobalQuiet;
+mod probe;
+#[cfg(test)]
+use probe::ProbeMailbox;
+pub(crate) use probe::{probe_console, ProbeAnswer, ProbeKey, ProbeRefused};
+use probe::{MeteringRunning, PROBE_MAILBOX};
 
 pub(crate) use global_commands::{
     global_channel_surface, global_channel_target, global_output_channel, global_output_mix_target,
@@ -670,28 +675,6 @@ pub fn clear_shared_clip_latches(channel_id: Option<&str>) {
     };
 }
 
-pub fn current_shared_status() -> RmeMeteringState {
-    let state = shared_meter_state();
-    let Ok(state) = state.lock() else {
-        return RmeMeteringState::Offline;
-    };
-    let now_ms = monotonic_now_ms();
-    state.status_at(now_ms)
-}
-
-pub fn wait_for_live_metering(timeout: Duration) -> bool {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if current_shared_status() == RmeMeteringState::Live {
-            return true;
-        }
-        if Instant::now() >= deadline {
-            return false;
-        }
-        thread::sleep(Duration::from_millis(25));
-    }
-}
-
 pub fn spawn_rme_totalmix_audio_metering(
     sender: Sender<Value>,
     db_path: PathBuf,
@@ -727,6 +710,9 @@ pub fn spawn_rme_totalmix_audio_metering(
         let mut last_status_publish_at: Option<Instant> = None;
         let mut last_keepalive_at: Option<Instant> = None;
         let mut last_link_flush_at: Option<Instant> = None;
+        // Setup's probe asks whether this loop runs; the guard says so for
+        // the loop's life, a panic's end included.
+        let _running = MeteringRunning::enter();
 
         loop {
             let now = Instant::now();
@@ -777,7 +763,7 @@ pub fn spawn_rme_totalmix_audio_metering(
                         }
                         None => {
                             let message = format!(
-                                "RME TotalMix metering is not listening: the TotalMix address {:?} does not resolve to an IP address (Setup, TotalMix address)",
+                                "RME TotalMix metering is not listening: the TotalMix address {:?} is no machine's address, or does not resolve to one (Setup, TotalMix address)",
                                 snapshot.send_host
                             );
                             let _ = append_log(&log_file_path, "WARN", &message);
@@ -824,7 +810,12 @@ pub fn spawn_rme_totalmix_audio_metering(
                     .unwrap_or(true)
             {
                 if let Some((send_host, _, _)) = bound_key.as_ref() {
-                    send_slot_keepalives(&sockets, send_host);
+                    // The remotes' bus and bank selection waits for a passed
+                    // probe (the audit of 2026-10-12): nothing that changes
+                    // TotalMix is written before it.
+                    if remotes_may_be_selected(cached_snapshot.as_ref()) {
+                        send_slot_keepalives(&sockets, send_host);
+                    }
                     if let Some(slot) = global_slot.as_mut() {
                         let stale = slot
                             .last_rx_at
@@ -848,6 +839,9 @@ pub fn spawn_rme_totalmix_audio_metering(
                     service_console_link(slot, send_host);
                 }
             }
+            // Setup's probe, if one waits: served once the bound settings are
+            // its own (`ProbeMailbox`).
+            PROBE_MAILBOX.service(bound_key.as_ref(), global_slot.as_ref(), now);
             if last_link_flush_at
                 .map(|last| now.duration_since(last) >= LINK_FLUSH_INTERVAL)
                 .unwrap_or(true)
@@ -954,7 +948,16 @@ pub(crate) fn resolve_console_address(send_host: &str) -> Option<IpAddr> {
         return Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
     if let Ok(address) = host.parse::<IpAddr>() {
-        return Some(address);
+        // The one-machine rule at the wire (the audit of 2026-10-12): saved
+        // data from before the rule may hold an address that is no machine's;
+        // the loop then binds nothing and says so, and no request goes to a
+        // multicast group or to every machine.
+        return match address {
+            IpAddr::V4(v4) if crate::commissioning::one_machine_ipv4(&v4.to_string()).is_none() => {
+                None
+            }
+            address => Some(address),
+        };
     }
     (host, 0_u16)
         .to_socket_addrs()
@@ -1271,6 +1274,11 @@ pub(crate) struct GlobalOscSlot {
     send_port: u16,
     socket: UdpSocket,
     last_rx_at: Option<Instant>,
+    /// Datagrams accepted from the console on this slot since it was bound;
+    /// Setup's probe counts TotalMix's answer by it: any datagram from the
+    /// console after its request, which proves that TotalMix at that address
+    /// sends to this port, not which request it answered.
+    heard: u64,
     /// The console's address: the one source this slot reads.
     console: IpAddr,
     /// Whether TotalMix is in touch on this remote.
@@ -1284,10 +1292,37 @@ impl GlobalOscSlot {
             send_port,
             socket,
             last_rx_at: None,
+            heard: 0,
             console,
             quiet: GlobalQuiet::new(Instant::now(), port),
         }
     }
+
+    /// Sends `/sendstate 1` to TotalMix at `host` on this remote: the status
+    /// request a TotalMix in touch always answers.
+    fn ask_for_state(&self, host: &str) -> bool {
+        let host = host.trim();
+        if host.is_empty() {
+            return false;
+        }
+        let (address, value) = console_state_message();
+        let Ok(bytes) = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: address,
+            args: vec![value],
+        })) else {
+            return false;
+        };
+        self.socket.send_to(&bytes, (host, self.send_port)).is_ok()
+    }
+}
+
+/// Whether the remotes' bus and bank selection (`send_slot_keepalives`) may go
+/// out: only once the audio probe has passed (the Console reads `ready`). The
+/// selection changes a remote's view, and until the probe has passed nothing
+/// that changes TotalMix is written (`docs/HARDWARE.md`); the Global remote's
+/// status request, which changes nothing, goes out regardless.
+fn remotes_may_be_selected(snapshot: Option<&AudioSnapshot>) -> bool {
+    snapshot.is_some_and(|snapshot| snapshot.status == "ready")
 }
 
 fn bind_global_slot(
@@ -1324,6 +1359,7 @@ pub(crate) fn read_global_packets(
                 }
                 let heard_at = Instant::now();
                 slot.last_rx_at = Some(heard_at);
+                slot.heard = slot.heard.saturating_add(1);
                 // TotalMix back after a quiet: the console link is marked at
                 // its first datagram, so the mark is there before a Sync whose
                 // dump follows has read the desk, and the Sync's aligned comes
