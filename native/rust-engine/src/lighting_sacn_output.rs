@@ -29,8 +29,9 @@ use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_SACN};
 use crate::lighting::{
-    lighting_output_armed, lighting_render_generation, read_lighting_sacn_output_state_from,
-    LightingSacnOutputState, LightingUniverseFrame, ParsedLightingState, LIGHTING_OUTPUT_ARMED_KEY,
+    lighting_bridge_refused_at_wire, lighting_output_armed, lighting_render_generation,
+    read_lighting_sacn_output_state_from, LightingSacnOutputState, LightingUniverseFrame,
+    ParsedLightingState, LIGHTING_OUTPUT_ARMED_KEY,
 };
 use crate::liveness::{Beat, Lifetime, Spec};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
@@ -232,6 +233,9 @@ struct SacnOutput {
     simulated: bool,
     /// How the sends go: a failed one is said, and read on the entry.
     sends: SendTally,
+    /// The bridge address the wire refused and the log has said so for
+    /// (the one-machine rule): said once per address.
+    refused_said: Option<String>,
     /// A test's wire with no route: every send fails as a socket's would.
     #[cfg(test)]
     broken_wire: bool,
@@ -364,9 +368,30 @@ impl SacnOutput {
             held: false,
             simulated: false,
             sends: SendTally::default(),
+            refused_said: None,
             #[cfg(test)]
             broken_wire: false,
         }
+    }
+
+    /// Saved data from before the one-machine rule may hold a bridge address
+    /// that is no machine's: the wire streams nothing to it, and the log says
+    /// so once per address, since the page shows only the probe's old word.
+    fn say_refused_bridge(&mut self, settings: &HashMap<String, String>, log_file_path: &Path) {
+        let refused = lighting_bridge_refused_at_wire(settings);
+        if refused == self.refused_said {
+            return;
+        }
+        if let Some(address) = &refused {
+            let _ = append_log(
+                log_file_path,
+                "WARN",
+                &format!(
+                    "Lighting sACN output: the bridge address {address} is no machine's (0.0.0.0, a broadcast or a multicast address) and nothing is streamed to it. Enter the bridge's own address in Setup."
+                ),
+            );
+        }
+        self.refused_said = refused;
     }
 
     /// One packet to the bridge, counted in the tally; whether it went. The
@@ -428,6 +453,8 @@ impl SacnOutput {
                 },
             );
         }
+
+        self.say_refused_bridge(&input.settings, log_file_path);
 
         // Held is the same as ineligible as far as the wire goes: whatever
         // was streaming ends with stream-terminated packets, then silence.
@@ -697,6 +724,44 @@ mod tests {
             );
             assert!(crate::lighting::lighting_watched_bridge(&no_machine).is_none());
         }
+    }
+
+    // The wire refusing a saved bridge address is said in the log, once per
+    // address, since the page shows only the probe's old word (the review).
+    #[test]
+    fn a_bridge_address_the_wire_refuses_is_said_once() {
+        use crate::control_surface::test_support::TestDir;
+
+        let test_dir = TestDir::new("sacn-refused-bridge");
+        let log = test_dir.path().join("engine.log");
+        let (_wire, port) = Wire::open();
+        let mut output = test_output(port);
+        let mut multicast = output_settings(Some(true));
+        multicast.insert(
+            String::from(LIGHTING_BRIDGE_IP_KEY),
+            String::from("239.255.0.1"),
+        );
+        for _ in 0..3 {
+            output.tick_settings(&multicast, &log);
+        }
+        let text = std::fs::read_to_string(&log).expect("the log is written");
+        assert_eq!(
+            text.matches("the bridge address 239.255.0.1 is no machine's")
+                .count(),
+            1,
+            "{text}"
+        );
+        assert!(!output.sends.failing, "nothing was sent, so nothing failed");
+
+        // The address set right: nothing more is said; set wrong again, once more.
+        output.tick_settings(&output_settings(Some(true)), &log);
+        output.tick_settings(&multicast, &log);
+        let text = std::fs::read_to_string(&log).expect("the log is written");
+        assert_eq!(
+            text.matches("the bridge address 239.255.0.1 is no machine's")
+                .count(),
+            2
+        );
     }
 
     #[test]

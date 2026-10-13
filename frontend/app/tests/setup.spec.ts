@@ -77,13 +77,13 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
 
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
-  await page.getByLabel("Lighting bridge IP").fill("0.0.0.0");
+  await page.getByLabel("Lighting bridge IP").fill("10.255.255.1");
   await page.getByTestId("setup-run-all-probes").click();
   // Slice 7: the step's own note prints the same count, so the result the probe
   // run reported is read off the notice it wrote.
   const feedback = page.getByTestId("setup-feedback");
   await expect(feedback).toContainText("2 of 3 probes passed");
-  await expect(feedback).toContainText("Lighting bridge: Bridge 0.0.0.0 did not answer");
+  await expect(feedback).toContainText("Lighting bridge: Bridge 10.255.255.1 did not answer");
   await expect(feedback).not.toContainText("..");
   // A failed probe never advances the runner on its own.
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();

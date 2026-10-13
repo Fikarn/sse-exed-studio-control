@@ -1795,6 +1795,11 @@ fn probe_key(send_port: u16) -> ProbeKey {
 
 #[test]
 fn the_probe_asks_totalmix_for_its_state_once_the_loop_has_bound_its_settings() {
+    // The answer fed to the slot reaches the shared console link, which the
+    // load tests read back: one at a time with them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (fake_console, console_port) = bind_test_receiver();
     let mut slot = bind_test_global_slot(console_port);
     let mailbox = ProbeMailbox::new();
@@ -1958,4 +1963,18 @@ fn a_probe_without_the_metering_loop_is_refused_at_once() {
         Err(ProbeRefused::NoMetering)
     );
     assert!(started.elapsed() < Duration::from_millis(500));
+}
+
+// The one-machine rule at the wire (the review): saved data from before the
+// rule may hold a TotalMix address that is no machine's; the loop then binds
+// nothing, and no request goes to a multicast group or to every machine.
+#[test]
+fn a_totalmix_address_that_is_not_one_machines_resolves_to_nothing() {
+    for address in ["0.0.0.0", "255.255.255.255", "239.255.0.1"] {
+        assert_eq!(resolve_console_address(address), None, "{address}");
+    }
+    assert_eq!(
+        resolve_console_address("10.1.0.20"),
+        Some(IpAddr::V4(Ipv4Addr::new(10, 1, 0, 20)))
+    );
 }

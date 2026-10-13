@@ -101,11 +101,23 @@ pub fn update_audio_settings(
     }
 
     if let Some(send_port) = request.send_port {
+        if let Some(refusal) = totalmix_port_refusal(send_port) {
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_PORT_INVALID",
+                String::from(refusal),
+            ));
+        }
         updates.push((String::from(AUDIO_SEND_PORT_KEY), send_port.to_string()));
         summary_parts.push(format!("send port -> {}", send_port));
     }
 
     if let Some(receive_port) = request.receive_port {
+        if let Some(refusal) = totalmix_port_refusal(receive_port) {
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_PORT_INVALID",
+                String::from(refusal),
+            ));
+        }
         updates.push((
             String::from(AUDIO_RECEIVE_PORT_KEY),
             receive_port.to_string(),
@@ -223,18 +235,6 @@ pub fn update_audio_settings(
     }
 
     if transport_changed {
-        updates.push((
-            format!("app.commissioning.check.{AUDIO_CHECK_ID}.status"),
-            String::from("idle"),
-        ));
-        updates.push((
-            format!("app.commissioning.check.{AUDIO_CHECK_ID}.message"),
-            String::from("The TotalMix address or ports changed. Run the audio probe again."),
-        ));
-        updates.push((
-            format!("app.commissioning.check.{AUDIO_CHECK_ID}.checked_at"),
-            String::new(),
-        ));
         updates.extend(console_transport_changed_updates());
         summary_parts.push(String::from("audio probe reset"));
     }
@@ -266,14 +266,29 @@ pub fn update_audio_settings(
 /// What a change of TotalMix's address or ports writes beside the new values,
 /// here and in Setup's audio probe (the audit of 2026-10-12: the probe wrote
 /// the address alone, and a saved `aligned` survived a port change): the
-/// Console reads `unknown` until a Sync, its last Sync is forgotten, and so
-/// are TotalMix's slot states, which belong to the desk the link heard;
-/// another address may be another desk. Written under `lock_audio_state`.
+/// audio probe reads `idle` again, so nothing that changes TotalMix is written
+/// to the new address until a probe has passed there (the probe itself writes
+/// its answer over it seconds later); the Console reads `unknown` until a
+/// Sync, its last Sync is forgotten, and so are TotalMix's slot states, which
+/// belong to the desk the link heard; another address may be another desk.
+/// Written under `lock_audio_state`.
 pub(crate) fn console_transport_changed_updates() -> Vec<(String, String)> {
     if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
         link.forget_snapshot_slots();
     }
     vec![
+        (
+            format!("app.commissioning.check.{AUDIO_CHECK_ID}.status"),
+            String::from("idle"),
+        ),
+        (
+            format!("app.commissioning.check.{AUDIO_CHECK_ID}.message"),
+            String::from("The TotalMix address or ports changed. Run the audio probe again."),
+        ),
+        (
+            format!("app.commissioning.check.{AUDIO_CHECK_ID}.checked_at"),
+            String::new(),
+        ),
         confidence_setting(ConsoleConfidence::Unknown),
         (String::from(AUDIO_LAST_CONSOLE_SYNC_AT_KEY), String::new()),
         (
@@ -281,6 +296,13 @@ pub(crate) fn console_transport_changed_updates() -> Vec<(String, String)> {
             String::new(),
         ),
     ]
+}
+
+/// TotalMix's ports must leave room for remotes 2 to 4 above them (the review
+/// of the audit's probes item): `None` when `port` does.
+pub(crate) fn totalmix_port_refusal(port: i64) -> Option<&'static str> {
+    (port > 65_532)
+        .then_some("TotalMix's ports must leave room for remotes 2 to 4 above them: at most 65532.")
 }
 
 /// The one-machine rule for TotalMix's address (the audit of 2026-10-12):

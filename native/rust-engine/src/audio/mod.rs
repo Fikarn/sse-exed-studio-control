@@ -100,6 +100,8 @@ pub use types::*;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_address_rules;
+#[cfg(test)]
 mod tests_console_link;
 #[cfg(test)]
 mod tests_console_load;

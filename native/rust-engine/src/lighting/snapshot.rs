@@ -429,6 +429,19 @@ pub fn lighting_watched_bridge(settings: &HashMap<String, String>) -> Option<Ipv
     crate::commissioning::one_machine_ipv4(&config.bridge_ip)
 }
 
+/// The bridge address the wire refuses (the one-machine rule, the audit of
+/// 2026-10-12): an address that is an IPv4 address but no machine's, held by
+/// saved data from before the rule, while lighting is on. The sACN output
+/// says so in the log, once per address; `None` otherwise.
+pub fn lighting_bridge_refused_at_wire(settings: &HashMap<String, String>) -> Option<String> {
+    let config = resolve_lighting_config(settings);
+    let address = config.bridge_ip.trim();
+    (config.enabled
+        && address.parse::<Ipv4Addr>().is_ok()
+        && crate::commissioning::one_machine_ipv4(address).is_none())
+    .then(|| String::from(address))
+}
+
 pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> LightingHealthCheck {
     let snapshot = read_lighting_snapshot(settings);
     LightingHealthCheck {

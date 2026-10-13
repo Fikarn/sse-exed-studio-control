@@ -33,7 +33,7 @@ mod probe;
 #[cfg(test)]
 use probe::ProbeMailbox;
 pub(crate) use probe::{probe_console, ProbeAnswer, ProbeKey, ProbeRefused};
-use probe::{METERING_RUNNING, PROBE_MAILBOX};
+use probe::{MeteringRunning, PROBE_MAILBOX};
 
 pub(crate) use global_commands::{
     global_channel_surface, global_channel_target, global_output_channel, global_output_mix_target,
@@ -710,7 +710,9 @@ pub fn spawn_rme_totalmix_audio_metering(
         let mut last_status_publish_at: Option<Instant> = None;
         let mut last_keepalive_at: Option<Instant> = None;
         let mut last_link_flush_at: Option<Instant> = None;
-        METERING_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
+        // Setup's probe asks whether this loop runs; the guard says so for
+        // the loop's life, a panic's end included.
+        let _running = MeteringRunning::enter();
 
         loop {
             let now = Instant::now();
@@ -761,7 +763,7 @@ pub fn spawn_rme_totalmix_audio_metering(
                         }
                         None => {
                             let message = format!(
-                                "RME TotalMix metering is not listening: the TotalMix address {:?} does not resolve to an IP address (Setup, TotalMix address)",
+                                "RME TotalMix metering is not listening: the TotalMix address {:?} is no machine's address, or does not resolve to one (Setup, TotalMix address)",
                                 snapshot.send_host
                             );
                             let _ = append_log(&log_file_path, "WARN", &message);
@@ -903,7 +905,6 @@ pub fn spawn_rme_totalmix_audio_metering(
 
             thread::sleep(poll_interval);
         }
-        METERING_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
     });
 }
 
@@ -947,7 +948,16 @@ pub(crate) fn resolve_console_address(send_host: &str) -> Option<IpAddr> {
         return Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
     if let Ok(address) = host.parse::<IpAddr>() {
-        return Some(address);
+        // The one-machine rule at the wire (the audit of 2026-10-12): saved
+        // data from before the rule may hold an address that is no machine's;
+        // the loop then binds nothing and says so, and no request goes to a
+        // multicast group or to every machine.
+        return match address {
+            IpAddr::V4(v4) if crate::commissioning::one_machine_ipv4(&v4.to_string()).is_none() => {
+                None
+            }
+            address => Some(address),
+        };
     }
     (host, 0_u16)
         .to_socket_addrs()
@@ -1265,7 +1275,9 @@ pub(crate) struct GlobalOscSlot {
     socket: UdpSocket,
     last_rx_at: Option<Instant>,
     /// Datagrams accepted from the console on this slot since it was bound;
-    /// Setup's probe counts TotalMix's answer by it.
+    /// Setup's probe counts TotalMix's answer by it: any datagram from the
+    /// console after its request, which proves that TotalMix at that address
+    /// sends to this port, not which request it answered.
     heard: u64,
     /// The console's address: the one source this slot reads.
     console: IpAddr,
