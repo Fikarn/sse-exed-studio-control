@@ -9,14 +9,14 @@
 //! log now says so, once per key for the engine's life.
 
 use std::collections::HashSet;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 use serde::de::DeserializeOwned;
 
 use crate::diagnostics::{log_event, LogLevel};
 
 /// The keys said in the log, each once.
-static SAID: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+static SAID: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// `value`, saved under `key`, as `T`; `None` when it does not read, with a
 /// WARN line the first time for that key.
@@ -38,8 +38,8 @@ pub(crate) fn parse_saved_json<T: DeserializeOwned>(key: &str, value: &str) -> O
 }
 
 fn first_complaint(key: &str) -> bool {
-    let mut said = SAID.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    said.get_or_insert_with(HashSet::new)
+    SAID.lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
         .insert(String::from(key))
 }
 
@@ -48,8 +48,7 @@ fn first_complaint(key: &str) -> bool {
 pub(crate) fn complained_about(key: &str) -> bool {
     SAID.lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .as_ref()
-        .is_some_and(|said| said.contains(key))
+        .contains(key)
 }
 
 #[cfg(test)]

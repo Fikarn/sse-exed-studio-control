@@ -40,7 +40,7 @@ describe("startupHelpers failure copy", () => {
       stage: "bootstrap",
     };
 
-    expect(getFailureTitle(failure)).toBe("Saved data from a newer build");
+    expect(getFailureTitle(failure)).toBe("Saved data too new");
     expect(formatFailureCode(failure)).toBe("Saved data from a newer build");
   });
 

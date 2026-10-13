@@ -216,12 +216,18 @@ pub(crate) fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         .and_then(|name| name.to_str())
         .ok_or_else(|| std::io::Error::other("the file has no name"))?;
     let part = path.with_file_name(format!("{name}.part"));
-    {
+    let written = (|| {
         let mut file = fs::File::create(&part)?;
         file.write_all(bytes)?;
         file.sync_all()?;
+        drop(file);
+        fs::rename(&part, path)
+    })();
+    if written.is_err() {
+        // Nothing lists a part file, and nothing would remove one either.
+        let _ = fs::remove_file(&part);
     }
-    fs::rename(&part, path)
+    written
 }
 
 /// Removes the oldest backups of every reason beyond its retention. The
@@ -270,16 +276,28 @@ pub fn prune_snapshots(backups_dir: &Path) -> EngineResult<Vec<PathBuf>> {
 /// The newest verified engine-written backup, by name. A `replaced` file is
 /// not a verified copy, so the recovery sentence never points at one.
 pub fn newest_snapshot(backups_dir: &Path) -> Option<PathBuf> {
-    fs::read_dir(backups_dir)
-        .ok()?
+    snapshots_newest_first(backups_dir).into_iter().next()
+}
+
+/// Every database backup but the replaced files, newest first: the names
+/// carry the timestamp at fixed width, so name order is age order.
+pub fn snapshots_newest_first(backups_dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(backups_dir) else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())
         .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
         .filter(|name| {
             snapshot_reason_of(name).is_some_and(|reason| reason != SnapshotReason::Replaced)
         })
-        .max()
+        .collect();
+    names.sort_unstable_by(|left, right| right.cmp(left));
+    names
+        .into_iter()
         .map(|name| backups_dir.join(name))
+        .collect()
 }
 
 pub(crate) fn snapshot_reason_of(file_name: &str) -> Option<SnapshotReason> {

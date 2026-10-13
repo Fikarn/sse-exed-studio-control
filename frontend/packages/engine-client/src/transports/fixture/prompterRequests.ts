@@ -311,6 +311,9 @@ function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params:
         );
       }
       // The page's second press, as the hardware link asks for it (the audit of 2026-10-12).
+      if (params.confirm !== undefined && params.confirm !== null && typeof params.confirm !== "boolean") {
+        throw invalid("confirm must be true or false.");
+      }
       if (params.confirm !== true) {
         throw new EngineRequestError(
           "PROMPTER_DELETE_NOT_CONFIRMED",

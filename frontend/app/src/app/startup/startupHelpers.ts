@@ -200,9 +200,10 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
     return "Saved data damaged";
   }
   // Not damaged, only newer than this build reads: the newer build, or a
-  // backup from before it, is the way out (the audit of 2026-10-12, M3).
+  // backup from before it, is the way out (the audit of 2026-10-12, M3). The
+  // word fits the display (below); the meta line says it longer.
   if (startupFailure?.code === "STORAGE_NEWER_SCHEMA") {
-    return "Saved data from a newer build";
+    return "Saved data too new";
   }
 
   // 2026-09 production readiness, Slice 5 (F09): the hardware link stopped
