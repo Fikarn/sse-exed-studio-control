@@ -1778,3 +1778,184 @@ fn a_first_hearing_after_the_start_marks_nothing() {
         "a first hearing marks nothing"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Setup's audio probe (the audit of 2026-10-12, M4): the probe's request goes
+// out once the loop has bound the probe's settings, on the Global slot, and
+// the answer is TotalMix's first datagram after it.
+// ---------------------------------------------------------------------------
+
+fn probe_key(send_port: u16) -> ProbeKey {
+    ProbeKey {
+        host: String::from("127.0.0.1"),
+        send_port: i64::from(send_port),
+        receive_port: 19_301,
+    }
+}
+
+#[test]
+fn the_probe_asks_totalmix_for_its_state_once_the_loop_has_bound_its_settings() {
+    let (fake_console, console_port) = bind_test_receiver();
+    let mut slot = bind_test_global_slot(console_port);
+    let mailbox = ProbeMailbox::new();
+    let started = Instant::now();
+    let receiver = mailbox
+        .post(probe_key(console_port), started + Duration::from_secs(3))
+        .expect("the first probe posts");
+    assert!(
+        matches!(
+            mailbox.post(probe_key(console_port), started + Duration::from_secs(3)),
+            Err(ProbeRefused::Busy)
+        ),
+        "one probe at a time"
+    );
+
+    // Other settings bound: nothing is asked, the probe waits.
+    let other = (
+        String::from("127.0.0.1"),
+        i64::from(console_port) + 1,
+        19_301,
+    );
+    mailbox.service(Some(&other), Some(&slot), started);
+    fake_console
+        .set_read_timeout(Some(Duration::from_millis(100)))
+        .expect("timeout should set");
+    let mut buffer = [0_u8; 256];
+    assert!(
+        fake_console.recv_from(&mut buffer).is_err(),
+        "no request before the loop binds the probe's settings"
+    );
+    assert!(receiver.try_recv().is_err());
+
+    // The probe's settings bound: `/sendstate 1` goes to TotalMix.
+    let bound = (String::from("127.0.0.1"), i64::from(console_port), 19_301);
+    mailbox.service(
+        Some(&bound),
+        Some(&slot),
+        started + Duration::from_millis(500),
+    );
+    assert_eq!(
+        receive_messages(&fake_console, 1),
+        vec![(String::from("/sendstate"), Some(1.0))]
+    );
+    mailbox.service(
+        Some(&bound),
+        Some(&slot),
+        started + Duration::from_millis(520),
+    );
+    assert!(receiver.try_recv().is_err(), "nothing heard yet");
+
+    // TotalMix answers from the console's address: the probe is answered.
+    let reply = encoder::encode(&OscPacket::Message(OscMessage {
+        addr: String::from("/status/connection"),
+        args: vec![OscType::Float(1.0)],
+    }))
+    .expect("reply should encode");
+    fake_console
+        .send_to(&reply, ("127.0.0.1", slot.local_port()))
+        .expect("reply should send");
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(None);
+    let heard_at = Instant::now() + Duration::from_millis(50);
+    while slot.heard == 0 && Instant::now() < heard_at + Duration::from_secs(2) {
+        read_global_packets(&mut slot, &state, monotonic_now_ms(), &mut drops);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(slot.heard, 1, "the answer was heard on the slot");
+    mailbox.service(
+        Some(&bound),
+        Some(&slot),
+        started + Duration::from_millis(600),
+    );
+    assert_eq!(receiver.try_recv(), Ok(ProbeAnswer::Answered));
+    assert!(
+        mailbox
+            .post(probe_key(console_port), started + Duration::from_secs(6))
+            .is_ok(),
+        "the mailbox is free again"
+    );
+}
+
+#[test]
+fn the_probe_is_unanswered_at_its_deadline_and_unbound_without_a_global_slot() {
+    let (_fake_console, console_port) = bind_test_receiver();
+    let slot = bind_test_global_slot(console_port);
+    let started = Instant::now();
+    let bound = (String::from("127.0.0.1"), i64::from(console_port), 19_301);
+
+    // Asked, and nothing came: unanswered at the deadline, with `asked`.
+    let mailbox = ProbeMailbox::new();
+    let receiver = mailbox
+        .post(probe_key(console_port), started + Duration::from_secs(3))
+        .expect("posts");
+    mailbox.service(Some(&bound), Some(&slot), started);
+    mailbox.service(Some(&bound), Some(&slot), started + Duration::from_secs(2));
+    assert!(receiver.try_recv().is_err(), "the deadline has not come");
+    mailbox.service(Some(&bound), Some(&slot), started + Duration::from_secs(3));
+    assert_eq!(
+        receiver.try_recv(),
+        Ok(ProbeAnswer::Unanswered { asked: true })
+    );
+
+    // Never bound (OSC off, or the settings not re-read): unanswered, not asked.
+    let receiver = mailbox
+        .post(probe_key(console_port), started + Duration::from_secs(3))
+        .expect("posts");
+    mailbox.service(None, None, started + Duration::from_secs(3));
+    assert_eq!(
+        receiver.try_recv(),
+        Ok(ProbeAnswer::Unanswered { asked: false })
+    );
+
+    // The probe's settings bound, but no Global slot: the port is held.
+    let receiver = mailbox
+        .post(probe_key(console_port), started + Duration::from_secs(3))
+        .expect("posts");
+    mailbox.service(Some(&bound), None, started);
+    assert_eq!(receiver.try_recv(), Ok(ProbeAnswer::SlotUnbound));
+
+    // A probe nobody waits for is withdrawn.
+    let _receiver = mailbox
+        .post(probe_key(console_port), started + Duration::from_secs(3))
+        .expect("posts");
+    mailbox.withdraw();
+    assert!(mailbox
+        .post(probe_key(console_port), started + Duration::from_secs(3))
+        .is_ok());
+}
+
+// Nothing that changes TotalMix is written before the audio probe has passed:
+// the remotes' bus and bank selection waits for the Console to read `ready`.
+#[test]
+fn the_remotes_are_selected_only_once_the_audio_probe_has_passed() {
+    let mut settings = HashMap::new();
+    assert!(!remotes_may_be_selected(None));
+    assert!(!remotes_may_be_selected(Some(&read_audio_snapshot(
+        &settings
+    ))));
+    settings.insert(
+        String::from("app.commissioning.check.audio.status"),
+        String::from("failed"),
+    );
+    assert!(!remotes_may_be_selected(Some(&read_audio_snapshot(
+        &settings
+    ))));
+    settings.insert(
+        String::from("app.commissioning.check.audio.status"),
+        String::from("passed"),
+    );
+    assert!(remotes_may_be_selected(Some(&read_audio_snapshot(
+        &settings
+    ))));
+}
+
+// Without the metering loop no probe is served: said at once, not after the wait.
+#[test]
+fn a_probe_without_the_metering_loop_is_refused_at_once() {
+    let started = Instant::now();
+    assert_eq!(
+        probe_console(probe_key(19_001), Duration::from_secs(3)),
+        Err(ProbeRefused::NoMetering)
+    );
+    assert!(started.elapsed() < Duration::from_millis(500));
+}

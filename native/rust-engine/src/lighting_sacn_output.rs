@@ -232,6 +232,9 @@ struct SacnOutput {
     simulated: bool,
     /// How the sends go: a failed one is said, and read on the entry.
     sends: SendTally,
+    /// A test's wire with no route: every send fails as a socket's would.
+    #[cfg(test)]
+    broken_wire: bool,
 }
 
 /// How the sends to the bridge go (the audit of 2026-10-12, H2). Until then a
@@ -351,29 +354,6 @@ impl SendTally {
 
 /// One packet to the bridge, counted by the tally; the simulated lights
 /// count it as sent and put nothing on the wire.
-fn send_packet(
-    socket: &UdpSocket,
-    simulated: bool,
-    sends: &mut SendTally,
-    packet: &[u8],
-    target: SocketAddrV4,
-    now: Instant,
-) -> bool {
-    if simulated {
-        return true;
-    }
-    match socket.send_to(packet, target) {
-        Ok(_) => {
-            sends.sent();
-            true
-        }
-        Err(error) => {
-            sends.failed(target, &error, now);
-            false
-        }
-    }
-}
-
 impl SacnOutput {
     fn new(socket: UdpSocket, port: u16) -> Self {
         Self {
@@ -384,7 +364,36 @@ impl SacnOutput {
             held: false,
             simulated: false,
             sends: SendTally::default(),
+            #[cfg(test)]
+            broken_wire: false,
         }
+    }
+
+    /// One packet to the bridge, counted in the tally; whether it went. The
+    /// simulated lights count every packet as sent, so sequences and
+    /// keep-alives run as they do on the rig.
+    fn send_packet(&mut self, packet: &[u8], target: SocketAddrV4, now: Instant) -> bool {
+        if self.simulated {
+            return true;
+        }
+        match self.put_on_wire(packet, target) {
+            Ok(_) => {
+                self.sends.sent();
+                true
+            }
+            Err(error) => {
+                self.sends.failed(target, &error, now);
+                false
+            }
+        }
+    }
+
+    fn put_on_wire(&self, packet: &[u8], target: SocketAddrV4) -> std::io::Result<usize> {
+        #[cfg(test)]
+        if self.broken_wire {
+            return Err(std::io::Error::other("no route to host"));
+        }
+        self.socket.send_to(packet, target)
     }
 
     /// What the health entry says of the output as it is.
@@ -518,34 +527,31 @@ impl SacnOutput {
     fn send_frame(&mut self, bridge_ip: Ipv4Addr, frame: &LightingUniverseFrame) {
         let target = SocketAddrV4::new(bridge_ip, self.port);
         let now = Instant::now();
-        let entry = self
-            .universes
-            .entry(frame.universe)
-            .or_insert_with(|| UniverseTx {
-                sequence: 0,
-                last_slots: [0_u8; 512],
-                last_sent_at: now.checked_sub(KEEPALIVE_INTERVAL).unwrap_or(now),
-            });
-
-        let changed = entry.last_slots != frame.slots;
-        if !changed && now.saturating_duration_since(entry.last_sent_at) < KEEPALIVE_INTERVAL {
+        let (sequence, due) = {
+            let entry = self
+                .universes
+                .entry(frame.universe)
+                .or_insert_with(|| UniverseTx {
+                    sequence: 0,
+                    last_slots: [0_u8; 512],
+                    last_sent_at: now.checked_sub(KEEPALIVE_INTERVAL).unwrap_or(now),
+                });
+            let changed = entry.last_slots != frame.slots;
+            let keep_alive =
+                now.saturating_duration_since(entry.last_sent_at) >= KEEPALIVE_INTERVAL;
+            (entry.sequence, changed || keep_alive)
+        };
+        if !due {
             return;
         }
 
-        let packet = build_e131_data_packet(frame.universe, entry.sequence, false, &frame.slots);
-        // The simulated lights count every packet as sent, so sequences and
-        // keep-alives run as they do on the rig.
-        if send_packet(
-            &self.socket,
-            self.simulated,
-            &mut self.sends,
-            &packet,
-            target,
-            now,
-        ) {
-            entry.sequence = entry.sequence.wrapping_add(1);
-            entry.last_slots = frame.slots;
-            entry.last_sent_at = now;
+        let packet = build_e131_data_packet(frame.universe, sequence, false, &frame.slots);
+        if self.send_packet(&packet, target, now) {
+            if let Some(entry) = self.universes.get_mut(&frame.universe) {
+                entry.sequence = entry.sequence.wrapping_add(1);
+                entry.last_slots = frame.slots;
+                entry.last_sent_at = now;
+            }
         }
     }
 
@@ -559,14 +565,7 @@ impl SacnOutput {
             for _ in 0..STREAM_TERMINATED_SENDS {
                 let packet =
                     build_e131_data_packet(universe, entry.sequence, true, &entry.last_slots);
-                send_packet(
-                    &self.socket,
-                    self.simulated,
-                    &mut self.sends,
-                    &packet,
-                    target_addr,
-                    now,
-                );
+                self.send_packet(&packet, target_addr, now);
                 entry.sequence = entry.sequence.wrapping_add(1);
             }
         }
@@ -685,6 +684,19 @@ mod tests {
             String::from("not-an-ip"),
         );
         assert!(read_lighting_sacn_output_state(&invalid).is_none());
+
+        // An address that is no machine's, from saved data older than the
+        // rule (the audit of 2026-10-12): never streamed to, a multicast
+        // address would reach every sACN receiver on the LAN.
+        for address in ["0.0.0.0", "255.255.255.255", "239.255.0.1"] {
+            let mut no_machine = HashMap::new();
+            no_machine.insert(String::from(LIGHTING_BRIDGE_IP_KEY), String::from(address));
+            assert!(
+                read_lighting_sacn_output_state(&no_machine).is_none(),
+                "{address} is streamed to"
+            );
+            assert!(crate::lighting::lighting_watched_bridge(&no_machine).is_none());
+        }
     }
 
     #[test]
@@ -1134,11 +1146,13 @@ mod tests {
         assert!(!tally.reset());
     }
 
-    // A send that fails on the wire (here a broadcast address, which the
-    // socket has no leave to send to) puts the entry at `attention` and the
-    // failure in the log; a hold ends the stream, and the entry reads its own
-    // word again. The registry is process-wide, so the entry is read through
-    // the tally and the log, which are this output's alone.
+    // A send that fails on the wire (here a wire with no route, the test's
+    // seam; until the one-machine rule of the audit of 2026-10-12 it was a
+    // broadcast address, which the wire now never streams to) puts the entry
+    // at `attention` and the failure in the log; a hold ends the stream, and
+    // the entry reads its own word again. The registry is process-wide, so
+    // the entry is read through the tally and the log, which are this
+    // output's alone.
     #[test]
     fn a_failed_send_reads_attention_until_the_stream_ends() {
         use crate::control_surface::test_support::TestDir;
@@ -1147,25 +1161,19 @@ mod tests {
         let log = test_dir.path().join("engine.log");
         let (_wire, port) = Wire::open();
         let mut output = test_output(port);
-        let mut armed = output_settings(Some(true));
-        armed.insert(
-            String::from(LIGHTING_BRIDGE_IP_KEY),
-            String::from("255.255.255.255"),
-        );
+        output.broken_wire = true;
+        let armed = output_settings(Some(true));
         assert!(
             read_lighting_sacn_output_state(&armed).is_some(),
             "the premise: this rig streams to the address as it was typed"
         );
 
         output.tick_settings(&armed, &log);
-        assert!(
-            output.sends.failing,
-            "a broadcast address without the socket's leave fails the send"
-        );
+        assert!(output.sends.failing, "a wire with no route fails the send");
         let text = std::fs::read_to_string(&log).expect("the log is written");
         assert!(
             text.contains("ERROR Lighting sACN output: ")
-                && text.contains("to 255.255.255.255:")
+                && text.contains("to 127.0.0.1:")
                 && text.contains("could not be sent"),
             "{text}"
         );

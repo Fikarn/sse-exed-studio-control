@@ -268,7 +268,7 @@ pub(super) fn persist_audio_state_with_actions(
 /// `AUDIO_STATE_LOCK` first, then the shared console link.
 static AUDIO_STATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-pub(super) fn lock_audio_state() -> std::sync::MutexGuard<'static, ()> {
+pub(crate) fn lock_audio_state() -> std::sync::MutexGuard<'static, ()> {
     AUDIO_STATE_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -389,7 +389,7 @@ pub(super) fn read_i64_setting(settings: &HashMap<String, String>, key: &str, de
         .unwrap_or(default)
 }
 
-pub(super) fn audio_osc_enabled(settings: &HashMap<String, String>) -> bool {
+pub(crate) fn audio_osc_enabled(settings: &HashMap<String, String>) -> bool {
     read_bool_setting(settings, AUDIO_OSC_ENABLED_KEY, DEFAULT_AUDIO_OSC_ENABLED)
 }
 

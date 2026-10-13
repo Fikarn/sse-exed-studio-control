@@ -90,6 +90,12 @@ pub fn update_audio_settings(
     }
 
     if let Some(send_host) = &request.send_host {
+        if let Some(refusal) = totalmix_host_refusal(send_host) {
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_HOST_INVALID",
+                String::from(refusal),
+            ));
+        }
         updates.push((String::from(AUDIO_SEND_HOST_KEY), send_host.clone()));
         summary_parts.push(format!("send host -> {}", send_host));
     }
@@ -229,17 +235,7 @@ pub fn update_audio_settings(
             format!("app.commissioning.check.{AUDIO_CHECK_ID}.checked_at"),
             String::new(),
         ));
-        updates.push(confidence_setting(ConsoleConfidence::Unknown));
-        updates.push((String::from(AUDIO_LAST_CONSOLE_SYNC_AT_KEY), String::new()));
-        updates.push((
-            String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
-            String::new(),
-        ));
-        // TotalMix's slot states belong to the desk the link heard; another
-        // address may be another desk.
-        if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
-            link.forget_snapshot_slots();
-        }
+        updates.extend(console_transport_changed_updates());
         summary_parts.push(String::from("audio probe reset"));
     }
 
@@ -265,4 +261,38 @@ pub fn update_audio_settings(
     let _state_guard = transport_changed.then(lock_audio_state);
     persist_audio_state(db_path, &updates)?;
     Ok(read_audio_snapshot(&load_audio_settings(db_path)?))
+}
+
+/// What a change of TotalMix's address or ports writes beside the new values,
+/// here and in Setup's audio probe (the audit of 2026-10-12: the probe wrote
+/// the address alone, and a saved `aligned` survived a port change): the
+/// Console reads `unknown` until a Sync, its last Sync is forgotten, and so
+/// are TotalMix's slot states, which belong to the desk the link heard;
+/// another address may be another desk. Written under `lock_audio_state`.
+pub(crate) fn console_transport_changed_updates() -> Vec<(String, String)> {
+    if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
+        link.forget_snapshot_slots();
+    }
+    vec![
+        confidence_setting(ConsoleConfidence::Unknown),
+        (String::from(AUDIO_LAST_CONSOLE_SYNC_AT_KEY), String::new()),
+        (
+            String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
+            String::new(),
+        ),
+    ]
+}
+
+/// The one-machine rule for TotalMix's address (the audit of 2026-10-12):
+/// `localhost`, or the IPv4 address of one machine; `0.0.0.0`, a broadcast or
+/// a multicast address names no desk and is refused, here and in Setup.
+pub(crate) fn totalmix_host_refusal(host: &str) -> Option<&'static str> {
+    let host = host.trim();
+    if host == "localhost" || crate::commissioning::one_machine_ipv4(host).is_some() {
+        None
+    } else if host.parse::<std::net::Ipv4Addr>().is_ok() {
+        Some("TotalMix's address must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address.")
+    } else {
+        Some("TotalMix's address must be localhost or four numbers, like 127.0.0.1.")
+    }
 }

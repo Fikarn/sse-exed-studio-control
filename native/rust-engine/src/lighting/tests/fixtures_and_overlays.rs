@@ -1310,3 +1310,50 @@ fn all_on_leaves_the_overlays_alone() {
     );
     assert!(wire_slot(&test_dir, "Key Left", "Dimmer") > 0);
 }
+
+// The one-machine rule (the audit of 2026-10-12): the Lighting page's own
+// change of the bridge address refuses what is no machine's, as Setup does,
+// and a multicast address would otherwise reach every sACN receiver on the LAN.
+#[test]
+fn a_bridge_address_that_is_not_one_machines_is_refused() {
+    let test_dir = TestDir::new("bridge-one-machine");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    let update = |address: &str| {
+        update_lighting_settings(
+            test_dir.db_path().as_path(),
+            &LightingSettingsUpdateRequest {
+                enabled: None,
+                bridge_ip: Some(String::from(address)),
+                universe: None,
+                grand_master: None,
+                selected_scene_id: None,
+                selected_fixture_id: None,
+                camera_marker: None,
+                subject_marker: None,
+                recall_fade_ms: None,
+            },
+        )
+    };
+    for address in ["0.0.0.0", "255.255.255.255", "239.255.0.1"] {
+        match update(address) {
+            Err(LightingCommandError::Rejected(code, message)) => {
+                assert_eq!(code, "LIGHTING_BRIDGE_INVALID", "{address}");
+                assert_eq!(
+                    message,
+                    "The bridge address must be the address of one machine: not 0.0.0.0, a broadcast or a multicast address."
+                );
+            }
+            other => panic!("{address} should be refused: {other:?}"),
+        }
+    }
+    match update("bridge") {
+        Err(LightingCommandError::Rejected(_, message)) => {
+            assert_eq!(
+                message,
+                "The bridge address must be four numbers, like 10.1.0.1."
+            );
+        }
+        other => panic!("words should be refused: {other:?}"),
+    }
+    assert!(update("10.1.0.1").is_ok(), "one machine's address is taken");
+}

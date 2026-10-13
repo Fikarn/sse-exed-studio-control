@@ -670,28 +670,6 @@ pub fn clear_shared_clip_latches(channel_id: Option<&str>) {
     };
 }
 
-pub fn current_shared_status() -> RmeMeteringState {
-    let state = shared_meter_state();
-    let Ok(state) = state.lock() else {
-        return RmeMeteringState::Offline;
-    };
-    let now_ms = monotonic_now_ms();
-    state.status_at(now_ms)
-}
-
-pub fn wait_for_live_metering(timeout: Duration) -> bool {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if current_shared_status() == RmeMeteringState::Live {
-            return true;
-        }
-        if Instant::now() >= deadline {
-            return false;
-        }
-        thread::sleep(Duration::from_millis(25));
-    }
-}
-
 pub fn spawn_rme_totalmix_audio_metering(
     sender: Sender<Value>,
     db_path: PathBuf,
@@ -727,6 +705,7 @@ pub fn spawn_rme_totalmix_audio_metering(
         let mut last_status_publish_at: Option<Instant> = None;
         let mut last_keepalive_at: Option<Instant> = None;
         let mut last_link_flush_at: Option<Instant> = None;
+        METERING_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
 
         loop {
             let now = Instant::now();
@@ -824,7 +803,12 @@ pub fn spawn_rme_totalmix_audio_metering(
                     .unwrap_or(true)
             {
                 if let Some((send_host, _, _)) = bound_key.as_ref() {
-                    send_slot_keepalives(&sockets, send_host);
+                    // The remotes' bus and bank selection waits for a passed
+                    // probe (the audit of 2026-10-12): nothing that changes
+                    // TotalMix is written before it.
+                    if remotes_may_be_selected(cached_snapshot.as_ref()) {
+                        send_slot_keepalives(&sockets, send_host);
+                    }
                     if let Some(slot) = global_slot.as_mut() {
                         let stale = slot
                             .last_rx_at
@@ -848,6 +832,9 @@ pub fn spawn_rme_totalmix_audio_metering(
                     service_console_link(slot, send_host);
                 }
             }
+            // Setup's probe, if one waits: served once the bound settings are
+            // its own (`ProbeMailbox`).
+            PROBE_MAILBOX.service(bound_key.as_ref(), global_slot.as_ref(), now);
             if last_link_flush_at
                 .map(|last| now.duration_since(last) >= LINK_FLUSH_INTERVAL)
                 .unwrap_or(true)
@@ -911,6 +898,7 @@ pub fn spawn_rme_totalmix_audio_metering(
 
             thread::sleep(poll_interval);
         }
+        METERING_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
     });
 }
 
@@ -1271,6 +1259,9 @@ pub(crate) struct GlobalOscSlot {
     send_port: u16,
     socket: UdpSocket,
     last_rx_at: Option<Instant>,
+    /// Datagrams accepted from the console on this slot since it was bound;
+    /// Setup's probe counts TotalMix's answer by it.
+    heard: u64,
     /// The console's address: the one source this slot reads.
     console: IpAddr,
     /// Whether TotalMix is in touch on this remote.
@@ -1284,10 +1275,218 @@ impl GlobalOscSlot {
             send_port,
             socket,
             last_rx_at: None,
+            heard: 0,
             console,
             quiet: GlobalQuiet::new(Instant::now(), port),
         }
     }
+
+    /// Sends `/sendstate 1` to TotalMix at `host` on this remote: the status
+    /// request a TotalMix in touch always answers.
+    fn ask_for_state(&self, host: &str) -> bool {
+        let host = host.trim();
+        if host.is_empty() {
+            return false;
+        }
+        let (address, value) = console_state_message();
+        let Ok(bytes) = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: address,
+            args: vec![value],
+        })) else {
+            return false;
+        };
+        self.socket.send_to(&bytes, (host, self.send_port)).is_ok()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Setup's audio probe (the audit of 2026-10-12, M4).
+//
+// The probe used to send bytes nobody reads to the typed address and pass when
+// levels were already arriving from whatever address was bound; the typed
+// address and ports were never exercised. It now asks this thread, which owns
+// the sockets, to ask TotalMix for its status on the Global remote at the
+// address and ports the probe was given, and passes only when TotalMix
+// answers from that address on that port. The probe posts its request here;
+// the metering loop serves it at each poll once it has bound the slots for
+// those settings (the settings refresh, 500 ms at most), and answers through
+// the probe's channel.
+// ---------------------------------------------------------------------------
+
+/// The settings a probe asks TotalMix's answer for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ProbeKey {
+    pub host: String,
+    pub send_port: i64,
+    pub receive_port: i64,
+}
+
+impl ProbeKey {
+    fn matches(&self, bound: &(String, i64, i64)) -> bool {
+        bound.0.trim() == self.host.trim()
+            && bound.1 == self.send_port
+            && bound.2 == self.receive_port
+    }
+}
+
+/// How a probe ended.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ProbeAnswer {
+    /// TotalMix answered on remote 4 from the probe's address.
+    Answered,
+    /// The slots for the probe's settings are bound, but the Global remote's
+    /// receive port could not be: another program holds it.
+    SlotUnbound,
+    /// Nothing came back before the deadline. `asked` says whether the
+    /// request went out at all: it does not while the loop has not bound the
+    /// probe's settings (OSC off, or the settings not yet re-read).
+    Unanswered { asked: bool },
+}
+
+/// Why a probe was not run at all.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ProbeRefused {
+    /// The metering thread is not running (a test, or a start that did not
+    /// start it): nobody would send the request.
+    NoMetering,
+    /// Another probe is still waiting for its answer.
+    Busy,
+}
+
+struct PendingProbe {
+    key: ProbeKey,
+    deadline: Instant,
+    /// When the request went out, once the slots matched the key.
+    asked_at: Option<Instant>,
+    /// The slot's count of datagrams heard when the request went out.
+    heard_before: u64,
+    reply: std::sync::mpsc::SyncSender<ProbeAnswer>,
+}
+
+/// Where a probe waits for the metering loop: one at a time.
+pub(crate) struct ProbeMailbox {
+    pending: Mutex<Option<PendingProbe>>,
+}
+
+static PROBE_MAILBOX: ProbeMailbox = ProbeMailbox::new();
+
+/// Whether the metering loop is running, so a posted probe will be served.
+static METERING_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+impl ProbeMailbox {
+    pub(crate) const fn new() -> Self {
+        Self {
+            pending: Mutex::new(None),
+        }
+    }
+
+    fn take_lock(&self) -> std::sync::MutexGuard<'_, Option<PendingProbe>> {
+        self.pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Posts a probe; the answer comes on the receiver by `deadline` at the
+    /// latest, once the loop serves it.
+    fn post(
+        &self,
+        key: ProbeKey,
+        deadline: Instant,
+    ) -> Result<std::sync::mpsc::Receiver<ProbeAnswer>, ProbeRefused> {
+        let mut pending = self.take_lock();
+        if pending.is_some() {
+            return Err(ProbeRefused::Busy);
+        }
+        let (reply, receiver) = std::sync::mpsc::sync_channel(1);
+        *pending = Some(PendingProbe {
+            key,
+            deadline,
+            asked_at: None,
+            heard_before: 0,
+            reply,
+        });
+        Ok(receiver)
+    }
+
+    /// Forgets a probe nobody waits for any more.
+    fn withdraw(&self) {
+        *self.take_lock() = None;
+    }
+
+    /// One poll's service of the pending probe, if any: the request goes out
+    /// once the loop's bound settings are the probe's (`bound`, with the slot
+    /// they bound), the answer is TotalMix's first datagram after it, and the
+    /// deadline ends an unanswered one. `host` is the bound settings' host.
+    fn service(
+        &self,
+        bound: Option<&(String, i64, i64)>,
+        slot: Option<&GlobalOscSlot>,
+        now: Instant,
+    ) {
+        let mut pending = self.take_lock();
+        let Some(probe) = pending.as_mut() else {
+            return;
+        };
+        let answer = match bound.filter(|bound| probe.key.matches(bound)) {
+            Some(bound) => match slot {
+                None => Some(ProbeAnswer::SlotUnbound),
+                Some(slot) if probe.asked_at.is_none() => {
+                    probe.heard_before = slot.heard;
+                    if slot.ask_for_state(&bound.0) {
+                        probe.asked_at = Some(now);
+                    }
+                    None
+                }
+                Some(slot) if slot.heard > probe.heard_before => Some(ProbeAnswer::Answered),
+                Some(_) => None,
+            },
+            None => None,
+        };
+        let answer = answer.or_else(|| {
+            (now >= probe.deadline).then_some(ProbeAnswer::Unanswered {
+                asked: probe.asked_at.is_some(),
+            })
+        });
+        if let Some(answer) = answer {
+            let _ = probe.reply.try_send(answer);
+            *pending = None;
+        }
+    }
+}
+
+/// Whether the metering loop runs, and so would serve a probe.
+pub(crate) fn metering_running() -> bool {
+    METERING_RUNNING.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Setup's audio probe: asks the metering loop to ask TotalMix for its status
+/// on remote 4 at `key`'s address and ports, and waits up to `timeout` for the
+/// answer. The loop serves it once it has bound those settings, so the probe's
+/// caller saves them first.
+pub(crate) fn probe_console(key: ProbeKey, timeout: Duration) -> Result<ProbeAnswer, ProbeRefused> {
+    if !metering_running() {
+        return Err(ProbeRefused::NoMetering);
+    }
+    let deadline = Instant::now() + timeout;
+    let receiver = PROBE_MAILBOX.post(key, deadline)?;
+    // The loop answers by the deadline; a loop that stalls past it answers
+    // nothing, and the probe is withdrawn as unanswered.
+    match receiver.recv_timeout(timeout + Duration::from_secs(1)) {
+        Ok(answer) => Ok(answer),
+        Err(_) => {
+            PROBE_MAILBOX.withdraw();
+            Ok(ProbeAnswer::Unanswered { asked: false })
+        }
+    }
+}
+
+/// Whether the remotes' bus and bank selection (`send_slot_keepalives`) may go
+/// out: only once the audio probe has passed (the Console reads `ready`). The
+/// selection changes a remote's view, and until the probe has passed nothing
+/// that changes TotalMix is written (`docs/HARDWARE.md`); the Global remote's
+/// status request, which changes nothing, goes out regardless.
+fn remotes_may_be_selected(snapshot: Option<&AudioSnapshot>) -> bool {
+    snapshot.is_some_and(|snapshot| snapshot.status == "ready")
 }
 
 fn bind_global_slot(
@@ -1324,6 +1523,7 @@ pub(crate) fn read_global_packets(
                 }
                 let heard_at = Instant::now();
                 slot.last_rx_at = Some(heard_at);
+                slot.heard = slot.heard.saturating_add(1);
                 // TotalMix back after a quiet: the console link is marked at
                 // its first datagram, so the mark is there before a Sync whose
                 // dump follows has read the desk, and the Sync's aligned comes
