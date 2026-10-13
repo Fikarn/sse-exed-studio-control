@@ -48,7 +48,7 @@ Two rules hold the design together:
 - **Real devices are driven only by a studio build,** or by a hardware test the owner asked for and is present at. Only `npm run release` makes a studio build: every other build, a release build included, is a development build.
 - **Held lights stay held** until they are armed on screen. A development run always starts held.
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.
-- **Saved data:** a schema upgrade writes a backup first. Backups are never deleted by a script. A newer build upgrades the saved data, and an older build then refuses it and stops at the recovery screen: going back means restoring the backup from there.
+- **Saved data:** a schema upgrade writes a backup first. The engine keeps the newest backups of each kind and removes the older ones: two weeks of dailies, the last three shutdown copies, the last five of each of the copies made before an upgrade, before a restore and of a replaced file (`storage_backups.rs`, `retention`). Nothing else deletes a backup, and no script touches the `backups` folder. A newer build upgrades the saved data, and an older build then refuses it and stops at the recovery screen: going back means restoring the backup from there.
 - **Files that are not in git are not deleted by the assistant:** old builds, build folders, the owner's own folders. The owner gets the command.
 - **Dependencies:** they move by hand, on the owner's word; there is no Dependabot. GitHub's security alerts stay on and are read. Never `npm audit fix`: take the fixed version. The shell's `windows` and `webview2-com` move only with a Tauri update, as one version each (a script test holds it).
 

@@ -21,8 +21,97 @@ use serde_json::Value;
 use studio_control_protocol::EVENT_NAMES;
 
 const CONTRACT_JSON: &str = include_str!("../../protocol/v1.contract.json");
+const PROTOCOL_MD: &str = include_str!("../../protocol/v1.md");
 const APP_DISPATCH_SOURCE: &str = include_str!("../src/app.rs");
 const CONTROL_SURFACE_DISPATCH_SOURCE: &str = include_str!("../src/control_surface.rs");
+
+/// The methods `v1.md` lists under "Current Method Set": the bullets from
+/// the heading to the first line after them that is neither a bullet nor
+/// blank (the prose that follows the list).
+fn methods_listed_in(markdown: &str) -> Vec<String> {
+    let Some((_, after_heading)) = markdown.split_once("## Current Method Set") else {
+        return Vec::new();
+    };
+    let mut listed = Vec::new();
+    for line in after_heading.lines() {
+        if let Some(bullet) = line.strip_prefix("- `") {
+            if let Some((name, _)) = bullet.split_once('`') {
+                listed.push(name.to_string());
+            }
+        } else if !line.trim().is_empty() && !listed.is_empty() {
+            break;
+        }
+    }
+    listed
+}
+
+// The audit of 2026-10-12 (M15): fifteen methods had joined the contract
+// without joining v1.md's list, which the document calls its prose mirror.
+// The list is held to the contract both ways.
+#[test]
+fn v1_md_s_method_list_is_the_contract_s() {
+    let contract: Value = serde_json::from_str(CONTRACT_JSON).expect("contract JSON must parse");
+    let in_contract: Vec<&str> = contract["methods"]
+        .as_array()
+        .expect("contract.methods must be an array")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let listed = methods_listed_in(PROTOCOL_MD);
+    assert!(
+        listed.len() > 50,
+        "v1.md's \"Current Method Set\" list was not found, or is cut short: {} names read",
+        listed.len()
+    );
+
+    let unlisted: Vec<&str> = in_contract
+        .iter()
+        .copied()
+        .filter(|name| !listed.iter().any(|listed| listed == name))
+        .collect();
+    assert!(
+        unlisted.is_empty(),
+        "{} contract method(s) are missing from v1.md's \"Current Method Set\": {:?}. Add each to the list, with its description.",
+        unlisted.len(),
+        unlisted
+    );
+
+    let gone: Vec<&String> = listed
+        .iter()
+        .filter(|name| !in_contract.contains(&name.as_str()))
+        .collect();
+    assert!(
+        gone.is_empty(),
+        "{} method(s) in v1.md's \"Current Method Set\" are not in v1.contract.json: {:?}. Remove each from the list, or add it to the contract (and run `npm run protocol:generate`).",
+        gone.len(),
+        gone
+    );
+}
+
+// The list reader stops at the prose after the bullets, and a backtick name
+// elsewhere in the document is not a listed method.
+#[test]
+fn the_method_list_reader_takes_the_bullets_and_stops_at_the_prose() {
+    let planted = "\
+## Message Types
+
+- `not.a.method` in another section
+
+## Current Method Set
+
+- `engine.ping`
+- `app.snapshot`
+
+This list is a mirror of `v1.contract.json`.
+
+- `later.bullet` after the prose
+";
+    assert_eq!(
+        methods_listed_in(planted),
+        vec!["engine.ping", "app.snapshot"]
+    );
+    assert_eq!(methods_listed_in("no heading"), Vec::<String>::new());
+}
 
 #[test]
 fn every_contract_method_has_a_dispatch_arm() {
