@@ -46,7 +46,10 @@ use windows::Win32::Graphics::DirectComposition::{
     IDCompositionTarget, IDCompositionVisual, IDCompositionVisual2, COMPOSITIONOBJECT_READ,
     COMPOSITIONOBJECT_WRITE,
 };
-use windows::Win32::Graphics::Dxgi::IDXGIDevice;
+use windows::Win32::Graphics::Dxgi::{
+    IDXGIDevice, DXGI_ERROR_DEVICE_HUNG, DXGI_ERROR_DEVICE_REMOVED, DXGI_ERROR_DEVICE_RESET,
+    DXGI_ERROR_DRIVER_INTERNAL_ERROR,
+};
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcess, PROCESS_DUP_HANDLE};
 
 /// How long the layer stays up without a word from the page.
@@ -190,24 +193,48 @@ fn tell_scene(content: &mut Content, scene: &Scene, counts: &mut Counts) {
     }
 }
 
+/// How long after a layer could not be made, or was lost with its device,
+/// the next try comes (the audit of 2026-10-12, M10: a failure at the start
+/// ended the thread for the app's life, and a lost device was never noticed).
+const LAYER_RETRY: Duration = Duration::from_secs(5);
+
 fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
-    let layer = match create_layer(hwnd) {
-        Ok(layer) => layer,
-        Err(error) => {
-            log(&format!(
-                "not made: {error}. The pictures' places stay empty."
-            ));
-            return;
-        }
-    };
-    log("made, topmost on the main window.");
+    let mut layer: Option<Layer> = None;
+    let mut next_try = Instant::now();
+    let mut said_not_made = false;
+    let mut said_no_layer = false;
     let mut placed: Option<Placement> = None;
     let mut last_word = Instant::now();
     let mut content: Option<Content> = None;
     let mut shown: Option<(i32, i32)> = None;
+    let mut show_failing = false;
     let mut counted = Instant::now();
     let mut counts = Counts::default();
     loop {
+        // The layer, made when there is none and the wait is over: at the
+        // start, and again after its device was lost.
+        if layer.is_none() && Instant::now() >= next_try {
+            match create_layer(hwnd) {
+                Ok(made) => {
+                    log("made, topmost on the main window.");
+                    layer = Some(made);
+                    said_not_made = false;
+                    said_no_layer = false;
+                    shown = None;
+                    show_failing = false;
+                }
+                Err(error) => {
+                    if !said_not_made {
+                        log(&format!(
+                            "not made: {error}. The pictures' places stay empty; it is tried again every {} s.",
+                            LAYER_RETRY.as_secs()
+                        ));
+                        said_not_made = true;
+                    }
+                    next_try = Instant::now() + LAYER_RETRY;
+                }
+            }
+        }
         match orders.recv_timeout(WAKE) {
             Ok(LayerOrder::Place(next)) => {
                 counts.places += 1;
@@ -223,49 +250,46 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                 writer,
             }) => {
                 // A connection older than the one held, whose hello came late:
-                // the newer one keeps its surface, and the older one ends.
+                // the newer one keeps its surface, and the older one ends. So
+                // does one that comes while there is no layer: the helper
+                // tries again after a while (said once per spell).
+                let Some(made) = layer.as_ref() else {
+                    let _ = writer.shutdown(Shutdown::Both);
+                    if !said_no_layer {
+                        log(&format!(
+                            "the pictures helper (process {pid}) connected while there is no layer: its connection ends, and it comes back by itself."
+                        ));
+                        said_no_layer = true;
+                    }
+                    continue;
+                };
                 if content.as_ref().is_some_and(|held| held.number > number) {
                     let _ = writer.shutdown(Shutdown::Both);
                 } else {
                     counts.attached += 1;
-                    release(&layer, content.take(), log);
-                    content = attach(
-                        &layer,
-                        number,
-                        pid,
-                        writer,
-                        placed.as_ref(),
-                        &mut counts,
-                        log,
-                    );
+                    release(made, content.take(), false, log);
+                    content = attach(made, number, pid, writer, placed.as_ref(), &mut counts, log);
                 }
             }
             Ok(LayerOrder::Detach { number }) => {
                 if content.as_ref().is_some_and(|held| held.number == number) {
                     counts.detached += 1;
-                    release(&layer, content.take(), log);
+                    if let Some(made) = layer.as_ref() {
+                        release(made, content.take(), false, log);
+                    }
                 }
             }
             Ok(LayerOrder::Stop) | Err(RecvTimeoutError::Disconnected) => {
-                release(&layer, content.take(), log);
-                let _ = show(&layer, None, shown.is_some());
+                if let Some(made) = layer.as_ref() {
+                    release(made, content.take(), false, log);
+                    let _ = show(made, None, shown.is_some());
+                }
                 return;
             }
             Err(RecvTimeoutError::Timeout) => {}
         }
-        let wanted = placed
-            .as_ref()
-            .filter(|_| content.is_some() && last_word.elapsed() < PAGE_SILENCE)
-            .map(|placed| (placed.x, placed.y));
-        if wanted != shown {
-            match show(&layer, wanted, shown.is_some()) {
-                Ok(()) => shown = wanted,
-                Err(error) => log(&format!(
-                    "could not {}: {error}.",
-                    if wanted.is_some() { "show" } else { "hide" }
-                )),
-            }
-        }
+        // The minute's count, with or without a layer, so that a spell
+        // without one does not run the count on into the next line.
         if counted.elapsed() >= COUNT_INTERVAL {
             counted = Instant::now();
             if counts.any() {
@@ -280,6 +304,54 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                 ));
             }
             counts = Counts::default();
+        }
+        let Some(made) = layer.as_ref() else {
+            continue;
+        };
+        // A device lost since the last wake (a driver reset during a show):
+        // the layer is made again, and the helper's connection ends, so
+        // that it comes back for a surface on the new one.
+        if let Some(error) = device_lost(made) {
+            log(&format!(
+                "the graphics device was lost ({error}): the layer is made again."
+            ));
+            release(made, content.take(), true, log);
+            layer = None;
+            shown = None;
+            next_try = Instant::now();
+            continue;
+        }
+        let wanted = placed
+            .as_ref()
+            .filter(|_| content.is_some() && last_word.elapsed() < PAGE_SILENCE)
+            .map(|placed| (placed.x, placed.y));
+        if wanted != shown {
+            match show(made, wanted, shown.is_some()) {
+                Ok(()) => {
+                    shown = wanted;
+                    show_failing = false;
+                }
+                Err(error) if lost_device(&error) => {
+                    log(&format!(
+                        "the graphics device was lost ({error}): the layer is made again."
+                    ));
+                    release(made, content.take(), true, log);
+                    layer = None;
+                    shown = None;
+                    next_try = Instant::now();
+                    continue;
+                }
+                // Said once per spell, not at every wake.
+                Err(error) => {
+                    if !show_failing {
+                        log(&format!(
+                            "could not {}: {error}.",
+                            if wanted.is_some() { "show" } else { "hide" }
+                        ));
+                        show_failing = true;
+                    }
+                }
+            }
         }
     }
 }
@@ -322,7 +394,7 @@ fn attach(
         log(&format!(
             "a surface for the pictures helper (process {pid}) was not said: the connection ends."
         ));
-        release(layer, Some(held), log);
+        release(layer, Some(held), false, log);
         return None;
     }
     log(&format!(
@@ -367,6 +439,27 @@ fn create_layer(hwnd: isize) -> windows::core::Result<Layer> {
             _d3d: d3d,
         })
     }
+}
+
+/// Whether the layer's graphics device is lost: Direct3D's word for it,
+/// asked once a wake. `None` while the device is there.
+#[allow(unsafe_code)]
+fn device_lost(layer: &Layer) -> Option<windows::core::Error> {
+    // SAFETY: a COM call on this thread's own device, with no arguments.
+    unsafe { layer._d3d.GetDeviceRemovedReason().err() }
+}
+
+/// Whether an error from the layer's calls says its device is gone (removed,
+/// reset, hung, or the driver's own fault): the layer is then made again
+/// rather than left to fail at every wake.
+fn lost_device(error: &windows::core::Error) -> bool {
+    [
+        DXGI_ERROR_DEVICE_REMOVED,
+        DXGI_ERROR_DEVICE_RESET,
+        DXGI_ERROR_DEVICE_HUNG,
+        DXGI_ERROR_DRIVER_INTERNAL_ERROR,
+    ]
+    .contains(&error.code())
 }
 
 /// A new composition surface handle, put into the visual as its content.
@@ -459,8 +552,10 @@ fn let_go_of_helper(helper: HANDLE, unsaid: Option<u64>) {
 }
 
 /// Takes a surface out of the visual and closes the shell's handle to it.
+/// With the device gone the visual is not asked (the layer goes with the
+/// device, and the ask would only fail and say so beside the loss's line).
 #[allow(unsafe_code)]
-fn release(layer: &Layer, content: Option<Content>, log: &dyn Fn(&str)) {
+fn release(layer: &Layer, content: Option<Content>, device_gone: bool, log: &dyn Fn(&str)) {
     let Some(content) = content else {
         return;
     };
@@ -471,12 +566,14 @@ fn release(layer: &Layer, content: Option<Content>, log: &dyn Fn(&str)) {
     drop(content.writer);
     // SAFETY: the handle is the shell's own copy, closed once, here.
     unsafe {
-        if let Err(error) = layer
-            .visual
-            .SetContent(None::<&IUnknown>)
-            .and_then(|()| layer.device.Commit())
-        {
-            log(&format!("the surface did not come out: {error}."));
+        if !device_gone {
+            if let Err(error) = layer
+                .visual
+                .SetContent(None::<&IUnknown>)
+                .and_then(|()| layer.device.Commit())
+            {
+                log(&format!("the surface did not come out: {error}."));
+            }
         }
         let _ = CloseHandle(content.handle);
     }
@@ -499,5 +596,31 @@ fn show(layer: &Layer, at: Option<(i32, i32)>, rooted: bool) -> windows::core::R
             None => layer.target.SetRoot(None::<&IDCompositionVisual>)?,
         }
         layer.device.Commit()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The errors that make the layer anew: the device gone in any of DXGI's
+    // four ways, and no other.
+    #[test]
+    fn the_lost_device_is_known_by_its_errors() {
+        for code in [
+            DXGI_ERROR_DEVICE_REMOVED,
+            DXGI_ERROR_DEVICE_RESET,
+            DXGI_ERROR_DEVICE_HUNG,
+            DXGI_ERROR_DRIVER_INTERNAL_ERROR,
+        ] {
+            assert!(
+                lost_device(&windows::core::Error::from_hresult(code)),
+                "{code:?}"
+            );
+        }
+        assert!(!lost_device(&windows::core::Error::from_hresult(
+            windows::Win32::Foundation::E_FAIL
+        )));
+        assert!(!lost_device(&windows::core::Error::empty()));
     }
 }

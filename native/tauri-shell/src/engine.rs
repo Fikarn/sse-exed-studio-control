@@ -108,9 +108,14 @@ pub struct EngineBridge {
 
 struct EngineProcess {
     child: Child,
-    /// `None` once a stop closed the pipe: the engine's request loop ends on
-    /// EOF.
-    stdin: Option<ChildStdin>,
+    /// Lines for the engine's stdin, which a thread of its own writes
+    /// (`spawn_stdin_writer`): an engine that stops reading blocks that
+    /// thread, never the process mutex, so the exit watcher, a stop and the
+    /// close go on (the audit of 2026-10-12, M2: the write ran under the
+    /// mutex, and a full pipe held every one of them). `None` once a stop
+    /// dropped it: the writer ends, the pipe closes, and the engine's request
+    /// loop ends on EOF.
+    to_stdin: Option<Sender<String>>,
     binary_path: PathBuf,
     generation: u64,
     pid: u32,
@@ -336,10 +341,22 @@ impl EngineBridge {
         }
         spawn_stdout_thread(Arc::clone(&sink), stdout, Arc::clone(&self.pending));
         spawn_stderr_thread(stderr, shell_log.clone());
+        let to_stdin = match spawn_stdin_writer(stdin, generation) {
+            Ok(to_stdin) => to_stdin,
+            // The writer's closure went with its stdin, so the pipe is
+            // closed and the engine ends on EOF; the kill makes sure.
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "The hardware link could not be started: its writer did not start: {error}."
+                ));
+            }
+        };
 
         let process = EngineProcess {
             child,
-            stdin: Some(stdin),
+            to_stdin: Some(to_stdin),
             binary_path,
             generation,
             pid,
@@ -427,7 +444,7 @@ impl EngineBridge {
                 // watcher and this call sees the exit first reports it as
                 // expected.
                 process.expected_exit = true;
-                process.stdin = None;
+                process.to_stdin = None;
                 process.generation
             })
         };
@@ -484,29 +501,56 @@ impl EngineBridge {
         Ok(process_guard.as_ref().map(EngineProcess::summary))
     }
 
+    /// Hands `request` to the engine's stdin writer. The process mutex is
+    /// held only to find the writer, never across the write.
     fn write_request(&self, request: &RequestEnvelope) -> Result<(), String> {
-        let mut process_guard = self
-            .process
-            .lock()
-            .map_err(|_| "Engine bridge poisoned".to_string())?;
-        let process = process_guard
-            .as_mut()
-            .ok_or_else(|| "Engine is not running".to_string())?;
-        let stdin = process
-            .stdin
-            .as_mut()
-            .ok_or_else(|| "Engine is stopping".to_string())?;
-
-        serde_json::to_writer(&mut *stdin, request)
+        let to_stdin = {
+            let process_guard = self
+                .process
+                .lock()
+                .map_err(|_| "Engine bridge poisoned".to_string())?;
+            let process = process_guard
+                .as_ref()
+                .ok_or_else(|| "Engine is not running".to_string())?;
+            process
+                .to_stdin
+                .as_ref()
+                .ok_or_else(|| "Engine is stopping".to_string())?
+                .clone()
+        };
+        let mut line = serde_json::to_string(request)
             .map_err(|error| format!("Failed to serialize engine request: {error}"))?;
-        stdin
-            .write_all(b"\n")
-            .map_err(|error| format!("Failed to send engine request: {error}"))?;
-        stdin
-            .flush()
-            .map_err(|error| format!("Failed to flush engine request: {error}"))?;
-        Ok(())
+        line.push('\n');
+        // The writer is gone when the engine is: the exit watcher answers the
+        // request's waiter, this answers the caller.
+        to_stdin
+            .send(line)
+            .map_err(|_| "Engine is not taking requests".to_string())
     }
+}
+
+/// Writes the lines it is handed to the engine's stdin, until the sender is
+/// dropped (a stop; the pipe then closes and the engine's loop ends on EOF)
+/// or a write fails (the engine is gone). A blocked write, an engine that
+/// stopped reading with its pipe full, blocks this thread alone: a stop then
+/// kills the engine after its grace, which ends the write. A thread that
+/// cannot be started (the system out of resources) is the launch's failure.
+fn spawn_stdin_writer(mut stdin: ChildStdin, generation: u64) -> std::io::Result<Sender<String>> {
+    let (sender, lines) = mpsc::channel::<String>();
+    thread::Builder::new()
+        .name(format!("engine-stdin-{generation}"))
+        .spawn(move || {
+            for line in lines {
+                if stdin
+                    .write_all(line.as_bytes())
+                    .and_then(|()| stdin.flush())
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        })?;
+    Ok(sender)
 }
 
 /// Polls the engine process every `ENGINE_EXIT_WATCH_INTERVAL` and reports
@@ -1171,6 +1215,60 @@ mod tests {
         // silent.
         thread::sleep(ENGINE_EXIT_WATCH_INTERVAL * 2);
         assert!(events.try_recv().is_err(), "the exit is reported once");
+    }
+
+    // The audit of 2026-10-12 (M2): an engine that stops reading its stdin
+    // with the pipe full used to block the writing request under the process
+    // mutex, and with it the exit watcher, the stop and the close. The writer
+    // is a thread of its own now: every request is handed over at once, and
+    // the stop kills the process after its grace, full pipe or not.
+    #[test]
+    fn a_full_pipe_holds_no_request_and_no_stop() {
+        let bridge = EngineBridge::default();
+        let (sink, events) = recording_sink();
+        bridge
+            .launch(lingering_process(), PathBuf::from("deaf"), sink, None)
+            .expect("the deaf process should launch");
+
+        // Far more than any pipe buffers, to a process that never reads.
+        let request = RequestEnvelope {
+            kind: "request".to_string(),
+            id: json!("fill"),
+            method: "app.snapshot".to_string(),
+            params: json!({ "filler": "x".repeat(4 * 1024) }),
+        };
+        let started = Instant::now();
+        for _ in 0..64 {
+            bridge
+                .write_request(&request)
+                .expect("a request is handed to the writer at once");
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "no request waited on the pipe: {:?}",
+            started.elapsed()
+        );
+        assert!(
+            bridge.summary().expect("summary").is_some(),
+            "the process mutex is free"
+        );
+
+        let started = Instant::now();
+        bridge
+            .stop_with_grace(Duration::from_millis(200))
+            .expect("stop should succeed");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the stop kills the deaf process after its grace"
+        );
+        let event = events
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the kill is reported");
+        assert_eq!(payload_of(&event)["graceful"], json!(true));
+        assert!(
+            bridge.write_request(&request).is_err(),
+            "no engine, no writer"
+        );
     }
 
     // Streamlining, 2026-09-28: the shell starts the engine in its own folder

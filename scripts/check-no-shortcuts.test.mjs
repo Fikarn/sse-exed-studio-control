@@ -263,6 +263,10 @@ const SHELL_UNSAFE = [
       "fn let_go_of_helper(",
       "The helper's process, held open since the hand-over, is closed, and a copy the helper was never told of is closed in it.",
     ],
+    [
+      "fn device_lost(",
+      "Direct3D's word for a lost device is a COM call on the layer's own device, asked once a wake so that the layer is made again (the audit of 2026-10-12).",
+    ],
   ].map(([item, reason]) => ({
     file: "src/shell_picture_layer.rs",
     item,

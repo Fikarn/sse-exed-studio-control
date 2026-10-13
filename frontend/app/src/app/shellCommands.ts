@@ -94,7 +94,13 @@ export function onShellCloseRequested(listener: () => void): () => void {
   }
   let disposed = false;
   let unlisten: UnlistenFn | null = null;
-  void listen(SHELL_CLOSE_REQUESTED_EVENT, () => listener()).then((stop) => {
+  void listen(SHELL_CLOSE_REQUESTED_EVENT, () => {
+    // The page saw the request and shows the dialog: said to the shell, which
+    // otherwise closes the app at a second press on the X five seconds on, as
+    // it does for a page that hangs (the audit of 2026-10-12).
+    void invoke("shell_close_request_seen").catch(() => {});
+    listener();
+  }).then((stop) => {
     if (disposed) {
       stop();
     } else {
