@@ -216,6 +216,38 @@ pub(crate) async fn shell_confirm_close(
         .map_err(|error| format!("Failed to close the main window: {error}"))
 }
 
+/// The page saw the shell's close request and shows the dialog: the request
+/// is answered, so the X does not force the close (`close_request_forces`).
+#[tauri::command]
+pub(crate) fn shell_close_request_seen(state: tauri::State<'_, EngineState>) {
+    if let Ok(mut asked) = state.close_asked_at.lock() {
+        *asked = None;
+    }
+}
+
+/// How long an unanswered close request stands before a second press on the
+/// X closes the app (the audit of 2026-10-12, L-Cor-6: with the page hung,
+/// the X could not close the app at all, only Task Manager could).
+pub(crate) const FORCED_CLOSE_AFTER: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Whether a press on the X closes the app without the page's confirm: the
+/// page did not acknowledge the last request (`shell_close_request_seen`)
+/// and that request is `FORCED_CLOSE_AFTER` old. A first press, or one soon
+/// after, asks the page and starts the wait.
+pub(crate) fn close_request_forces(
+    asked: &mut Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> bool {
+    match *asked {
+        Some(at) if now.saturating_duration_since(at) >= FORCED_CLOSE_AFTER => true,
+        Some(_) => false,
+        None => {
+            *asked = Some(now);
+            false
+        }
+    }
+}
+
 #[tauri::command]
 pub(crate) async fn engine_summary(
     state: tauri::State<'_, EngineState>,
@@ -239,6 +271,7 @@ mod window_gate_tests {
         "shell_enter_studio_fullscreen",
         "shell_reset_window_layout",
         "shell_confirm_close",
+        "shell_close_request_seen",
         "prompter_window_alive",
         "pictures_place",
         "shell_test_bridge_config",
@@ -360,5 +393,36 @@ mod shell_only_method_tests {
         ] {
             assert!(page_may_send(method), "{method}");
         }
+    }
+
+    // The audit of 2026-10-12 (L-Cor-6): a press on the X asks the page and
+    // starts a wait; a second press while the page has not acknowledged the
+    // request, five seconds on, closes the app. A page that acknowledges
+    // (`shell_close_request_seen` clears the wait) is never forced.
+    #[test]
+    fn a_second_press_on_the_x_forces_the_close_only_after_an_unanswered_wait() {
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        let mut asked = None;
+        assert!(
+            !super::close_request_forces(&mut asked, start),
+            "the first press asks"
+        );
+        assert_eq!(asked, Some(start));
+        assert!(
+            !super::close_request_forces(&mut asked, start + Duration::from_secs(2)),
+            "a second press within the wait asks again"
+        );
+        assert!(
+            super::close_request_forces(&mut asked, start + super::FORCED_CLOSE_AFTER),
+            "unanswered for the wait: the close goes"
+        );
+        // The page answered: the wait is cleared, and the next press asks anew.
+        asked = None;
+        assert!(!super::close_request_forces(
+            &mut asked,
+            start + Duration::from_secs(60)
+        ));
+        assert_eq!(asked, Some(start + Duration::from_secs(60)));
     }
 }

@@ -56,7 +56,8 @@ use shell_windows::{build_main_window, MAIN_WINDOW_LABEL};
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::sync_channel;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tauri::{Emitter, Manager};
 
 pub(crate) struct EngineState {
@@ -67,6 +68,11 @@ pub(crate) struct EngineState {
     /// dialog; the `CloseRequested` hook lets the window close only then
     /// (2026-09 audit Slice 11).
     pub(crate) close_confirmed: AtomicBool,
+    /// When the hook last asked the page to confirm a close that the page
+    /// has not acknowledged (`shell_close_request_seen` clears it). A second
+    /// press on the X while it stands `FORCED_CLOSE_AFTER` old closes the app
+    /// (the audit of 2026-10-12, L-Cor-6: a hung page left the X useless).
+    pub(crate) close_asked_at: Mutex<Option<Instant>>,
 }
 
 /// Raised on the main window when the operator asks to close it and the
@@ -97,6 +103,7 @@ fn main() {
         .manage(EngineState {
             bridge: Arc::new(EngineBridge::default()),
             close_confirmed: AtomicBool::new(false),
+            close_asked_at: Mutex::new(None),
         })
         .manage(HeldDisplay::default())
         .manage(PrompterWindowState::default())
@@ -132,21 +139,44 @@ fn main() {
                 // operator confirms, keep the window and let the frontend
                 // raise the dialog.
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    let confirmed = app_handle
-                        .state::<EngineState>()
-                        .close_confirmed
-                        .load(Ordering::SeqCst);
-                    if !confirmed {
-                        api.prevent_close();
-                        let _ = window_for_events.emit_to(
-                            MAIN_WINDOW_LABEL,
-                            SHELL_CLOSE_REQUESTED_EVENT,
-                            (),
-                        );
-                    } else {
+                    let state = app_handle.state::<EngineState>();
+                    if state.close_confirmed.load(Ordering::SeqCst) {
                         // The layer lets go of the window before the window goes.
                         shell_picture_layer::stop();
+                        return;
                     }
+                    // The audit of 2026-10-12 (L-Cor-6): a page that does not
+                    // answer the request (WebView2 hung) used to leave the X
+                    // useless. A second press, five seconds after a request
+                    // the page never acknowledged, closes the app: the
+                    // hardware link is stopped first, here, since the window
+                    // goes next and the app with it.
+                    let forced = state
+                        .close_asked_at
+                        .lock()
+                        .map(|mut asked| {
+                            shell_commands::close_request_forces(&mut asked, Instant::now())
+                        })
+                        .unwrap_or(false);
+                    if forced {
+                        state.bridge.log_shell_line(
+                            "SHELL",
+                            "The page did not answer the close request within 5 s: the window closes and the hardware link is stopped.",
+                        );
+                        state.close_confirmed.store(true, Ordering::SeqCst);
+                        close_with_the_app(&app_handle);
+                        if let Err(error) = state.bridge.stop() {
+                            eprintln!("Engine stop before the forced close failed: {error}");
+                        }
+                        shell_picture_layer::stop();
+                        return;
+                    }
+                    api.prevent_close();
+                    let _ = window_for_events.emit_to(
+                        MAIN_WINDOW_LABEL,
+                        SHELL_CLOSE_REQUESTED_EVENT,
+                        (),
+                    );
                 }
                 // The app ends with the operator's window. Tauri ends it
                 // when the last window closes, so the prompter's goes with
@@ -170,6 +200,7 @@ fn main() {
         shell_window_layout::shell_enter_studio_fullscreen,
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
+        shell_commands::shell_close_request_seen,
         shell_prompter_window::prompter_window_alive,
         shell_pictures::pictures_place,
         shell_test_bridge::shell_test_bridge_config,
@@ -189,6 +220,7 @@ fn main() {
         shell_window_layout::shell_enter_studio_fullscreen,
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
+        shell_commands::shell_close_request_seen,
         shell_prompter_window::prompter_window_alive,
         shell_pictures::pictures_place
     ]));
