@@ -395,10 +395,10 @@ impl Cameras {
                 // (finding 19); a saved reading that cannot be read is
                 // nothing read.
                 if runtime.setup.set_up() {
-                    if let Some(saved) = last_readings
-                        .get(&last_reading_key(runtime.camera()))
-                        .and_then(|value| serde_json::from_str::<SavedReading>(value).ok())
-                    {
+                    let key = last_reading_key(runtime.camera());
+                    if let Some(saved) = last_readings.get(&key).and_then(|value| {
+                        crate::saved_json::parse_saved_json::<SavedReading>(&key, value)
+                    }) {
                         runtime.reading = Some(saved.reading);
                         runtime.read_at = Some(saved.read_at);
                         runtime.values_last_read = true;

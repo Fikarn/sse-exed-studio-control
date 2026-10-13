@@ -1744,7 +1744,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return performRequest("prompter.script.restore", { scriptId });
     },
     deletePrompterScript(scriptId: string) {
-      return performRequest("prompter.script.delete", { scriptId });
+      // The page arms Delete for good and calls this at the second press: the
+      // press is the confirm the hardware link asks for (the audit of 2026-10-12).
+      return performRequest("prompter.script.delete", { scriptId, confirm: true });
     },
     bringBackPrompterVersion(scriptId: string, versionId: number) {
       return performRequest("prompter.script.version.bringBack", { scriptId, versionId });

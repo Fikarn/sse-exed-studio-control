@@ -203,6 +203,27 @@ fn verify_snapshot(path: &Path) -> EngineResult<()> {
     Ok(())
 }
 
+/// Writes `bytes` to `path` so that a power cut leaves the old file or the
+/// new one, never half of either: into a sibling `.part` file, flushed to the
+/// disk, then moved into place (the audit of 2026-10-12: the JSON archives,
+/// the pre-restore rollback archive among them, went through `fs::write`,
+/// while the database backups were flushed).
+pub(crate) fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| std::io::Error::other("the file has no name"))?;
+    let part = path.with_file_name(format!("{name}.part"));
+    {
+        let mut file = fs::File::create(&part)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+    }
+    fs::rename(&part, path)
+}
+
 /// Removes the oldest backups of every reason beyond its retention. The
 /// names carry the timestamp at fixed width, so name order is age order.
 /// Files that are not engine backups (support archives, anything else) are
@@ -688,6 +709,31 @@ mod tests {
         assert_eq!(
             file_timestamp(UNIX_EPOCH + Duration::from_secs(951_782_400)),
             "2000-02-29T00-00-00-000Z"
+        );
+    }
+}
+
+#[cfg(test)]
+mod durable_write_tests {
+    use super::write_durably;
+    use crate::control_surface::test_support::TestDir;
+
+    // The archives are whole or not there (the audit of 2026-10-12): written
+    // beside their name, flushed, then moved into place; a second write
+    // replaces the first, and no part file is left behind.
+    #[test]
+    fn an_archive_is_written_whole_and_replaces_the_one_before() {
+        let test_dir = TestDir::new("durable-write");
+        let path = test_dir.path().join("archive.json");
+        write_durably(&path, b"{\"first\": true}").expect("the first write");
+        write_durably(&path, b"{\"second\": true}").expect("the second write");
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("the file"),
+            "{\"second\": true}"
+        );
+        assert!(
+            !test_dir.path().join("archive.json.part").exists(),
+            "no part file is left"
         );
     }
 }

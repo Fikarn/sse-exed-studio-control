@@ -125,7 +125,7 @@ describe("the fixture double's backup replies", () => {
     });
     await request("prompter.putOn", { scriptId: intro });
     await request("prompter.jump", { to: "paragraph", paragraph: 1 });
-    await request("prompter.script.delete", { scriptId: spare });
+    await request("prompter.script.delete", { scriptId: spare, confirm: true });
     await request("prompter.script.create", { name: "Newer" });
     await request("prompter.look.update", { textColour: "white" });
     const glassBefore = await request("prompter.glass.snapshot");
@@ -189,7 +189,7 @@ describe("the fixture double's backup replies", () => {
     // The archived place, read back: the script deleted for good comes back from it.
     await request("prompter.clear");
     await request("prompter.script.remove", { scriptId: talk });
-    await request("prompter.script.delete", { scriptId: talk });
+    await request("prompter.script.delete", { scriptId: talk, confirm: true });
     await request("support.backup.restore", { path });
     const restored = await request("prompter.script.snapshot", { scriptId: talk });
     expect((restored.script as JsonObject).place).toEqual({ paragraph: 3, word: 0 });

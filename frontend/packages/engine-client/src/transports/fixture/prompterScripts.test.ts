@@ -161,7 +161,12 @@ describe("the fixture double's prompter scripts", () => {
     await call("prompter.script.restore", { scriptId: off });
     expect(names((await snapshot()).scripts)).toEqual(["On air", "Spare"]);
     await call("prompter.script.remove", { scriptId: off });
-    await call("prompter.script.delete", { scriptId: off });
+    // A delete for good takes the page's second press, `confirm: true` (the audit of 2026-10-12).
+    expect(await refused("prompter.script.delete", { scriptId: off })).toEqual({
+      code: "PROMPTER_DELETE_NOT_CONFIRMED",
+      sentence: "Deleting Spare for good cannot be undone. Press Delete for good again to confirm.",
+    });
+    await call("prompter.script.delete", { scriptId: off, confirm: true });
     expect((await snapshot()).removed).toEqual([]);
     expect((await refused("prompter.script.snapshot", { scriptId: off })).code).toBe("PROMPTER_SCRIPT_UNKNOWN");
   });

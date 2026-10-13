@@ -113,6 +113,11 @@ export function formatFailureCode(failure: StartupFailure | null): string {
   if (code === "STORAGE_MIGRATION_FAILED") {
     return "Saved data upgrade failed";
   }
+  // The audit of 2026-10-12 (M3): saved data a newer build wrote; the engine
+  // stays up for the recovery screen, as for the two codes above.
+  if (code === "STORAGE_NEWER_SCHEMA") {
+    return "Saved data from a newer build";
+  }
   // 2026-09 production readiness, Slice 5 (F09, F19): the link that stopped
   // during a session, and the second copy of the app that was refused.
   if (code === "ENGINE_EXITED") {
@@ -167,6 +172,7 @@ export function formatFailureMeta(failure: StartupFailure | null): string | unde
   if (
     failure.code === "STORAGE_CORRUPT" ||
     failure.code === "STORAGE_MIGRATION_FAILED" ||
+    failure.code === "STORAGE_NEWER_SCHEMA" ||
     failure.code === "ENGINE_READY_TIMEOUT"
   ) {
     return formatFailureCode(failure);
@@ -192,6 +198,11 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
   // data asking for attention — restore a backup from Setup / Support.
   if (startupFailure?.code === "STORAGE_CORRUPT" || startupFailure?.code === "STORAGE_MIGRATION_FAILED") {
     return "Saved data damaged";
+  }
+  // Not damaged, only newer than this build reads: the newer build, or a
+  // backup from before it, is the way out (the audit of 2026-10-12, M3).
+  if (startupFailure?.code === "STORAGE_NEWER_SCHEMA") {
+    return "Saved data from a newer build";
   }
 
   // 2026-09 production readiness, Slice 5 (F09): the hardware link stopped

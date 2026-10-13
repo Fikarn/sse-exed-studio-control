@@ -239,6 +239,17 @@ fn step_param(params: &Value) -> Result<Option<i64>, PrompterError> {
     }
 }
 
+/// `confirm`: the page's second press on an item that arms; absent is `false`.
+fn confirm_param(params: &Value) -> Result<bool, PrompterError> {
+    match params.get("confirm") {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Bool(confirm)) => Ok(*confirm),
+        Some(_) => Err(PrompterError::Invalid(String::from(
+            "confirm must be true or false.",
+        ))),
+    }
+}
+
 fn script_id(params: &Value) -> Result<&str, PrompterError> {
     text_param(params, "scriptId")
 }
@@ -655,8 +666,12 @@ fn remove_request(
     ))
 }
 
-/// `prompter.script.delete { scriptId }`: "Delete for good…" in Removed, the
-/// only way a script ends (§3.3). The page asks first.
+/// `prompter.script.delete { scriptId, confirm }`: "Delete for good…" in
+/// Removed, the only way a script ends (§3.3). The page arms the item and
+/// sends `confirm: true` at the second press; a request without it is refused
+/// (the audit of 2026-10-12: the confirm lived in the page alone, and one
+/// request from anywhere deleted the script and its versions, as a camera's
+/// irreversible requests never could).
 fn delete_request(connection: &mut Connection, params: &Value) -> Handled {
     let id = script_id(params)?;
     let script = existing_script(connection, id)?;
@@ -665,6 +680,15 @@ fn delete_request(connection: &mut Connection, params: &Value) -> Handled {
             "PROMPTER_SCRIPT_NOT_REMOVED",
             format!(
                 "{} is not in Removed. Remove it first; only a removed script can be deleted for good.",
+                script.name
+            ),
+        ));
+    }
+    if !confirm_param(params)? {
+        return Err(PrompterError::Refused(
+            "PROMPTER_DELETE_NOT_CONFIRMED",
+            format!(
+                "Deleting {} for good cannot be undone. Press Delete for good again to confirm.",
                 script.name
             ),
         ));

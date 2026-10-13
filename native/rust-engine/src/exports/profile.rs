@@ -80,7 +80,8 @@ pub fn export_companion_config(
         .unwrap_or(0);
     let json = serde_json::to_vec_pretty(&config)
         .map_err(|error| ExportCommandError::Storage(error.to_string()))?;
-    fs::write(&path, json).map_err(|error| ExportCommandError::Storage(error.to_string()))?;
+    crate::storage_backups::write_durably(&path, &json)
+        .map_err(|error| ExportCommandError::Storage(error.to_string()))?;
 
     Ok(CompanionExportSummary {
         path: path.display().to_string(),

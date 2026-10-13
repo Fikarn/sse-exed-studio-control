@@ -47,6 +47,12 @@ pub enum StorageError {
     /// migration's transaction is rolled back and the schema version stays
     /// where it was.
     MigrationFailed { key: String, detail: String },
+    /// The database was written by a newer build (its schema is past this
+    /// build's). Nothing is changed: the way out is that build, or a backup
+    /// from before it, which the recovery screen restores (the audit of
+    /// 2026-10-12, M3: until then this was a plain sentence, and the screen
+    /// that restores a backup was never offered).
+    NewerSchema { schema_version: i64, supported: i64 },
 }
 
 impl fmt::Display for StorageError {
@@ -60,6 +66,13 @@ impl fmt::Display for StorageError {
             StorageError::MigrationFailed { key, detail } => write!(
                 formatter,
                 "Database migration refused: the stored value {key} is not readable ({detail})"
+            ),
+            StorageError::NewerSchema {
+                schema_version,
+                supported,
+            } => write!(
+                formatter,
+                "Database schema {schema_version} is newer than this build's {supported}: start the newer build, or restore a backup from before it"
             ),
         }
     }
@@ -394,10 +407,10 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
     // migration plan." Surfacing a typed, recoverable error keeps the
     // operator on the original version instead of silently corrupting.
     if schema_version > STORAGE_SCHEMA_VERSION {
-        return Err(format!(
-            "This workstation database is at schema version {schema_version}, which is newer than this engine binary (supports up to {STORAGE_SCHEMA_VERSION}). \
-             Reinstall the newer release or restore a v{STORAGE_SCHEMA_VERSION}-or-earlier backup before launching this version."
-        )
+        return Err(StorageError::NewerSchema {
+            schema_version,
+            supported: STORAGE_SCHEMA_VERSION,
+        }
         .into());
     }
 

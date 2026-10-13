@@ -99,7 +99,10 @@ export function SetupRecoverySurface({
   // data does not open. It took the newest of either kind until then, and an
   // archive was refused.
   const lastBackup = backups.find((backup) => backup.kind === "database") ?? null;
-  const storageFailed = failure?.code === "STORAGE_CORRUPT" || failure?.code === "STORAGE_MIGRATION_FAILED";
+  const storageFailed =
+    failure?.code === "STORAGE_CORRUPT" ||
+    failure?.code === "STORAGE_MIGRATION_FAILED" ||
+    failure?.code === "STORAGE_NEWER_SCHEMA";
   // The visual overhaul's polish (2026-10-05): the page's own sentence fits
   // the display's two lines; Retry startup, beside it, names the first way out.
   const summary =

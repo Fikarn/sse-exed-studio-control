@@ -80,6 +80,10 @@ pub const STARTUP_CODE_STORAGE_CORRUPT: &str = "STORAGE_CORRUPT";
 /// A schema migration refused a stored value it could not read; nothing was
 /// changed and the pre-migration backup is on disk (Slice 3 — F13).
 pub const STARTUP_CODE_STORAGE_MIGRATION_FAILED: &str = "STORAGE_MIGRATION_FAILED";
+/// The saved data was written by a newer build (the audit of 2026-10-12, M3):
+/// the engine stays up in recovery mode, as for the two codes above, so a
+/// backup from before that build can be restored from the recovery screen.
+pub const STARTUP_CODE_STORAGE_NEWER_SCHEMA: &str = "STORAGE_NEWER_SCHEMA";
 /// Sub-directory of the app-data directory where the shell writes diagnostics
 /// exports; reported as `runtime.paths.exportsDir` so the Support surfaces
 /// can open it (2026-09 production readiness, Slice 4 — finding F15).
@@ -771,6 +775,19 @@ fn storage_startup_failure(
                 runtime_paths.db_path.display()
             ),
         },
+        StorageError::NewerSchema {
+            schema_version,
+            supported,
+        } => StartupFailure {
+            code: STARTUP_CODE_STORAGE_NEWER_SCHEMA,
+            message: format!(
+                "The saved data file {} was written by a newer Studio Control (its data is at \
+                 version {schema_version}; this one reads up to {supported}). Nothing was \
+                 changed. {backup_sentence} Start the newer Studio Control, or restore a backup \
+                 from before it from Setup / Support.",
+                runtime_paths.db_path.display()
+            ),
+        },
     };
     Box::new(failure)
 }
@@ -783,7 +800,8 @@ mod tests {
         storage_startup_failure, validate_protocol_version, RuntimePaths, StartupFailure,
         INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
         STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
-        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
+        STARTUP_CODE_STORAGE_MIGRATION_FAILED, STARTUP_CODE_STORAGE_NEWER_SCHEMA,
+        SUPPORTED_PROTOCOL_VERSION,
     };
     use crate::lighting::{
         lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
@@ -1130,6 +1148,47 @@ mod tests {
             "{log}"
         );
         drop(holder);
+    }
+
+    // The audit of 2026-10-12 (M3): saved data from a newer build has its own
+    // code, so the engine stays up for the recovery screen; the sentence names
+    // both versions and the way out.
+    #[test]
+    fn a_newer_schema_maps_to_its_own_code() {
+        let test_dir = TestDir::new("newer-schema");
+        let paths = runtime_paths_for(&test_dir);
+        let error = storage_startup_failure(
+            &paths,
+            Box::new(StorageError::NewerSchema {
+                schema_version: 12,
+                supported: 10,
+            }),
+        );
+        let failure = error
+            .downcast_ref::<StartupFailure>()
+            .expect("a StartupFailure");
+        assert_eq!(failure.code, STARTUP_CODE_STORAGE_NEWER_SCHEMA);
+        assert!(
+            failure.message.contains("version 12"),
+            "{}",
+            failure.message
+        );
+        assert!(
+            failure.message.contains("reads up to 10"),
+            "{}",
+            failure.message
+        );
+        assert!(
+            failure
+                .message
+                .contains("Start the newer Studio Control, or restore a backup"),
+            "{}",
+            failure.message
+        );
+        assert_eq!(
+            startup_failure_code(error.as_ref()),
+            STARTUP_CODE_STORAGE_NEWER_SCHEMA
+        );
     }
 
     // 2026-09 production readiness, Slice 3 (F13): a refused migration has
