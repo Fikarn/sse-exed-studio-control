@@ -65,8 +65,12 @@ async function quietCount(read: () => number): Promise<number> {
 
 describe("a page is drawn again only for a change of its own", () => {
   // jsdom measures nothing and has no media queries: the plot and the layout
-  // provider ask for both.
+  // provider ask for both. Its animation frames never come either: the plot
+  // eases its framing over frames, and under a loaded test run that easing
+  // never settled, so the page rendered on its own without end.
   beforeEach(() => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => {});
     vi.stubGlobal(
       "ResizeObserver",
       class {
