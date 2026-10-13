@@ -398,14 +398,13 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
 
     let mut schema_version = current_schema_version(connection)?;
 
-    // plan PR 7 / workstream E4: forward-compatibility guard. If the
-    // workstation is downgraded to a binary older than the DB schema it
-    // last ran against, opening the DB silently used to succeed and any
-    // newer-only column or seed would be invisible / corrupted. AGENTS.md
-    // rollback posture is: "rollback to a prior tag must remain a
-    // reinstall-away; do not change on-disk formats without an explicit
-    // migration plan." Surfacing a typed, recoverable error keeps the
-    // operator on the original version instead of silently corrupting.
+    // The forward guard (plan PR 7 / workstream E4). A build older than
+    // the schema the saved data last ran against used to open it, and a
+    // newer-only column or seed went unseen or was damaged. AGENTS.md's
+    // rule: "A newer build upgrades the saved data, and an older build then
+    // refuses it and stops at the recovery screen: going back means
+    // restoring the backup from there." The typed error is that refusal
+    // (`STORAGE_NEWER_SCHEMA`, the audit of 2026-10-12).
     if schema_version > STORAGE_SCHEMA_VERSION {
         return Err(StorageError::NewerSchema {
             schema_version,
