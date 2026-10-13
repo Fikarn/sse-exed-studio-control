@@ -1845,32 +1845,23 @@ fn channel_meter_payload(channel: &AudioChannelSnapshot) -> Value {
         || channel.clip;
 
     json!({
-        "channelPathClip": channel.clip,
-        "channelPathClipHold": channel.clip,
         "id": channel.id,
         "meterPoint": meter_point_for_channel(channel),
         "meterLeft": channel.meter_left,
         "meterRight": channel.meter_right,
         "meterLevel": channel.meter_level,
-        "peakHold": channel.peak_hold,
         "peakHoldLeft": channel.peak_hold_left,
         "peakHoldRight": channel.peak_hold_right,
         "levelLeftDbfs": level_left_dbfs,
         "levelRightDbfs": level_right_dbfs,
         "peakLeftDbfs": normalized_to_payload_dbfs(peak_left),
         "peakRightDbfs": normalized_to_payload_dbfs(peak_right),
-        "rmsLeftDbfs": level_left_dbfs,
-        "rmsRightDbfs": level_right_dbfs,
         "peakHoldLeftDbfs": normalized_to_payload_dbfs(channel.peak_hold_left),
         "peakHoldRightDbfs": normalized_to_payload_dbfs(channel.peak_hold_right),
         "peakWarning": peak_warning,
         "meterPointOver": meter_point_over,
         "meterPointOverLeft": over_left,
         "meterPointOverRight": over_right,
-        "over": meter_point_over,
-        "overLeft": over_left,
-        "overRight": over_right,
-        "clipHold": channel.clip,
         "clip": channel.clip,
     })
 }
@@ -1887,32 +1878,24 @@ fn mix_target_meter_payload(mix_target: &AudioMixTargetSnapshot) -> Value {
         || level_right_dbfs >= CONSOLE_PEAK_WARNING_DBFS;
 
     json!({
-        "channelPathClip": false,
-        "channelPathClipHold": false,
         "id": mix_target.id,
         "meterPoint": CONSOLE_METER_POINT_POST_FADER,
         "meterLeft": mix_target.meter_left,
         "meterRight": mix_target.meter_right,
         "meterLevel": mix_target.meter_level,
-        "peakHold": mix_target.peak_hold,
         "peakHoldLeft": mix_target.peak_hold_left,
         "peakHoldRight": mix_target.peak_hold_right,
         "levelLeftDbfs": level_left_dbfs,
         "levelRightDbfs": level_right_dbfs,
         "peakLeftDbfs": normalized_to_payload_dbfs(peak_left),
         "peakRightDbfs": normalized_to_payload_dbfs(peak_right),
-        "rmsLeftDbfs": level_left_dbfs,
-        "rmsRightDbfs": level_right_dbfs,
         "peakHoldLeftDbfs": normalized_to_payload_dbfs(mix_target.peak_hold_left),
         "peakHoldRightDbfs": normalized_to_payload_dbfs(mix_target.peak_hold_right),
         "peakWarning": peak_warning,
         "meterPointOver": meter_point_over,
         "meterPointOverLeft": over_left,
         "meterPointOverRight": over_right,
-        "over": meter_point_over,
-        "overLeft": over_left,
-        "overRight": over_right,
-        "clipHold": false,
+        "clip": false,
     })
 }
 

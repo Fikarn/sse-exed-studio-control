@@ -437,10 +437,7 @@ export function audioMeterPayloadFromSnapshot(
     const meterPointOver = overLeft || overRight;
 
     return {
-      channelPathClip: clip,
-      channelPathClipHold: clip,
       clip,
-      clipHold: clip,
       id: asString(record.id),
       lufsIntegrated: asNumber(record.lufsIntegrated, 0),
       levelLeftDbfs,
@@ -452,18 +449,12 @@ export function audioMeterPayloadFromSnapshot(
       meterPointOver,
       meterPointOverLeft: overLeft,
       meterPointOverRight: overRight,
-      over: meterPointOver,
-      overLeft,
-      overRight,
-      peakHold: asNumber(record.peakHold, 0),
       peakHoldLeft,
       peakHoldRight,
       peakLeftDbfs: normalizedToDbfs(peakLeft),
       peakRightDbfs: normalizedToDbfs(peakRight),
       peakWarning:
         levelLeftDbfs >= AUDIO_METER_PEAK_WARNING_DBFS || levelRightDbfs >= AUDIO_METER_PEAK_WARNING_DBFS || clip,
-      rmsLeftDbfs: levelLeftDbfs,
-      rmsRightDbfs: levelRightDbfs,
       peakHoldLeftDbfs: normalizedToDbfs(peakHoldLeft),
       peakHoldRightDbfs: normalizedToDbfs(peakHoldRight),
     };

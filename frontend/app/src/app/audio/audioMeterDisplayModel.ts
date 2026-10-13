@@ -90,18 +90,14 @@ export function maxMeterDbfs(...values: Array<number | null | undefined>) {
 }
 
 export function meterDisplayTargetFromEntry(entry: AudioMeterEntry, mirrorRight = false): MeterDisplayTarget {
-  const bodyLeftDbfs = maxMeterDbfs(entry.levelLeftDbfs, entry.rmsLeftDbfs);
-  const bodyRightDbfs = mirrorRight ? bodyLeftDbfs : maxMeterDbfs(entry.levelRightDbfs, entry.rmsRightDbfs);
+  const bodyLeftDbfs = maxMeterDbfs(entry.levelLeftDbfs);
+  const bodyRightDbfs = mirrorRight ? bodyLeftDbfs : maxMeterDbfs(entry.levelRightDbfs);
   const transientLeftDbfs = maxMeterDbfs(bodyLeftDbfs, entry.peakLeftDbfs);
   const transientRightDbfs = mirrorRight ? transientLeftDbfs : maxMeterDbfs(bodyRightDbfs, entry.peakRightDbfs);
-  const meterPointOverLeft = entry.meterPointOverLeft ?? entry.overLeft ?? entry.meterPointOver ?? entry.over ?? false;
-  const rawMeterPointOverRight =
-    entry.meterPointOverRight ?? entry.overRight ?? entry.meterPointOver ?? entry.over ?? false;
-  const channelPathClip =
-    entry.channelPathClip === true ||
-    entry.channelPathClipHold === true ||
-    entry.clipHold === true ||
-    entry.clip === true;
+  const meterPointOverLeft = entry.meterPointOverLeft ?? entry.meterPointOver ?? false;
+  const rawMeterPointOverRight = entry.meterPointOverRight ?? entry.meterPointOver ?? false;
+  // The console's held clip, drawn over the meter until `audio.clip.clear`.
+  const channelPathClip = entry.clip === true;
 
   return {
     bodyLeftDbfs,
