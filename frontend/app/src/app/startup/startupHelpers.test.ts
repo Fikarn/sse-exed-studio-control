@@ -30,6 +30,20 @@ describe("startupHelpers failure copy", () => {
     expect(formatFailureCode(failure)).toBe("Saved data upgrade failed");
   });
 
+  // The audit of 2026-10-12 (M3): saved data a newer build wrote is not damaged;
+  // the title and the label say so, and the recovery screen offers a restore.
+  it("formats STORAGE_NEWER_SCHEMA", () => {
+    const failure = {
+      code: "STORAGE_NEWER_SCHEMA",
+      message:
+        "The saved data file was written by a newer Studio Control. Start it, or restore a backup from before it.",
+      stage: "bootstrap",
+    };
+
+    expect(getFailureTitle(failure)).toBe("Saved data too new");
+    expect(formatFailureCode(failure)).toBe("Saved data from a newer build");
+  });
+
   // The visual overhaul's polish (2026-10-05): BOOTSTRAP_FAILED read
   // "Bootstrap failed", a word the screen does not use.
   it("keeps the generic title and names a bootstrap failure in the screen's words", () => {
@@ -85,6 +99,7 @@ describe("the recovery display's meta line", () => {
   it("names what failed where the word does not say it", () => {
     expect(meta("STORAGE_CORRUPT", "bootstrap")).toBe("Saved data check failed");
     expect(meta("STORAGE_MIGRATION_FAILED", "bootstrap")).toBe("Saved data upgrade failed");
+    expect(meta("STORAGE_NEWER_SCHEMA", "bootstrap")).toBe("Saved data from a newer build");
     expect(meta("ENGINE_READY_TIMEOUT", "ready-event")).toBe("Startup timed out");
   });
 
@@ -101,6 +116,7 @@ describe("the recovery display's meta line", () => {
       ["ENGINE_EXITED", "runtime"],
       ["STORAGE_CORRUPT", "bootstrap"],
       ["STORAGE_MIGRATION_FAILED", "bootstrap"],
+      ["STORAGE_NEWER_SCHEMA", "bootstrap"],
       ["ENGINE_READY_TIMEOUT", "ready-event"],
     ] as const) {
       expect((meta(code, stage) ?? "").length, code).toBeLessThanOrEqual(30);

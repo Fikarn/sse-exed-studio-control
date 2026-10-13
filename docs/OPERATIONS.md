@@ -244,6 +244,6 @@ Everything is in `%APPDATA%\ExEd Studio Control Native`: the database, and the `
 
 The app backs the database up by itself and checks every copy: before it upgrades the saved data, daily, at every clean close and before a restore. It keeps the last 5, 14, 3 and 5 of them. `Export backup` adds a backup archive: the setup, the lighting and audio settings, the deck's settings and the scripts.
 
-A newer build upgrades the saved data at its first start. An older build then refuses it. Going back means putting the backup from before the upgrade in place of the database, by hand and with the app closed. What was saved after the upgrade is lost.
+A newer build upgrades the saved data at its first start. An older build then refuses it and stops at the recovery screen, which names the newest backup it reads; restore a backup from before the upgrade there. What was saved after the upgrade is lost.
 
 Never delete the `backups` folder. It is the only way back.

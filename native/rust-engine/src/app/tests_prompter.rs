@@ -281,7 +281,11 @@ fn a_format_6_archive_adds_scripts_and_never_removes_one() {
         "prompter.jump",
         json!({ "to": "paragraph", "paragraph": 1 }),
     );
-    result(&app, "prompter.script.delete", json!({ "scriptId": spare }));
+    result(
+        &app,
+        "prompter.script.delete",
+        json!({ "scriptId": spare, "confirm": true }),
+    );
     result(&app, "prompter.script.create", json!({ "name": "Newer" }));
     result(
         &app,

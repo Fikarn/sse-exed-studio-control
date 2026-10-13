@@ -790,7 +790,9 @@ pub fn control_surface_last_event(db_path: &Path) -> Value {
     list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .ok()
         .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())
-        .and_then(|serialized| serde_json::from_str::<Value>(&serialized).ok())
+        .and_then(|serialized| {
+            crate::saved_json::parse_saved_json::<Value>(LAST_EVENT_KEY, &serialized)
+        })
         .unwrap_or(Value::Null)
 }
 

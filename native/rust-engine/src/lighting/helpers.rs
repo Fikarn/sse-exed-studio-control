@@ -550,7 +550,7 @@ pub(super) fn read_marker_setting(
     key: &str,
 ) -> Option<LightingSpatialMarker> {
     read_optional_setting(settings, key)
-        .and_then(|value| serde_json::from_str::<LightingSpatialMarker>(&value).ok())
+        .and_then(|value| crate::saved_json::parse_saved_json::<LightingSpatialMarker>(key, &value))
         .map(normalize_marker)
 }
 

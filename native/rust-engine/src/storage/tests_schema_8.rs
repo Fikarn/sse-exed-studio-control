@@ -505,10 +505,10 @@ fn a_database_from_a_newer_build_is_refused_by_name() {
     let error = initialize_database(&db_path, &backups_dir)
         .expect_err("a schema-11 database must be refused");
     let message = error.to_string();
-    assert!(message.contains("schema version 11"), "{message}");
-    assert!(message.contains("(supports up to 10)"), "{message}");
+    assert!(message.contains("schema 11"), "{message}");
+    assert!(message.contains("newer than this build's 10"), "{message}");
     assert!(
-        message.contains("restore a v10-or-earlier backup"),
+        message.contains("restore a backup from before it"),
         "{message}"
     );
 

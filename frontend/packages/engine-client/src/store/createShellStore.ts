@@ -180,7 +180,7 @@ interface PendingStartupGate {
 const AUTOMATIC_RESTART_LIMIT = 3;
 /** The start-up failures after which the engine stays up in recovery mode,
  *  answering only the backup requests (Slice 7 — F20). */
-const RECOVERY_MODE_CODES = new Set(["STORAGE_CORRUPT", "STORAGE_MIGRATION_FAILED"]);
+const RECOVERY_MODE_CODES = new Set(["STORAGE_CORRUPT", "STORAGE_MIGRATION_FAILED", "STORAGE_NEWER_SCHEMA"]);
 const AUTOMATIC_RESTART_WINDOW_MS = 5 * 60_000;
 const AUTOMATIC_RESTART_BACKOFF_MS: readonly number[] = [1_000, 2_000, 4_000];
 /** Background failures kept for the diagnostics export (Slice 9 renders them). */
@@ -1744,7 +1744,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return performRequest("prompter.script.restore", { scriptId });
     },
     deletePrompterScript(scriptId: string) {
-      return performRequest("prompter.script.delete", { scriptId });
+      // The page arms Delete for good and calls this at the second press: the
+      // press is the confirm the hardware link asks for (the audit of 2026-10-12).
+      return performRequest("prompter.script.delete", { scriptId, confirm: true });
     },
     bringBackPrompterVersion(scriptId: string, versionId: number) {
       return performRequest("prompter.script.version.bringBack", { scriptId, versionId });

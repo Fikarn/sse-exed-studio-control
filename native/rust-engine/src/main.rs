@@ -33,6 +33,7 @@ mod protocol;
 mod rme_console_link;
 mod rme_totalmix_names;
 mod rme_totalmix_osc;
+mod saved_json;
 mod shell_settings;
 mod storage;
 mod storage_backups;
@@ -47,6 +48,7 @@ use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
 use crate::bootstrap::{
     resolve_runtime_paths, startup_failure_code, validate_protocol_version, EXPORTS_DIR_NAME,
     STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
+    STARTUP_CODE_STORAGE_NEWER_SCHEMA,
 };
 use crate::diagnostics::{append_log, init_log, log_event, LogLevel};
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BACKUPS, SUBSYSTEM_OSC};
@@ -722,7 +724,9 @@ fn main() -> io::Result<()> {
                 LogLevel::Error,
                 &format!("The hardware link did not start: {error}"),
             );
-            if code == STARTUP_CODE_STORAGE_CORRUPT || code == STARTUP_CODE_STORAGE_MIGRATION_FAILED
+            if code == STARTUP_CODE_STORAGE_CORRUPT
+                || code == STARTUP_CODE_STORAGE_MIGRATION_FAILED
+                || code == STARTUP_CODE_STORAGE_NEWER_SCHEMA
             {
                 // Recovery mode (Slice 7 — F20): the saved data needs a
                 // backup restored, and the Support surface does that through

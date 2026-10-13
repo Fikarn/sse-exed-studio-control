@@ -80,6 +80,10 @@ pub const STARTUP_CODE_STORAGE_CORRUPT: &str = "STORAGE_CORRUPT";
 /// A schema migration refused a stored value it could not read; nothing was
 /// changed and the pre-migration backup is on disk (Slice 3 — F13).
 pub const STARTUP_CODE_STORAGE_MIGRATION_FAILED: &str = "STORAGE_MIGRATION_FAILED";
+/// The saved data was written by a newer build (the audit of 2026-10-12, M3):
+/// the engine stays up in recovery mode, as for the two codes above, so a
+/// backup from before that build can be restored from the recovery screen.
+pub const STARTUP_CODE_STORAGE_NEWER_SCHEMA: &str = "STORAGE_NEWER_SCHEMA";
 /// Sub-directory of the app-data directory where the shell writes diagnostics
 /// exports; reported as `runtime.paths.exportsDir` so the Support surfaces
 /// can open it (2026-09 production readiness, Slice 4 — finding F15).
@@ -771,8 +775,47 @@ fn storage_startup_failure(
                 runtime_paths.db_path.display()
             ),
         },
+        StorageError::NewerSchema {
+            schema_version,
+            supported,
+        } => {
+            // The newest backup is most likely the newer build's own, which
+            // this build refuses too (the review): the sentence names the
+            // newest one this build reads.
+            let readable = newest_readable_snapshot(&runtime_paths.backups_dir, *supported);
+            let readable_sentence = match readable {
+                Some(path) => format!(
+                    "The newest backup this Studio Control reads is {}.",
+                    path.display()
+                ),
+                None => format!(
+                    "No backup from before the newer Studio Control exists in {}.",
+                    runtime_paths.backups_dir.display()
+                ),
+            };
+            StartupFailure {
+                code: STARTUP_CODE_STORAGE_NEWER_SCHEMA,
+                message: format!(
+                    "The saved data file {} was written by a newer Studio Control (its data is \
+                     at version {schema_version}; this one reads up to {supported}). Nothing \
+                     was changed. {readable_sentence} Start the newer Studio Control, or restore \
+                     a backup from before it; the recovery screen and Setup / Support list them.",
+                    runtime_paths.db_path.display()
+                ),
+            }
+        }
     };
     Box::new(failure)
+}
+
+/// The newest database backup whose data `supported` reads, by name order
+/// (which is age order), each inspected until one fits; `None` with none.
+fn newest_readable_snapshot(backups_dir: &Path, supported: i64) -> Option<PathBuf> {
+    crate::storage_backups::snapshots_newest_first(backups_dir)
+        .into_iter()
+        .find(|path| {
+            inspect_database_backup(path).is_ok_and(|facts| facts.schema_version <= supported)
+        })
 }
 
 #[cfg(test)]
@@ -783,7 +826,8 @@ mod tests {
         storage_startup_failure, validate_protocol_version, RuntimePaths, StartupFailure,
         INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
         STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
-        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
+        STARTUP_CODE_STORAGE_MIGRATION_FAILED, STARTUP_CODE_STORAGE_NEWER_SCHEMA,
+        SUPPORTED_PROTOCOL_VERSION,
     };
     use crate::lighting::{
         lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
@@ -1130,6 +1174,101 @@ mod tests {
             "{log}"
         );
         drop(holder);
+    }
+
+    // The audit of 2026-10-12 (M3): saved data from a newer build has its own
+    // code, so the engine stays up for the recovery screen; the sentence names
+    // both versions and the way out.
+    #[test]
+    fn a_newer_schema_maps_to_its_own_code() {
+        let test_dir = TestDir::new("newer-schema");
+        let paths = runtime_paths_for(&test_dir);
+        let error = storage_startup_failure(
+            &paths,
+            Box::new(StorageError::NewerSchema {
+                schema_version: 12,
+                supported: 10,
+            }),
+        );
+        let failure = error
+            .downcast_ref::<StartupFailure>()
+            .expect("a StartupFailure");
+        assert_eq!(failure.code, STARTUP_CODE_STORAGE_NEWER_SCHEMA);
+        assert!(
+            failure.message.contains("version 12"),
+            "{}",
+            failure.message
+        );
+        assert!(
+            failure.message.contains("reads up to 10"),
+            "{}",
+            failure.message
+        );
+        assert!(
+            failure
+                .message
+                .contains("Start the newer Studio Control, or restore a backup"),
+            "{}",
+            failure.message
+        );
+        assert_eq!(
+            startup_failure_code(error.as_ref()),
+            STARTUP_CODE_STORAGE_NEWER_SCHEMA
+        );
+    }
+
+    // The newest backup after a newer build ran is that build's own, which this
+    // build refuses too (the review): the newer-schema sentence names the
+    // newest backup this build reads, and `newest_snapshot` still says the
+    // newest of all.
+    #[test]
+    fn the_newer_schema_sentence_names_the_newest_backup_this_build_reads() {
+        use crate::storage_backups::{newest_snapshot, snapshot_database, SnapshotReason};
+
+        let test_dir = TestDir::new("newer-schema-backups");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.backups_dir).expect("backups dir");
+        crate::storage::initialize_database(&paths.db_path, &paths.backups_dir)
+            .expect("the database should initialize");
+        let readable = snapshot_database(&paths.db_path, &paths.backups_dir, SnapshotReason::Daily)
+            .expect("the daily backup");
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let newer = snapshot_database(&paths.db_path, &paths.backups_dir, SnapshotReason::Shutdown)
+            .expect("the shutdown backup");
+        crate::storage::open_connection(&newer)
+            .expect("the backup opens")
+            .execute(
+                "INSERT INTO schema_migrations(version) VALUES (?1)",
+                [crate::storage::STORAGE_SCHEMA_VERSION + 1],
+            )
+            .expect("the newer version row");
+
+        assert_eq!(newest_snapshot(&paths.backups_dir), Some(newer.clone()));
+        assert_eq!(
+            super::newest_readable_snapshot(
+                &paths.backups_dir,
+                crate::storage::STORAGE_SCHEMA_VERSION
+            ),
+            Some(readable.clone())
+        );
+        let error = storage_startup_failure(
+            &paths,
+            Box::new(StorageError::NewerSchema {
+                schema_version: crate::storage::STORAGE_SCHEMA_VERSION + 1,
+                supported: crate::storage::STORAGE_SCHEMA_VERSION,
+            }),
+        );
+        let failure = error
+            .downcast_ref::<StartupFailure>()
+            .expect("a StartupFailure");
+        let readable_name = readable.file_name().unwrap().to_str().unwrap();
+        let newer_name = newer.file_name().unwrap().to_str().unwrap();
+        assert!(
+            failure.message.contains(readable_name),
+            "{}",
+            failure.message
+        );
+        assert!(!failure.message.contains(newer_name), "{}", failure.message);
     }
 
     // 2026-09 production readiness, Slice 3 (F13): a refused migration has

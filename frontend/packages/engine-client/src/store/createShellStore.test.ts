@@ -387,6 +387,20 @@ describe("createShellStore engine supervision", () => {
     expect(store.getSnapshot().supportSnapshot).toMatchObject({ backupCount: 1 });
     expect(requests.filter((method) => method === "support.snapshot")).toHaveLength(1);
 
+    // The audit of 2026-10-12 (M3): saved data from a newer build keeps the
+    // engine up too, and the list is fetched for the same restore.
+    for (const storageCode of ["STORAGE_MIGRATION_FAILED", "STORAGE_NEWER_SCHEMA"]) {
+      code = storageCode;
+      requests.length = 0;
+      await store.restart();
+      await settle(() => requests.includes("support.snapshot"));
+      expect(store.getSnapshot().lifecycle, storageCode).toBe("failed");
+      expect(
+        requests.filter((method) => method === "support.snapshot"),
+        storageCode
+      ).toHaveLength(1);
+    }
+
     code = "ENGINE_ALREADY_RUNNING";
     requests.length = 0;
     await store.restart();

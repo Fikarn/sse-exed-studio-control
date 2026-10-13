@@ -249,7 +249,19 @@ fn removed_scripts_come_back_and_only_a_removed_one_is_deleted() {
     prompter.call("prompter.script.restore", json!({ "scriptId": off }));
     assert_eq!(names(&prompter.snapshot()["scripts"]), ["On air", "Spare"]);
     prompter.call("prompter.script.remove", json!({ "scriptId": off }));
-    prompter.call("prompter.script.delete", json!({ "scriptId": off }));
+    // A delete for good takes the page's second press, `confirm: true` (the
+    // audit of 2026-10-12): without it the script stays in Removed.
+    let (code, sentence) = prompter.refused("prompter.script.delete", json!({ "scriptId": off }));
+    assert_eq!(code, "PROMPTER_DELETE_NOT_CONFIRMED");
+    assert_eq!(
+        sentence,
+        "Deleting Spare for good cannot be undone. Press Delete for good again to confirm."
+    );
+    assert_eq!(names(&prompter.snapshot()["removed"]), ["Spare"]);
+    prompter.call(
+        "prompter.script.delete",
+        json!({ "scriptId": off, "confirm": true }),
+    );
     let snapshot = prompter.snapshot();
     assert_eq!(names(&snapshot["removed"]), Vec::<String>::new());
     assert_eq!(

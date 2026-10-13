@@ -116,7 +116,9 @@ pub(super) fn read_mix_target_state_map(
 pub(super) fn read_hidden_channel_ids(settings: &HashMap<String, String>) -> Vec<String> {
     settings
         .get(AUDIO_HIDDEN_CHANNEL_IDS_KEY)
-        .and_then(|value| serde_json::from_str::<Vec<String>>(value).ok())
+        .and_then(|value| {
+            crate::saved_json::parse_saved_json::<Vec<String>>(AUDIO_HIDDEN_CHANNEL_IDS_KEY, value)
+        })
         .unwrap_or_default()
 }
 
@@ -139,7 +141,7 @@ where
 {
     settings
         .get(key)
-        .and_then(|value| serde_json::from_str::<HashMap<String, T>>(value).ok())
+        .and_then(|value| crate::saved_json::parse_saved_json::<HashMap<String, T>>(key, value))
         .unwrap_or_default()
 }
 

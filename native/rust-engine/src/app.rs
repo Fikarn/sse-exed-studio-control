@@ -132,7 +132,7 @@ impl EngineApp {
         crate::health::report(
             crate::health::SUBSYSTEM_STORAGE,
             crate::health::SubsystemState::Error,
-            "The saved data failed its check; verify and restore a database backup from Setup / Support",
+            "The saved data did not open; verify and restore a database backup from Setup / Support",
         );
         Self {
             runtime: recovery_runtime_context(runtime_paths),

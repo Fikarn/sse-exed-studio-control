@@ -34,9 +34,16 @@ pub(super) fn load_lighting_editor_state_with_inventory(
     config: &LightingBackendConfig,
     inventory: &LightingBackendInventory,
 ) -> LightingEditorState {
+    // A saved state that does not read is said in the log, once (`saved_json`);
+    // the rig then shows the defaults until it is written again.
     settings
         .get(LIGHTING_EDITOR_STATE_KEY)
-        .and_then(|value| serde_json::from_str::<LightingEditorState>(value).ok())
+        .and_then(|value| {
+            crate::saved_json::parse_saved_json::<LightingEditorState>(
+                LIGHTING_EDITOR_STATE_KEY,
+                value,
+            )
+        })
         .map(|state| normalize_lighting_editor_state(state, config, inventory))
         .unwrap_or_else(|| default_lighting_editor_state(config, inventory))
 }

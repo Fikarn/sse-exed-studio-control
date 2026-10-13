@@ -1357,3 +1357,23 @@ fn a_bridge_address_that_is_not_one_machines_is_refused() {
     }
     assert!(update("10.1.0.1").is_ok(), "one machine's address is taken");
 }
+
+// A saved lighting state that does not read (the audit of 2026-10-12, M11):
+// the rig shows the defaults, as before, and the log now says so, once.
+#[test]
+fn a_saved_lighting_state_that_does_not_read_is_said_once_and_the_defaults_shown() {
+    let mut settings = HashMap::new();
+    settings.insert(
+        String::from(LIGHTING_BRIDGE_IP_KEY),
+        String::from("127.0.0.1"),
+    );
+    settings.insert(
+        String::from("app.lighting.editor.state"),
+        String::from("{\"fixtures\": [this is not json"),
+    );
+    let snapshot = read_lighting_snapshot(&settings);
+    assert!(!snapshot.fixtures.is_empty(), "the defaults stand in");
+    assert!(crate::saved_json::complained_about(
+        "app.lighting.editor.state"
+    ));
+}

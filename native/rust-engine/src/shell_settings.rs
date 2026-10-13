@@ -116,11 +116,21 @@ impl ShellSettingsSnapshot {
             .and_then(|value| parse_optional_shell_state_value(value));
         snapshot.lighting_scene_thumbs = settings
             .get(LIGHTING_SCENE_THUMBS_KEY)
-            .and_then(|raw| serde_json::from_str::<HashMap<String, String>>(raw).ok())
+            .and_then(|raw| {
+                crate::saved_json::parse_saved_json::<HashMap<String, String>>(
+                    LIGHTING_SCENE_THUMBS_KEY,
+                    raw,
+                )
+            })
             .unwrap_or_default();
         snapshot.lighting_talent_marks = settings
             .get(LIGHTING_TALENT_MARKS_KEY)
-            .and_then(|raw| serde_json::from_str::<Vec<ShellTalentMark>>(raw).ok())
+            .and_then(|raw| {
+                crate::saved_json::parse_saved_json::<Vec<ShellTalentMark>>(
+                    LIGHTING_TALENT_MARKS_KEY,
+                    raw,
+                )
+            })
             .unwrap_or_default();
 
         if let Some(width) = settings

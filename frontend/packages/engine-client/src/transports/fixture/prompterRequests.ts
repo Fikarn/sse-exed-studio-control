@@ -310,6 +310,16 @@ function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params:
           `${script.name} is not in Removed. Remove it first; only a removed script can be deleted for good.`
         );
       }
+      // The page's second press, as the hardware link asks for it (the audit of 2026-10-12).
+      if (params.confirm !== undefined && params.confirm !== null && typeof params.confirm !== "boolean") {
+        throw invalid("confirm must be true or false.");
+      }
+      if (params.confirm !== true) {
+        throw new EngineRequestError(
+          "PROMPTER_DELETE_NOT_CONFIRMED",
+          `Deleting ${script.name} for good cannot be undone. Press Delete for good again to confirm.`
+        );
+      }
       deleteScript(prompter, id);
       return answer({ scriptId: id }, "script-deleted");
     }

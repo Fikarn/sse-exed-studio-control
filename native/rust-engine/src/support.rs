@@ -981,7 +981,10 @@ fn write_support_backup_archive(
     let path = runtime.backups_dir.join(&file_name);
     let bytes = serde_json::to_vec_pretty(&archive)
         .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
-    fs::write(&path, bytes).map_err(|error| SupportCommandError::Storage(error.to_string()))?;
+    // Flushed to the disk and moved into place, as the database backups are:
+    // an archive in the backups folder is whole or not there.
+    crate::storage_backups::write_durably(&path, &bytes)
+        .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
 
     Ok(SupportBackupExportSummary {
         path: path.display().to_string(),
