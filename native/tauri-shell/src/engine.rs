@@ -341,7 +341,18 @@ impl EngineBridge {
         }
         spawn_stdout_thread(Arc::clone(&sink), stdout, Arc::clone(&self.pending));
         spawn_stderr_thread(stderr, shell_log.clone());
-        let to_stdin = spawn_stdin_writer(stdin, generation);
+        let to_stdin = match spawn_stdin_writer(stdin, generation) {
+            Ok(to_stdin) => to_stdin,
+            // The writer's closure went with its stdin, so the pipe is
+            // closed and the engine ends on EOF; the kill makes sure.
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "The hardware link could not be started: its writer did not start: {error}."
+                ));
+            }
+        };
 
         let process = EngineProcess {
             child,
@@ -522,10 +533,11 @@ impl EngineBridge {
 /// dropped (a stop; the pipe then closes and the engine's loop ends on EOF)
 /// or a write fails (the engine is gone). A blocked write, an engine that
 /// stopped reading with its pipe full, blocks this thread alone: a stop then
-/// kills the engine after its grace, which ends the write.
-fn spawn_stdin_writer(mut stdin: ChildStdin, generation: u64) -> Sender<String> {
+/// kills the engine after its grace, which ends the write. A thread that
+/// cannot be started (the system out of resources) is the launch's failure.
+fn spawn_stdin_writer(mut stdin: ChildStdin, generation: u64) -> std::io::Result<Sender<String>> {
     let (sender, lines) = mpsc::channel::<String>();
-    let _ = thread::Builder::new()
+    thread::Builder::new()
         .name(format!("engine-stdin-{generation}"))
         .spawn(move || {
             for line in lines {
@@ -537,8 +549,8 @@ fn spawn_stdin_writer(mut stdin: ChildStdin, generation: u64) -> Sender<String> 
                     break;
                 }
             }
-        });
-    sender
+        })?;
+    Ok(sender)
 }
 
 /// Polls the engine process every `ENGINE_EXIT_WATCH_INTERVAL` and reports

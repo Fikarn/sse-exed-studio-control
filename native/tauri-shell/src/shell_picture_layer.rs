@@ -202,6 +202,7 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
     let mut layer: Option<Layer> = None;
     let mut next_try = Instant::now();
     let mut said_not_made = false;
+    let mut said_no_layer = false;
     let mut placed: Option<Placement> = None;
     let mut last_word = Instant::now();
     let mut content: Option<Content> = None;
@@ -218,7 +219,9 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                     log("made, topmost on the main window.");
                     layer = Some(made);
                     said_not_made = false;
+                    said_no_layer = false;
                     shown = None;
+                    show_failing = false;
                 }
                 Err(error) => {
                     if !said_not_made {
@@ -249,16 +252,22 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                 // A connection older than the one held, whose hello came late:
                 // the newer one keeps its surface, and the older one ends. So
                 // does one that comes while there is no layer: the helper
-                // tries again after a while.
+                // tries again after a while (said once per spell).
                 let Some(made) = layer.as_ref() else {
                     let _ = writer.shutdown(Shutdown::Both);
+                    if !said_no_layer {
+                        log(&format!(
+                            "the pictures helper (process {pid}) connected while there is no layer: its connection ends, and it comes back by itself."
+                        ));
+                        said_no_layer = true;
+                    }
                     continue;
                 };
                 if content.as_ref().is_some_and(|held| held.number > number) {
                     let _ = writer.shutdown(Shutdown::Both);
                 } else {
                     counts.attached += 1;
-                    release(made, content.take(), log);
+                    release(made, content.take(), false, log);
                     content = attach(made, number, pid, writer, placed.as_ref(), &mut counts, log);
                 }
             }
@@ -266,18 +275,35 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                 if content.as_ref().is_some_and(|held| held.number == number) {
                     counts.detached += 1;
                     if let Some(made) = layer.as_ref() {
-                        release(made, content.take(), log);
+                        release(made, content.take(), false, log);
                     }
                 }
             }
             Ok(LayerOrder::Stop) | Err(RecvTimeoutError::Disconnected) => {
                 if let Some(made) = layer.as_ref() {
-                    release(made, content.take(), log);
+                    release(made, content.take(), false, log);
                     let _ = show(made, None, shown.is_some());
                 }
                 return;
             }
             Err(RecvTimeoutError::Timeout) => {}
+        }
+        // The minute's count, with or without a layer, so that a spell
+        // without one does not run the count on into the next line.
+        if counted.elapsed() >= COUNT_INTERVAL {
+            counted = Instant::now();
+            if counts.any() {
+                log(&format!(
+                    "in the last minute the page said {} places and the helper was told {} scenes ({} did not go); {} attached, {} detached; now {}.",
+                    counts.places,
+                    counts.scenes,
+                    counts.unsaid,
+                    counts.attached,
+                    counts.detached,
+                    if shown.is_some() { "shown" } else { "hidden" }
+                ));
+            }
+            counts = Counts::default();
         }
         let Some(made) = layer.as_ref() else {
             continue;
@@ -289,7 +315,7 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
             log(&format!(
                 "the graphics device was lost ({error}): the layer is made again."
             ));
-            release(made, content.take(), log);
+            release(made, content.take(), true, log);
             layer = None;
             shown = None;
             next_try = Instant::now();
@@ -309,7 +335,7 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                     log(&format!(
                         "the graphics device was lost ({error}): the layer is made again."
                     ));
-                    release(made, content.take(), log);
+                    release(made, content.take(), true, log);
                     layer = None;
                     shown = None;
                     next_try = Instant::now();
@@ -326,21 +352,6 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                     }
                 }
             }
-        }
-        if counted.elapsed() >= COUNT_INTERVAL {
-            counted = Instant::now();
-            if counts.any() {
-                log(&format!(
-                    "in the last minute the page said {} places and the helper was told {} scenes ({} did not go); {} attached, {} detached; now {}.",
-                    counts.places,
-                    counts.scenes,
-                    counts.unsaid,
-                    counts.attached,
-                    counts.detached,
-                    if shown.is_some() { "shown" } else { "hidden" }
-                ));
-            }
-            counts = Counts::default();
         }
     }
 }
@@ -383,7 +394,7 @@ fn attach(
         log(&format!(
             "a surface for the pictures helper (process {pid}) was not said: the connection ends."
         ));
-        release(layer, Some(held), log);
+        release(layer, Some(held), false, log);
         return None;
     }
     log(&format!(
@@ -541,8 +552,10 @@ fn let_go_of_helper(helper: HANDLE, unsaid: Option<u64>) {
 }
 
 /// Takes a surface out of the visual and closes the shell's handle to it.
+/// With the device gone the visual is not asked (the layer goes with the
+/// device, and the ask would only fail and say so beside the loss's line).
 #[allow(unsafe_code)]
-fn release(layer: &Layer, content: Option<Content>, log: &dyn Fn(&str)) {
+fn release(layer: &Layer, content: Option<Content>, device_gone: bool, log: &dyn Fn(&str)) {
     let Some(content) = content else {
         return;
     };
@@ -553,12 +566,14 @@ fn release(layer: &Layer, content: Option<Content>, log: &dyn Fn(&str)) {
     drop(content.writer);
     // SAFETY: the handle is the shell's own copy, closed once, here.
     unsafe {
-        if let Err(error) = layer
-            .visual
-            .SetContent(None::<&IUnknown>)
-            .and_then(|()| layer.device.Commit())
-        {
-            log(&format!("the surface did not come out: {error}."));
+        if !device_gone {
+            if let Err(error) = layer
+                .visual
+                .SetContent(None::<&IUnknown>)
+                .and_then(|()| layer.device.Commit())
+            {
+                log(&format!("the surface did not come out: {error}."));
+            }
         }
         let _ = CloseHandle(content.handle);
     }

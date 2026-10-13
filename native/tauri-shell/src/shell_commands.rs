@@ -232,8 +232,9 @@ pub(crate) const FORCED_CLOSE_AFTER: std::time::Duration = std::time::Duration::
 
 /// Whether a press on the X closes the app without the page's confirm: the
 /// page did not acknowledge the last request (`shell_close_request_seen`)
-/// and that request is `FORCED_CLOSE_AFTER` old. A first press, or one soon
-/// after, asks the page and starts the wait.
+/// and that request is `FORCED_CLOSE_AFTER` old. A first press asks the page
+/// and starts the wait; one soon after asks again and leaves the wait
+/// standing.
 pub(crate) fn close_request_forces(
     asked: &mut Option<std::time::Instant>,
     now: std::time::Instant,
@@ -282,7 +283,9 @@ mod window_gate_tests {
 
     // The list above is the one `main.rs` registers, in both of its forms:
     // a command that is added there is added here, and is refused to the
-    // prompter's window until this test says otherwise.
+    // prompter's window until this test says otherwise. A line is a
+    // registration when it is a module's path to one name and nothing
+    // more: a call or a constant on such a line is not one.
     #[test]
     fn the_list_of_commands_is_main_rs_s() {
         let main = include_str!("main.rs");
@@ -291,7 +294,7 @@ mod window_gate_tests {
             .map(str::trim)
             .filter_map(|line| line.strip_suffix(',').or(Some(line)))
             .filter_map(|line| line.rsplit_once("::"))
-            .filter(|(module, _)| {
+            .filter(|(module, command)| {
                 [
                     "shell_commands",
                     "shell_paths",
@@ -301,6 +304,7 @@ mod window_gate_tests {
                     "shell_test_bridge",
                 ]
                 .contains(module)
+                    && command.chars().all(|c| c.is_alphanumeric() || c == '_')
             })
             .map(|(_, command)| command)
             .collect();

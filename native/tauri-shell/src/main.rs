@@ -47,7 +47,7 @@ mod shell_windows;
 
 use engine::EngineBridge;
 use shell_browser_keys::switch_off_browser_keys;
-use shell_commands::gated;
+use shell_commands::{close_request_forces, gated, FORCED_CLOSE_AFTER};
 use shell_display_watch::start_display_watch;
 use shell_prompter_window::{close_with_the_app, PrompterWindowState, WatchWake};
 use shell_smoke::run_smoke_test;
@@ -154,14 +154,15 @@ fn main() {
                     let forced = state
                         .close_asked_at
                         .lock()
-                        .map(|mut asked| {
-                            shell_commands::close_request_forces(&mut asked, Instant::now())
-                        })
+                        .map(|mut asked| close_request_forces(&mut asked, Instant::now()))
                         .unwrap_or(false);
                     if forced {
                         state.bridge.log_shell_line(
                             "SHELL",
-                            "The page did not answer the close request within 5 s: the window closes and the hardware link is stopped.",
+                            &format!(
+                                "The page did not answer the close request within {} s: the window closes and the hardware link is stopped.",
+                                FORCED_CLOSE_AFTER.as_secs()
+                            ),
                         );
                         state.close_confirmed.store(true, Ordering::SeqCst);
                         close_with_the_app(&app_handle);
