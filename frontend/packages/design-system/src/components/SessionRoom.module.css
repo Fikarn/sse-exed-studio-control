@@ -1,0 +1,271 @@
+/* The Session page's Room (D51; board 2): a picture of a room in its tone,
+   600 × 880 on the page, where the whole Room is the key, and 423 × 620 as
+   the window's picture. Depth is the planes' shading and the one-pixel light
+   edge; the textures and the skylight's glow are the SVG's own, so no CSS
+   gradient is drawn. */
+@layer components {
+  .room {
+    position: relative;
+    display: block;
+    flex: none;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    background: var(--session-floor);
+    box-shadow: var(--elevation-edge-light);
+    color: var(--text-text);
+    text-align: center;
+    transition: box-shadow var(--motion-duration-move) var(--motion-easing-mech);
+  }
+
+  /* On the page: the key. */
+  .page {
+    appearance: none;
+    width: 600px;
+    height: 880px;
+    border-radius: var(--radius-panel);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .page:disabled {
+    cursor: default;
+  }
+
+  /* Under the pointer the light edge brightens and closes round the Room. */
+  .page:hover:not(:disabled) {
+    box-shadow: var(--elevation-edge-hover);
+  }
+
+  .page:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* While its window is open the Room's picture is in the window: the Room
+     keeps its place, empty. */
+  .page[data-away] {
+    visibility: hidden;
+  }
+
+  /* In the window: the window's picture at its left, its corners the window's. */
+  .window {
+    width: 423px;
+    height: 620px;
+    border-radius: var(--radius-panel) 0 0 var(--radius-panel);
+  }
+
+  /* The three tones (core.json `session`): identity, not status. */
+  .green {
+    --session-back: var(--session-green-back);
+    --session-ceil: var(--session-green-ceil);
+    --session-lit: var(--session-green-lit);
+    --session-shade: var(--session-green-shade);
+    --session-floor: var(--session-green-floor);
+    --session-draw: var(--session-green-draw);
+    --session-obj: var(--session-green-obj);
+    --session-obj2: var(--session-green-obj2);
+    --session-accent: var(--session-green-accent);
+    --session-accent2: var(--session-green-accent2);
+    --session-light: var(--session-green-light);
+  }
+
+  .umber {
+    --session-back: var(--session-umber-back);
+    --session-ceil: var(--session-umber-ceil);
+    --session-lit: var(--session-umber-lit);
+    --session-shade: var(--session-umber-shade);
+    --session-floor: var(--session-umber-floor);
+    --session-draw: var(--session-umber-draw);
+    --session-obj: var(--session-umber-obj);
+    --session-obj2: var(--session-umber-obj2);
+    --session-accent: var(--session-umber-accent);
+    --session-accent2: var(--session-umber-accent2);
+    --session-light: var(--session-umber-light);
+  }
+
+  .slate {
+    --session-back: var(--session-slate-back);
+    --session-ceil: var(--session-slate-ceil);
+    --session-lit: var(--session-slate-lit);
+    --session-shade: var(--session-slate-shade);
+    --session-floor: var(--session-slate-floor);
+    --session-draw: var(--session-slate-draw);
+    --session-obj: var(--session-slate-obj);
+    --session-obj2: var(--session-slate-obj2);
+    --session-accent: var(--session-slate-accent);
+    --session-accent2: var(--session-slate-accent2);
+    --session-light: var(--session-slate-light);
+  }
+
+  .art {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* The planes, in the brand's shading. */
+  .art [data-plane="back"] {
+    fill: var(--session-back);
+  }
+
+  .art [data-plane="ceil"] {
+    fill: var(--session-ceil);
+  }
+
+  .art [data-plane="lit"] {
+    fill: var(--session-lit);
+  }
+
+  .art [data-plane="shade"] {
+    fill: var(--session-shade);
+  }
+
+  .art [data-plane="floor"] {
+    fill: var(--session-floor);
+  }
+
+  .art [data-edge] {
+    fill: none;
+    stroke: var(--session-edge);
+    stroke-width: 1;
+  }
+
+  .art [data-skylight] {
+    fill: none;
+    stroke: var(--session-draw);
+  }
+
+  .art [data-skylight="pane"] {
+    fill: var(--session-sky);
+  }
+
+  .art [data-stop="sky"] {
+    stop-color: var(--session-sky);
+  }
+
+  .art [data-stop="light"] {
+    stop-color: var(--session-light);
+  }
+
+  /* The drawing's inks (SessionRoomDrawings.tsx): its line, then the fills a
+     drawn thing takes. A thing may take a fill and the line (`obj line`). */
+  .art [data-ink~="line"] {
+    fill: none;
+    stroke: var(--session-draw);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .art [data-ink~="fine"] {
+    stroke-width: 1.6;
+  }
+
+  .art [data-ink~="heavy"] {
+    stroke-width: 4.5;
+  }
+
+  .art [data-ink~="obj"] {
+    fill: var(--session-obj);
+  }
+
+  .art [data-ink~="obj2"] {
+    fill: var(--session-obj2);
+  }
+
+  .art [data-ink~="accent"] {
+    fill: var(--session-accent);
+  }
+
+  .art [data-ink~="accent2"] {
+    fill: var(--session-accent2);
+  }
+
+  .art [data-ink~="dot"] {
+    fill: var(--session-draw);
+  }
+
+  .art [data-ink~="shadow"] {
+    fill: var(--session-shadow);
+  }
+
+  .art [data-ink~="light"] {
+    fill: var(--session-light);
+  }
+
+  /* The light: the skylight's glow and the drawing's own lights, low at rest;
+     on under the pointer, on the Room whose session runs and in the window. */
+  .art [data-light] {
+    opacity: 0.4;
+    transition: opacity var(--motion-duration-move) var(--motion-easing-out);
+  }
+
+  .art [data-light="sky"] {
+    opacity: 0.55;
+  }
+
+  .page:hover:not(:disabled) .art [data-light],
+  .page[data-lit] .art [data-light],
+  .window .art [data-light] {
+    opacity: 1;
+  }
+
+  /* The name and the line on the floor, as the brand's posters set theirs:
+     the name in SSE Adelia tracked as an inscription (DESIGN.md section 3),
+     the line in the hardware link's PT Serif italic in the second ink. */
+  .name,
+  .line,
+  .caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    box-sizing: border-box;
+    padding: 0 24px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .name {
+    top: 724px;
+    font: var(--font-weight-bold) var(--font-size-readout) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-room);
+    text-transform: uppercase;
+    color: var(--text-text);
+  }
+
+  .line {
+    top: 768px;
+    font: italic var(--font-weight-regular) var(--font-size-word) / 1.2 var(--font-family-serif);
+    color: var(--text-text2);
+  }
+
+  /* The running session's caption in place of the line: a lamp and its word
+     at the body size, then PT Sans in the second ink. */
+  .caption {
+    --font-size-label: var(--font-size-body);
+    top: 768px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 24px;
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text2);
+  }
+
+  /* In the window the words take their own steps, 20 and 14, where the
+     page's 28 and 20 stand when the picture is drawn at 620 high. */
+  .window .name {
+    top: 510px;
+    font-size: var(--font-size-word);
+  }
+
+  .window .line {
+    top: 541px;
+    font-size: var(--font-size-label);
+  }
+}
