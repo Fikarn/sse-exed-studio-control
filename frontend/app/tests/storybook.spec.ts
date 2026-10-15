@@ -15,8 +15,10 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // Of the A primitives the Sheet is captured, which holds every primitive at
 // rest but the header's, the Shell board, which holds those (the tabs, the
 // lamps, the REC tally and the logotype), the Overview board, which holds the
-// Overview's parts (D47: the rooms, the status card, the speed tape), and the
-// boards of the overlays held open (their names end ", open");
+// Overview's parts (D47: the rooms, the status card, the speed tape), the
+// Session board, which holds the Session page's Rooms (D51), and the boards of
+// the overlays held open (their names end ", open": the menus, and the
+// Session page's window);
 // `ui-contract.spec.ts` measures every one of their pages. The shell's page
 // stories are gone (2026-09-28): `visual-review.spec.ts` captures the same
 // boards from the same fixtures. The
@@ -52,6 +54,7 @@ const stories: StoryEntry[] = Object.values(index.entries)
       story.name.startsWith("Sheet") ||
       story.name === "Shell" ||
       story.name === "Overview" ||
+      story.name === "Session" ||
       story.name.endsWith(", open")
   );
 
