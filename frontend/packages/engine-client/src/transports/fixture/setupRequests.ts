@@ -46,7 +46,7 @@ const UNANSWERING_BRIDGE = "10.255.255.1";
 const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
 
 /** The pages `settings.update` opens (`WORKSPACES` in `native/rust-engine/src/shell_settings.rs`). */
-export const WORKSPACES = ["lighting", "audio", "setup", "teleprompter", "cameras", "overview"] as const;
+export const WORKSPACES = ["lighting", "audio", "setup", "teleprompter", "cameras", "overview", "session"] as const;
 
 /** `settings.update`'s refusal of a page it does not know (`workspace_refusal`). */
 export function workspaceRefusal(): string {

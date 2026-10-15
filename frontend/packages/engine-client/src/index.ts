@@ -52,6 +52,7 @@ export type {
   FixturePrompterScriptSeed,
   FixturePrompterSeed,
   FixtureScenario,
+  FixtureSessionSeed,
   AudioClipClearRequest,
   AudioMeterEntry,
   AudioMeterFrame,
@@ -169,3 +170,8 @@ export type { PrompterCheckTone } from "./generated/snapshots/PrompterCheckTone"
 export type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
 export type { PrompterTextColour } from "./generated/snapshots/PrompterTextColour";
 export type { PrompterVersionSummary } from "./generated/snapshots/PrompterVersionSummary";
+export type { Session } from "./generated/snapshots/Session";
+export type { SessionBeginReply } from "./generated/snapshots/SessionBeginReply";
+export type { SessionEndReply } from "./generated/snapshots/SessionEndReply";
+export type { SessionKind } from "./generated/snapshots/SessionKind";
+export type { SessionSnapshot } from "./generated/snapshots/SessionSnapshot";

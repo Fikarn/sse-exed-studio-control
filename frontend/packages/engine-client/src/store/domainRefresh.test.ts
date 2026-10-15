@@ -17,10 +17,12 @@ describe("domainRefresh", () => {
   const everyMapping: Array<[string, readonly DomainKey[]]> = [
     ...EVENT_NAMES.map((event): [string, readonly DomainKey[]] => [event, EVENT_DOMAIN_REFRESH[event]]),
     ...REQUEST_METHODS.map((method): [string, readonly DomainKey[]] => [method, domainsForMethod(method)]),
-    ...(["setup", "lighting", "audio", "overview"] as const).map((workspace): [string, readonly DomainKey[]] => [
-      `opening ${workspace}`,
-      domainsForMethod("settings.update", { workspace }),
-    ]),
+    ...(["setup", "lighting", "audio", "overview", "session"] as const).map(
+      (workspace): [string, readonly DomainKey[]] => [
+        `opening ${workspace}`,
+        domainsForMethod("settings.update", { workspace }),
+      ]
+    ),
     ["an event nobody mapped", domainsForEvent("rig.changed").domains],
     ["a method nobody mapped", domainsForMethod("rig.update")],
   ];
@@ -51,8 +53,9 @@ describe("domainRefresh", () => {
     for (const domain of ALL_DOMAINS) {
       expect(REQUEST_METHODS).toContain(DOMAIN_REQUESTS[domain]);
     }
-    // Nine, the Teleprompter's two since the new pages program's Slice 6a, and the cameras'.
-    expect(ALL_DOMAINS).toHaveLength(12);
+    // Nine, the Teleprompter's two since the new pages program's Slice 6a, the cameras', and
+    // the session's (2026-10-15).
+    expect(ALL_DOMAINS).toHaveLength(13);
   });
 
   it("maps a request by its own name before its prefix", () => {
@@ -132,6 +135,26 @@ describe("domainRefresh", () => {
       "audio",
       "prompter",
       "cameras",
+    ]);
+  });
+
+  it("reads the session again after a begin, an end and its event, and with the Overview's facts when its page opens", () => {
+    for (const method of ["session.begin", "session.end", "session.snapshot"]) {
+      expect(domainsForMethod(method), method).toEqual(["session"]);
+    }
+    expect(domainsForEvent("session.changed")).toEqual({ domains: ["session"], known: true });
+    // The Session page (2026-10-15): its window says the worst page's note and its footer is
+    // the Overview's, so it reads what the Overview reads, and the session.
+    expect(domainsForMethod("settings.update", { workspace: "session" })).toEqual([
+      "app",
+      "health",
+      "support",
+      "lighting",
+      "lightingDmxMonitor",
+      "audio",
+      "prompter",
+      "cameras",
+      "session",
     ]);
   });
 });

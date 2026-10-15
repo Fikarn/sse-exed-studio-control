@@ -289,6 +289,16 @@ The owner asked, after the Overview's release, for the level meter to be the str
 
 It reaches the studio at the next `npm run release`, and the walk checks it on the desk.
 
+### The Session page (2026-10-15)
+
+A new page and the landing page: every session begins there, with a choice of Green Screen Recording, Podcast Recording or Webinar, drawn as three of the brand's Rooms; pressing one opens its window with the session's name and `Begin`, which opens the Overview. The design is board 2 (`docs/design/boards/session-2.html`), its note `docs/design/session.md`; the owner took every recommendation on 2026-10-15 (D51, written by the pull request that builds the page). Three pull requests, in this order:
+
+- [x] The hardware link (#TBD): the `session` domain (`session.snapshot`, `session.begin`, `session.end` and the event `session.changed`), the running session and the last of each kind in two settings under `session.`, outside the archive; a row in the action log for each begin and end; `session` a page the hardware link accepts and keeps, the default staying the Overview; the store's slice and the test double. Nothing on screen changes yet.
+- [ ] The design system: the Session tones, the Session Room with its three drawings, the window (`Sheet`), on their Storybook boards.
+- [ ] The page: the `Session` tab first, the landing, the Rooms and the window on the page, the test data, the page tests, the captures and the documents; the boards and the note committed.
+
+Then, on the owner's word: `npm run release`, the walk with the page's CHECKLIST lines, `release:verified`. The deck's profile does not change.
+
 ### The BGH1s over the network (was Slice 13)
 
 It starts once the owner has read the SDK's licence (under "Waiting on the owner").

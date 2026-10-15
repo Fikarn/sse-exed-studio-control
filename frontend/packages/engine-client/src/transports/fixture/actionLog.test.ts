@@ -296,6 +296,54 @@ describe("the fixture double's action log", () => {
       [row("cameras", "connected", "CAM 2", "CAM 2 taken back; it is held again when it answers.")],
     ],
     ["cameras.release", { camera: 4, confirm: true }, { camera: 4, sentence: "CAM 4 released." }, []],
+    // The session (2026-10-15): the kind's id as the target and a sentence naming the kind and
+    // the session (`ui_actions`' session arm); a begin over a running session ends it first.
+    [
+      "session.begin",
+      { kind: "podcast", name: "Morning take" },
+      {
+        session: { kind: "podcast", name: "Morning take", begunAt: "2026-10-15T07:16:00.000Z", endedAt: null },
+        ended: null,
+      },
+      [row("session", "begun", "podcast", "Session begun: Podcast Recording · Morning take")],
+    ],
+    [
+      "session.begin",
+      { kind: "webinar", name: "Spring launch" },
+      {
+        session: { kind: "webinar", name: "Spring launch", begunAt: "2026-10-15T10:02:30.250Z", endedAt: null },
+        ended: {
+          kind: "podcast",
+          name: "Morning take",
+          begunAt: "2026-10-15T07:16:00.000Z",
+          endedAt: "2026-10-15T10:02:30.250Z",
+        },
+      },
+      [
+        row("session", "ended", "podcast", "Session ended: Podcast Recording · Morning take"),
+        row("session", "begun", "webinar", "Session begun: Webinar · Spring launch"),
+      ],
+    ],
+    [
+      "session.end",
+      {},
+      {
+        ended: {
+          kind: "green-screen",
+          name: "",
+          begunAt: "2026-10-15T07:16:00.000Z",
+          endedAt: "2026-10-15T10:02:30.250Z",
+        },
+      },
+      [row("session", "ended", "green-screen", "Session ended: Green Screen Recording")],
+    ],
+    ["session.end", {}, {}, []],
+    [
+      "session.begin",
+      { kind: "interview" },
+      { session: { kind: "interview", name: "A", begunAt: "2026-10-15T07:16:00.000Z", endedAt: null }, ended: null },
+      [],
+    ],
   ];
 
   it.each(cases)("%s %j writes the hardware link's rows", (method, params, result, expected) => {
