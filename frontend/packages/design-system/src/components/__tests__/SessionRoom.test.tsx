@@ -115,6 +115,10 @@ describe("SessionRoom", () => {
     expect(ids.length).toBeGreaterThan(0);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(id).toMatch(/^[a-zA-Z0-9_-]+$/);
+    // The textures are marked: the page tests' captures leave the grain out.
+    const room = container.querySelector("[data-session-room]")!;
+    expect(room.querySelector('[data-texture="grain"]')?.getAttribute("filter")).toMatch(/^url\(#.+-grain\)$/);
+    expect(room.querySelector('[data-texture="watercolour"]')?.getAttribute("filter")).toMatch(/^url\(#.+-mottle\)$/);
     // Every reference finds its definition in its own picture.
     for (const svg of Array.from(container.querySelectorAll("svg"))) {
       const references = Array.from(svg.querySelectorAll("[fill], [filter]"))

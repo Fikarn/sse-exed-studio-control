@@ -109,9 +109,12 @@ export function SessionRoom({
         <path data-plane="shade" d="M600 0 V880 L510 590 V100 Z" />
         <path data-plane="floor" d="M90 590 H510 L600 880 H0 Z" />
         <rect data-plane="back" x="90" y="100" width="420" height="490" />
-        {/* The textures: a watercolour mottle on the back wall, a fine grain over everything. */}
-        <rect x="90" y="100" width="420" height="490" filter={`url(#${mottle})`} />
-        <rect x="0" y="0" width="600" height="880" filter={`url(#${grain})`} />
+        {/* The textures: a watercolour mottle on the back wall, a fine grain
+            over everything. The grain is noise, pixel by pixel, which no
+            capture stores small: the page tests' captures leave it out
+            (`data-texture`, tests/helpers/captures.css); the measures read it. */}
+        <rect data-texture="watercolour" x="90" y="100" width="420" height="490" filter={`url(#${mottle})`} />
+        <rect data-texture="grain" x="0" y="0" width="600" height="880" filter={`url(#${grain})`} />
         {/* The edges where the planes meet, very quiet. */}
         <path data-edge="" d="M0 0 L90 100 M600 0 L510 100 M0 880 L90 590 M600 880 L510 590 M90 100 H510 V590 H90 Z" />
         {/* The skylight, and its light on the back wall. */}

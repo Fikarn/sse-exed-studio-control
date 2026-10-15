@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { fileURLToPath } from "node:url";
 
 if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
   delete process.env.NO_COLOR;
@@ -32,6 +33,8 @@ export default defineConfig({
       caret: "hide",
       maxDiffPixels: 100,
       threshold: 0.01,
+      // The Session Rooms' grain is left out of the captures (the file says why).
+      stylePath: fileURLToPath(new URL("./tests/helpers/captures.css", import.meta.url)),
     },
   },
   // Studio Control runs on Windows at 2560×1440 and nowhere else, so the
