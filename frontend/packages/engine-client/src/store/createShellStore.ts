@@ -13,6 +13,7 @@ import type { PrompterAnchor } from "../generated/snapshots/PrompterAnchor";
 import type { PrompterSnapshot } from "../generated/snapshots/PrompterSnapshot";
 import type { PrompterParagraph } from "../generated/snapshots/PrompterParagraph";
 import type { PrompterScriptSnapshot } from "../generated/snapshots/PrompterScriptSnapshot";
+import type { SessionKind } from "../generated/snapshots/SessionKind";
 import { transitionStartupState } from "../machines/startupMachine";
 import { noteAnchorArrival } from "../prompter/anchorArrival";
 import { anchorOrder } from "../prompter/anchorOrder";
@@ -90,6 +91,7 @@ const initialState: ShellState = {
   prompterSnapshot: null,
   prompterGlassSnapshot: null,
   camerasSnapshot: null,
+  sessionSnapshot: null,
   startupFailure: null,
   lastEvent: null,
   errorSummary: null,
@@ -112,6 +114,7 @@ const DOMAIN_STATE_KEYS = {
   prompter: "prompterSnapshot",
   prompterGlass: "prompterGlassSnapshot",
   cameras: "camerasSnapshot",
+  session: "sessionSnapshot",
 } as const satisfies Record<DomainKey, keyof ShellState>;
 
 /** The prompter's snapshots, which the start reads without depending on them (new pages program, Slice 6a). */
@@ -1831,6 +1834,12 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         return;
       }
       await refreshDomains(["cameras"]);
+    },
+    beginSession(kind: SessionKind, name: string) {
+      return performRequest("session.begin", { kind, name });
+    },
+    endSession() {
+      return performRequest("session.end");
     },
     async refreshControlSurfaceSnapshot() {
       if (state.lifecycle !== "ready") {

@@ -20,6 +20,9 @@ import type { PrompterParagraph } from "./generated/snapshots/PrompterParagraph"
 import type { PrompterPlace } from "./generated/snapshots/PrompterPlace";
 import type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScriptSnapshot";
 import type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
+import type { Session } from "./generated/snapshots/Session";
+import type { SessionKind } from "./generated/snapshots/SessionKind";
+import type { SessionSnapshot } from "./generated/snapshots/SessionSnapshot";
 
 /** The pages, in the tab order (D4); the Overview first since D47. */
 export type WorkspaceId = "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
@@ -440,6 +443,17 @@ export interface FixtureCamerasSeed {
   simulated?: boolean;
 }
 
+/**
+ * The session a scenario starts with (the Session page, 2026-10-15; `fixture/sessionState.ts`):
+ * the running one, its `endedAt` null, and the last of each kind, newest first, each ended.
+ * Times are UTC as the hardware link writes them (`2026-10-15T07:16:00.000Z`). Without it,
+ * none runs and no kind has a last.
+ */
+export interface FixtureSessionSeed {
+  current?: Session;
+  last?: Session[];
+}
+
 export interface FixtureScenario {
   appSnapshot?: JsonObject;
   healthSnapshot?: JsonObject;
@@ -463,6 +477,9 @@ export interface FixtureScenario {
   /** The cameras the double starts with; without it, none set up and CAM 1 selected (new
    *  pages program, Slice 8; `fixture/camerasSeed.ts`). */
   cameras?: FixtureCamerasSeed;
+  /** The session the double starts with; without it, none running and no last (the Session
+   *  page, 2026-10-15; `fixture/sessionState.ts`). */
+  session?: FixtureSessionSeed;
 }
 
 export interface EngineTransport {
@@ -549,6 +566,11 @@ export interface ShellState {
    * its `REC` chip read `checks.cameras` in the health snapshot instead.
    */
   camerasSnapshot: CamerasSnapshot | null;
+  /**
+   * The session (the Session page, 2026-10-15): the running one and the last
+   * of each kind. Read at the start with the settings: a failed read fails it.
+   */
+  sessionSnapshot: SessionSnapshot | null;
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;
@@ -693,6 +715,16 @@ export interface ShellStore {
    * row: the page does once a second while it is open, and for its "again" keys.
    */
   refreshCamerasSnapshot(): Promise<void>;
+  // The session (the Session page, 2026-10-15). Each answers what the hardware
+  // link answered, or throws its refusal (`EngineRequestError`), and the
+  // session is read again.
+  /**
+   * `session.begin`: the session begins now, with a name the hardware link
+   * trims (empty for none); a running one ends at the same moment.
+   */
+  beginSession(kind: SessionKind, name: string): Promise<JsonValue>;
+  /** `session.end`: the running session ends now. */
+  endSession(): Promise<JsonValue>;
   refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;

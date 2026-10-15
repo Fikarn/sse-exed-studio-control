@@ -59,9 +59,10 @@ use crate::prompter::{after_archive_restore, handle_prompter_request, PrompterEr
 use crate::protocol::{
     error_response, event_message, invalid_params, ok_response, RequestEnvelope, ResponseEnvelope,
     EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_CAMERAS_CHANGED, EVENT_COMMISSIONING_CHANGED,
-    EVENT_ENGINE_READY, EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SETTINGS_CHANGED,
-    EVENT_SUPPORT_CHANGED,
+    EVENT_ENGINE_READY, EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SESSION_CHANGED,
+    EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
+use crate::session::{handle_session_request, SessionError};
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
 use crate::storage::{list_settings_by_prefix, set_settings, EngineResult};
 use crate::support::{
@@ -69,7 +70,7 @@ use crate::support::{
     restore_support_backup, verify_support_backup, SupportCommandError,
 };
 use serde_json::json;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 pub struct EngineApp {
     runtime: RuntimeContext,
@@ -572,6 +573,14 @@ impl EngineApp {
             "cameras.pictures.showing" => self.dispatch_cameras(request),
 
             // -------------------------------------------------------------
+            // The session (the Session page, 2026-10-15): what the studio
+            // is making, kept in two settings (`session.rs`).
+            // -------------------------------------------------------------
+            "session.snapshot" => self.dispatch_session(request),
+            "session.begin" => self.dispatch_session(request),
+            "session.end" => self.dispatch_session(request),
+
+            // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
             // error enums (support.backup.*), chained snapshot reads
             // (commissioning.update, settings.update), or unique reply
@@ -932,6 +941,39 @@ impl EngineApp {
                 Self::reply(error_response(request.id, code, message))
             }
             Err(CameraError::Storage(message)) => {
+                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+            }
+        }
+    }
+
+    /// A `session.*` request: its reply, and `session.changed { reason }`
+    /// when a session began or ended. The rows of a begin and an end are
+    /// written after the reply, as every screen action's are
+    /// (`record_ui_actions`).
+    fn dispatch_session(&self, request: RequestEnvelope) -> EngineReply {
+        match handle_session_request(
+            &self.runtime.db_path,
+            &request.method,
+            &request.params,
+            SystemTime::now(),
+        ) {
+            Ok(reply) => EngineReply {
+                response: ok_response(request.id, reply.result),
+                events: reply
+                    .event
+                    .map(|reason| {
+                        vec![event_message(
+                            EVENT_SESSION_CHANGED,
+                            json!({ "reason": reason }),
+                        )]
+                    })
+                    .unwrap_or_default(),
+            },
+            Err(SessionError::Invalid(message)) => Self::reply(invalid_params(request.id, message)),
+            Err(SessionError::Refused(code, message)) => {
+                Self::reply(error_response(request.id, code, message))
+            }
+            Err(SessionError::Storage(message)) => {
                 Self::reply(error_response(request.id, "STORAGE_ERROR", message))
             }
         }
@@ -1311,3 +1353,5 @@ mod tests;
 mod tests_cameras;
 #[cfg(test)]
 mod tests_prompter;
+#[cfg(test)]
+mod tests_session;

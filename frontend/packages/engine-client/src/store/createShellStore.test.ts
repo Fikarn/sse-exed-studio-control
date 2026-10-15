@@ -160,6 +160,8 @@ const TYPED_SNAPSHOT_REQUESTS = new Set([
   "prompter.glass.snapshot",
   // The cameras', absent until they were read.
   "cameras.snapshot",
+  // The session's (the Session page, 2026-10-15), likewise.
+  "session.snapshot",
 ]);
 
 function supervisedTransport() {
@@ -514,6 +516,8 @@ describe("createShellStore scoped refresh", () => {
       "lighting.changed": ["lighting.dmxMonitor.snapshot", "lighting.snapshot"],
       // New pages program, Slice 6a: the prompter's snapshot; its text only when the layout key moves.
       "prompter.changed": ["prompter.snapshot"],
+      // The Session page (2026-10-15): a begin or an end.
+      "session.changed": ["session.snapshot"],
       "settings.changed": ["app.snapshot"],
       "support.changed": ["support.snapshot"],
     };
@@ -580,6 +584,7 @@ describe("createShellStore scoped refresh", () => {
       "lighting.dmxMonitor.snapshot",
       "lighting.snapshot",
       "prompter.snapshot",
+      "session.snapshot",
       "support.snapshot",
     ]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("rig.changed"));
@@ -613,8 +618,9 @@ describe("createShellStore scoped refresh", () => {
     calls.length = 0;
     await store.refresh();
     expect(catalogRequests()).toBe(1);
-    // Twelve: the Teleprompter's two (new pages program, Slice 6a) and the cameras'.
-    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(12);
+    // Thirteen: the Teleprompter's two (new pages program, Slice 6a), the cameras' and the
+    // session's (2026-10-15).
+    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(13);
     await store.dispose();
   });
 
@@ -670,8 +676,9 @@ describe("createShellStore scoped refresh", () => {
     // An applied archive rewrites lighting and audio settings too, and no
     // lighting or audio event says so.
     answer("support.backup.restore", { requiresRestart: false });
-    // Nine: the Teleprompter's snapshot (new pages program, Slice 6a) and the cameras'.
-    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(9);
+    // Ten: the Teleprompter's snapshot (new pages program, Slice 6a), the cameras' and the
+    // session's, which no archive carries but which is read with everything that can change.
+    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(10);
 
     // The cameras: every request reads their snapshot again, and nothing else. What moves
     // the Cameras lamp is followed by `app.changed { reason: "health" }`.
@@ -690,6 +697,9 @@ describe("createShellStore scoped refresh", () => {
     expect(await after(() => store.pairCamera(1))).toEqual(cameras);
     expect(await after(() => store.forgetCamera(1))).toEqual(cameras);
     expect(await after(() => store.refreshCamerasSnapshot())).toEqual(cameras);
+    // The session (2026-10-15): a begin and an end read its snapshot again, and nothing else.
+    expect(await after(() => store.beginSession("podcast", "Morning take"))).toEqual(["session.snapshot"]);
+    expect(await after(() => store.endSession())).toEqual(["session.snapshot"]);
     // Setup / Support opened on a section is one request, and reads what Setup shows.
     answer("app.snapshot", {
       shell: { workspace: "setup", setup: { activeSection: "cameras" } },
@@ -1346,6 +1356,85 @@ describe("createShellStore the cameras", () => {
       message: "cameras.snapshot: recent is not a list",
     });
     await guarded.dispose();
+  });
+});
+
+// The Session page (2026-10-15): the session is read at the start with the
+// settings, and a read that fails fails the start (the cameras' and the
+// prompter's are the exceptions); it is read again after `session.changed`
+// and after the store's own begin and end, which go out as the contract
+// names them.
+describe("createShellStore the session", () => {
+  const session = { kind: "podcast", name: "Morning take", begunAt: "2026-10-15T07:16:00.000Z", endedAt: null };
+
+  it("reads the session at the start and again when it changes", async () => {
+    const { answer, calls, emit, snapshotRequests, transport } = supervisedTransport();
+    answer("session.snapshot", { current: null, last: [] });
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: null, last: [] });
+
+    calls.length = 0;
+    answer("session.snapshot", { current: session, last: [] });
+    emit({ type: "event", event: "session.changed", payload: { reason: "begun" } });
+    await tick();
+    expect(snapshotRequests()).toEqual(["session.snapshot"]);
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [] });
+    await store.dispose();
+  });
+
+  it("does not start when the session cannot be read", async () => {
+    const { refuse, transport } = supervisedTransport();
+    refuse("session.snapshot");
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("failed");
+    expect(store.getSnapshot().errorSummary).toContain("session.snapshot refused");
+    await store.dispose();
+  });
+
+  it("refuses a reply that is not the session's and keeps the last good one", async () => {
+    const { answer, transport } = supervisedTransport();
+    answer("session.snapshot", { current: session, last: [] });
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    answer("session.snapshot", { current: "podcast", last: [] });
+    await store.endSession();
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [] });
+    expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
+      context: "reply refused",
+      message: "session.snapshot: current is not an object",
+    });
+    answer("session.snapshot", { current: null });
+    await store.endSession();
+    expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
+      message: "session.snapshot: last is not a list",
+    });
+    await store.dispose();
+  });
+
+  it("sends a begin and an end as the contract names them", async () => {
+    const { transport } = supervisedTransport();
+    const sent: Array<[string, unknown]> = [];
+    const store = createShellStore({
+      ...transport,
+      request: (method, params) => {
+        if (method === "session.begin" || method === "session.end") sent.push([method, params ?? {}]);
+        return transport.request(method, params);
+      },
+    });
+    await store.initialize();
+    await store.beginSession("green-screen", "  Studio intro ");
+    await store.beginSession("webinar", "");
+    await store.endSession();
+    expect(sent).toEqual([
+      // The hardware link trims the name; the store sends it as given.
+      ["session.begin", { kind: "green-screen", name: "  Studio intro " }],
+      ["session.begin", { kind: "webinar", name: "" }],
+      ["session.end", {}],
+    ]);
+    await store.dispose();
   });
 });
 

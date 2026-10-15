@@ -18,7 +18,8 @@ export type DomainKey =
   | "controlSurface"
   | "prompter"
   | "prompterGlass"
-  | "cameras";
+  | "cameras"
+  | "session";
 
 export const DOMAIN_REQUESTS = {
   health: "health.snapshot",
@@ -33,6 +34,7 @@ export const DOMAIN_REQUESTS = {
   prompter: "prompter.snapshot",
   prompterGlass: "prompter.glass.snapshot",
   cameras: "cameras.snapshot",
+  session: "session.snapshot",
 } as const satisfies Record<DomainKey, RequestMethod>;
 
 /** Every snapshot: the bootstrap's set and what an explicit `refresh()` fetches. */
@@ -89,6 +91,8 @@ export const EVENT_DOMAIN_REFRESH = {
   // snapshot's layout key has moved (the store's `prompterGlassIsStale`), so a
   // play, a pause or a speed step costs one small read, never the text.
   "prompter.changed": ["prompter"],
+  // The Session page (2026-10-15): a begin or an end, in the session's snapshot.
+  "session.changed": ["session"],
   "settings.changed": ["app"],
   "support.changed": ["support"],
 } as const satisfies Record<EventName, readonly DomainKey[]>;
@@ -133,6 +137,9 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   // actions move its `recent`. Their rows reach Setup / Support's list when Setup is opened,
   // as every other row does.
   ["cameras.", ["cameras"]],
+  // The session: a begin and an end change its snapshot. Their rows reach
+  // Setup / Support's list when Setup is opened, as every other row does.
+  ["session.", ["session"]],
 ];
 
 // Opening a workspace refreshes what that workspace shows. Not every change
@@ -153,6 +160,10 @@ const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {
   audio: ["audio"],
   teleprompter: ["prompter"],
   cameras: ["cameras"],
+  // The Session page (2026-10-15): its window says the worst page's note as
+  // the Overview does, its footer is the Overview's, and its Rooms show the
+  // session.
+  session: ["health", "support", ...LIGHTING_DOMAINS, "audio", "prompter", "cameras", "session"],
 };
 
 /**

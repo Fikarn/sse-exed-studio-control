@@ -6,6 +6,8 @@ import { handleFixturePrompterRequest } from "./fixture/prompterRequests";
 import { bindFixtureCameras, handleFixtureCamerasRequest } from "./fixture/camerasRequests";
 import { seedFixtureCameras } from "./fixture/camerasSeed";
 import { seedFixturePrompter } from "./fixture/prompterSeed";
+import { handleFixtureSessionRequest } from "./fixture/sessionRequests";
+import { seedFixtureSession } from "./fixture/sessionState";
 import { disposeFixturePrompter } from "./fixture/prompterState";
 import type { FixtureScenario, EngineTransport } from "../types";
 import {
@@ -40,6 +42,7 @@ const FIXTURE_REQUEST_HANDLERS: readonly FixtureRequestHandler[] = [
   handleFixtureSetupRequest,
   handleFixturePrompterRequest,
   handleFixtureCamerasRequest,
+  handleFixtureSessionRequest,
 ];
 
 export function createFixtureTransport(scenario: FixtureScenario): EngineTransport {
@@ -55,6 +58,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
   // a seed (D15 rule 1) — read at once and sent nothing, before the first sync works out
   // `checks.cameras`.
   seedFixtureCameras(state, scenario.cameras);
+  // The Session page (2026-10-15): the running session and the last of each kind the
+  // scenario starts with; without a seed, none.
+  seedFixtureSession(state, scenario.session);
   const audioMeteringActive = scenario.audioMeteringActive === true;
   const startupDelayMs = typeof scenario.startupDelayMs === "number" ? scenario.startupDelayMs : 0;
   const startupFailure =

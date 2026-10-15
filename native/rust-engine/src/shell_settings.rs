@@ -28,7 +28,9 @@ pub const DEFAULT_WORKSPACE: &str = "overview";
 /// Slice 8: `cameras` joins them, before the Cameras page (Slice 9), as the
 /// Teleprompter's did before its page. The Overview (D47) joins them before
 /// its page, as the Cameras' did; the deck's word `workspace` reads it, and
-/// the deck turns to PROMPTER on it (D49).
+/// the deck turns to PROMPTER on it (D49). The Session page (2026-10-15)
+/// joins them before its page, as the Overview's did; no follow trigger of the
+/// deck matches its word, so the deck stays where it is.
 pub const WORKSPACES: &[&str] = &[
     "lighting",
     "audio",
@@ -36,6 +38,7 @@ pub const WORKSPACES: &[&str] = &[
     "teleprompter",
     "cameras",
     "overview",
+    "session",
 ];
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
 /// Setup / Support's sections: the runner, Support, the cameras' setup (the
@@ -540,7 +543,7 @@ mod tests {
         // was "workspace must be one of: lighting, audio, setup").
         assert_eq!(
             error,
-            "workspace must be one of: lighting, audio, setup, teleprompter, cameras, overview"
+            "workspace must be one of: lighting, audio, setup, teleprompter, cameras, overview, session"
         );
     }
 

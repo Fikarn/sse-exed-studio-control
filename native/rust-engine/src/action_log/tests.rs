@@ -288,7 +288,118 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             json!({ "camera": 2 }),
             json!({ "camera": 2, "state": "held", "sentence": "CAM 2 held again." }),
         ),
+        // The session (2026-10-15): a begin over a running session, and an
+        // end.
+        (
+            "session.begin",
+            json!({ "kind": "webinar", "name": "Spring launch" }),
+            json!({
+                "session": session_value("webinar", "Spring launch", None),
+                "ended": session_value("podcast", "Morning take", Some(SESSION_NOON))
+            }),
+        ),
+        (
+            "session.end",
+            json!({}),
+            json!({ "ended": session_value("webinar", "Spring launch", Some(SESSION_NOON)) }),
+        ),
     ]
+}
+
+const SESSION_MORNING: &str = "2026-10-15T07:16:00.000Z";
+const SESSION_NOON: &str = "2026-10-15T10:02:30.250Z";
+
+/// A session as `session.begin` and `session.end` answer it.
+fn session_value(kind: &str, name: &str, ended_at: Option<&str>) -> Value {
+    json!({ "kind": kind, "name": name, "begunAt": SESSION_MORNING, "endedAt": ended_at })
+}
+
+// The session (2026-10-15, D51): a begin and an end are rows under the
+// session, the kind's id as the target and a sentence that names the kind
+// and the session, since Recent actions show the sentence alone; a begin over
+// a running session ends it first, so the end's row comes first; a name not
+// given is left out of the sentence; the read is not an action.
+#[test]
+fn the_session_rows_are_its_end_and_its_begin_in_that_order() {
+    let rows = |method: &str, result: Value| {
+        ui_actions(method, &json!({}), &result, false)
+            .into_iter()
+            .map(|entry| {
+                assert_eq!(entry.source, ActionSource::Ui);
+                (entry.domain, entry.action, entry.target, entry.detail)
+            })
+            .collect::<Vec<_>>()
+    };
+    let row = |action: &'static str, target: &str, detail: &str| {
+        (
+            DOMAIN_SESSION,
+            action,
+            String::from(target),
+            String::from(detail),
+        )
+    };
+    assert_eq!(
+        rows(
+            "session.begin",
+            json!({ "session": session_value("podcast", "Morning take", None), "ended": null })
+        ),
+        vec![row(
+            "begun",
+            "podcast",
+            "Session begun: Podcast Recording · Morning take"
+        )]
+    );
+    assert_eq!(
+        rows(
+            "session.begin",
+            json!({
+                "session": session_value("webinar", "Spring launch", None),
+                "ended": session_value("podcast", "Morning take", Some(SESSION_NOON))
+            })
+        ),
+        vec![
+            row(
+                "ended",
+                "podcast",
+                "Session ended: Podcast Recording · Morning take"
+            ),
+            row("begun", "webinar", "Session begun: Webinar · Spring launch"),
+        ]
+    );
+    assert_eq!(
+        rows(
+            "session.end",
+            json!({ "ended": session_value("green-screen", "", Some(SESSION_NOON)) })
+        ),
+        vec![row(
+            "ended",
+            "green-screen",
+            "Session ended: Green Screen Recording"
+        )]
+    );
+    // An answer that does not carry its session leaves nothing.
+    // The name as the answer carries it, trimmed as `text` trims: a byte-order
+    // mark is not White_Space and stays, as it does in the double's sentence
+    // (the review of #351).
+    assert_eq!(
+        rows(
+            "session.begin",
+            json!({ "session": session_value("podcast", "\u{feff}Take", None), "ended": null })
+        )[0]
+        .3,
+        "Session begun: Podcast Recording · \u{feff}Take"
+    );
+    assert!(rows("session.end", json!({})).is_empty());
+    assert!(rows(
+        "session.begin",
+        json!({ "session": session_value("interview", "A", None), "ended": null })
+    )
+    .is_empty());
+    assert_eq!(
+        ui_method_class("session.snapshot"),
+        Some(UiMethodClass::NotAnAction)
+    );
+    assert!(rows("session.snapshot", json!({ "current": null, "last": [] })).is_empty());
 }
 
 // New pages program, Slice 8: the cameras' rows are under the cameras, the

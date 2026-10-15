@@ -29,6 +29,9 @@ pub const EVENT_LIGHTING_CHANGED: &str = "lighting.changed";
 /// and `anchor`, the glass's motion from now on (`null` when nothing is on
 /// the prompter), so a view can draw a play, a pause or a jump at once.
 pub const EVENT_PROMPTER_CHANGED: &str = "prompter.changed";
+/// A session began or ended (the Session page, 2026-10-15). Payload:
+/// `reason`, `begun` or `ended`.
+pub const EVENT_SESSION_CHANGED: &str = "session.changed";
 pub const EVENT_SETTINGS_CHANGED: &str = "settings.changed";
 pub const EVENT_SUPPORT_CHANGED: &str = "support.changed";
 
@@ -43,6 +46,7 @@ pub const EVENT_NAMES: &[&str] = &[
     EVENT_ENGINE_STARTUP_FAILED,
     EVENT_LIGHTING_CHANGED,
     EVENT_PROMPTER_CHANGED,
+    EVENT_SESSION_CHANGED,
     EVENT_SETTINGS_CHANGED,
     EVENT_SUPPORT_CHANGED,
 ];

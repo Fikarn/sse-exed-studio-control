@@ -289,6 +289,16 @@ The owner asked, after the Overview's release, for the level meter to be the str
 
 It reaches the studio at the next `npm run release`, and the walk checks it on the desk.
 
+### The Session page (2026-10-15)
+
+A new page and the landing page: every session begins there, with a choice of Green Screen Recording, Podcast Recording or Webinar, drawn as three of the brand's Rooms; pressing one opens its window with the session's name and `Begin`, which opens the Overview. The design is board 2 (`docs/design/boards/session-2.html`), its note `docs/design/session.md`; the owner took every recommendation on 2026-10-15 (D51, written by the pull request that builds the page). Three pull requests, in this order:
+
+- [x] The hardware link (#351): the `session` domain (`session.snapshot`, `session.begin`, `session.end` and the event `session.changed`), the running session and the last of each kind in two settings under `session.`, outside the archive; a row in the action log for each begin and end; `session` a page the hardware link accepts and keeps, the default staying the Overview; the store's slice and the test double. Nothing on screen changes yet.
+- [ ] The design system: the Session tones, the Session Room with its three drawings, the window (`Sheet`), on their Storybook boards.
+- [ ] The page: the `Session` tab first, the landing, the Rooms and the window on the page, the test data, the page tests, the captures and the documents; the boards and the note committed.
+
+Then, on the owner's word: `npm run release`, the walk with the page's CHECKLIST lines, `release:verified`. The deck's profile does not change.
+
 ### The BGH1s over the network (was Slice 13)
 
 It starts once the owner has read the SDK's licence (under "Waiting on the owner").
@@ -420,6 +430,10 @@ Found on Part A of the walk of the studio build `2026-10-13_ba1cb9f` (2026-10-13
 
 - [ ] **A camera never read shows `— last read`.** CAM 1, unreachable since the start (the Pocket off), shows each value on the Cameras plate as `— last read` in the doubt's keyline, while each section's head reads `locked · never read` and the line under its state "no answer since the start": there is no last reading to show. The readout of a camera that is not held takes `last read` as its unit whenever the camera is in doubt (`CamerasPlate.tsx`, the `Readout` with `unit={doubt ? "last read" : "not read"}`), while its keyline asks for doubt and a value shown; `not read` would say what is true.
 - [ ] **`VERIFIED · 0 values confirmed` right after a Sync.** The Console's state display counts the changes TotalMix confirmed (`confirmedSends`, `AudioCluster.tsx`), not the desk's values, so right after a Sync that read the whole desk (102 names) it reads `VERIFIED` over `0 values confirmed`, as if nothing were. Count what the Sync read, or say what the number counts (`0 changes confirmed`).
+
+Found by the review of #351 (the Session page's hardware link, 2026-10-15), older than it:
+
+- [ ] **An archive's restore writes whatever setting keys the archive holds.** `support.rs` writes the archive's `settings` (and the lighting's and the audio's maps) without checking each key against `RESTORE_KEY_PREFIXES`, so an archive edited by hand can write `session.current` or `cameras.released.<n>`, which no archive Studio Control exports carries, and nothing announces it. Only a hand-made archive can do this. Filter the keys by the prefixes the restore owns (saved data: one review).
 
 ## Waiting on the owner
 

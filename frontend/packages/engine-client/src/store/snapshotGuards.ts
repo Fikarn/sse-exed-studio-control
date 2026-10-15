@@ -110,6 +110,12 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
         // `null` when the action log could not be read.
         value.recent === null ? null : listProblem(value, "recent", { ids: false })
       );
+    case "session":
+      // The Session page (2026-10-15): the running session or `null`, and the last of each kind.
+      return firstProblem(
+        objectProblem(value, "current", { nullable: true }),
+        listProblem(value, "last", { ids: false })
+      );
     default:
       return null;
   }

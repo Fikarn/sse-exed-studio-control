@@ -97,6 +97,9 @@ export const REQUEST_METHODS = [
   "cameras.setup.pair",
   "cameras.setup.forget",
   "cameras.pictures.showing",
+  "session.snapshot",
+  "session.begin",
+  "session.end",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];
 
@@ -111,6 +114,7 @@ export const EVENT_NAMES = [
   "engine.startupFailed",
   "lighting.changed",
   "prompter.changed",
+  "session.changed",
   "settings.changed",
   "support.changed",
 ] as const;

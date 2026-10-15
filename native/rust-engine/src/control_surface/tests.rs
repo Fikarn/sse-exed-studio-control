@@ -202,6 +202,28 @@ fn the_deck_reads_the_overview_as_its_workspace_word() {
     assert_eq!(answer["words"]["workspace"], "overview");
 }
 
+// The Session page (2026-10-15): its word reaches the displays as it is, and
+// no follow trigger of the deck matches it, so the deck stays on its page.
+#[test]
+fn the_deck_reads_the_session_page_as_its_workspace_word() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_audio_test_db("workspace-session");
+    let db_path = test_dir.db_path();
+    set_settings_owned(
+        db_path.as_path(),
+        &[(String::from(WORKSPACE_KEY), String::from("session"))],
+    )
+    .expect("workspace should persist");
+    assert_eq!(
+        read_control_surface_lcd_text(db_path.as_path(), "workspace")
+            .expect("workspace key should render"),
+        "session"
+    );
+    let answer =
+        read_deck_displays(db_path.as_path(), true, Instant::now()).expect("the bridge answers");
+    assert_eq!(answer["words"]["workspace"], "session");
+}
+
 #[test]
 fn context_includes_workspace_and_audio_deck_block() {
     let test_dir = ready_audio_test_db("context-audio");

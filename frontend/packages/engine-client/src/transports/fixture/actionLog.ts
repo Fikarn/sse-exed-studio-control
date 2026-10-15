@@ -3,6 +3,7 @@
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import { cameraModel } from "./camerasModel";
 import { asArray, asBoolean, asNumber, asRecord } from "./json";
+import { SESSION_KIND_NAMES, isSessionKind, trimmedName } from "./sessionState";
 import type { MutableFixtureState } from "./state";
 
 // The action log as the hardware link keeps it for the screen
@@ -46,6 +47,9 @@ export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "prompter.clear",
   "prompter.putOn",
   "prompter.update",
+  // The session (2026-10-15): a begin, which may end the running one first, and an end.
+  "session.begin",
+  "session.end",
   "support.backup.restore",
 ];
 
@@ -74,7 +78,7 @@ export const CAMERA_ACTIONS = {
 
 /** One row before it is stored: which part of the studio, what, on what, and the sentence the operator reads. */
 export interface UiActionRow {
-  domain: "lighting" | "audio" | "setup" | "prompter" | "cameras";
+  domain: "lighting" | "audio" | "setup" | "prompter" | "cameras" | "session";
   action: string;
   target: string;
   detail: string;
@@ -87,6 +91,17 @@ function text(value: JsonValue, path: readonly string[]): string | null {
     node = asRecord(node)?.[key];
   }
   const trimmed = typeof node === "string" ? node.trim() : "";
+  return trimmed ? trimmed : null;
+}
+
+// `text` with Rust's own trim (`str::trim`, White_Space), which keeps U+FEFF where JavaScript's
+// `trim` takes it: the session's name is the operator's text, so the sentence must match.
+function sessionText(value: JsonValue, path: readonly string[]): string | null {
+  let node: JsonValue | undefined = value;
+  for (const key of path) {
+    node = asRecord(node)?.[key];
+  }
+  const trimmed = typeof node === "string" ? trimmedName(node) : "";
   return trimmed ? trimmed : null;
 }
 
@@ -412,6 +427,24 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
         ];
       }
       return [{ domain: "cameras", action: CAMERA_ACTIONS[method], target: cameraModel(camera).tag, detail }];
+    }
+
+    // The session (2026-10-15): a begin and an end; a begin while a session runs ends it
+    // first, so the end's row comes first. The kind's id is the target, and the sentence
+    // names the kind and the session, leaving out a name not given. Trimmed as Rust's
+    // `text` trims (`sessionText`): a name may hold what JavaScript's own trim would take.
+    case "session.begin":
+    case "session.end": {
+      const row = (action: "begun" | "ended", key: "session" | "ended"): UiActionRow[] => {
+        const kind = sessionText(result, [key, "kind"]);
+        if (!isSessionKind(kind)) return [];
+        const what = action === "begun" ? "Session begun" : "Session ended";
+        const name = sessionText(result, [key, "name"]);
+        const detail =
+          name === null ? `${what}: ${SESSION_KIND_NAMES[kind]}` : `${what}: ${SESSION_KIND_NAMES[kind]} · ${name}`;
+        return [{ domain: "session", action, target: kind, detail }];
+      };
+      return [...row("ended", "ended"), ...(method === "session.begin" ? row("begun", "session") : [])];
     }
     default:
       return [];
