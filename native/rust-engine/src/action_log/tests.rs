@@ -378,6 +378,17 @@ fn the_session_rows_are_its_end_and_its_begin_in_that_order() {
         )]
     );
     // An answer that does not carry its session leaves nothing.
+    // The name as the answer carries it, trimmed as `text` trims: a byte-order
+    // mark is not White_Space and stays, as it does in the double's sentence
+    // (the review of #351).
+    assert_eq!(
+        rows(
+            "session.begin",
+            json!({ "session": session_value("podcast", "\u{feff}Take", None), "ended": null })
+        )[0]
+        .3,
+        "Session begun: Podcast Recording · \u{feff}Take"
+    );
     assert!(rows("session.end", json!({})).is_empty());
     assert!(rows(
         "session.begin",

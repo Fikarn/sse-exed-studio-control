@@ -337,6 +337,17 @@ describe("the fixture double's action log", () => {
       },
       [row("session", "ended", "green-screen", "Session ended: Green Screen Recording")],
     ],
+    // Trimmed as the hardware link's `text` trims (the review of #351): a byte-order mark is not
+    // White_Space and stays, where JavaScript's own trim would take it.
+    [
+      "session.begin",
+      { kind: "podcast", name: "﻿Take" },
+      {
+        session: { kind: "podcast", name: "﻿Take", begunAt: "2026-10-15T07:16:00.000Z", endedAt: null },
+        ended: null,
+      },
+      [row("session", "begun", "podcast", "Session begun: Podcast Recording · ﻿Take")],
+    ],
     ["session.end", {}, {}, []],
     [
       "session.begin",

@@ -431,6 +431,10 @@ Found on Part A of the walk of the studio build `2026-10-13_ba1cb9f` (2026-10-13
 - [ ] **A camera never read shows `— last read`.** CAM 1, unreachable since the start (the Pocket off), shows each value on the Cameras plate as `— last read` in the doubt's keyline, while each section's head reads `locked · never read` and the line under its state "no answer since the start": there is no last reading to show. The readout of a camera that is not held takes `last read` as its unit whenever the camera is in doubt (`CamerasPlate.tsx`, the `Readout` with `unit={doubt ? "last read" : "not read"}`), while its keyline asks for doubt and a value shown; `not read` would say what is true.
 - [ ] **`VERIFIED · 0 values confirmed` right after a Sync.** The Console's state display counts the changes TotalMix confirmed (`confirmedSends`, `AudioCluster.tsx`), not the desk's values, so right after a Sync that read the whole desk (102 names) it reads `VERIFIED` over `0 values confirmed`, as if nothing were. Count what the Sync read, or say what the number counts (`0 changes confirmed`).
 
+Found by the review of #351 (the Session page's hardware link, 2026-10-15), older than it:
+
+- [ ] **An archive's restore writes whatever setting keys the archive holds.** `support.rs` writes the archive's `settings` (and the lighting's and the audio's maps) without checking each key against `RESTORE_KEY_PREFIXES`, so an archive edited by hand can write `session.current` or `cameras.released.<n>`, which no archive Studio Control exports carries, and nothing announces it. Only a hand-made archive can do this. Filter the keys by the prefixes the restore owns (saved data: one review).
+
 ## Waiting on the owner
 
 Nothing holds the BGH1 work any more (D18, D29, D40); it comes after the Pocket's link:

@@ -309,8 +309,9 @@ fn a_kind_the_hardware_link_does_not_know_is_refused() {
     }
 }
 
+// Said once for the key: `saved_json`'s own test holds the once.
 #[test]
-fn a_damaged_running_session_reads_as_none_and_is_said_once() {
+fn a_damaged_running_session_reads_as_none_and_is_said_in_the_log() {
     let test = TestSession::new("damaged");
     set_settings(
         &test.db_path,

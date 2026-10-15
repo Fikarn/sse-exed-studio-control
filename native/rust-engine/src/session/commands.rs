@@ -66,7 +66,9 @@ pub(crate) fn handle_session_request(
 
 /// What the settings hold: the running session and the last of each kind.
 /// A value that does not read is absent, and the log says so once for its
-/// key (`saved_json`); the next begin or end writes it again.
+/// key (`saved_json`): `session.current` is written again by the next begin
+/// (an end is refused, since none reads as running), `session.last` when a
+/// session next ends.
 pub(crate) fn read_session(db_path: &Path) -> Result<SessionSnapshot, SessionError> {
     let settings = list_settings_by_prefix(db_path, SESSION_SETTINGS_PREFIX)?;
     let current = settings
