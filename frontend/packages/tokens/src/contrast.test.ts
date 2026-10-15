@@ -119,6 +119,20 @@ describe("legibility from the token values", () => {
     expect(textOn("--sse-black", "--sse-beige")).toBeGreaterThanOrEqual(4.5);
   });
 
+  // The Session page's Rooms (D51): a Room's name in the main ink and its line
+  // in the second ink stand on its floor, their boxes running out over the
+  // side walls; the drawing's line reads on the back wall.
+  it("a Session Room's words read at 4.5:1 on its floor and walls", () => {
+    for (const tone of ["green", "umber", "slate"]) {
+      for (const plane of ["floor", "lit", "shade", "back"]) {
+        for (const ink of ["--text-text", "--text-text2"]) {
+          expect(textOn(ink, `--session-${tone}-${plane}`), `${ink} on ${tone} ${plane}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      expect(textOn(`--session-${tone}-draw`, `--session-${tone}-back`), `${tone} line`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it("every colour token resolves to the palette or to its own value, never a second copy of a palette colour", () => {
     const palette = new Map(
       Object.entries(vars)

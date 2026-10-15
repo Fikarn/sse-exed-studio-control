@@ -30,6 +30,7 @@
   --material-edge: rgba(246, 245, 232, 0.07); /** the one-pixel light edge along a raised surface's top */
   --material-latch-tint: rgba(242, 222, 111, 0.07); /** the Overview's status card (D47): the latch row's faint yellow while something is latched */
   --material-latch-edge: rgba(242, 222, 111, 0.35); /** the line over that row while something is latched */
+  --material-scrim: rgba(3, 6, 5, 0.74); /** the page dimmed under a sheet, the header left live above it (the Session page's window, D51) */
   --material-sheen: transparent; /** deprecated: no highlights */
   --material-shade: transparent; /** deprecated: only the floating layer casts a shadow */
   --material-well-shade: transparent; /** deprecated: wells are flat */
@@ -93,6 +94,42 @@
   --room-umber-key: #30261A; /** a key's face and a list's face in the room */
   --room-umber-line: #3B2F21; /** the room's hairline: under the name band, between rows, a well's edge */
   --room-umber-line2: #50412D; /** a key's edge in the room */
+  --session-sky: #FFFBEA; /** the skylight's light: its pane in the ceiling and its glow on the back wall, in every Room */
+  --session-shadow: rgba(0, 0, 0, 0.28); /** a shadow on a Room's floor under the things the drawing stands there */
+  --session-edge: rgba(0, 0, 0, 0.22); /** the quiet line where a Room's planes meet */
+  --session-green-back: #0F4533; /** the back wall, which the skylight lights */
+  --session-green-ceil: #0C3B2B; /** the ceiling */
+  --session-green-lit: #0D3D2D; /** the lit side wall, a step under the back wall */
+  --session-green-shade: #0A3226; /** the shaded side wall */
+  --session-green-floor: #0A3025; /** the floor, where the Room's name and line stand */
+  --session-green-draw: #D9EADB; /** the drawing's line */
+  --session-green-obj: #165840; /** a drawn thing's face */
+  --session-green-obj2: #0F4532; /** a drawn thing's second face, a step darker */
+  --session-green-accent: #2F8D59; /** the accent: the green screen */
+  --session-green-accent2: #247349; /** the accent in shade: the screen's sweep onto the floor */
+  --session-green-light: #F4FFE8; /** the drawing's own light: the soft lights' beams on the screen */
+  --session-umber-back: #45321E; /** the back wall, which the skylight lights */
+  --session-umber-ceil: #3D2C1A; /** the ceiling */
+  --session-umber-lit: #3F2E1B; /** the lit side wall, a step under the back wall */
+  --session-umber-shade: #342616; /** the shaded side wall */
+  --session-umber-floor: #322414; /** the floor, where the Room's name and line stand */
+  --session-umber-draw: #F2E4CC; /** the drawing's line */
+  --session-umber-obj: #5A432B; /** a drawn thing's face */
+  --session-umber-obj2: #4A3723; /** a drawn thing's second face, a step darker */
+  --session-umber-accent: #A9793F; /** the accent: the headphones and the microphones */
+  --session-umber-accent2: #8A6234; /** the accent in shade */
+  --session-umber-light: #FFD98F; /** the drawing's own light: the pendant over the table and its beam */
+  --session-slate-back: #1F364B; /** the back wall, which the skylight lights */
+  --session-slate-ceil: #1B3042; /** the ceiling */
+  --session-slate-lit: #1C3245; /** the lit side wall, a step under the back wall */
+  --session-slate-shade: #172A39; /** the shaded side wall */
+  --session-slate-floor: #162736; /** the floor, where the Room's name and line stand */
+  --session-slate-draw: #DBE7F1; /** the drawing's line */
+  --session-slate-obj: #2B4864; /** a drawn thing's face */
+  --session-slate-obj2: #233C54; /** a drawn thing's second face, a step darker */
+  --session-slate-accent: #2F6398; /** the accent: the audience's faces on the screen, the microphone */
+  --session-slate-accent2: #23507E; /** the accent in shade: the screen, the laptop */
+  --session-slate-light: #9CC4FF; /** the drawing's own light: the glow of the screen of faces */
   --prompter-glass-floor: #000000; /** the glass's background, black in every look */
   --prompter-glass-text: #ffffff; /** white text, the standard */
   --prompter-glass-text-yellow: #ffd84a; /** yellow text, the look's other colour */
@@ -112,6 +149,7 @@
   --elevation-float: 0 0 0 1px #000000, 0 16px 40px rgba(0, 0, 0, 0.55); /** the floating layer: menu, popover, dialog, drawer, toast (data-level=float) */
   --elevation-tip: 0 6px 16px rgba(0, 0, 0, 0.45); /** the tooltip (data-level=float) */
   --elevation-edge-light: inset 0 1px 0 var(--material-edge); /** a raised surface's light top edge: a platter, the REC tally (D48) */
+  --elevation-edge-hover: inset 0 0 0 1px rgba(246, 245, 232, 0.16), inset 0 1px 0 rgba(246, 245, 232, 0.14); /** a Session Room under the pointer (D51): its light edge brightens and closes round it; nothing moves */
   --elevation-recess: inset 0 1px 1px rgba(0, 0, 0, 0.35); /** a tray's soft inner edge: keys that belong together, set into one recess (the Overview, D47) */
   --elevation-well: inset 0 0 0 1px var(--material-line); /** deprecated: a well's edge, drawn inside */
   --elevation-key: inset 0 0 0 1px var(--material-line2); /** deprecated: a key's edge, drawn inside */
@@ -175,6 +213,8 @@
   --motion-duration-enter: 200ms; /** a floating layer entering (8 px rise and fade) */
   --motion-duration-exit: 120ms;
   --motion-duration-move: 160ms; /** bank change, tab change */
+  --motion-duration-open: 340ms; /** a sheet opens from what it came from: the Session page's window from its Room (D51) */
+  --motion-duration-close: 260ms; /** a sheet closes back into what it came from */
   --motion-duration-normal: 180ms; /** deprecated: use state */
   --motion-duration-slow: 240ms; /** deprecated: use enter */
   --motion-duration-pulse: 1200ms; /** deprecated: nothing pulses */
