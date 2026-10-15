@@ -57,10 +57,12 @@ export const DEFAULT_ROOTS = [
 // Where a key listener on a window, a document or an element is plain keyboard
 // operation. Each entry says why.
 export const KEY_LISTENERS = {
-  "frontend/packages/design-system/src/components/Dialog.tsx":
-    "Esc closes the dialog and Tab stays inside it, while focus is in the dialog (D6)",
+  "frontend/packages/design-system/src/components/useModalFocus.ts":
+    "a modal layer's focus (the dialog's, the sheet's): Tab stays inside it, and Esc closes a dialog, while focus is in it (D6)",
   "frontend/packages/design-system/src/components/Drawer.tsx":
     "Esc closes the open drawer, unless a menu or popover in it took the Esc first (D6)",
+  "frontend/packages/design-system/src/components/Sheet.tsx":
+    "Esc closes the open sheet (the Session page's window) wherever focus is, unless a layer above took the Esc first (D6, D51)",
   "frontend/packages/design-system/src/components/Tooltip.tsx":
     "Esc closes an open tooltip and goes on to whatever else listens, registered only while a tooltip shows (WCAG 1.4.13, D6)",
   "frontend/packages/design-system/src/components/useArm.ts":
@@ -110,7 +112,8 @@ export const KEY_HANDLERS = {
 
 // Where reading a modifier key is allowed: Shift+Tab keeps focus inside a dialog.
 export const MODIFIER_READERS = {
-  "frontend/packages/design-system/src/components/Dialog.tsx": "Shift+Tab keeps focus inside the dialog (D6)",
+  "frontend/packages/design-system/src/components/useModalFocus.ts":
+    "Shift+Tab keeps focus inside a modal layer, the dialog or the sheet (D6)",
   "frontend/app/src/app/shared/ShellDialog.tsx": "Shift+Tab keeps focus inside the shell's dialog (D6)",
 };
 

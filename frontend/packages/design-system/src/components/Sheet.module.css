@@ -1,0 +1,71 @@
+/* The sheet (D51; board 2): the floating layer as a window over a dimmed
+   page, under the header, which stays live. Its face is the raised surface
+   at 12 with a key's edge, the light edge along its top and the float
+   shadow; its art stands at its left with the face's corners there, its body
+   at the right. The face is its own element, so the motion can grow it from
+   what the sheet opens from while the body's layout never changes. */
+@layer components {
+  .scrim {
+    position: fixed;
+    top: var(--operator-shell-height, var(--chrome-studio-header));
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--z-overlay);
+    background: var(--material-scrim);
+  }
+
+  /* Centred in the bay: between the header and the footer. */
+  .sheet {
+    --sheet-top: var(--operator-shell-height, var(--chrome-studio-header));
+    position: fixed;
+    top: calc(var(--sheet-top) + (100% - var(--sheet-top) - var(--chrome-studio-footer) - var(--sheet-height)) / 2);
+    left: calc((100% - var(--sheet-width)) / 2);
+    z-index: var(--z-overlay);
+    width: var(--sheet-width);
+    height: var(--sheet-height);
+    border-radius: var(--radius-panel);
+    color: var(--text-text);
+    outline: none;
+  }
+
+  .sheet:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-panel);
+    background: var(--material-raise);
+    box-shadow: var(--elevation-edge-light), var(--elevation-float);
+  }
+
+  .art {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--sheet-art-width);
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-panel) 0 0 var(--radius-panel);
+    transform-origin: 0 0;
+  }
+
+  .body {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--sheet-art-width);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+}
