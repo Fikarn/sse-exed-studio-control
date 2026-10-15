@@ -34,6 +34,7 @@ mod rme_console_link;
 mod rme_totalmix_names;
 mod rme_totalmix_osc;
 mod saved_json;
+mod session;
 mod shell_settings;
 mod storage;
 mod storage_backups;

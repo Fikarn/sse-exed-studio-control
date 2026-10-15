@@ -7,7 +7,9 @@
 //! shell. The table keeps the design's name, `event_log`.
 //!
 //! **What is a row.** A discrete operator action that reaches a device: power,
-//! recall, mute, 48 V, arming the light outputs, a patch change. A
+//! recall, mute, 48 V, arming the light outputs, a patch change. A session's
+//! begin and end are rows too (2026-10-15, D51): they reach no device yet, and
+//! they are the record of what the studio made. A
 //! ride is not — a fader, a gain, an intensity, a colour temperature, the
 //! grand master, a Stream Deck dial detent: a commit waits for the disk
 //! (about 35 ms on the workstation), a dial sends a key per detent, and a row
@@ -34,6 +36,7 @@ use crate::cameras::model::RECORDING_CAMERA;
 use crate::cameras::runtime::utc_time;
 use crate::cameras::snapshot::TakesToday;
 use crate::diagnostics::{log_event, LogLevel};
+use crate::session::snapshot::SessionKind;
 use crate::storage::{open_connection, EngineResult};
 use rusqlite::{params, Connection, Transaction};
 use serde::Serialize;
@@ -54,6 +57,9 @@ pub(crate) const DOMAIN_PROMPTER: &str = "prompter";
 /// The cameras (new pages program, Slice 8): a take, a format, a look, who
 /// holds a camera.
 pub(crate) const DOMAIN_CAMERAS: &str = "cameras";
+/// The session (the Session page, 2026-10-15, D51): its begin and its end.
+/// It reaches no device yet; the row is the record of what the studio made.
+pub(crate) const DOMAIN_SESSION: &str = "session";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ActionSource {
@@ -360,6 +366,10 @@ const RECORDED_UI_METHODS: &[&str] = &[
     "prompter.clear",
     "prompter.putOn",
     "prompter.update",
+    // The session (2026-10-15): a begin, which may end the running one
+    // first, and an end.
+    "session.begin",
+    "session.end",
     "support.backup.restore",
 ];
 
@@ -443,6 +453,8 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "cameras.setup.update",
     "cameras.snapshot",
     "cameras.step",
+    // The session's read.
+    "session.snapshot",
     // The shell's own settings, files.
     "commissioning.update",
     "exports.companion.export",
@@ -924,6 +936,40 @@ pub(crate) fn ui_actions(
                 format!("CAM {camera}"),
                 detail,
             )]
+        }
+
+        // The session (2026-10-15, D51): a begin, and an end. A begin while
+        // a session runs ends that one first, so its row comes first. The
+        // kind's id is the target; the sentence names the kind and the
+        // session as the operator reads them, since Recent actions show the
+        // sentence alone, and leaves out a name not given.
+        "session.begin" | "session.end" => {
+            let row = |action: &'static str, session: &str| {
+                let kind =
+                    text(result, &format!("{session}/kind")).and_then(SessionKind::from_id)?;
+                let what = if action == "begun" {
+                    "Session begun"
+                } else {
+                    "Session ended"
+                };
+                let detail = match text(result, &format!("{session}/name")) {
+                    Some(name) => format!("{what}: {} · {name}", kind.name()),
+                    None => format!("{what}: {}", kind.name()),
+                };
+                Some(ActionRecord::new(
+                    ActionSource::Ui,
+                    DOMAIN_SESSION,
+                    action,
+                    kind.id(),
+                    detail,
+                ))
+            };
+            let begun = if method == "session.begin" {
+                row("begun", "/session")
+            } else {
+                None
+            };
+            row("ended", "/ended").into_iter().chain(begun).collect()
         }
         _ => Vec::new(),
     }

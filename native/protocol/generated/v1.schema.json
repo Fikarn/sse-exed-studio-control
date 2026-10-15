@@ -146,7 +146,10 @@
           "cameras.setup.update",
           "cameras.setup.pair",
           "cameras.setup.forget",
-          "cameras.pictures.showing"
+          "cameras.pictures.showing",
+          "session.snapshot",
+          "session.begin",
+          "session.end"
         ]
       }
     },
@@ -164,6 +167,7 @@
           "engine.startupFailed",
           "lighting.changed",
           "prompter.changed",
+          "session.changed",
           "settings.changed",
           "support.changed"
         ]
