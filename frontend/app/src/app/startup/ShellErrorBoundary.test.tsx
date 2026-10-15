@@ -107,6 +107,8 @@ describe("ShellErrorBoundary", () => {
           "prompter.glass.snapshot": null,
           // The cameras', absent as well.
           "cameras.snapshot": null,
+          // The session's (the Session page, 2026-10-15), likewise.
+          "session.snapshot": null,
         };
         return method in typed ? (typed[method] ?? null) : { protocol: "2" };
       },
