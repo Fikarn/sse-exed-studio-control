@@ -1,0 +1,1887 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Session · board 1</title>
+    <style>
+      /* =====================================================================================
+   THE SESSION PAGE · board 1 · 2026-10-15
+   The start of every session: the studio's state on the left, three doors in the middle
+   (Green Screen Recording, Podcast Recording, Webinar), the chosen door's options on the
+   plate, Begin at the plate's foot. Drawn in board 3's language (overview-3.html): the
+   skylight header, raised panels at 12, what sits in them at 8, depth from light, tint
+   only for focus. The note is docs/design/session.md.
+
+   The corner panel:
+     ?moment=choose (default) · chosen · session      ?kind=green · podcast (default) · webinar
+     ?sheet=step1 (default: what step 1 builds) · later (the later steps, examples only)
+     ?notes=1 numbered notes   ?ui=0 hides the corner   ?fit=0 keeps 1:1
+   The doors, the name field, Begin, Continue, End session and Sync from TotalMix all work.
+   ===================================================================================== */
+      @font-face {
+        font-family: "SSE Adelia";
+        font-weight: 700;
+        src: local("SSE Adelia Bold"), local("SSEAdelia-Bold");
+      }
+      @font-face {
+        font-family: "PT Sans";
+        font-weight: 400;
+        src: local("PT Sans"), local("PTSans-Regular");
+      }
+      @font-face {
+        font-family: "PT Sans";
+        font-weight: 700;
+        src: local("PT Sans Bold"), local("PTSans-Bold");
+      }
+      @font-face {
+        font-family: "PT Serif";
+        font-weight: 400;
+        font-style: italic;
+        src: local("PT Serif Italic"), local("PTSerif-Italic");
+      }
+
+      :root {
+        --sse-green: #99ba92;
+        --sse-dark-green: #004932;
+        --sse-beige: #edebd1;
+        --sse-beige-light: #f6f5e8;
+        --sse-yellow: #f2de6f;
+        --sse-coral: #ff7d55;
+        --sse-burgundy: #671919;
+        --sse-blue: #3a87e5;
+        --material-bg: #0b1311;
+        --material-well: #040706;
+        --text: #f6f5e8;
+        --text2: #c5c7b9;
+        --text3: #8d9389;
+        --text4: #59625c;
+        --ease-mech: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --bar-top: #18221f;
+        --bar-bottom: #141e1b;
+        --bar-line: #33433d;
+        --edge-light: rgba(246, 245, 232, 0.07);
+        --wall: #141d1a;
+        --lintel: #101916;
+        --floor: #0e1714;
+        --tray: #0e1714;
+        --key: #1f2a26;
+        --line: #27332e;
+        --line2: #3a4842;
+      }
+      /* The doors' tones: the Overview's rooms' (D47), identity, not status. Each adds the
+         colours of its drawing: the light line, the accent and its darker step, and the tag
+         a session of that kind carries in a list. */
+      .in-green {
+        --wall: #112b21;
+        --lintel: #0c2219;
+        --floor: #0a1c15;
+        --tray: #0a1c15;
+        --key: #1a3a2d;
+        --line: #224536;
+        --line2: #305c4a;
+        --draw: #d3e4cb;
+        --accent: #2a7550;
+        --accent2: #1c5539;
+        --tag: #4f9a6c;
+      }
+      .in-umber {
+        --wall: #231b12;
+        --lintel: #1a140c;
+        --floor: #16110a;
+        --tray: #16110a;
+        --key: #30261a;
+        --line: #3b2f21;
+        --line2: #50412d;
+        --draw: #ecdcc3;
+        --accent: #7a5a36;
+        --accent2: #57401f;
+        --tag: #b08a57;
+      }
+      .in-slate {
+        --wall: #12202a;
+        --lintel: #0d1820;
+        --floor: #0b141b;
+        --tray: #0b141b;
+        --key: #1b2d3b;
+        --line: #243849;
+        --line2: #324b5f;
+        --draw: #d2e0ea;
+        --accent: #22507a;
+        --accent2: #183b5a;
+        --tag: #5b8db8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        background: var(--material-bg);
+        color: var(--text);
+        font:
+          400 16px/1.25 "PT Sans",
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
+      }
+      p {
+        margin: 0;
+      }
+      .abs {
+        position: absolute;
+      }
+      .sp {
+        flex: 1;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+
+      /* ---------- lamps and words ---------- */
+      .lamp {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        flex: none;
+      }
+      .lamp.hollow {
+        background: none;
+        border: 1px solid currentColor;
+      }
+      .lw {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        color: var(--text2);
+      }
+      .lw .cap {
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .lw.ok .cap,
+      .lw.ok .lamp {
+        color: var(--sse-green);
+      }
+      .lw.att .cap,
+      .lw.att .lamp {
+        color: var(--sse-yellow);
+      }
+      .lw.off .cap,
+      .lw.off .lamp {
+        color: var(--text3);
+      }
+
+      /* ---------- keys: a raised face with a one-pixel light edge, radius 8 ---------- */
+      .key {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 8px;
+        background: var(--key);
+        border: 0;
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--line2);
+        color: var(--text);
+        font: 700 16px/1 "PT Sans";
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+        flex: none;
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          background 100ms var(--ease-mech);
+      }
+      .key:hover:not(.primary) {
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--text4);
+      }
+      .key.small {
+        min-height: 28px;
+        padding: 0 10px;
+        font-size: 14px;
+      }
+      .key.large {
+        min-height: 48px;
+      }
+      .key.tall {
+        min-height: 64px;
+      }
+      .key.stack {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .key .cap {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .key.primary {
+        background: var(--sse-beige-light);
+        color: #000;
+        box-shadow: none;
+      }
+      .key.primary .hint {
+        color: #000;
+      }
+      .key.primary:hover {
+        background: #fffef4;
+      }
+      .key.ico {
+        width: 36px;
+        padding: 0;
+      }
+      .dots {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+      /* a door: the panel's way on */
+      .door {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: var(--key);
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--line2);
+        font: 700 14px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .door .ar {
+        font: 700 16px/1 "SSE Adelia";
+      }
+
+      /* ---------- section heads and the one grouped list ---------- */
+      .shead {
+        display: flex;
+        align-items: last baseline;
+        gap: 12px;
+        height: 28px;
+        padding-bottom: 4px;
+        border-bottom: 2px solid var(--line2);
+      }
+      .shead .t {
+        font: 700 18px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .shead .d {
+        font: 400 14px/1.2 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .ilist {
+        border-radius: 12px;
+        background: var(--key);
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--line);
+        overflow: hidden;
+      }
+      .ilist .row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 34px;
+        padding: 0 14px;
+        white-space: nowrap;
+      }
+      .ilist .row + .row::before {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 0;
+        top: 0;
+        height: 1px;
+        background: var(--line);
+      }
+      .ilist .lab {
+        color: var(--text2);
+        font-size: 16px;
+      }
+      .ilist .val {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        font-weight: 700;
+        color: var(--text);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ilist .val .n {
+        font-weight: 400;
+        font-size: 14px;
+        color: var(--text2);
+      }
+      .ilist.tall .row {
+        height: 42px;
+      }
+      .doubtv {
+        color: var(--sse-yellow) !important;
+        outline: 1px dashed var(--sse-yellow);
+        outline-offset: 2px;
+      }
+
+      /* ================================ THE HEADER AND THE FOOTER: the raised layer ================================ */
+      .hdr {
+        left: 0;
+        top: 0;
+        width: 2560px;
+        height: 88px;
+        display: flex;
+        align-items: center;
+        padding: 0 32px;
+        gap: 4px;
+        white-space: nowrap;
+        background: linear-gradient(var(--bar-top), var(--bar-bottom));
+        box-shadow:
+          inset 0 -1px 0 var(--bar-line),
+          0 1px 0 rgba(0, 0, 0, 0.6);
+      }
+      .hdr .logo {
+        height: 40px;
+        display: block;
+        flex: none;
+      }
+      .hdr .rule {
+        width: 1px;
+        height: 40px;
+        margin: 0 20px;
+        flex: none;
+        background: rgba(246, 245, 232, 0.12);
+      }
+      .hdr .sp {
+        flex: 1;
+        min-width: 16px;
+      }
+      .tab {
+        position: relative;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        flex: none;
+        border-radius: 8px;
+        color: var(--text2);
+        font: 700 16px/1 "PT Sans";
+        white-space: nowrap;
+        cursor: default;
+      }
+      .tab .st {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 4px;
+      }
+      .tab .w,
+      .chip .w {
+        font: 700 16px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .tab .ok,
+      .chip .ok {
+        color: var(--sse-green);
+      }
+      .tab .att {
+        color: var(--sse-yellow);
+      }
+      .chip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 10px;
+        color: var(--text3);
+        white-space: nowrap;
+        flex: none;
+        border-radius: 8px;
+      }
+      .hdr .hstrip {
+        display: inline-flex;
+        align-items: center;
+        height: 48px;
+        padding: 4px;
+        gap: 2px;
+        border-radius: 12px;
+        flex: none;
+        background: #222e29;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.08),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.05),
+          0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .hdr .hstrip > * + *::before {
+        content: "";
+        position: absolute;
+        left: -2px;
+        top: 11px;
+        bottom: 11px;
+        width: 1px;
+        background: rgba(246, 245, 232, 0.09);
+      }
+      .hdr .hstrip > .on::before,
+      .hdr .hstrip > .on + *::before {
+        display: none;
+      }
+      .hdr .tab.on {
+        background: var(--sse-dark-green);
+        color: var(--sse-beige-light);
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.14),
+          inset 0 0 0 1px rgba(153, 186, 146, 0.22);
+      }
+      .tally {
+        height: 48px;
+        width: 272px;
+        display: flex;
+        flex: none;
+        margin-left: 4px;
+      }
+      .tally > div {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        height: 100%;
+        padding: 0 14px;
+        border-radius: 12px;
+        color: var(--text3);
+        white-space: nowrap;
+        background: #222e29;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.08),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.05),
+          0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .tally .nm {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .clock {
+        font: 700 20px/1 "PT Sans";
+        color: var(--text);
+        margin-left: 24px;
+        flex: none;
+      }
+      .ftr {
+        left: 0;
+        top: 1400px;
+        width: 2560px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        padding: 0 32px;
+        font: 400 14px/1.35 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+        background: linear-gradient(var(--bar-bottom), var(--bar-top));
+        box-shadow: inset 0 1px 0 var(--bar-line);
+      }
+      .ftr .item {
+        display: inline-flex;
+        gap: 10px;
+      }
+      .ftr .v {
+        color: var(--text2);
+      }
+      .ftr .colophon {
+        margin-left: auto;
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+
+      /* ================================ THE STATUS CARD (the Overview's) ================================ */
+      .card {
+        left: 16px;
+        top: 104px;
+        width: 408px;
+        height: 252px;
+        border-radius: 12px;
+        background: var(--material-well);
+        box-shadow:
+          inset 0 0 0 1px #1c2622,
+          0 1px 0 var(--edge-light);
+        overflow: hidden;
+      }
+      .sd {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        height: 180px;
+        padding: 18px 18px 18px 24px;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+      .sd .top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: 40px;
+        margin-bottom: 12px;
+      }
+      .sd .top .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .sd .word {
+        font: 700 40px/1 "SSE Adelia";
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .sd .menu {
+        margin-left: auto;
+        --key: #18221f;
+        --line2: #2e3b35;
+      }
+      .sd .sentence {
+        font:
+          italic 400 20px/26px "PT Serif",
+          serif;
+        color: var(--text);
+      }
+      .sd .foot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .sd .meta {
+        font: 400 14px/1.35 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+        flex: 1;
+      }
+      .latch {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 14px 0 24px;
+        box-shadow: inset 0 1px 0 #1c2622;
+        color: var(--text3);
+      }
+      .latch .lamp {
+        width: 10px;
+        height: 10px;
+      }
+
+      /* ================================ THE BAY: the day, the question, three doors ================================ */
+      .title .kick {
+        font: 700 18px/1 "SSE Adelia";
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+      .title .q {
+        margin-top: 14px;
+        font: 700 40px/1 "SSE Adelia";
+        text-transform: uppercase;
+        color: var(--text);
+        white-space: nowrap;
+      }
+      .title .sub {
+        margin-top: 16px;
+        font: 400 20px/1.2 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .choices {
+        display: flex;
+        gap: 16px;
+      }
+      /* a door: a raised panel in its tone, the whole panel a key */
+      .choice {
+        position: relative;
+        flex: 1 1 0;
+        min-width: 0;
+        height: 848px;
+        border-radius: 12px;
+        cursor: pointer;
+        background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(246, 245, 232, 0.04), transparent 70%), var(--wall);
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.045),
+          0 1px 0 rgba(0, 0, 0, 0.45);
+        outline: 2px solid transparent;
+        outline-offset: 3px;
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          outline-color 160ms ease-out;
+      }
+      .choice:hover {
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.16),
+          0 1px 0 rgba(0, 0, 0, 0.45);
+      }
+      .choice.selected {
+        outline-color: var(--sse-beige);
+      }
+      .choice .stage {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        top: 16px;
+        height: 420px;
+        border-radius: 8px;
+        background: var(--floor);
+        box-shadow:
+          inset 0 1px 1px rgba(0, 0, 0, 0.35),
+          0 1px 0 var(--edge-light);
+        overflow: hidden;
+        display: grid;
+        place-items: center;
+      }
+      .choice .stage svg {
+        width: 480px;
+        height: 330px;
+        display: block;
+      }
+      .choice .badge {
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line2);
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .choice .cname {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        top: 468px;
+        font: 700 28px/1 "SSE Adelia";
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text);
+        white-space: nowrap;
+      }
+      .choice .cjob {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        top: 512px;
+        font:
+          italic 400 20px/1.2 "PT Serif",
+          serif;
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      /* what stands under the name sits on the door's foot: the last session (step 1), or what it sets up (later) */
+      .choice .crows {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+      }
+      .choice .ckick {
+        margin: 0 0 10px 12px;
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+
+      /* the drawings: light lines in the door's tone, set into its recess */
+      .pict .s {
+        fill: none;
+        stroke: var(--draw);
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .pict .t {
+        stroke-width: 1.6;
+      }
+      .pict .q {
+        opacity: 0.4;
+      }
+      .pict .w {
+        fill: var(--floor);
+      }
+      .pict .a {
+        fill: var(--accent);
+      }
+      .pict .a2 {
+        fill: var(--accent2);
+      }
+      .pict .lit {
+        fill: var(--draw);
+        opacity: 0.2;
+      }
+      .pict .dot {
+        fill: var(--draw);
+      }
+
+      /* recent sessions: one grouped list, the bay's width */
+      .rlist .row {
+        display: grid;
+        grid-template-columns: 150px 170px 220px minmax(0, 1fr) 200px;
+        align-items: center;
+        column-gap: 16px;
+      }
+      .rlist .day {
+        font-weight: 700;
+      }
+      .rlist .time {
+        color: var(--text2);
+      }
+      .rlist .kind {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text);
+      }
+      .rlist .nm {
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .rlist .end {
+        justify-self: end;
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--text2);
+      }
+      .tag {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 4px;
+        background: var(--tag);
+        flex: none;
+      }
+      .rlist .door {
+        height: 28px;
+      }
+
+      /* ================================ THE PLATE: the chosen session ================================ */
+      .phead {
+        left: 2136px;
+        top: 104px;
+        width: 408px;
+        height: 84px;
+        border-radius: 12px;
+        background: var(--sse-dark-green);
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.14),
+          inset 0 0 0 1px rgba(153, 186, 146, 0.22);
+        padding: 0 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .phead .n {
+        font: 700 28px/1 "PT Sans";
+        color: var(--sse-beige-light);
+        white-space: nowrap;
+      }
+      .phead .s {
+        font: 400 16px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .psec {
+        left: 2136px;
+        width: 408px;
+      }
+      .psec .body {
+        margin-top: 12px;
+      }
+      .field {
+        display: flex;
+        align-items: center;
+        height: 48px;
+        padding: 0 14px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line2);
+      }
+      .field:focus-within {
+        box-shadow: inset 0 0 0 2px var(--sse-beige);
+      }
+      .field input {
+        all: unset;
+        flex: 1;
+        min-width: 0;
+        font: 700 20px/1 "PT Sans";
+        color: var(--text);
+      }
+      .field input::placeholder {
+        font-weight: 400;
+        color: var(--text3);
+      }
+      .phint {
+        margin-top: 10px;
+        font: 400 14px/1.3 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .empty {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 40px;
+        padding-left: 2px;
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .empty .lamp {
+        color: var(--text3);
+      }
+      .radio {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px var(--text3);
+        flex: none;
+      }
+      .radio.on {
+        box-shadow: inset 0 0 0 2px var(--sse-beige);
+        background: radial-gradient(circle, var(--sse-beige) 0 3.5px, transparent 4px);
+      }
+      .ilist .row.pick {
+        cursor: pointer;
+      }
+      .folder {
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .folder .root {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .folder .leaf {
+        margin-top: 8px;
+        font: 700 16px/1.1 "PT Sans";
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .subs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .subs span {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 8px;
+        background: var(--key);
+        box-shadow: inset 0 0 0 1px var(--line2);
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .pbegin {
+        left: 2136px;
+        width: 408px;
+      }
+      .pbegin .key {
+        width: 408px;
+      }
+      .pbegin .note {
+        margin-bottom: 12px;
+        font: 400 14px/1.3 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+
+      /* ================================ THE BOARD'S CORNER, NOTES, TOAST ================================ */
+      .board {
+        position: absolute;
+        left: 16px;
+        bottom: 52px;
+        z-index: 50;
+        font: 400 14px/1.3 "PT Sans";
+        color: #000;
+        background: rgba(237, 235, 209, 0.97);
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        padding: 10px 12px;
+        width: 408px;
+      }
+      .board .r1 {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .board .r1 + .r1 {
+        margin-top: 6px;
+      }
+      .board b {
+        font-weight: 700;
+        width: 64px;
+      }
+      .board button {
+        font: 700 13px/1 "PT Sans";
+        padding: 6px 9px;
+        border: 1px solid #00000040;
+        border-radius: 6px;
+        background: #fff;
+        color: #000;
+        cursor: pointer;
+      }
+      .board button.on {
+        background: #000;
+        color: #edebd1;
+      }
+      .board .hint {
+        margin-top: 8px;
+        color: #333;
+        font-size: 13px;
+      }
+      .pin {
+        position: absolute;
+        z-index: 40;
+        width: 30px;
+        height: 30px;
+        margin: -15px 0 0 -15px;
+        border-radius: 50%;
+        background: var(--sse-beige);
+        color: #000;
+        font: 700 15px/30px "PT Sans";
+        text-align: center;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.65);
+        cursor: help;
+      }
+      .noteb {
+        position: absolute;
+        z-index: 45;
+        max-width: 420px;
+        background: var(--sse-beige);
+        color: #000;
+        font: 400 14px/1.35 "PT Sans";
+        padding: 10px 12px;
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        display: none;
+      }
+      .noteb b {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .toast {
+        position: absolute;
+        left: 1280px;
+        top: 112px;
+        transform: translateX(-50%);
+        z-index: 60;
+        background: var(--sse-beige);
+        color: #000;
+        font: 700 16px/1 "PT Sans";
+        padding: 14px 18px;
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        display: none;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ======================================== HEADER ======================================== -->
+    <header class="abs hdr" id="hdr"></header>
+
+    <!-- ======================================== THE CLUSTER: the status card, the studio ======================================== -->
+    <div class="abs card" id="card">
+      <div class="sd">
+        <div class="top">
+          <span class="lamp" id="sdLamp"></span><span class="word" id="sdWord"></span>
+          <span class="key ico menu" title="Session ⋯ — Sync from TotalMix · Read all cameras again · Setup / Support"
+            ><svg class="dots" viewBox="0 0 20 20">
+              <circle cx="4" cy="10" r="1.8" fill="currentColor" />
+              <circle cx="10" cy="10" r="1.8" fill="currentColor" />
+              <circle cx="16" cy="10" r="1.8" fill="currentColor" /></svg
+          ></span>
+        </div>
+        <p class="sentence" id="sdSentence"></p>
+        <div class="foot"><span class="meta" id="sdMeta"></span><span id="sdWay"></span></div>
+      </div>
+      <div class="latch"><span class="lamp hollow"></span><span>Nothing latched</span></div>
+    </div>
+
+    <section class="abs" style="left: 16px; top: 380px; width: 408px">
+      <div class="shead"><span class="t">The studio</span><span class="d">what each page has set</span></div>
+      <div class="ilist tall" style="margin-top: 12px" id="studio"></div>
+    </section>
+
+    <!-- ======================================== THE BAY: the day, the question, the three doors ======================================== -->
+    <section class="abs title" style="left: 456px; top: 112px; width: 1648px">
+      <div class="kick">Thursday 15 October</div>
+      <div class="q">What are we making today?</div>
+      <div class="sub" id="sub"></div>
+    </section>
+
+    <div class="abs choices" style="left: 456px; top: 256px; width: 1648px" id="choices"></div>
+
+    <section class="abs" style="left: 456px; top: 1128px; width: 1648px">
+      <div class="shead"><span class="t">Recent sessions</span><span class="d" id="recentSub"></span></div>
+      <div class="ilist tall rlist" style="margin-top: 12px" id="recent"></div>
+    </section>
+
+    <!-- ======================================== THE PLATE: the chosen session ======================================== -->
+    <div id="plate"></div>
+
+    <!-- ======================================== FOOTER ======================================== -->
+    <footer class="abs ftr" id="footer"></footer>
+
+    <!-- ======================================== THE BOARD'S CORNER ======================================== -->
+    <div class="board" id="board">
+      <div class="r1">
+        <b>Moment</b><button data-moment="choose">Choose</button><button data-moment="chosen">Chosen</button
+        ><button data-moment="session">In session</button>
+      </div>
+      <div class="r1">
+        <b>Kind</b><button data-kind="green">Green screen</button><button data-kind="podcast">Podcast</button
+        ><button data-kind="webinar">Webinar</button>
+      </div>
+      <div class="r1">
+        <b>Sheet</b><button data-sheet="step1">Step 1</button><button data-sheet="later">Later steps (examples)</button>
+      </div>
+      <div class="r1"><b>Board</b><button id="bNotes">Notes</button></div>
+      <div class="hint">
+        Press a door to choose it, type a name, then Begin. Continue, End session and Sync from TotalMix work too.
+      </div>
+    </div>
+    <div id="notes"></div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      (() => {
+        "use strict";
+        const q = new URLSearchParams(location.search);
+        const $ = (id) => document.getElementById(id);
+        const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
+
+        if (q.get("fit") !== "0") {
+          const fit = () => {
+            document.documentElement.style.zoom = Math.min(1, innerWidth / 2560);
+          };
+          fit();
+          addEventListener("resize", fit);
+        }
+        if (q.get("ui") === "0") $("board").style.display = "none";
+
+        /* ------------------------------------------------------------------ the three kinds ------------------------------------------------------------------ */
+        // The owner's three kinds (2026-10-15). What "Later" shows is an example of what later steps
+        // could put here, nothing decided: the names of scenes, mixes, presets and folders are made up.
+        const KINDS = {
+          green: {
+            tone: "in-green",
+            name: "Green screen recording",
+            full: "Green Screen Recording",
+            short: "Green screen",
+            job: "A presenter at the screen, with the prompter.",
+            suggested: "Strategy in Practice — lecture 4",
+            last: ["Tue 13 Oct", "Strategy in Practice — lecture 3"],
+            sets: [
+              ["Lights", "Green screen, even"],
+              ["Console", "Mix 3 · Lavalier"],
+              ["Cameras", "CAM 1"],
+              ["Prompter", "the script you load"],
+              ["vMix", "Green screen.vmix"],
+            ],
+            presets: [
+              ["Lecture to camera", "CAM 1 · the prompter"],
+              ["Two at the screen", "CAM 1 and CAM 2"],
+              ["Pick-ups", "as the last session"],
+            ],
+            subs: ["Video", "vMix Recording", "Script", "Exports"],
+            checks: [
+              ["The Prompter XL shows the script", "auto", "ok", "on screen"],
+              ["CAM 1's card: over an hour", "auto", "att", "short", "52 min"],
+              ["The screen is lit evenly", "tick"],
+              ["The presenter's microphone on the meter", "tick"],
+            ],
+            does: [
+              "Lighting recalls Green screen, even",
+              "TotalMix loads Mix 3 · Lavalier",
+              "The folder is made",
+              "The Overview opens",
+            ],
+          },
+          podcast: {
+            tone: "in-umber",
+            name: "Podcast recording",
+            full: "Podcast Recording",
+            short: "Podcast",
+            job: "Voices around the table, a camera on each.",
+            suggested: "Leading Through Change — episode 3",
+            last: ["Wed 14 Oct", "Leading Through Change — episode 2"],
+            sets: [
+              ["Lights", "Podcast, warm"],
+              ["Console", "Mix 2 · Three voices"],
+              ["Cameras", "CAM 1 – 3"],
+              ["Prompter", "off"],
+              ["vMix", "Podcast.vmix"],
+            ],
+            presets: [
+              ["Two voices", "CAM 1 and CAM 2 · SM7B 1, 2"],
+              ["Three voices", "CAM 1 – 3 · SM7B 1 – 3"],
+              ["With a remote guest", "N-1 on Playback 5/6"],
+            ],
+            subs: ["Audio", "Video", "vMix Recording", "Exports"],
+            checks: [
+              ["The Console verified", "auto", "sync"],
+              ["CAM 1 – 3 held", "auto", "ok", "held"],
+              ["SM7B 1 – 3 on the meters", "tick"],
+              ["Phones 1 and 2 at the table", "tick"],
+            ],
+            does: [
+              "Lighting recalls Podcast, warm",
+              "TotalMix loads Mix 2 · Three voices",
+              "The folder is made",
+              "The Overview opens",
+            ],
+          },
+          webinar: {
+            tone: "in-slate",
+            name: "Webinar",
+            full: "Webinar",
+            short: "Webinar",
+            job: "Live to an audience online.",
+            suggested: "Markets Outlook, winter",
+            last: ["Fri 9 Oct", "Markets Outlook, autumn"],
+            sets: [
+              ["Lights", "Webinar"],
+              ["Console", "Mix 4 · Stream"],
+              ["Cameras", "CAM 1"],
+              ["Prompter", "off"],
+              ["vMix", "Webinar.vmix"],
+            ],
+            presets: [
+              ["One presenter", "CAM 1"],
+              ["Presenter and slides", "CAM 1 · slides on Playback 9/10"],
+              ["A panel of three", "CAM 1 – 3"],
+            ],
+            subs: ["Slides", "vMix Recording", "Exports"],
+            checks: [
+              ["The Console verified", "auto", "sync"],
+              ["The remote audio on N-1 5/6", "tick"],
+              ["The slides open on the second screen", "tick"],
+              ["vMix's stream set up", "tick"],
+            ],
+            does: [
+              "Lighting recalls Webinar",
+              "TotalMix loads Mix 4 · Stream",
+              "The folder is made",
+              "The Overview opens",
+            ],
+          },
+        };
+        const ORDER = ["green", "podcast", "webinar"];
+
+        const RECENT = [
+          ["Wed 14 Oct", "09:10 – 11:42", "podcast", "Leading Through Change — episode 2", "3 takes"],
+          ["Tue 13 Oct", "13:30 – 15:05", "green", "Strategy in Practice — lecture 3", "7 takes"],
+          ["Fri 9 Oct", "10:00 – 11:10", "webinar", "Markets Outlook, autumn", "live 64 min"],
+          ["Thu 8 Oct", "14:00 – 16:20", "green", "Strategy in Practice — lecture 2", "9 takes"],
+          ["Mon 5 Oct", "09:30 – 12:05", "podcast", "Leading Through Change — episode 1", "4 takes"],
+        ];
+
+        /* ------------------------------------------------------------------ the state ------------------------------------------------------------------ */
+        const S = {
+          sheet: pick(q.get("sheet"), ["step1", "later"], "step1"),
+          selected: null,
+          running: null,
+          synced: false,
+          clock: "09:14",
+          names: { green: "", podcast: "", webinar: "" },
+          preset: { green: 0, podcast: 1, webinar: 1 },
+          ticks: {},
+        };
+        function load(moment, kind) {
+          S.moment = moment;
+          S.running = null;
+          S.selected = null;
+          S.synced = false;
+          S.clock = "09:14";
+          S.names = { green: "", podcast: "", webinar: "" };
+          if (moment === "chosen") {
+            S.selected = kind;
+            S.names[kind] = KINDS[kind].suggested;
+          }
+          if (moment === "session") {
+            S.selected = kind;
+            S.synced = true;
+            S.clock = "09:41";
+            S.running = { kind, name: KINDS[kind].suggested, since: "09:16" };
+          }
+        }
+        load(pick(q.get("moment"), ["choose", "chosen", "session"], "choose"), pick(q.get("kind"), ORDER, "podcast"));
+
+        /* ------------------------------------------------------------------ small parts ------------------------------------------------------------------ */
+        const lw = (tone, word) =>
+          `<span class="lw ${tone}"><span class="lamp${tone === "off" ? " hollow" : ""}"></span><span class="cap">${word}</span></span>`;
+        const row = (lab, val, n = "") =>
+          `<div class="row"><span class="lab">${lab}</span><span class="val"><span>${val}</span>${n ? `<span class="n">${n}</span>` : ""}</span></div>`;
+        const empty = (text, tip) =>
+          `<div class="empty" title="${tip}"><span class="lamp hollow"></span><span>${text}</span></div>`;
+        const shead = (t, d = "") =>
+          `<div class="shead"><span class="t">${t}</span>${d ? `<span class="d">${d}</span>` : ""}</div>`;
+        let toastTimer = 0;
+        function toast(text) {
+          const T = $("toast");
+          T.textContent = text;
+          T.style.display = "block";
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => {
+            T.style.display = "none";
+          }, 3200);
+        }
+
+        /* ------------------------------------------------------------------ the drawings ------------------------------------------------------------------ */
+        // Each in a 480 × 330 frame, light lines on the door's recess: what the studio looks like
+        // in that session. `w` fills hide what stands behind; `a` and `a2` are the door's accent.
+        const arc = (cx, cy, r, a1, a2) => {
+          const p = (a) => [cx + r * Math.cos((a * Math.PI) / 180), cy + r * Math.sin((a * Math.PI) / 180)];
+          const [x1, y1] = p(a1),
+            [x2, y2] = p(a2);
+          return `M${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+        };
+        const softbox = (x, dir) => {
+          // a light on its stand; dir 1 faces right, −1 faces left
+          const X = (d) => x + d * dir;
+          return (
+            `<path class="s" d="M${X(0)} 316 L${X(0)} 178"/>` +
+            `<path class="s t" d="M${X(0)} 300 L${X(-14)} 316 M${X(0)} 300 L${X(14)} 316"/>` +
+            `<path class="w s" d="M${X(-18)} 130 L${X(22)} 108 L${X(22)} 184 L${X(-18)} 162 Z"/>` +
+            `<path class="lit" d="M${X(22)} 108 L${X(22)} 184 L${X(52)} 196 L${X(52)} 96 Z"/>` +
+            `<path class="s" style="stroke-width:4" d="M${X(22)} 110 L${X(22)} 182"/>`
+          );
+        };
+        const tripodCamera = (x, dir) =>
+          // a camera on its tripod, its lens towards the middle (dir 1 faces right, −1 left)
+          `<path class="s" d="M${x} 252 L${x} 272 M${x} 272 L${x - 16} 316 M${x} 272 L${x + 16} 316 M${x} 272 L${x} 316"/>` +
+          `<rect class="w s" x="${x - 20}" y="224" width="40" height="28" rx="5"/>` +
+          `<rect class="w s" x="${dir > 0 ? x + 20 : x - 32}" y="230" width="12" height="16" rx="3"/>`;
+        const person = (cx, cy, base) =>
+          `<path class="w s" d="M${cx - 38} ${base} C${cx - 38} ${cy + 52} ${cx - 26} ${cy + 36} ${cx} ${cy + 34} C${cx + 26} ${cy + 36} ${cx + 38} ${cy + 52} ${cx + 38} ${base} Z"/>` +
+          `<circle class="w s" cx="${cx}" cy="${cy}" r="18"/>`;
+
+        const DRAW = {
+          green: () =>
+            `<svg class="pict" viewBox="0 0 480 330" aria-hidden="true">` +
+            `<path class="s t q" d="M20 316 H460"/>` +
+            // the screen: its wall and the sweep into the floor
+            `<path class="a s" d="M100 250 V46 Q100 34 112 34 H368 Q380 34 380 46 V250"/>` +
+            `<path class="a2 s" d="M100 250 C100 272 90 286 72 296 H408 C390 286 380 272 380 250 Z"/>` +
+            softbox(56, 1) +
+            softbox(424, -1) +
+            // the presenter
+            `<path class="w s" d="M202 284 C202 224 206 194 214 182 C222 170 230 166 240 166 C250 166 258 170 266 182 C274 194 278 224 278 284 Z"/>` +
+            `<circle class="w s" cx="240" cy="134" r="20"/>` +
+            `<path class="s t" d="M231 167 L240 180 L249 167"/>` +
+            // the camera with the prompter's hood, seen from behind
+            `<rect class="w s" x="214" y="226" width="52" height="22" rx="4"/>` +
+            `<rect class="w s" x="190" y="246" width="100" height="34" rx="5"/>` +
+            `<path class="s t q" d="M200 263 H280"/>` +
+            `<path class="s" d="M240 280 L240 292 M240 292 L214 316 M240 292 L266 316 M240 292 L240 316"/>` +
+            `</svg>`,
+          podcast: () => {
+            const people = [
+              [132, 138],
+              [240, 126],
+              [348, 138],
+            ];
+            let s =
+              `<svg class="pict" viewBox="0 0 480 330" aria-hidden="true">` + `<path class="s t q" d="M20 316 H460"/>`;
+            for (const [cx, cy] of people) {
+              s += person(cx, cy, 236);
+              // headphones
+              s += `<path class="s" d="M${cx - 22} ${cy + 4} A22 22 0 0 1 ${cx + 22} ${cy + 4}"/>`;
+              s += `<rect class="a s t" x="${cx - 27}" y="${cy - 6}" width="9" height="18" rx="4"/>`;
+              s += `<rect class="a s t" x="${cx + 18}" y="${cy - 6}" width="9" height="18" rx="4"/>`;
+            }
+            // the round table: the people sit behind it
+            s += `<ellipse class="w s" cx="240" cy="234" rx="170" ry="20"/>`;
+            s += `<path class="s" d="M240 254 V298"/><ellipse class="s" cx="240" cy="304" rx="52" ry="8"/>`;
+            // a microphone on its arm before each voice
+            for (const [cx, cy] of people) {
+              s += `<path class="s t" d="M${cx + 25} ${cy + 58} L${cx + 46} ${cy + 78} L${cx + 46} 218"/>`;
+              s += `<rect class="a s" x="${cx + 8}" y="${cy + 26}" width="15" height="36" rx="7.5" transform="rotate(-26 ${cx + 15.5} ${cy + 44})"/>`;
+            }
+            s += tripodCamera(44, 1) + tripodCamera(436, -1);
+            return s + `</svg>`;
+          },
+          webinar: () => {
+            let s =
+              `<svg class="pict" viewBox="0 0 480 330" aria-hidden="true">` + `<path class="s t q" d="M20 316 H460"/>`;
+            // the audience online, on the screen
+            s += `<rect class="a s" x="244" y="48" width="208" height="136" rx="8"/>`;
+            const tw = (188 - 12) / 3,
+              th = (116 - 6) / 2;
+            for (let j = 0; j < 2; j++)
+              for (let i = 0; i < 3; i++) {
+                const x0 = 254 + i * (tw + 6),
+                  y0 = 58 + j * (th + 6);
+                s += `<rect class="a2" x="${x0.toFixed(1)}" y="${y0}" width="${tw.toFixed(1)}" height="${th}" rx="4"/>`;
+                s += `<circle class="s t" cx="${(x0 + tw / 2).toFixed(1)}" cy="${y0 + 21}" r="8"/>`;
+                s += `<path class="s t" d="M${(x0 + 13).toFixed(1)} ${y0 + 50} Q${(x0 + tw / 2).toFixed(1)} ${y0 + 30} ${(x0 + tw - 13).toFixed(1)} ${y0 + 50}"/>`;
+              }
+            // live: the signal over the screen
+            s += `<circle class="dot" cx="348" cy="32" r="3.5"/>`;
+            for (const r of [10, 18, 26]) s += `<path class="s t" d="${arc(348, 32, r, 212, 328)}"/>`;
+            // the presenter at the desk, with the laptop and a microphone
+            s += person(150, 126, 214);
+            s += `<path class="a2 s" d="M170 178 H230 L226 214 H174 Z"/>`;
+            s += `<rect class="a s" x="114" y="182" width="13" height="24" rx="6.5"/><path class="s t" d="M120.5 206 V214"/>`;
+            s += `<rect class="w s" x="44" y="212" width="226" height="14" rx="4"/>`;
+            s += `<path class="s" d="M62 226 V316 M252 226 V316"/>`;
+            return s + `</svg>`;
+          },
+        };
+
+        /* ------------------------------------------------------------------ the header ------------------------------------------------------------------ */
+        function renderHeader() {
+          const tab = (name, st, on = false) => {
+            const cls = `tab${on ? " on" : ""}`;
+            if (!st) return `<span class="${cls}"><span>${name}</span></span>`;
+            return `<span class="${cls}"><span>${name}</span><span class="st"><span class="lamp ${st[0]}"></span><span class="w ${st[0]}">${st[1]}</span></span></span>`;
+          };
+          const pages =
+            tab("Session", null, true) +
+            tab("Overview") +
+            tab("Lighting", ["ok", "ready"]) +
+            tab("Audio", S.synced ? ["ok", "ready"] : ["att", "assumed"]) +
+            tab("Cameras", ["ok", "ready"]) +
+            tab("Teleprompter", ["ok", "ready"]);
+          const system =
+            `<span class="chip">Surface<span class="lamp ok"></span><span class="w ok">ready</span></span>` +
+            tab("Setup / Support");
+          $("hdr").innerHTML =
+            `<img class="logo" src="sse-exed-horizontal-white.png" alt="SSE Executive Education">` +
+            `<span class="rule"></span>` +
+            `<span class="hstrip" id="pagesPlatter">${pages}</span><span class="sp"></span>` +
+            `<span class="hstrip">${system}</span>` +
+            `<div class="tally"><div><span class="lamp hollow"></span><span class="nm">Rec</span></div></div>` +
+            `<span class="clock">${S.clock}</span>`;
+        }
+
+        /* ------------------------------------------------------------------ the cluster ------------------------------------------------------------------ */
+        function renderCluster() {
+          const sd = S.synced
+            ? {
+                tone: "ok",
+                word: "Ready",
+                sentence: "Every link answers. Nothing on any page needs you.",
+                meta: "8 of 8 links answer · synced 09:15",
+                way: "",
+              }
+            : {
+                tone: "att",
+                word: "Assumed",
+                sentence: "Console: the strips may not match TotalMix since the start.",
+                meta: "since 09:05",
+                way: "Sync from TotalMix",
+              };
+          const c = { ok: "var(--sse-green)", att: "var(--sse-yellow)" }[sd.tone];
+          $("sdLamp").style.background = c;
+          $("sdWord").style.color = c;
+          $("sdWord").textContent = sd.word;
+          $("sdSentence").textContent = sd.sentence;
+          $("sdMeta").textContent = sd.meta;
+          $("sdWay").innerHTML = sd.way ? `<span class="key primary" id="way">${sd.way}</span>` : "";
+          if (sd.way)
+            $("way").addEventListener("click", () => {
+              S.synced = true;
+              render();
+            });
+          const r = (lab, val, word, doubt = false) =>
+            `<div class="row"><span class="lab" style="width:104px">${lab}</span><span style="font-weight:700"><span class="${doubt ? "doubtv" : ""}">${val}</span></span><span class="sp"></span>${word}</div>`;
+          $("studio").innerHTML =
+            r("Lighting", "Warm wash · 3 of 4 lit", lw("ok", "on rig")) +
+            r("Console", "Mix 1", S.synced ? lw("ok", "active") : lw("att", "assumed"), !S.synced) +
+            r("Cameras", "CAM 1 · card 52 min", lw("ok", "held")) +
+            r("Prompter XL", "1920×1080 · 60 Hz", lw("ok", "on screen")) +
+            r("Pictures", "NDI from vMix · 3 of 3", lw("ok", "live")) +
+            r("Deck", "the LIGHTS page", lw("ok", "ready"));
+        }
+
+        /* ------------------------------------------------------------------ the bay ------------------------------------------------------------------ */
+        function renderBay() {
+          $("sub").textContent = S.running
+            ? `${KINDS[S.running.kind].full} is in session since ${S.running.since}. Continue it on the right, or choose another to begin it instead.`
+            : "Choose one. Its options open on the right, and nothing in the studio changes until you begin.";
+          $("choices").innerHTML = ORDER.map((id) => {
+            const k = KINDS[id];
+            const running = S.running && S.running.kind === id;
+            const selected = S.selected === id;
+            let rows;
+            if (S.sheet === "later") {
+              rows =
+                `<div class="ckick">Sets up</div><div class="ilist">` +
+                k.sets.map(([l, v]) => row(l, v)).join("") +
+                `</div>`;
+            } else {
+              rows = `<div class="ilist tall">${row("Last session", `${k.last[0]} · ${k.last[1]}`)}</div>`;
+            }
+            const badge = running
+              ? `<span class="badge">${lw("ok", "in session")}<span>since ${S.running.since}</span></span>`
+              : "";
+            // The whole door is the key: no key of its own inside it. Chosen, it takes the Beige keyline.
+            return (
+              `<div class="choice ${k.tone}${selected ? " selected" : ""}" data-kind-door="${id}" role="button" tabindex="0" aria-pressed="${selected}" aria-label="${k.full}">` +
+              `<div class="stage">${DRAW[id]()}</div>${badge}` +
+              `<div class="cname">${k.full}</div>` +
+              `<div class="cjob">${k.job}</div>` +
+              `<div class="crows">${rows}</div>` +
+              `</div>`
+            );
+          }).join("");
+          document.querySelectorAll("[data-kind-door]").forEach((el) => {
+            const choose = () => {
+              S.selected = el.dataset.kindDoor;
+              if (!S.running) S.moment = "chosen";
+              if (!S.names[S.selected] && !(S.running && S.running.kind === S.selected))
+                S.names[S.selected] = KINDS[S.selected].suggested;
+              render();
+            };
+            el.addEventListener("click", choose);
+            el.addEventListener("keydown", (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                choose();
+              }
+            });
+          });
+
+          $("recentSub").textContent =
+            S.sheet === "later" ? "the last five, with their takes" : "the last five, from the hardware link's log";
+          $("recent").innerHTML = RECENT.map(([day, time, kind, name, takes]) => {
+            const k = KINDS[kind];
+            const end =
+              S.sheet === "later"
+                ? `<span class="end"><span>${takes}</span><span class="door">Again<span class="ar">→</span></span></span>`
+                : `<span class="end"></span>`;
+            return (
+              `<div class="row"><span class="day">${day}</span><span class="time">${time}</span>` +
+              `<span class="kind ${k.tone}"><span class="tag"></span>${k.short}</span>` +
+              `<span class="nm">${name}</span>${end}</div>`
+            );
+          }).join("");
+        }
+
+        /* ------------------------------------------------------------------ the plate ------------------------------------------------------------------ */
+        function renderPlate() {
+          const P = $("plate");
+          const later = S.sheet === "later";
+          const at = (top, html, cls = "psec") => `<section class="abs ${cls}" style="top:${top}px">${html}</section>`;
+          const head = (n, s) => `<div class="abs phead"><span class="n">${n}</span><span class="s">${s}</span></div>`;
+
+          if (!S.selected) {
+            P.innerHTML =
+              head("Today's session", "Thursday 15 October · none begun") +
+              at(
+                212,
+                shead("Choose one") +
+                  `<div class="body">${empty("Choose what you are making today.", "Press one of the three doors. Its options open here; nothing in the studio changes until Begin.")}` +
+                  `<p class="phint">Its name, presets, folder and checks open here.</p></div>`
+              );
+            return;
+          }
+
+          const k = KINDS[S.selected];
+          const isRunning = S.running && S.running.kind === S.selected;
+          const other = S.running && !isRunning ? KINDS[S.running.kind] : null;
+          const laterLine = (what) =>
+            empty(
+              "Defined in a later step",
+              `${what} come${what.endsWith("s") ? "" : "s"} in a later step of the Session page.`
+            );
+          let h = head(
+            k.full,
+            isRunning ? `In session since ${S.running.since} · Thursday 15 October` : "Thursday 15 October · not begun"
+          );
+
+          // NAME
+          if (isRunning) {
+            h += at(
+              212,
+              shead("Name") +
+                `<div class="body"><div class="ilist tall">${row("Name", S.running.name || "none given")}</div></div>`
+            );
+          } else {
+            h += at(
+              212,
+              shead("Name", "optional") +
+                `<div class="body"><label class="field"><input id="nameIn" maxlength="80" placeholder="Name this session" value="${S.names[S.selected].replace(/"/g, "&quot;")}"></label>` +
+                `<p class="phint">${later ? "It names the session and its folder." : "It names the session in the hardware link's log."}</p></div>`
+            );
+          }
+
+          // PRESET, FOLDER, BEFORE YOU ROLL
+          if (!later) {
+            const y = isRunning ? 330 : 360;
+            h += at(y, shead("Preset", "what it sets up") + `<div class="body">${laterLine("Presets")}</div>`);
+            h += at(
+              y + 110,
+              shead("Folder", "made when it begins") + `<div class="body">${laterLine("Folders")}</div>`
+            );
+            h += at(y + 220, shead("Before you roll", "checks") + `<div class="body">${laterLine("Checks")}</div>`);
+          } else {
+            const y = isRunning ? 330 : 360;
+            const presets = isRunning ? [k.presets[S.preset[S.selected]]] : k.presets;
+            h += at(
+              y,
+              shead("Preset", "what it sets up") +
+                `<div class="body"><div class="ilist tall">` +
+                presets
+                  .map((p, i) => {
+                    const on = isRunning || i === S.preset[S.selected];
+                    return `<div class="row pick" data-preset="${i}"><span class="radio${on ? " on" : ""}"></span><span style="font-weight:700">${p[0]}</span><span class="sp"></span><span style="color:var(--text2);font-size:14px">${p[1]}</span></div>`;
+                  })
+                  .join("") +
+                `</div></div>`
+            );
+            const fy = y + (isRunning ? 112 : 196);
+            const leaf = `${(isRunning ? S.running.name : S.names[S.selected]) || k.full} (2026-10-15)`;
+            h += at(
+              fy,
+              shead("Folder", isRunning ? "made at 09:16" : "made when it begins") +
+                `<div class="body"><div class="folder"><div class="root">D:\\Sessions\\</div><div class="leaf">${leaf}</div></div>` +
+                `<div class="subs">${k.subs.map((x) => `<span>${x}</span>`).join("")}</div></div>`
+            );
+            const cy = fy + 176;
+            h += at(
+              cy,
+              shead("Before you roll", "checks") +
+                `<div class="body"><div class="ilist tall">` +
+                k.checks
+                  .map(([label, how, tone, word, value], i) => {
+                    let right;
+                    // Adelia never carries a number (DESIGN.md §3): the value stands beside the word in PT Sans.
+                    if (how === "auto" && tone === "sync")
+                      right = S.synced ? lw("ok", "verified") : lw("att", "assumed");
+                    else if (how === "auto")
+                      right = (value ? `<span style="font-weight:700">${value}</span>` : "") + lw(tone, word);
+                    else
+                      right = S.ticks[`${S.selected}:${i}`]
+                        ? `<span class="key small" data-tick="${i}">${lw("ok", "checked")}</span>`
+                        : `<span class="key small" data-tick="${i}">Tick</span>`;
+                    return `<div class="row"><span class="lab" style="overflow:hidden;text-overflow:ellipsis">${label}</span><span class="sp"></span>${right}</div>`;
+                  })
+                  .join("") +
+                `</div></div>`
+            );
+          }
+
+          // WHEN IT BEGINS (or SO FAR), and the keys
+          if (isRunning) {
+            const so = [
+              ["Begun", `${S.running.since} today`],
+              later ? ["Takes in this session", "2 · 14 min"] : ["Takes today", "none yet"],
+            ];
+            h += at(
+              1106,
+              shead("So far") +
+                `<div class="body"><div class="ilist">${so.map(([l, v]) => row(l, v)).join("")}</div></div>`
+            );
+            h +=
+              `<section class="abs pbegin" style="top:1240px"><span class="key large" id="endKey">End session</span></section>` +
+              `<section class="abs pbegin" style="top:1320px"><span class="key primary tall stack" id="contKey"><span class="cap">Continue</span><span class="hint">on the Overview</span></span></section>`;
+          } else {
+            const does = later
+              ? [...k.does]
+              : ["The hardware link notes the session", "Nothing in the studio changes", "The Overview opens"];
+            if (other) does.unshift(`The ${other.short} session ends`);
+            const top = 1296 - 40 - does.length * 34;
+            h += at(
+              top,
+              shead("When it begins") +
+                `<div class="body"><div class="ilist">${does.map((d) => `<div class="row"><span class="lab">${d}</span></div>`).join("")}</div></div>`
+            );
+            h += `<section class="abs pbegin" style="top:1320px"><span class="key primary tall stack" id="beginKey"><span class="cap">${other ? `Begin ${k.short} instead` : "Begin session"}</span><span class="hint">${other ? `ends ${other.short} · opens the Overview` : `${k.full} · opens the Overview`}</span></span></section>`;
+          }
+          P.innerHTML = h;
+
+          const nameIn = $("nameIn");
+          if (nameIn)
+            nameIn.addEventListener("input", () => {
+              S.names[S.selected] = nameIn.value;
+              if (later) {
+                const leaf = document.querySelector(".folder .leaf");
+                if (leaf) leaf.textContent = `${nameIn.value || k.full} (2026-10-15)`;
+              }
+            });
+          P.querySelectorAll("[data-preset]").forEach((el) =>
+            el.addEventListener("click", () => {
+              if (isRunning) return;
+              S.preset[S.selected] = Number(el.dataset.preset);
+              renderPlate();
+            })
+          );
+          P.querySelectorAll("[data-tick]").forEach((el) =>
+            el.addEventListener("click", () => {
+              const key = `${S.selected}:${el.dataset.tick}`;
+              S.ticks[key] = !S.ticks[key];
+              renderPlate();
+            })
+          );
+          if ($("beginKey"))
+            $("beginKey").addEventListener("click", () => {
+              S.running = { kind: S.selected, name: S.names[S.selected], since: "09:16" };
+              S.moment = "session";
+              S.clock = "09:16";
+              render();
+              toast("In the app, Begin opens the Overview. The board stays here to show the session.");
+            });
+          if ($("contKey"))
+            $("contKey").addEventListener("click", () => toast("In the app, Continue opens the Overview."));
+          if ($("endKey"))
+            $("endKey").addEventListener("click", () => {
+              const was = KINDS[S.running.kind].full;
+              S.running = null;
+              S.selected = null;
+              S.moment = "choose";
+              render();
+              toast(`${was} ended. The page waits for the next session.`);
+            });
+        }
+
+        /* ------------------------------------------------------------------ the footer ------------------------------------------------------------------ */
+        function renderFooter() {
+          const it = (l, v) => `<span class="item"><span>${l}</span><span class="v">${v}</span></span>`;
+          $("footer").innerHTML =
+            it("Takes today", S.running && S.sheet === "later" ? "2 · 14 min" : "none yet · 4 yesterday") +
+            it("Last sync", S.synced ? "09:15" : "none since the start") +
+            it("Backup", "today 09:12") +
+            `<span class="colophon">Studio Control</span>`;
+        }
+
+        /* ------------------------------------------------------------------ render, the corner ------------------------------------------------------------------ */
+        function markBoard() {
+          document
+            .querySelectorAll("[data-moment]")
+            .forEach((b) => b.classList.toggle("on", b.dataset.moment === S.moment));
+          const kind = S.selected || (S.running && S.running.kind);
+          document.querySelectorAll("[data-kind]").forEach((b) => b.classList.toggle("on", b.dataset.kind === kind));
+          document
+            .querySelectorAll("[data-sheet]")
+            .forEach((b) => b.classList.toggle("on", b.dataset.sheet === S.sheet));
+        }
+        function render() {
+          renderHeader();
+          renderCluster();
+          renderBay();
+          renderPlate();
+          renderFooter();
+          markBoard();
+          placeNotes();
+        }
+        document.querySelectorAll("[data-moment]").forEach((b) =>
+          b.addEventListener("click", () => {
+            load(b.dataset.moment, S.selected || (S.running && S.running.kind) || "podcast");
+            render();
+          })
+        );
+        document.querySelectorAll("[data-kind]").forEach((b) =>
+          b.addEventListener("click", () => {
+            load(S.moment === "choose" ? "chosen" : S.moment, b.dataset.kind);
+            render();
+          })
+        );
+        document.querySelectorAll("[data-sheet]").forEach((b) =>
+          b.addEventListener("click", () => {
+            S.sheet = b.dataset.sheet;
+            render();
+          })
+        );
+
+        /* ------------------------------------------------------------------ the notes (numbered as in session.md) ------------------------------------------------------------------ */
+        const NOTES = [
+          [
+            250,
+            30,
+            "The Session tab",
+            "First on the pages' platter: the day starts here. The app lands on it at every start; the open page's Dark Green segment. Measured in the app's fullest header (every page's longest word and every chip): 110 px to spare today; the tab is 77 px wide, which leaves 31 px (the shell's test asks for 16).",
+          ],
+          [
+            16,
+            104,
+            "The status card, as the Overview's",
+            "The worst page's word, its sentence and its way out: the check before a session. The Console is ASSUMED until a Sync here; nothing stops a session from beginning.",
+          ],
+          [
+            16,
+            380,
+            "The studio at a glance",
+            "What each page has set, with its lamp: the rig's scene, the Console's mix, CAM 1 and its card, the Prompter XL, the pictures, the deck.",
+          ],
+          [
+            456,
+            112,
+            "The day and one question",
+            "The date and the question in Adelia, the page's title. The line under it promises that choosing changes nothing; only Begin acts.",
+          ],
+          [
+            456,
+            256,
+            "Three doors",
+            "One raised panel for each kind, the whole panel a key, in a tone of its own: green, umber and slate, the Overview's rooms' tones, identity and not status. Chosen, it takes the Beige selection keyline and its options open on the plate.",
+          ],
+          [
+            1018,
+            300,
+            "Drawn, not photographed",
+            "Each drawing shows the studio as that session uses it: the presenter at the green screen behind the prompter's camera; voices round the table, a microphone and a camera on each; a presenter and an audience online. Light lines in the door's recess; nothing in them to read.",
+          ],
+          [
+            1018,
+            1066,
+            "The door's foot",
+            "Step 1: the last session of the kind, from the hardware link's log. Later steps: what the session sets up (press Later steps in the corner). The whole door is the key, so it holds no key of its own.",
+          ],
+          [
+            456,
+            1128,
+            "Recent sessions",
+            "The last five, from the log: the day, the times, the kind's tag, the name. Later: the takes of each, and Again to begin the next of a series under the same name.",
+          ],
+          [
+            2136,
+            104,
+            "The plate holds the choice",
+            "As on every page, the plate is the selection: the kind's name as the owner wrote it on the Dark Green title plate, the day under it.",
+          ],
+          [
+            2136,
+            360,
+            "Places for the later steps",
+            "Preset, Folder and Before you roll stand in step 1 as places with one quiet line each, so the page's shape is settled now and filled step by step.",
+          ],
+          [
+            2136,
+            1150,
+            "What Begin will do",
+            "Listed before the press: in step 1 the hardware link notes the session and the Overview opens; later the rig's scene, TotalMix's mix and the folder. While a session runs, another door's Begin ends it first, and says so.",
+          ],
+          [
+            2136,
+            1340,
+            "Begin, then the Overview",
+            "The one primary key, at the plate's foot. A session lasts until End session or until another begins; no clock ends it. In session the plate offers Continue (to the Overview) and End session.",
+          ],
+          [14, 1404, "The footer", "The day so far, as on the Overview: takes today, the last Sync, the backup."],
+        ];
+        function placeNotes() {
+          const box = $("notes");
+          box.innerHTML = "";
+          if (!$("bNotes").classList.contains("on")) return;
+          NOTES.forEach(([x, y, title, text], i) => {
+            const pin = document.createElement("div");
+            pin.className = "pin";
+            pin.style.left = x + "px";
+            pin.style.top = y + "px";
+            pin.textContent = i + 1;
+            const note = document.createElement("div");
+            note.className = "noteb";
+            note.innerHTML = `<b>${i + 1} · ${title}</b>${text}`;
+            note.style.left = Math.min(2560 - 440, x + 20) + "px";
+            note.style.top = Math.min(1440 - 180, y + 20) + "px";
+            pin.addEventListener("mouseenter", () => {
+              note.style.display = "block";
+            });
+            pin.addEventListener("mouseleave", () => {
+              note.style.display = "none";
+            });
+            box.append(pin, note);
+          });
+        }
+        $("bNotes").addEventListener("click", () => {
+          $("bNotes").classList.toggle("on");
+          placeNotes();
+        });
+        if (q.get("notes") === "1") $("bNotes").classList.add("on");
+
+        /* ------------------------------------------------------------------ the report: what is cut ------------------------------------------------------------------ */
+        window.__report = () => {
+          const cut = [...document.querySelectorAll("body *")]
+            .filter((el) => {
+              if (el.closest(".board") || el.closest("#notes") || el.closest(".pict")) return false;
+              const cs = getComputedStyle(el);
+              if (cs.display === "none" || !el.textContent.trim()) return false;
+              return (
+                (cs.whiteSpace === "nowrap" || cs.textOverflow === "ellipsis") &&
+                el.scrollWidth > el.clientWidth + 1 &&
+                el.children.length === 0
+              );
+            })
+            .map((el) => `${el.className || el.tagName}: ${el.textContent.trim().slice(0, 50)}`);
+          const names = [...document.querySelectorAll(".cname, .cjob")].map((el) => ({
+            text: el.textContent,
+            spare: Math.round(el.clientWidth - el.scrollWidth),
+          }));
+          const pages = $("pagesPlatter").getBoundingClientRect();
+          return { moment: S.moment, sheet: S.sheet, cut, names, pagesRight: Math.round(pages.right) };
+        };
+
+        Promise.all(
+          ["700 40px 'SSE Adelia'", "400 16px 'PT Sans'", "700 16px 'PT Sans'", "italic 400 20px 'PT Serif'"].map((f) =>
+            document.fonts.load(f)
+          )
+        )
+          .catch(() => null)
+          .then(() => document.fonts.ready)
+          .then(render);
+      })();
+    </script>
+  </body>
+</html>

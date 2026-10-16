@@ -10,11 +10,24 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] F5, Ctrl+R, Ctrl+Shift+R, Ctrl+P and Ctrl+F do nothing.
 - [ ] Esc closes a dialog and cancels an armed key.
 - [ ] Alt+F4 asks first; Cancel keeps the session, and Confirm leaves no `studio-control-engine.exe` in Task Manager.
-- [ ] The app opens on the Overview, also after a restart on another page; Setup / Support's `Publish` and its `⋯` › `Back to the Overview` open it too (since 2026-10-09, D47).
-- [ ] The header (the skylight, D48): the SSE logotype at the left; `Overview`, `Lighting`, `Audio`, `Cameras` and `Teleprompter` on one platter, the open page in dark green; `Surface` and `Setup / Support` on a second platter at the right; `REC` on its own; the clock last; `Studio Control` ends the footer, and nothing says Planning.
+- [ ] The app opens on the Session page, also after a restart on another page (since 2026-10-15, D51; on the Overview from D47); Setup / Support's `Publish` and its `⋯` › `Back to the Overview` still open the Overview.
+- [ ] The header (the skylight, D48): the SSE logotype at the left; `Session`, `Overview`, `Lighting`, `Audio`, `Cameras` and `Teleprompter` on one platter, the open page in dark green; `Surface` and `Setup / Support` on a second platter at the right; `REC` on its own; the clock last; `Studio Control` ends the footer, and nothing says Planning.
 - [ ] `Studio fullscreen` and `Reset the window layout`, in Setup / Support › Workstation, each put the window back fullscreen.
 - [ ] From the chair, the header is one row, taller than in the last build (88 px, 80 before; finding 6 of the walk of 2026-10-07), and every lamp can be read, in Setup too. The Console's plate and the cameras' pictures still fit under it.
 - [ ] Hovering moves nothing, and on an idle screen only the meters move.
+
+## The Session page
+
+- [ ] The three Rooms come in once after the start, and not again on a return to the page; under the pointer a Room's light comes on (the skylight, the soft lights, the pendant, the screen of faces) and nothing moves.
+- [ ] A Room opens its window from the Room, its name field ready to type in; `Esc`, `Cancel` and a press on the dimmed page close it back into its Room. With the window open the header's tabs still work above it, and one opens its page.
+- [ ] `Use this name` puts the last session's name in the field, and a name typed instead is the one the platter shows later; Enter in the field does nothing.
+- [ ] With the Console not yet synced, the window says `ASSUMED` with `Console: …` and `Sync from TotalMix`; one press syncs, and the note goes.
+- [ ] `Begin session` opens the Overview, and the deck turns to `PROMPTER` as before; back on Session, the Room is lit, reads `IN SESSION · since …`, and the platter under the question says the kind, the name and since when; its `Continue` opens the Overview.
+- [ ] The running Room's window shows the name and when it began; `End session` ends it, the Room's light goes off and the platter goes.
+- [ ] With a session running, another Room's window names it and its key reads `Begin instead`; a press ends the running one and begins the new one.
+- [ ] A restart of the app keeps the running session: it opens on Session with the Room lit and the platter.
+- [ ] Setup / Support's Recent actions show each begin and end (`Session begun: Podcast Recording · …`, `Session ended: …`).
+- [ ] While the Session page is open the deck stays on the page it was on.
 
 ## The Overview
 

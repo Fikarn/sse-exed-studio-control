@@ -22,11 +22,13 @@ Every page is one grid: **header · cluster · bay · plate · footer**, 88 · 4
 | Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                              |  440 wide |
 | Footer        | the raised bar: telemetry as `Label value` items, one action key, and the product's name as the colophon                                                       |   40 high |
 
-The header is the skylight (D48, 2026-10-09): one raised bar, a step lighter than the page (`--material-bar`) and closed by a line (`--material-bar-line`), with no gradient. It reads left to right: the SSE logotype alone at the frame's 32 px margin, 40 px high with half its height clear on every side, then a rule; the pages on one platter (radius 12, `--material-platter`, the light edge, 4 px in from its edge, a hairline between two segments that are not the open one), Overview · Lighting · Audio · Cameras · Teleprompter, the names bold in the second ink, each page's tab carrying its page's lamp and state word (16 px), the Overview's none (it shows every page) and the open page's none, because its state display says it, though it keeps the word's room (drawn unseen after its name), so no tab moves when the page changes; the open page is the one Dark Green segment (radius 8), its name in Beige Light, and the only tint in the header; the room left over; the system's own things on a second platter: the deck's lamp, `Surface`, a `Backup` chip only while the automatic backup failed or is overdue, the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself and all of them off the Overview, which shows every page's (on Lighting, which has a Solo of its own, the Console's reads `AUDIO SOLO`), and `Setup / Support` last, so it stays put while a latch comes, goes or changes its word; the `REC` tally on a platter of its own that never moves, quiet at rest, a coral edge on a faint coral tint while CAM 1 records, a dashed yellow edge while what it says is last known; and the clock at the right margin. The product's name stands nowhere in the header: beside the logotype it would read as a lockup, which the brand does not allow. It ends the footer instead, as its colophon: SSE Adelia at 14 px, tracked `0.14em`, in the quiet ink. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer; no tab is the current one, and a lamp never read is hollow and says `pending`, or `not read` after a start that failed. Density never comes from the type; the sizes stay.
+The header is the skylight (D48, 2026-10-09): one raised bar, a step lighter than the page (`--material-bar`) and closed by a line (`--material-bar-line`), with no gradient. It reads left to right: the SSE logotype alone at the frame's 32 px margin, 40 px high with half its height clear on every side, then a rule; the pages on one platter (radius 12, `--material-platter`, the light edge, 4 px in from its edge, a hairline between two segments that are not the open one), Session · Overview · Lighting · Audio · Cameras · Teleprompter, the names bold in the second ink, each page's tab carrying its page's lamp and state word (16 px), the Session page's and the Overview's none (the one begins a session, the other shows every page) and the open page's none, because its state display says it, though it keeps the word's room (drawn unseen after its name), so no tab moves when the page changes; the open page is the one Dark Green segment (radius 8), its name in Beige Light, and the only tint in the header; the room left over; the system's own things on a second platter: the deck's lamp, `Surface`, a `Backup` chip only while the automatic backup failed or is overdue, the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself and all of them off the Overview, which shows every page's (on Lighting, which has a Solo of its own, the Console's reads `AUDIO SOLO`), and `Setup / Support` last, so it stays put while a latch comes, goes or changes its word; the `REC` tally on a platter of its own that never moves, quiet at rest, a coral edge on a faint coral tint while CAM 1 records, a dashed yellow edge while what it says is last known; and the clock at the right margin. The product's name stands nowhere in the header: beside the logotype it would read as a lockup, which the brand does not allow. It ends the footer instead, as its colophon: SSE Adelia at 14 px, tracked `0.14em`, in the quiet ink. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer; no tab is the current one, and a lamp never read is hollow and says `pending`, or `not read` after a start that failed. Density never comes from the type; the sizes stay.
 
 Every take-time key has one fixed home. A latch goes into the latch slot, never above or between keys, so nothing a hand reaches for during a take is ever pushed.
 
-**The Overview** (D47, board 3: `docs/design/boards/overview-3.html`) is the landing page and keeps the frame. Its state display stands where every page's does, in a status card with the latch slot under it (16, 104, 408 × 252), and four rooms stand in the shell's columns, each 16 px inside its column and 16 px from the next: THE TAKE under the status card in the cluster, THE PICTURE over THE SCRIPT in the bay, THE SOUND the whole plate. The shell parts its columns with hairlines; on the Overview the rooms part them, so it draws none there. Outside the rooms there is only the studio list, under THE TAKE.
+**The Session page** (D51, board 2: `docs/design/boards/session-2.html`) is the landing page, and the one page without the frame's cluster, plate and state display: the header, one question and three Rooms in the bay, which is the whole width there, and the footer. The frame draws no column for it. The question stands centred at 214, the day in Adelia 18 tracked as the colophon over `What are we making today?` in Adelia 40; the three Rooms, 600 × 880, stand 56 apart and centred at 342, the whole Room a key. While a session runs, a platter under the question says what runs and since when, with `Continue`, and the question stands at 150; the Rooms do not move. A Room opens its window, a sheet 1200 × 620 centred in the bay with the Room's picture at its left. The header shows every lamp and latch here, as on every page but the Overview. A screen drawn in its place (its loading, its fault) draws its own two columns.
+
+**The Overview** (D47, board 3: `docs/design/boards/overview-3.html`) keeps the frame; it is the page that the Session page's Begin and Continue and every return key open (the landing page from D47 until D51). Its state display stands where every page's does, in a status card with the latch slot under it (16, 104, 408 × 252), and four rooms stand in the shell's columns, each 16 px inside its column and 16 px from the next: THE TAKE under the status card in the cluster, THE PICTURE over THE SCRIPT in the bay, THE SOUND the whole plate. The shell parts its columns with hairlines; on the Overview the rooms part them, so it draws none there. Outside the rooms there is only the studio list, under THE TAKE.
 
 ## 3. Type
 
@@ -34,7 +36,7 @@ Three faces, the brand's own:
 
 - **PT Sans** (Regular and Bold) for everything read to act: labels, values, keys, rows, tables. Its figures are tabular at both weights, so values never jitter; no monospace face is needed.
 - **SSE Adelia** (Bold, capitals only) for display words: state words, section heads, the product's name, big key caps. Adelia draws lowercase as capitals ("dB" would become "DB") and its figures are proportional, so it **never** carries a value, a unit, a number that changes, or a name that keeps its case (a strip's, a fixture's, a scene's, a script's). It is SSE's licensed face: the repository never holds its file; the pages use the copy installed on the studio PC and fall back to PT Serif elsewhere.
-- **PT Serif** italic for the hardware link's own voice: the sentence in the state display, and a room's job on the Overview (`act`, `watch`, `read`, `listen`).
+- **PT Serif** italic for the hardware link's own voice: the sentence in the state display, a room's job on the Overview (`act`, `watch`, `read`, `listen`), and a Session Room's line on its floor (`Voices around the table, a camera on each.`).
 
 PT Sans and PT Serif are ParaType's, under the SIL Open Font License, committed with their licence (`frontend/packages/tokens/src/fonts/`). The prompter's glass is the presenter's picture, not the page: it keeps Inter (`--font-family-glass`).
 
@@ -45,16 +47,16 @@ Seven sizes. A page uses at most eight; the seven leave one spare.
 | tick    |   13 | scale numerals, graph axes, labels on the plot: never read to act                                                         |
 | label   |   14 | secondary facts, units, table cells, the footer, a tooltip, a lamp's word                                                 |
 | body    |   16 | keys, labels, list rows, menu items, tabs, plate facts                                                                    |
-| head    |   18 | a section head (Adelia)                                                                                                   |
+| head    |   18 | a section head (Adelia); the day over the Session page's question, a window's kicker                                      |
 | word    |   20 | names, plate values, the clock, big key caps and region titles (Adelia), the hardware link's sentence: read during a take |
-| readout |   28 | a strip's readout, the plate's title, a long state word                                                                   |
-| display |   40 | the state word (Adelia), the one number read from a metre away                                                            |
+| readout |   28 | a strip's readout, the plate's title, a long state word; a Session Room's name, a session's name                          |
+| display |   40 | the state word (Adelia), the one number read from a metre away; the Session page's question                               |
 
 Why 12 is still the floor: on this monitor (108.8 px per inch) at 70 cm a 12 px capital is at the lower edge of reliable recognition for a short familiar label, and 20 px is the minimum for reading, which is why every word read during a take is 20 px or larger. The smallest step is 13.
 
-Two weights, 400 and 700. Units are half the size of their number, in the quiet ink, after a small gap. Minus signs are real (−). Adelia is tracked `0.03em` at 20 px and below and set tight above; PT Sans in capitals `0.04em`; the footer's colophon `0.14em` (D48) and a room's name on the Overview `0.08em`, cut like an inscription (D47); nothing else is tracked. Names never wrap: one line, with an ellipsis and the whole name in its tooltip if ever needed. Never justified text, never a text shadow.
+Two weights, 400 and 700. Units are half the size of their number, in the quiet ink, after a small gap. Minus signs are real (−). Adelia is tracked `0.03em` at 20 px and below and set tight above; PT Sans in capitals `0.04em`; the footer's colophon `0.14em` (D48), and the day over the Session page's question and a window's kicker with it (D51); a room's name on the Overview `0.08em`, cut like an inscription (D47), and a Session Room's name at 28 the same, the second inscription (D51); nothing else is tracked. Names never wrap: one line, with an ellipsis and the whole name in its tooltip if ever needed. Never justified text, never a text shadow.
 
-A picture is the exception: the prompter's glass and a camera's picture are marked `data-picture`, and what is inside them is the presenter's or the camera's, not the page's. The measures skip it.
+A picture is the exception: the prompter's glass and a camera's picture are marked `data-picture`, and what is inside them is the presenter's or the camera's, not the page's. The measures skip it. A Session Room's drawing (D51) is the page's own picture and holds no text: the Room's name and line stand over it as the page's words, so the Room is not marked and the measures read them.
 
 ## 4. Colour roles
 
@@ -83,6 +85,8 @@ The operator's colour tags on scenes, groups and palettes are identity, not stat
 
 The Overview's rooms (D47) are identity too: each takes the dark member of a brand pair, pulled down to the page's depth: stone (Beige) for THE TAKE, green (Dark Green) for THE PICTURE, slate (Sky and Blue) for THE SCRIPT and umber (Brown and Yellow) for THE SOUND (`--room-<tone>-wall`, `-lintel`, `-floor`, `-tray`, `-key`, `-line`, `-line2`). They are dark enough that a lamp, a lit key or a meter always stands out; inside a room the keys, the lists and the hairlines take the room's tones. A room in trouble takes the state display's keyline, coral or yellow, round the whole room.
 
+The Session page's Rooms (D51) are identity as well: the Overview's tones made richer, green (Dark Green) for the green screen's picture, umber (Brown) for the podcast's voices and slate (Sky and Blue) for the webinar's screen (`--session-<tone>-*`: the five planes, the drawing's line, its things' two faces, two accents and its own light). They never carry status: a running session is its Room's light and the green `IN SESSION` lamp and word, not a tint.
+
 There is one theme, Studio.
 
 ## 5. Material
@@ -101,7 +105,7 @@ Flat and matte, three planes, the raised layer of the header and the footer, the
 
 A Session Room is the one place a drawing stands. Its light and its textures are drawn in its own picture (SVG), so the rule on gradients below does not reach inside it; its name and line are text over the picture, which the page tests measure as they measure the page, so the Room is not marked `data-picture`. Under the pointer, on the Room of the session that runs and in its window, its light comes on: the skylight's glow on the back wall and the drawing's own lights (the soft lights, the pendant, the screen of faces), by opacity only, and its edge brightens and closes round it (`--elevation-edge-hover`). The sheet is the floating layer as a window that opens from what it came from (the Session page's window from its Room): its face at 12 with the light edge along its top, a picture at its left with the face's corners there, over the page dimmed by `--material-scrim` from under the header, which stays live above it.
 
-A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards outside the Overview's rooms. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px), the head's row standing 4 px above it with or without keys. One radius, 4 px, everywhere (a lamp is a circle), but on the raised layer and on the Overview: a platter, a room, the status card, a tray and a list are 12 px, what sits in them 8 px (a key, a well, a picture), and what sits in that 4 px, so the shapes nest.
+A box appears only around something you press and around a black well. Sections are drawn by type and a rule, lists are rows divided by hairlines, never cards outside the Overview's rooms. Lines are exactly 1 px, except selection (2 px) and the heavy rule under a section head (2 px), the head's row standing 4 px above it with or without keys. One radius, 4 px, everywhere (a lamp is a circle), but on the raised layer, on the Overview and on the Session page: a platter, a room, the status card, a tray, a list, a Session Room and its window are 12 px, what sits in them 8 px (a key, a well, a picture, the window's name field and notes), and what sits in that 4 px, so the shapes nest.
 
 On the Overview (D47) board 3's forms are the page's: the room; the tray; the one grouped list for the take's facts, the studio and the cues (a rounded face in the key's tone, rows on hairlines that start after the row's margin, the value bold at the right); and the status card, the state display and the latch slot as one card, its latch row tinted yellow while something is latched, an error drawn as the coral keyline round the whole card. The pictures, the glass, the speed tape and the meters stand in black: the content is the hero.
 
@@ -111,22 +115,25 @@ On the Console's strip (D50) the meter is the hero and the fader is secondary: t
 
 ## 6. Motion
 
-| Purpose                                       | Duration     | Easing                           |
-| --------------------------------------------- | ------------ | -------------------------------- |
-| A lamp or a lit fill switches                 | 0 ms         | none: a light does not ramp      |
-| A key press                                   | 100 ms       | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
-| A state word or keyline changes               | 160 ms       | out                              |
-| A floating layer enters · leaves              | 200 · 120 ms | out · in (8 px rise and fade)    |
-| A sheet opens from its Room · closes into it  | 340 · 260 ms | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
-| A Session Room's light comes on · goes off    | 160 ms       | out                              |
-| Bank or tab change                            | 160 ms       | in-out                           |
-| The Overview's speed tape, one tick a detent  | 160 ms       | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
-| Meters, countdown bars, the prompter's scroll | frame rate   | the hardware link's              |
-| The cameras' pictures                         | frame rate   | the source's                     |
+| Purpose                                        | Duration         | Easing                           |
+| ---------------------------------------------- | ---------------- | -------------------------------- |
+| A lamp or a lit fill switches                  | 0 ms             | none: a light does not ramp      |
+| A key press                                    | 100 ms           | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
+| A state word or keyline changes                | 160 ms           | out                              |
+| A floating layer enters · leaves               | 200 · 120 ms     | out · in (8 px rise and fade)    |
+| A sheet opens from its Room · closes into it   | 340 · 260 ms     | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
+| The Session page's Rooms come in, once a start | 420 ms, 70 apart | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
+| A Session Room's light comes on · goes off     | 160 ms           | out                              |
+| Bank or tab change                             | 160 ms           | in-out                           |
+| The Overview's speed tape, one tick a detent   | 160 ms           | `cubic-bezier(0.2, 0.8, 0.2, 1)` |
+| Meters, countdown bars, the prompter's scroll  | frame rate       | the hardware link's              |
+| The cameras' pictures                          | frame rate       | the source's                     |
 
 Nothing on an idle surface animates. Hover changes an edge or a colour, never a position or a size. `prefers-reduced-motion` removes enter, exit and move and the meters' display smoothing.
 
 A sheet opens from what it came from: its face grows from that outline to its own while the picture there travels into the sheet's left side at the same proportions, and its content fades in from 210 ms; closing runs it back, and the sheet leaves when it has run. The picture is drawn at its own size with its own type steps: only the travel is a transform, so nothing is drawn scaled at rest. Under `prefers-reduced-motion` a sheet only fades (200 · 120 ms).
+
+The Session page's Rooms come in once after a start of the app, not at every return to the page: an 8 px rise and a fade each, 70 ms apart, the question rising with the first, about half a second in all. Under `prefers-reduced-motion` they stand at rest at once.
 
 ## 7. The components
 
@@ -140,7 +147,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
 - **Empty**: `EmptyLine`, an empty list or section: one quiet line in PT Sans body, the explanation as its tooltip, an optional hollow lamp (as the latch slot's "Nothing latched") and at most one key. Pages draw no empty state of their own.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Sheet` (a modal window that opens from what it came from, a picture at its left, over the page dimmed from under the live header), `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
-- **The Session page** (D51, on the boards "Session" and "Session window, open"): `SessionRoom` (tone, name, line, the running session's caption in place of the line, lit; on the page a key 600 × 880 at 12, in its window the window's picture at 423 × 620 with its own type steps, 20 and 14), holding one of its three drawings, `GreenScreenDrawing`, `PodcastDrawing` or `WebinarDrawing`, which hold no text; and the `Sheet` its window opens in.
+- **The Session page** (D51, on the boards "Session" and "Session window, open"): `SessionRoom` (tone, name, line, the running session's caption in place of the line, lit; on the page a key 600 × 880 at 12, in its window the window's picture at 423 × 620 with its own type steps, 20 and 14), holding one of its three drawings, `GreenScreenDrawing`, `PodcastDrawing` or `WebinarDrawing`, which hold no text; and the `Sheet` its window opens in. The page builds its question, the running session's platter and its window's two forms from these (`frontend/app/src/app/session/`): a new session's (the name in a well 64 high, the last session of the kind with `Use this name`, the worst page's note and the session Begin would end as wells 56 high, `Cancel` and `Begin session`) and the running session's own (`End session`, `Close`, `Continue`).
 - **The Overview** (D47, on the board "Overview"): `Room` (tone, name, job, what it holds now, a `Door` to its page, a floor where it needs one, the alert keyline), `Door`, `Tray`, `GroupedList` with `GroupedListRow`, `StatusCard` (the `StateDisplay` and the `LatchSlot` as one card), and `SpeedTape`, a display of the prompter's pace that slides one tick a detent of the deck's SPEED dial and says when the deck turned it. Inside a room the keys and wells take the room's tones with no edit of their own.
 - **Setup**: its step keys (an `ArmKey` with the step's number, name and word; on a published setup it reads `press twice` and arms in its own height) and its probe rows (the name, a `LampWord`, the answer under it) are the page's own, built from these, and so are the deck's map and the Support sections.
 
@@ -162,6 +169,8 @@ The sentence keeps two lines, so every state sentence is written to fit them, ab
 
 The Overview adds no state of its own (D47): its display mirrors the worst of the header's lamps, an error before attention and a tie in the take's order (CAM 1's take, the prompter, the Console, the rig, the deck, the backup), with that page's way out: `Sync from TotalMix` sent from there when that is the Console's own, otherwise `Open <page>`. The room of the page it names takes its keyline.
 
+The Session page has no state display (D51): `IN SESSION` is a lamp's word, on the running session's Room, its platter and its window. A Room's window shows the Overview's state as a note, the worst page's word, sentence and way out, and only while it needs the operator; and, when another kind's session runs, the session Begin would end.
+
 ## 9. Copy and controls
 
 - Sentence case for commands (verb and object). The deck's words on big key caps, in Adelia capitals. The hardware link's words for states.
@@ -170,6 +179,7 @@ The Overview adds no state of its own (D47): its display mirrors the worst of th
 - Numbers carry sign and unit: `−3.8 dB`, `32 dB`, `3200 K`, `76 %`, `18:24`.
 - **Every action is reachable from a visible control: a key, or the ⋯ menu on its object.** Right-click on an object opens the same menu as its ⋯; nothing is right-click only. Controls used during a take stay keys, never menu items. A menu's head names its object; its items show their current value in words at the right; a disabled item says why; a destructive item sits last, in coral, and arms in place.
 - **Hints are tooltips**, except where a press cannot be undone or arms something: "press again", a countdown, 48 V, `LOAD?` and a lock's reason stay on screen. No tooltip covers a take-time control.
+- The Session page's Rooms are keys: the whole Room is pressed, and its name and line are its words. Its window's name field stands in no form, so Enter in it begins nothing; `Begin session` is the one press that acts, and in later steps it will press the rig and the desk. The window keeps Tab inside it, but the header stays live above its scrim: a tab press leaves the page and takes the window with it, with no close to run and no Room to give the focus back to.
 - The Overview's speed tape is a display: it takes no wheel, no key and no press; the deck's dial and the − 5 and + 5 keys set the pace. The Overview's ⋯ holds the standing commands of the pages it shows: `Sync from TotalMix`, `Read all cameras again`, `Clear clips` and `Setup / Support`.
 - No surface shows a key, a key glyph or a key hint. The keyboard does only what it does in any program: Tab, Enter or Space on the focused control, typing, the arrows on a focused slider or list, and Esc on a dialog, a menu or an armed key.
 
@@ -190,13 +200,13 @@ Per page, at 2560×1440, the page tests hold:
 
 - no page scroll;
 - type floor 12 px, at most 8 sizes, only PT Sans, PT Serif and SSE Adelia, only weights 400 and 700, and every face asked for loaded (SSE Adelia judged where it is installed);
-- pixel-sampled contrast of at least 4.5:1 for text (3:1 for large text); locked controls at 55 % are exempt, and so is text a scrolled field hides;
+- pixel-sampled contrast of at least 4.5:1 for text (3:1 for large text); locked controls at 55 % are exempt, and so is text a scrolled field hides, and text an open modal layer covers under its scrim (the Session page's window);
 - every enabled target at least 24 px, and take-time targets at least 28 px;
 - radii only 0, 4, 8, 12 and pill;
 - no shadow with a negative offset, and blur over 8 px only on a lit element or the floating layer;
 - gradients only on signal and material;
 - no running animation at idle;
-- chrome sizes within 2 px of section 2, and the state display at the same place on every page;
+- chrome sizes within 2 px of section 2, and the state display at the same place on every page; the Session page is the one exception, with the header and the footer alone (D51);
 - no forbidden word on screen (section 9).
 
 From the token values, unit tests hold the contrast pairs of section 4, that no colour is defined twice, that every custom property a stylesheet reads is declared, and that the deprecated tokens only lose readers (`frontend/packages/tokens/src/contrast.test.ts` and `frontend/packages/design-system/src/__tests__/css-tokens.test.ts`).
