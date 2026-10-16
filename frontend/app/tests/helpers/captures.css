@@ -1,0 +1,10 @@
+/* Applied to every capture (`toHaveScreenshot`, playwright.config.ts), never
+   to what the measures read. The Session Rooms' grain (D51) is noise, pixel
+   by pixel, which a PNG cannot store small: with it a board of three Rooms
+   weighs 1.9 MB, over the repository's limit for a file (file-health.mjs),
+   and 0.4 MB without. The grain is fixed by its seed and guards nothing the
+   capture is for, the layout, the type and the colours, so the captures
+   leave it out; the page and the measures keep it. */
+[data-texture="grain"] {
+  display: none;
+}

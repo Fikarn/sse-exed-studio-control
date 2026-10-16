@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Bell, Ellipsis, Pencil, Pin, Plus, Save, Trash2 } from "lucide-react";
 
@@ -24,6 +24,9 @@ import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../com
 import { Popover } from "../components/Popover";
 import { Room } from "../components/Room";
 import { SegmentedControl } from "../components/SegmentedControl";
+import { SessionRoom } from "../components/SessionRoom";
+import { GreenScreenDrawing, PodcastDrawing, WebinarDrawing } from "../components/SessionRoomDrawings";
+import { Sheet as SheetLayer } from "../components/Sheet";
 import { Groove, Slider } from "../components/Slider";
 import { SpeedTape } from "../components/SpeedTape";
 import { StateDisplay } from "../components/StateDisplay";
@@ -42,9 +45,9 @@ import { Field, Readout, Screen } from "../components/Well";
 // cluster's inner width, on the one surface, and fits 2560×1440 without
 // scrolling. The page tests measure every board (ui-contract.spec.ts) and
 // capture the Sheet, which holds them all but the header's, the Shell board,
-// which holds those, the board of the menus and overlays open, and the
-// Overview board, which holds the Overview's parts at their own widths
-// (storybook.spec.ts).
+// which holds those, the board of the menus and overlays open, the Overview
+// board, which holds the Overview's parts at their own widths, and the
+// Session boards, the Rooms and their window open (storybook.spec.ts).
 
 /** A card stands at the cluster's inner width (424 less its 24 px gutters). */
 const CARD_WIDTH = 376;
@@ -1051,6 +1054,324 @@ function OverviewCards() {
   );
 }
 
+// The Session page's parts (D51; docs/design/session.md, board 2): the three
+// Rooms 56 apart as the page stands them, the umber one lit with the running
+// session's caption, and a Room at the window's size, drawn there with its own
+// type steps.
+
+const sessionBoard: CSSProperties = {
+  ...overviewBoard,
+  gap: 56,
+  padding: 40,
+};
+
+const sinceWord: CSSProperties = {
+  font: "var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-ui)",
+  color: "var(--text-text2)",
+};
+
+type SessionTone = "green" | "umber" | "slate";
+
+const SESSION_TONES: readonly SessionTone[] = ["green", "umber", "slate"];
+
+/** The kinds as board 2 names them, with its made-up session names. */
+const SESSION_KINDS: Record<SessionTone, { name: string; line: string }> = {
+  green: { name: "Green Screen Recording", line: "A presenter at the screen, with the prompter." },
+  umber: { name: "Podcast Recording", line: "Voices around the table, a camera on each." },
+  slate: { name: "Webinar", line: "Live, to an audience online." },
+};
+
+const SESSION_NAMES: Record<SessionTone, { next: string; last: string; lastDay: string }> = {
+  green: {
+    next: "Strategy in Practice — lecture 4",
+    last: "Strategy in Practice — lecture 3",
+    lastDay: "Tuesday 13 October",
+  },
+  umber: {
+    next: "Leading Through Change — episode 3",
+    last: "Leading Through Change — episode 2",
+    lastDay: "Wednesday 14 October",
+  },
+  slate: { next: "Markets Outlook, winter", last: "Markets Outlook, autumn", lastDay: "Friday 9 October" },
+};
+
+function drawingOf(tone: SessionTone) {
+  if (tone === "green") return <GreenScreenDrawing />;
+  if (tone === "umber") return <PodcastDrawing />;
+  return <WebinarDrawing />;
+}
+
+function SessionCards() {
+  return (
+    <div style={sessionBoard}>
+      <Wide title="Room · green, at rest" width={600}>
+        <SessionRoom tone="green" {...SESSION_KINDS.green}>
+          <GreenScreenDrawing />
+        </SessionRoom>
+      </Wide>
+      <Wide title="Room · umber, lit: its session runs" width={600}>
+        <SessionRoom
+          tone="umber"
+          {...SESSION_KINDS.umber}
+          lit
+          caption={
+            <>
+              <LampWord tone="ok">In session</LampWord>
+              <span style={sinceWord}>· since 09:16</span>
+            </>
+          }
+        >
+          <PodcastDrawing />
+        </SessionRoom>
+      </Wide>
+      <Wide title="Room · slate, at rest" width={600}>
+        <SessionRoom tone="slate" {...SESSION_KINDS.slate}>
+          <WebinarDrawing />
+        </SessionRoom>
+      </Wide>
+      <Wide title="The window's picture, at its own size" width={423}>
+        <SessionRoom tone="umber" {...SESSION_KINDS.umber} size="window">
+          <PodcastDrawing />
+        </SessionRoom>
+      </Wide>
+    </div>
+  );
+}
+
+// The Session page's window open (D51; board 2, step 1): the sheet over a
+// sketch of the page, dimmed under the header, which stays live; the Room's
+// picture at the sheet's left (its Room on the page stands empty) and a
+// sketch of the step-1 form at its right, its name field holding the focus.
+// The board works: a Room opens its window, and Esc, Cancel, Begin or a press
+// on the dimmed page closes it.
+
+const sessionPage: CSSProperties = {
+  position: "relative",
+  height: "100vh",
+  overflow: "hidden",
+  background: "var(--material-bg)",
+  color: "var(--text-text)",
+  font: "var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui)",
+};
+
+const sessionHeader: CSSProperties = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  gap: 24,
+  height: "var(--chrome-studio-header)",
+  padding: "0 32px",
+  borderBottom: "1px solid var(--material-bar-line)",
+  background: "var(--material-bar)",
+};
+
+const sessionQuestion: CSSProperties = {
+  position: "absolute",
+  top: 214,
+  left: 0,
+  right: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 18,
+};
+
+const displayWord = (size: string, tracking: string): CSSProperties => ({
+  font: `var(--font-weight-bold) var(${size}) / 1 var(--font-family-display)`,
+  letterSpacing: tracking,
+  textTransform: "uppercase",
+});
+
+const sessionRooms: CSSProperties = { position: "absolute", top: 342, left: 324, display: "flex", gap: 56 };
+
+const sessionForm: CSSProperties = {
+  boxSizing: "border-box",
+  display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  padding: "52px 56px 48px",
+};
+
+const formWell: CSSProperties = {
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  border: "1px solid var(--material-line2)",
+  borderRadius: "var(--radius-control)",
+  background: "var(--material-well)",
+};
+
+const formText = (weight: string, size: string, color: string): CSSProperties => ({
+  font: `var(${weight}) var(${size}) / 1.2 var(--font-family-ui)`,
+  color: `var(${color})`,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+});
+
+function SessionFormSketch({ tone, onDone }: { tone: SessionTone; onDone: () => void }) {
+  const names = SESSION_NAMES[tone];
+  return (
+    <div style={sessionForm}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 16 }}>
+        <span
+          id="session-sketch-kicker"
+          style={{
+            ...displayWord("--font-size-head", "var(--font-tracking-colophon)"),
+            color: "var(--text-text3)",
+          }}
+        >
+          New session
+        </span>
+        <span style={formText("--font-weight-regular", "--font-size-body", "--text-text2")}>Thursday 15 October</span>
+      </div>
+      <span style={{ ...formText("--font-weight-bold", "--font-size-body", "--text-text2"), marginTop: 44 }}>
+        Name this session
+      </span>
+      <label style={{ ...formWell, height: 64, marginTop: 12, padding: "0 18px" }}>
+        <input
+          data-autofocus=""
+          aria-label="Name this session"
+          defaultValue={names.next}
+          maxLength={80}
+          placeholder="A name, optional"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: 0,
+            border: 0,
+            outline: "none",
+            background: "transparent",
+            color: "var(--text-text)",
+            font: "var(--font-weight-bold) var(--font-size-readout) / 1 var(--font-family-ui)",
+          }}
+        />
+      </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
+        <span style={{ display: "flex", flex: 1, flexDirection: "column", gap: 6, minWidth: 0 }}>
+          <span style={formText("--font-weight-regular", "--font-size-label", "--text-text3")}>
+            Last time · {names.lastDay}
+          </span>
+          <span style={formText("--font-weight-bold", "--font-size-body", "--text-text2")}>{names.last}</span>
+        </span>
+        <Key size="small">Use this name</Key>
+      </div>
+      <div style={{ ...formWell, gap: 14, minHeight: 56, marginTop: 28, padding: "10px 12px 10px 18px" }}>
+        <span style={{ "--font-size-label": "var(--font-size-body)", flex: "none" } as CSSProperties}>
+          <LampWord tone="attention">Assumed</LampWord>
+        </span>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            font: "italic var(--font-weight-regular) var(--font-size-body) / 1.3 var(--font-family-serif)",
+          }}
+        >
+          Console: the strips may not match TotalMix since the start.
+        </span>
+        <Key>Sync from TotalMix</Key>
+      </div>
+      <span style={{ flex: 1 }} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+        <Key size="tall" style={{ width: 180 }} onClick={onDone}>
+          Cancel
+        </Key>
+        <Key
+          mode="primary"
+          size="tall"
+          layout="stack"
+          cap="Begin session"
+          hint="opens the Overview"
+          style={{ width: 360 }}
+          onClick={onDone}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SessionWindowOpen() {
+  const rooms = useRef<Partial<Record<SessionTone, HTMLButtonElement | null>>>({});
+  // The kind whose window is drawn, and whether it is open or closing.
+  const [shown, setShown] = useState<SessionTone | null>("umber");
+  const [open, setOpen] = useState(true);
+  const close = () => setOpen(false);
+  return (
+    <div style={sessionPage}>
+      <header style={sessionHeader}>
+        <Crest size="header" />
+        <div style={{ ...platter, alignSelf: "center" }}>
+          <Tab id="session" label="Session" active />
+          <Tab id="overview" label="Overview" />
+          <Tab id="lighting" label="Lighting" word="ready" tone="ok" />
+          <Tab id="audio" label="Audio" word="assumed" tone="attention" />
+          <Tab id="cameras" label="Cameras" word="ready" tone="ok" />
+          <Tab id="teleprompter" label="Teleprompter" word="ready" tone="ok" />
+        </div>
+      </header>
+      <div style={sessionQuestion}>
+        <span
+          style={{ ...displayWord("--font-size-head", "var(--font-tracking-colophon)"), color: "var(--text-text3)" }}
+        >
+          Thursday 15 October
+        </span>
+        <span style={displayWord("--font-size-display", "0")}>What are we making today?</span>
+      </div>
+      <div style={sessionRooms}>
+        {SESSION_TONES.map((tone) => (
+          <SessionRoom
+            key={tone}
+            tone={tone}
+            {...SESSION_KINDS[tone]}
+            away={shown === tone}
+            ref={(element) => {
+              rooms.current[tone] = element;
+            }}
+            onClick={() => {
+              setShown(tone);
+              setOpen(true);
+            }}
+          >
+            {drawingOf(tone)}
+          </SessionRoom>
+        ))}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+        <Footer
+          items={[
+            { label: "Takes today", value: "none yet · 4 yesterday" },
+            { label: "Last sync", value: "none since the start" },
+            { label: "Backup", value: "today 09:12" },
+          ]}
+        />
+      </div>
+      {shown ? (
+        <SheetLayer
+          open={open}
+          labelledBy="session-sketch-kicker"
+          width={1200}
+          height={620}
+          art={
+            <SessionRoom tone={shown} {...SESSION_KINDS[shown]} size="window">
+              {drawingOf(shown)}
+            </SessionRoom>
+          }
+          artWidth={423}
+          from={() => rooms.current[shown] ?? null}
+          onClose={close}
+          onClosed={() => setShown(null)}
+        >
+          <SessionFormSketch key={shown} tone={shown} onDone={close} />
+        </SheetLayer>
+      ) : null}
+    </div>
+  );
+}
+
 function Sheet() {
   return (
     <>
@@ -1349,5 +1670,7 @@ export const ShellBoard: Story = {
   ),
 };
 export const OverviewBoard: Story = { name: "Overview", render: () => <OverviewCards /> };
+export const SessionBoard: Story = { name: "Session", render: () => <SessionCards /> };
+export const SessionWindowOpenBoard: Story = { name: "Session window, open", render: () => <SessionWindowOpen /> };
 export const WholeSheet: Story = { name: "Sheet", render: () => <Sheet /> };
 export const MenusAndOverlaysOpenBoard: Story = { name: "Menus and overlays, open", render: () => <OverlaysOpen /> };

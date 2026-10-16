@@ -71,6 +71,8 @@ The committed captures are under `frontend/app/tests/__visual__/`.
 
 A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (ten headers, six footers). A change to the header moves the strips and no page.
 
+Every capture applies `frontend/app/tests/helpers/captures.css` (`stylePath` in `playwright.config.ts`), which leaves out the Session Rooms' grain (`data-texture="grain"`): it is noise, pixel by pixel, which no PNG stores small, and with it a board of three Rooms weighs 1.9 MB, over `file-health.mjs`'s 1.5 MB limit for a tracked file. The layout measures take their own screenshot and read the grain.
+
 A board that a page reaches by a press (the Teleprompter's editor, Setup's Map step on a page of the deck) has its presses in `BOARD_STEPS`, in `frontend/app/tests/helpers/ui-contract/boards.mjs`. The captures and the layout measures both make them.
 
 When a change moves a page:

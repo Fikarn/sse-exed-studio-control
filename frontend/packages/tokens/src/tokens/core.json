@@ -112,6 +112,10 @@
       "$value": "rgba(242, 222, 111, 0.35)",
       "$description": "the line over that row while something is latched"
     },
+    "scrim": {
+      "$value": "rgba(3, 6, 5, 0.74)",
+      "$description": "the page dimmed under a sheet, the header left live above it (the Session page's window, D51)"
+    },
     "bay": {
       "$value": "{material.bg}",
       "$description": "deprecated: the bay is the one surface"
@@ -551,6 +555,162 @@
       }
     }
   },
+  "session": {
+    "$description": "The Session page's three Rooms (D51): the brand's Room (Brand Guidelines p.41), a one-point-perspective space in one hue with a skylight, holding the program's own drawing of the studio as one kind of session uses it. The Overview's room tones made richer: green for the picture, umber for the sound, slate for the screen. Identity, not status, as the Overview's rooms are. Each tone names its five planes, the drawing's line, its objects' two faces, its two accents and its own light (SessionRoom.module.css).",
+    "sky": {
+      "$value": "#FFFBEA",
+      "$description": "the skylight's light: its pane in the ceiling and its glow on the back wall, in every Room"
+    },
+    "shadow": {
+      "$value": "rgba(0, 0, 0, 0.28)",
+      "$description": "a shadow on a Room's floor under the things the drawing stands there"
+    },
+    "edge": {
+      "$value": "rgba(0, 0, 0, 0.22)",
+      "$description": "the quiet line where a Room's planes meet"
+    },
+    "green": {
+      "$description": "Green: Green Screen Recording",
+      "back": {
+        "$value": "#0F4533",
+        "$description": "the back wall, which the skylight lights"
+      },
+      "ceil": {
+        "$value": "#0C3B2B",
+        "$description": "the ceiling"
+      },
+      "lit": {
+        "$value": "#0D3D2D",
+        "$description": "the lit side wall, a step under the back wall"
+      },
+      "shade": {
+        "$value": "#0A3226",
+        "$description": "the shaded side wall"
+      },
+      "floor": {
+        "$value": "#0A3025",
+        "$description": "the floor, where the Room's name and line stand"
+      },
+      "draw": {
+        "$value": "#D9EADB",
+        "$description": "the drawing's line"
+      },
+      "obj": {
+        "$value": "#165840",
+        "$description": "a drawn thing's face"
+      },
+      "obj2": {
+        "$value": "#0F4532",
+        "$description": "a drawn thing's second face, a step darker"
+      },
+      "accent": {
+        "$value": "#2F8D59",
+        "$description": "the accent: the green screen"
+      },
+      "accent2": {
+        "$value": "#247349",
+        "$description": "the accent in shade: the screen's sweep onto the floor"
+      },
+      "light": {
+        "$value": "#F4FFE8",
+        "$description": "the drawing's own light: the soft lights' beams on the screen"
+      }
+    },
+    "umber": {
+      "$description": "Umber: Podcast Recording",
+      "back": {
+        "$value": "#45321E",
+        "$description": "the back wall, which the skylight lights"
+      },
+      "ceil": {
+        "$value": "#3D2C1A",
+        "$description": "the ceiling"
+      },
+      "lit": {
+        "$value": "#3F2E1B",
+        "$description": "the lit side wall, a step under the back wall"
+      },
+      "shade": {
+        "$value": "#342616",
+        "$description": "the shaded side wall"
+      },
+      "floor": {
+        "$value": "#322414",
+        "$description": "the floor, where the Room's name and line stand"
+      },
+      "draw": {
+        "$value": "#F2E4CC",
+        "$description": "the drawing's line"
+      },
+      "obj": {
+        "$value": "#5A432B",
+        "$description": "a drawn thing's face"
+      },
+      "obj2": {
+        "$value": "#4A3723",
+        "$description": "a drawn thing's second face, a step darker"
+      },
+      "accent": {
+        "$value": "#A9793F",
+        "$description": "the accent: the headphones and the microphones"
+      },
+      "accent2": {
+        "$value": "#8A6234",
+        "$description": "the accent in shade"
+      },
+      "light": {
+        "$value": "#FFD98F",
+        "$description": "the drawing's own light: the pendant over the table and its beam"
+      }
+    },
+    "slate": {
+      "$description": "Slate: Webinar",
+      "back": {
+        "$value": "#1F364B",
+        "$description": "the back wall, which the skylight lights"
+      },
+      "ceil": {
+        "$value": "#1B3042",
+        "$description": "the ceiling"
+      },
+      "lit": {
+        "$value": "#1C3245",
+        "$description": "the lit side wall, a step under the back wall"
+      },
+      "shade": {
+        "$value": "#172A39",
+        "$description": "the shaded side wall"
+      },
+      "floor": {
+        "$value": "#162736",
+        "$description": "the floor, where the Room's name and line stand"
+      },
+      "draw": {
+        "$value": "#DBE7F1",
+        "$description": "the drawing's line"
+      },
+      "obj": {
+        "$value": "#2B4864",
+        "$description": "a drawn thing's face"
+      },
+      "obj2": {
+        "$value": "#233C54",
+        "$description": "a drawn thing's second face, a step darker"
+      },
+      "accent": {
+        "$value": "#2F6398",
+        "$description": "the accent: the audience's faces on the screen, the microphone"
+      },
+      "accent2": {
+        "$value": "#23507E",
+        "$description": "the accent in shade: the screen, the laptop"
+      },
+      "light": {
+        "$value": "#9CC4FF",
+        "$description": "the drawing's own light: the glow of the screen of faces"
+      }
+    }
+  },
   "prompterGlass": {
     "$description": "The Prompter XL's screen, the glass the presenter reads (docs/design/teleprompter.md 4.1). A picture, never themed: black gives off no light, so the glass shows only the words.",
     "floor": {
@@ -631,6 +791,10 @@
     "edgeLight": {
       "$value": "inset 0 1px 0 var(--material-edge)",
       "$description": "a raised surface's light top edge: a platter, the REC tally (D48)"
+    },
+    "edgeHover": {
+      "$value": "inset 0 0 0 1px rgba(246, 245, 232, 0.16), inset 0 1px 0 rgba(246, 245, 232, 0.14)",
+      "$description": "a Session Room under the pointer (D51): its light edge brightens and closes round it; nothing moves"
     },
     "recess": {
       "$value": "inset 0 1px 1px rgba(0, 0, 0, 0.35)",
@@ -989,6 +1153,14 @@
       "move": {
         "$value": "160ms",
         "$description": "bank change, tab change"
+      },
+      "open": {
+        "$value": "340ms",
+        "$description": "a sheet opens from what it came from: the Session page's window from its Room (D51)"
+      },
+      "close": {
+        "$value": "260ms",
+        "$description": "a sheet closes back into what it came from"
       },
       "normal": {
         "$value": "180ms",

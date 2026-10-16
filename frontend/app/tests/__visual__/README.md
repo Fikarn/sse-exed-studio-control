@@ -4,6 +4,8 @@ Committed Playwright screenshots of the app's pages (`visual-review.spec.ts`) an
 
 A page's capture is its workspace: the header and the footer are masked there, and captured once, as strips (`header-*`, `footer-*`).
 
+The Session Rooms' grain (`data-texture="grain"`) is left out of every capture by [`helpers/captures.css`](../helpers/captures.css): it is noise, pixel by pixel, and with it a board of three Rooms weighs more than the repository allows a file.
+
 ## Layout
 
 ```

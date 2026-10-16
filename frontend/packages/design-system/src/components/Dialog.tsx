@@ -1,16 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import styles from "./Dialog.module.css";
-
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
+import { useModalFocus } from "./useModalFocus";
 
 export interface DialogProps {
   actions?: ReactNode;
@@ -22,81 +14,18 @@ export interface DialogProps {
   title: ReactNode;
 }
 
-function getFocusableElements(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (element) => element.offsetParent !== null || element === document.activeElement
-  );
-}
-
 // Visual overhaul A, Slice 3 (system §5, §9), restyled 2026-10 (Atrium): a
 // dialog is the floating layer (`data-level="float"`: the raised surface, a
 // key's edge, the float shadow) over a flat scrim, with a 20 px PT Sans
 // title in sentence case, the sentence in body type and sentence-case verbs
 // on keys at the right. Focus moves in on mount, stays inside on Tab, and
-// returns on unmount; Escape closes.
-//
-// New pages program, Slice 3 review: focus moves in once per opening. The
-// effect used to run again whenever `onClose` changed, and callers pass an
-// inline handler that is new on every render (the shell's clock draws the
-// workspace again every 15 s), so each render pulled focus back to the first
-// field, off the key the operator had tabbed to. Escape reads the latest
-// `onClose` from a ref instead.
+// returns on unmount; Escape closes (`useModalFocus`, shared with the Sheet).
 export function Dialog({ actions, body, children, className, labelledBy, onClose, title }: DialogProps) {
   const generatedTitleId = useId();
   const titleId = labelledBy ?? generatedTitleId;
   const dialogRef = useRef<HTMLElement | null>(null);
-  const onCloseRef = useRef(onClose);
 
-  useLayoutEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return undefined;
-    }
-
-    const focusables = getFocusableElements(dialog);
-    (focusables[0] ?? dialog).focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const close = onCloseRef.current;
-      if (event.key === "Escape" && close) {
-        event.preventDefault();
-        close();
-        return;
-      }
-
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      const nextFocusables = getFocusableElements(dialog);
-      if (nextFocusables.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-
-      const first = nextFocusables[0]!;
-      const last = nextFocusables[nextFocusables.length - 1]!;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    dialog.addEventListener("keydown", handleKeyDown);
-    return () => {
-      dialog.removeEventListener("keydown", handleKeyDown);
-      previouslyFocused?.focus();
-    };
-  }, []);
+  useModalFocus(dialogRef, { onClose });
 
   if (typeof document === "undefined") return null;
 
