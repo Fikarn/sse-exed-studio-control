@@ -11,7 +11,15 @@ declare global {
   }
 }
 
-const CRASH_TARGETS: readonly WorkspaceId[] = ["overview", "setup", "lighting", "audio", "cameras", "teleprompter"];
+const CRASH_TARGETS: readonly WorkspaceId[] = [
+  "session",
+  "overview",
+  "setup",
+  "lighting",
+  "audio",
+  "cameras",
+  "teleprompter",
+];
 
 /**
  * The store the shell runs on. In the app's window it talks to the hardware
@@ -49,16 +57,17 @@ export async function createShellEnvironment() {
     window.__SSE_TEST_DISARM_CRASH__ = disarmWorkspaceCrash;
   }
 
-  // D47 (D1 amended): the app opens on the Overview at every start. On the
-  // double a page test opens on its fixture's saved page, as the boards and
-  // the captures do, unless the address asks for the landing with
-  // `?landing=1` (as `?crash=` asks for a fault). A start of the app is a
-  // window's first load: the root error screen's Reload loads the window again
-  // over the hardware link that runs on, and keeps the page and the deck where
-  // they were (the review of the landing), so a window that has landed says so
-  // for as long as it lives.
+  // D51 (D1 and D47 amended): the app opens on the Session page at every
+  // start, where every session begins; the Overview stays the page that
+  // Begin, Continue and every return key open. On the double a page test
+  // opens on its fixture's saved page, as the boards and the captures do,
+  // unless the address asks for the landing with `?landing=1` (as `?crash=`
+  // asks for a fault). A start of the app is a window's first load: the root
+  // error screen's Reload loads the window again over the hardware link that
+  // runs on, and keeps the page and the deck where they were (the review of
+  // the landing), so a window that has landed says so for as long as it lives.
   const landingAsked = useLiveTransport || url.searchParams.get("landing") === "1";
-  const landing: WorkspaceId | undefined = landingAsked && !windowHasLanded() ? "overview" : undefined;
+  const landing: WorkspaceId | undefined = landingAsked && !windowHasLanded() ? "session" : undefined;
 
   // A development build refuses a malformed reply loudly (Slice 9 — F32);
   // the packaged build keeps the last good snapshot and records the failure.

@@ -1,0 +1,296 @@
+/* The Session page (D51; docs/design/session.md, board 2): one question and
+   three Rooms in the bay, which is the whole width here (the page has no
+   cluster, no plate and no state display), and the footer. The places are
+   the board's, measured at 2560 × 1440: the question at 214 (150 while a
+   session runs, its platter under it), the Rooms at 342, 56 apart and
+   centred. The bay starts under the header, 88 down. */
+
+.workspace {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.question {
+  position: absolute;
+  top: 126px;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: top var(--motion-duration-enter) var(--motion-easing-mech);
+}
+
+.workspace[data-running] .question {
+  top: 62px;
+}
+
+/* The day in SSE Adelia, tracked as the colophon, in the quiet ink. */
+.day {
+  margin: 0;
+  font: var(--font-weight-bold) var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-colophon);
+  text-transform: uppercase;
+  color: var(--text-text3);
+  white-space: nowrap;
+}
+
+.ask {
+  margin: 18px 0 0;
+  font: var(--font-weight-bold) var(--font-size-display) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--text-text);
+  white-space: nowrap;
+}
+
+/* The session that runs: one platter under the question, Continue one press away. */
+.platter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  height: 56px;
+  margin-top: 28px;
+  padding: 0 10px 0 20px;
+  border-radius: var(--radius-panel);
+  background: var(--material-platter);
+  box-shadow: var(--elevation-edge-light);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+/* A lamp's word at the body size, beside the body's words (the platter, a note). */
+.bodyWord {
+  --font-size-label: var(--font-size-body);
+  display: inline-flex;
+  flex: none;
+}
+
+.platterName {
+  font-weight: var(--font-weight-bold);
+  color: var(--text-text);
+}
+
+.rooms {
+  position: absolute;
+  top: 254px;
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  gap: 56px;
+}
+
+/* The running Room's caption after its lamp: `· since 09:16`. */
+.since {
+  color: var(--text-text2);
+}
+
+/* The Rooms come in once after a start of the app: an 8 px rise and a fade
+   each, 70 ms apart; the question rises with the first. The app's reduced
+   motion shortens it to nothing (global.css). */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.workspace[data-entering] .question,
+.workspace[data-entering] .room {
+  animation: enter 420ms var(--motion-easing-mech) backwards;
+}
+
+.workspace[data-entering] .room:nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.workspace[data-entering] .room:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+/* ---------------------------------------------------------------------------
+   The window (SessionWindow.tsx): the form at the sheet's right, board 2's
+   step 1. Its keys at the bottom right, the primary at the right.
+   --------------------------------------------------------------------------- */
+
+.form {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  padding: 52px 56px 48px;
+}
+
+.kicker {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.kickerWord {
+  font: var(--font-weight-bold) var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+  letter-spacing: var(--font-tracking-colophon);
+  text-transform: uppercase;
+  color: var(--text-text3);
+}
+
+/* The running session's own kicker: its lamp and word at the kicker's size and tracking. */
+.kickerLamp {
+  --font-size-label: var(--font-size-head);
+  --font-tracking-display: var(--font-tracking-colophon);
+  display: inline-flex;
+  align-self: center;
+}
+
+.kickerDay {
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.label {
+  margin-top: 44px;
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+/* The name: a well 64 high, its words at the strip readout's size. It stands
+   in no form, so Enter in it begins nothing. */
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  height: 64px;
+  margin: 12px 0 0;
+  padding: 0 18px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-control);
+  background: var(--material-well);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-readout) / var(--font-line-height-tight) var(--font-family-ui);
+  outline: none;
+}
+
+.field::placeholder {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-text3);
+  opacity: 1;
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+/* The last session of this kind, one press from reuse: a series keeps its name. */
+.last {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.lastFacts {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lastDay {
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+  white-space: nowrap;
+}
+
+.lastName {
+  font: var(--font-weight-bold) var(--font-size-body) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* What needs the operator before the session begins, if anything. */
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.note {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 10px 12px 10px 18px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-control);
+  background: var(--material-well);
+}
+
+.noteSay {
+  flex: 1;
+  min-width: 0;
+  font: italic var(--font-weight-regular) var(--font-size-body) / 1.3 var(--font-family-serif);
+  color: var(--text-text);
+}
+
+.noteKey {
+  flex: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.keys {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancel {
+  width: 180px;
+}
+
+.begin {
+  width: 360px;
+}
+
+.end {
+  width: 180px;
+  margin-right: auto;
+}
+
+.close {
+  width: 140px;
+}
+
+.continue {
+  width: 300px;
+}
+
+/* The running session's own window: its name and when it began. */
+.runningName {
+  margin-top: 28px;
+  font: var(--font-weight-bold) var(--font-size-readout) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.runningFacts {
+  margin-top: 12px;
+  font: var(--font-weight-regular) var(--font-size-body) / 1.3 var(--font-family-ui);
+  color: var(--text-text2);
+}

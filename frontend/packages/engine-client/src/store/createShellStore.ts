@@ -147,7 +147,8 @@ export interface ShellStoreOptions {
   development?: boolean;
   /**
    * The page the app opens on at its start, whatever page was saved (D47,
-   * which amends D1: the Overview, at every start of the app). It is written
+   * which amends D1, and D51, which amends both: the Session page, at every
+   * start of the app). It is written
    * as the saved page, so the deck's `workspace` word follows it (D49), and
    * only once in the store's life: a restart of the hardware link keeps the
    * page the operator is on. A start while the setup is not done stays on
@@ -229,6 +230,7 @@ function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
     typeof workspace === "object" && workspace && "workspace" in workspace ? (workspace.workspace as string) : "setup";
 
   if (
+    value === "session" ||
     value === "overview" ||
     value === "lighting" ||
     value === "audio" ||
@@ -1360,10 +1362,11 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         recordBackgroundFailure(failure, "the cameras' state");
       }
 
-      // D47 (D1 amended): the app opens on the Overview at every start of the
-      // app, once in the store's life and before the ready state, so the saved
-      // page never shows first. The page shown is still the saved page
-      // (`deriveWorkspace`), which every tab press writes.
+      // D51 (D1 and D47 amended): the app opens on its landing page, the
+      // Session page, at every start of the app, once in the store's life and
+      // before the ready state, so the saved page never shows first. The page
+      // shown is still the saved page (`deriveWorkspace`), which every tab
+      // press writes.
       if (landing !== null && !landed && rest.accepted.has("app")) {
         const app = await withLandingPage(landing, asRecord(rest.accepted.get("app")));
         if (!isCurrentBootstrap()) return;

@@ -918,8 +918,9 @@ describe("createShellStore scoped refresh", () => {
 // New pages program, D1: the page on screen is the page last saved. Planning
 // left the screen in Slice 1, and a page saved while it was open reads as the
 // Console until the hardware link rewrites the saved value (Slice 2). D47
-// amends D1: the app opens on the Overview at every start of the app, which
-// is a write at the start (the cases at the end), not a rule of the reading.
+// amends D1, and D51 amends both: the app opens on the Session page at every
+// start of the app, which is a write at the start (the cases at the end), not
+// a rule of the reading.
 describe("createShellStore landing page", () => {
   const savedPage = (workspace: string, targetSurface = "dashboard") => ({
     shell: { workspace },
@@ -943,6 +944,7 @@ describe("createShellStore landing page", () => {
     await store.initialize();
 
     for (const [saved, expected] of [
+      ["session", "session"],
       ["overview", "overview"],
       ["lighting", "lighting"],
       ["audio", "audio"],
@@ -966,9 +968,9 @@ describe("createShellStore landing page", () => {
   // hardware link answers the write with the whole app snapshot, as the double
   // does; an answer of the settings alone carries the page in `shell` too.
   it.each([
-    ["the whole app snapshot", savedPage("overview")],
-    ["the settings alone", { settings: { "shell.workspace": "overview" }, shell: { workspace: "overview" } }],
-  ])("a start lands on the Overview with one write, answered with %s", async (_answer, reply) => {
+    ["the whole app snapshot", savedPage("session")],
+    ["the settings alone", { settings: { "shell.workspace": "session" }, shell: { workspace: "session" } }],
+  ])("a start lands on the Session page with one write, answered with %s", async (_answer, reply) => {
     const { answer, transport } = supervisedTransport();
     answer("app.snapshot", savedPage("cameras"));
     answer("settings.update", reply);
@@ -981,7 +983,7 @@ describe("createShellStore landing page", () => {
           return transport.request(method, params);
         },
       },
-      { landing: "overview" }
+      { landing: "session" }
     );
     const shownWhenReady = new Set<string>();
     store.subscribe(() => {
@@ -989,12 +991,12 @@ describe("createShellStore landing page", () => {
     });
     await store.initialize();
 
-    expect(sent).toEqual([["settings.update", { workspace: "overview" }, "waiting-for-app-snapshot"]]);
+    expect(sent).toEqual([["settings.update", { workspace: "session" }, "waiting-for-app-snapshot"]]);
     expect(store.getSnapshot().lifecycle).toBe("ready");
-    expect(store.getSnapshot().activeWorkspace).toBe("overview");
-    expect(store.getSnapshot().appSnapshot?.shell).toMatchObject({ workspace: "overview" });
+    expect(store.getSnapshot().activeWorkspace).toBe("session");
+    expect(store.getSnapshot().appSnapshot?.shell).toMatchObject({ workspace: "session" });
     expect(store.getSnapshot().appSnapshot?.startup).toEqual({ targetSurface: "dashboard" });
-    expect([...shownWhenReady]).toEqual(["overview"]);
+    expect([...shownWhenReady]).toEqual(["session"]);
     expect(store.getSnapshot().backgroundFailures).toEqual([]);
     await store.dispose();
   });
@@ -1002,7 +1004,7 @@ describe("createShellStore landing page", () => {
   it("a start while the setup is not done stays on Setup and writes nothing, and the publish's restart does not land", async () => {
     const { answer, calls, transport } = supervisedTransport();
     answer("app.snapshot", savedPage("setup", "commissioning"));
-    const store = createShellStore(transport, { landing: "overview" });
+    const store = createShellStore(transport, { landing: "session" });
     await store.initialize();
     expect(store.getSnapshot().activeWorkspace).toBe("setup");
     expect(writes(calls)).toBe(0);
@@ -1022,10 +1024,10 @@ describe("createShellStore landing page", () => {
   it("a restart of the hardware link keeps the page the operator is on", async () => {
     const { answer, calls, launches, transport } = supervisedTransport();
     answer("app.snapshot", savedPage("audio"));
-    answer("settings.update", savedPage("overview"));
-    const store = createShellStore(transport, { landing: "overview" });
+    answer("settings.update", savedPage("session"));
+    const store = createShellStore(transport, { landing: "session" });
     await store.initialize();
-    expect(store.getSnapshot().activeWorkspace).toBe("overview");
+    expect(store.getSnapshot().activeWorkspace).toBe("session");
     expect(writes(calls)).toBe(1);
 
     // The operator opens Lighting, and the hardware link restarts.
@@ -1056,7 +1058,7 @@ describe("createShellStore landing page", () => {
     const { answer, calls, refuse, transport } = supervisedTransport();
     answer("app.snapshot", savedPage("cameras"));
     refuse("settings.update");
-    const store = createShellStore(transport, { landing: "overview" });
+    const store = createShellStore(transport, { landing: "session" });
     await store.initialize();
     expect(store.getSnapshot().lifecycle).toBe("ready");
     expect(store.getSnapshot().activeWorkspace).toBe("cameras");
@@ -1086,7 +1088,7 @@ describe("createShellStore landing page", () => {
             ? Promise.reject(new EngineRequestError("ENGINE_EXITED", "The hardware link stopped."))
             : transport.request(method, params),
       },
-      { landing: "overview" }
+      { landing: "session" }
     );
     await store.initialize();
     expect(store.getSnapshot().lifecycle).toBe("failed");
@@ -1094,10 +1096,10 @@ describe("createShellStore landing page", () => {
     expect(store.getSnapshot().backgroundFailures).toEqual([]);
 
     stopped = false;
-    answer("settings.update", savedPage("overview"));
+    answer("settings.update", savedPage("session"));
     await store.restart();
     expect(store.getSnapshot().lifecycle).toBe("ready");
-    expect(store.getSnapshot().activeWorkspace).toBe("overview");
+    expect(store.getSnapshot().activeWorkspace).toBe("session");
     await store.dispose();
   });
 });

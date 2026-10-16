@@ -336,6 +336,69 @@ function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
   return scenario as FixtureScenarioRecord;
 }
 
+// The Session page's four boards (D51; board 2's `?moment=`), built on the Overview's landing:
+// the first look of the day, nothing recording, the script waiting at ¶ 1, the console assumed
+// and not read since the start, so a window's note is the Console's ASSUMED and its Sync. They
+// open on the Session page. The last session of two kinds stands in the windows' Last time;
+// the webinar was never made. While a session runs the desk is the take's, read at the
+// morning's Sync, so every page reads READY and a window's one note is the session its Begin
+// would end. The sessions' names are made up, as the boards' are: the repository is public.
+//
+// - choose, window: no session runs; `window` is the podcast Room's window, which the layout
+//   gate's step opens (`BOARD_STEPS`).
+// - running, running-window: the podcast recording runs since 08:46, 25 minutes before the
+//   captures' 09:11 in Stockholm, and each kind has a last session; `running-window` is the
+//   running session's own window.
+type SessionMoment = "choose" | "window" | "running" | "running-window";
+
+/** The running session: begun 25 minutes before the captures' 09:11 (06:46 UTC). */
+const SESSION_RUNNING = {
+  kind: "podcast",
+  name: "Leading Through Change — episode 3",
+  begunAt: "2026-04-23T06:46:00.000Z",
+  endedAt: null,
+};
+
+/** The last session of each kind, newest first: Wednesday's podcast, Tuesday's lecture, a webinar of the week before. */
+const SESSION_LAST = [
+  {
+    kind: "podcast",
+    name: "Leading Through Change — episode 2",
+    begunAt: "2026-04-22T12:02:00.000Z",
+    endedAt: "2026-04-22T13:16:00.000Z",
+  },
+  {
+    kind: "green-screen",
+    name: "Strategy in Practice — lecture 3",
+    begunAt: "2026-04-21T08:30:00.000Z",
+    endedAt: "2026-04-21T09:52:00.000Z",
+  },
+  {
+    kind: "webinar",
+    name: "Markets Outlook, spring",
+    begunAt: "2026-04-17T13:00:00.000Z",
+    endedAt: "2026-04-17T14:05:00.000Z",
+  },
+];
+
+function buildSessionFixture(moment: SessionMoment): FixtureScenarioRecord {
+  const running = moment === "running" || moment === "running-window";
+  const landing = buildOverviewFixture("landing") as FixtureScenarioRecord & { appSnapshot: Record<string, unknown> };
+  const take = buildOverviewFixture("take") as FixtureScenarioRecord & { audioSnapshot: unknown };
+  const scenario = {
+    ...landing,
+    appSnapshot: {
+      ...landing.appSnapshot,
+      shell: { ...(landing.appSnapshot.shell as Record<string, unknown>), workspace: "session" },
+    },
+    ...(running ? { audioSnapshot: take.audioSnapshot, audioMeteringActive: true } : {}),
+    session: running
+      ? { current: SESSION_RUNNING, last: SESSION_LAST }
+      : { last: SESSION_LAST.filter((session) => session.kind !== "webinar") },
+  };
+  return scenario as FixtureScenarioRecord;
+}
+
 // 2026-09-29: the rig as `lighting-populated`, with the bridge watch saying
 // the bridge stopped answering at 10:42 UTC. Setup's probe passed, so nothing
 // is locked. Built here, not in `fixtures.json`, so it adds no UI-contract
@@ -401,6 +464,10 @@ const derivedFixtureMap: FixtureMap = {
   "overview-fault": buildOverviewFixture("fault"),
   "overview-landing": buildOverviewFixture("landing"),
   "overview-take": buildOverviewFixture("take"),
+  "session-choose": buildSessionFixture("choose"),
+  "session-running": buildSessionFixture("running"),
+  "session-running-window": buildSessionFixture("running-window"),
+  "session-window": buildSessionFixture("window"),
 };
 
 export const fixtureScenarios = derivedFixtureMap;

@@ -51,16 +51,16 @@ describe("the engine's test double", () => {
     await environment.store.dispose();
   });
 
-  // D47: the app opens on the Overview at every start; a page test asks for
-  // it, as `?crash=` asks for a fault, and every other open keeps the page
-  // its fixture saved.
-  it("lands on the Overview when the address asks for it", async () => {
+  // D51 (D47 amended): the app opens on the Session page at every start; a
+  // page test asks for it, as `?crash=` asks for a fault, and every other
+  // open keeps the page its fixture saved.
+  it("lands on the Session page when the address asks for it", async () => {
     window.history.replaceState(null, "", "/?fixture=audio-populated&transport=fixture&landing=1");
     const environment = await createShellEnvironment();
-    expect(storeOptions()?.landing).toBe("overview");
+    expect(storeOptions()?.landing).toBe("session");
     await environment.store.initialize();
     expect(environment.store.getSnapshot().lifecycle).toBe("ready");
-    expect(environment.store.getSnapshot().activeWorkspace).toBe("overview");
+    expect(environment.store.getSnapshot().activeWorkspace).toBe("session");
     await environment.store.dispose();
   });
 
@@ -71,7 +71,7 @@ describe("the engine's test double", () => {
     window.history.replaceState(null, "", "/?fixture=audio-populated&transport=fixture&landing=1");
     const first = await createShellEnvironment();
     await first.store.initialize();
-    expect(first.store.getSnapshot().activeWorkspace).toBe("overview");
+    expect(first.store.getSnapshot().activeWorkspace).toBe("session");
     await first.store.dispose();
 
     const reloaded = await createShellEnvironment();
@@ -87,8 +87,8 @@ describe("the engine's test double", () => {
     const environment = await createShellEnvironment();
     expect(environment.liveTransportRequested).toBe(true);
     expect(environment.crashWorkspace).toBeNull();
-    // The app's window lands on the Overview whatever the address says.
-    expect(storeOptions()?.landing).toBe("overview");
+    // The app's window lands on the Session page whatever the address says.
+    expect(storeOptions()?.landing).toBe("session");
   });
 
   it("is imported by one module, which is loaded on request", () => {

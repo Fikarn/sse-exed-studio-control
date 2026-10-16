@@ -24,8 +24,8 @@ import type { Session } from "./generated/snapshots/Session";
 import type { SessionKind } from "./generated/snapshots/SessionKind";
 import type { SessionSnapshot } from "./generated/snapshots/SessionSnapshot";
 
-/** The pages, in the tab order (D4); the Overview first since D47. */
-export type WorkspaceId = "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+/** The pages, in the tab order (D4); the Session page first since D51, then the Overview (D47). */
+export type WorkspaceId = "session" | "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
 export type RecoveryState = "healthy" | "degraded" | "recovery";
 export type CommissioningStage = "setup-required" | "in-progress" | "ready";
 export type RunnerStage = "import" | "probe" | "map" | "verify" | "publish";

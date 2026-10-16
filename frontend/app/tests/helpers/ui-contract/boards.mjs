@@ -8,9 +8,18 @@ export const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 const fixtureMap = JSON.parse(
   readFileSync(new URL("../../../../packages/test-fixtures/src/fixtures.json", import.meta.url), "utf8")
 );
-// The Overview's three moments (D47) are built in code (test-fixtures'
-// `index.ts`), not in `fixtures.json`, so they are named here to be measured.
-export const CODE_BOARDS = ["overview-take", "overview-landing", "overview-fault"];
+// The Overview's three moments (D47) and the Session page's four (D51) are
+// built in code (test-fixtures' `index.ts`), not in `fixtures.json`, so they
+// are named here to be measured.
+export const CODE_BOARDS = [
+  "overview-take",
+  "overview-landing",
+  "overview-fault",
+  "session-choose",
+  "session-window",
+  "session-running",
+  "session-running-window",
+];
 export const FIXTURES = [...Object.keys(fixtureMap), ...CODE_BOARDS];
 
 // Pre-ready families never hydrate the audio snapshot, so they skip the
@@ -32,8 +41,17 @@ export function isLoading(fixture) {
 // data alone — the Teleprompter's editor is the bay's second view, chosen on
 // the page. The fixture holds the data; these are the presses that bring the
 // page to the board, and the mark that says it is there. Setup's Map step is
-// on the deck's first page until another page's tab is pressed.
+// on the deck's first page until another page's tab is pressed. A Session
+// Room's window opens from its Room (D51).
 export const BOARD_STEPS = {
+  "session-window": {
+    presses: ["session-room-podcast"],
+    ready: "[data-testid=session-window][role=dialog]",
+  },
+  "session-running-window": {
+    presses: ["session-room-podcast"],
+    ready: "[data-testid=session-window][role=dialog]",
+  },
   "setup-map-cameras": {
     presses: ["setup-deck-page-cameras"],
     ready: "[data-testid=setup-deck-page-cameras][data-active=true]",
@@ -132,6 +150,13 @@ export const EXCEPTIONS = {
   // The Console's loading surface stands in for its display and its footer:
   // the header, the cluster and the plate stand empty.
   "audio-loading": { regionsPresent: 3 },
+  // The Session page (D51) is the one page without the frame's cluster, plate
+  // and state display: the header, the question and three Rooms in the bay,
+  // and the footer.
+  "session-choose": { regionsPresent: 2 },
+  "session-window": { regionsPresent: 2 },
+  "session-running": { regionsPresent: 2 },
+  "session-running-window": { regionsPresent: 2 },
 };
 
 /** The limits of one board: the common ones, with the board's own in their place. */

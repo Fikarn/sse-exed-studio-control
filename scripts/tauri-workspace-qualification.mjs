@@ -173,16 +173,17 @@ const DEFAULT_WAIT_TIMEOUT_MS = 40_000;
 
 // New pages program, Slice 1: Planning has left the screen, and with it this
 // lane's Planning round-trips and the Planning page it restarted on. The page
-// the lane leaves on is Lighting. D47 (2026-10-09, D1 amended): the app opens
-// on the Overview at every start, whatever page was saved, so the restart
-// opens the Overview and writes it as the saved page (the deck's word); what
-// was saved is proved by the rest of the restart's checks. Until D47 the
-// restart came back on Lighting, the page saved.
+// the lane leaves on is Lighting. D51 (2026-10-15, D1 and D47 amended): the
+// app opens on the Session page at every start, whatever page was saved, so
+// the restart opens the Session page and writes it as the saved page (the
+// deck's word); what was saved is proved by the rest of the restart's checks.
+// From D47 (2026-10-09) the restart opened the Overview; until D47 it came
+// back on Lighting, the page saved. The lane reads the store, never the page.
 const SAVED_WORKSPACE = "lighting";
-/** The page the app opens on at every start once the setup is published (D47). */
-const LANDING_WORKSPACE = "overview";
+/** The page the app opens on at every start once the setup is published (D51). */
+const LANDING_WORKSPACE = "session";
 const SCOPE_CHANGED =
-  "D47 (2026-10-09): the lane leaves on Lighting and the restart opens the Overview, the page the app opens on at every start, and saves it; the scene, the console's selection and its last read prove the saved data. Until D47 the restart came back on Lighting. New pages program, Slice 1: no Planning project is checked; until then the page was Planning and a created Planning project had to survive the restart.";
+  "D51 (2026-10-15): the lane leaves on Lighting and the restart opens the Session page, the page the app opens on at every start, and saves it; the scene, the console's selection and its last read prove the saved data. From D47 (2026-10-09) the restart opened the Overview, and until D47 it came back on Lighting. New pages program, Slice 1: no Planning project is checked; until then the page was Planning and a created Planning project had to survive the restart.";
 // 2026-10-01 (the owner's decision, after the studio walk): the Console's
 // snapshots are TotalMix's own. The lane loads TotalMix's slot 2 through the
 // test bridge, as the operator's second press does; on the simulated console
@@ -569,7 +570,7 @@ async function runWorkspaceQualification() {
     }
 
     // The page the operator leaves on is saved: the lane ends on it, and the
-    // restart below opens the Overview all the same (D47).
+    // restart below opens the Session page all the same (D51).
     const finalWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
       workspaceId: SAVED_WORKSPACE,
     });
@@ -617,9 +618,9 @@ async function runWorkspaceQualification() {
     restartSession = await launchRestartReadySession(runtime);
     const restartStatus = restartSession.status;
 
-    // D47: the start opens the Overview though Lighting was saved, and writes
-    // it before the shell is ready, so the saved page (the deck's word) says
-    // it too.
+    // D51: the start opens the Session page though Lighting was saved, and
+    // writes it before the shell is ready, so the saved page (the deck's word)
+    // says it too.
     assertWorkspaceReady(restartStatus, LANDING_WORKSPACE);
     assert(
       restartStatus.shellState.appSnapshot?.shell?.workspace === LANDING_WORKSPACE,
