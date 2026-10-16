@@ -91,8 +91,8 @@
 }
 
 /* The Rooms come in once after a start of the app: an 8 px rise and a fade
-   each, 70 ms apart; the question rises with the first. The app's reduced
-   motion shortens it to nothing (global.css). */
+   each, 70 ms apart; the question rises with the first. With reduced motion
+   they stand at rest at once. */
 @keyframes enter {
   from {
     opacity: 0;
@@ -100,17 +100,19 @@
   }
 }
 
-.workspace[data-entering] .question,
-.workspace[data-entering] .room {
-  animation: enter 420ms var(--motion-easing-mech) backwards;
-}
+@media (prefers-reduced-motion: no-preference) {
+  .workspace[data-entering] .question,
+  .workspace[data-entering] .room {
+    animation: enter 420ms var(--motion-easing-mech) backwards;
+  }
 
-.workspace[data-entering] .room:nth-child(2) {
-  animation-delay: 70ms;
-}
+  .workspace[data-entering] .room:nth-child(2) {
+    animation-delay: 70ms;
+  }
 
-.workspace[data-entering] .room:nth-child(3) {
-  animation-delay: 140ms;
+  .workspace[data-entering] .room:nth-child(3) {
+    animation-delay: 140ms;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -186,12 +188,19 @@
   border-color: var(--accent);
 }
 
-/* The last session of this kind, one press from reuse: a series keeps its name. */
+/* The last session of this kind, one press from reuse: a series keeps its name.
+   The row keeps its two lines' height when the kind was never made, so the
+   notes under it stand at one place in every window. */
 .last {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-height: 40px;
   margin-top: 14px;
+}
+
+.last[data-none] {
+  align-items: flex-start;
 }
 
 .lastFacts {

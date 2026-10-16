@@ -137,6 +137,20 @@ export function censusInPage() {
     if (x1 - x0 < 1 || y1 - y0 < 1) return null;
     return { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) };
   };
+  // The Session page's window (D51): while a modal layer stands open (a sheet,
+  // a dialog), the page it dims under its scrim is not there to be read, as a
+  // text scrolled out of sight is not, so its contrast is not sampled: the
+  // sampler reads a text's own colour against the dimmed pixels behind it, and
+  // a dark key's word under the scrim would fail a contrast no one is to read.
+  // A text is covered when the topmost thing at its middle is neither it, nor
+  // inside it, nor what holds it. The layer's own texts, and those the layer
+  // leaves above it (the header), are read.
+  const modals = [...root.querySelectorAll('[aria-modal="true"]')].filter((m) => vis(m, m.getBoundingClientRect()));
+  const coveredByModal = (el, r) => {
+    if (modals.length === 0 || modals.some((m) => m.contains(el))) return false;
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return hit !== null && hit !== el && !el.contains(hit) && !hit.contains(el);
+  };
   // Allowed radii per system §5: 4 · 8 · 12 · pill. A pill is any radius at or
   // above 999 px or a 50 % circle; 0 is "no radius" and not counted.
   const radiusAllowed = (value) => {
@@ -293,6 +307,8 @@ export function censusInPage() {
       // The box on screen (`visibleBox`); a text scrolled or clipped out of
       // sight keeps its full box and says so, and its contrast is not sampled.
       clippedOut: seen === null,
+      // Under an open modal layer's scrim (`coveredByModal`): not sampled either.
+      covered: coveredByModal(el, r),
       x: seen ? seen.x : Math.round(r.left),
       y: seen ? seen.y : Math.round(r.top),
       w: seen ? seen.w : Math.round(r.width),
@@ -368,6 +384,8 @@ export function censusInPage() {
     // The texts the contrast sampler skips as out of sight (`visibleBox`), so
     // a board's report shows what the gate did not read.
     clippedOutTexts: texts.filter((t) => t.clippedOut).length,
+    // The texts an open modal layer covers, which the sampler skips too.
+    coveredTexts: texts.filter((t) => t.covered).length,
     textColorCount: textColors.size,
     bgColorCount: bgColors.size,
     radii: sortMap(radii),

@@ -307,4 +307,36 @@ test.describe("UI contract — the census", () => {
       expect(worstContrast(contrast, 6, " · ")).toBe("");
     }
   });
+
+  // The Session page's window (D51): a modal layer over a page dimmed under its
+  // scrim, with the header left live above it. A dark key's word under the
+  // scrim is not there to be read (the sampler would read its own ink against
+  // the dimmed key and fail it), so it is not sampled; the layer's words and
+  // the header's are.
+  test("does not sample what an open modal layer covers, and samples the layer and what stands above it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.setContent(
+      `<!doctype html><html><body style="margin:0;background:rgb(11,19,17);color:rgb(246,245,232);font:20px/1.5 sans-serif">` +
+        `<header style="position:relative;z-index:2;height:80px">Header word</header>` +
+        `<button style="margin:40px;padding:8px 16px;border:0;background:rgb(237,235,209);color:rgb(0,0,0);font:inherit">Dark key</button>` +
+        `<p style="margin:40px">Page line</p>` +
+        `<div style="position:fixed;top:80px;left:0;right:0;bottom:0;z-index:1;background:rgba(3,6,5,0.74)"></div>` +
+        `<section role="dialog" aria-modal="true" style="position:fixed;z-index:1;left:400px;top:300px;width:300px;padding:16px;background:rgb(23,34,30)">` +
+        `<span>Layer word</span> <button style="border:0;padding:8px;background:rgb(237,235,209);color:rgb(0,0,0);font:inherit">Layer key</button></section>` +
+        `</body></html>`
+    );
+    const { census, contrast } = await measureBoard(page);
+    const texts = census.texts as Array<{ text: string; covered: boolean }>;
+    const covered = (text: string) => texts.find((t) => t.text === text)?.covered;
+    expect(covered("Dark key")).toBe(true);
+    expect(covered("Page line")).toBe(true);
+    for (const read of ["Header word", "Layer word", "Layer key"]) expect(covered(read), read).toBe(false);
+    expect(census.coveredTexts).toBe(2);
+    if (SAMPLES_CONTRAST) {
+      expect(contrast?.measured).toBe(texts.length - 2);
+      expect(worstContrast(contrast, 6, " · ")).toBe("");
+    }
+  });
 });

@@ -279,6 +279,12 @@ const STATE_FIXTURES = [
   "overview-take",
   "overview-landing",
   "overview-fault",
+  // The Session page (D51): the three Rooms, the podcast Room's window, a
+  // session running and its own window.
+  "session-choose",
+  "session-window",
+  "session-running",
+  "session-running-window",
 ] as const;
 
 // The fixtures no capture draws: their state display says the whole of its
@@ -323,6 +329,7 @@ test.describe("state coverage", () => {
 // board whose desk does not answer, and on a start that failed; and each
 // page's footer.
 const CHROME = [
+  { name: "header-session", fixture: "session-choose", region: HEADER },
   { name: "header-overview", fixture: "overview-take", region: HEADER },
   { name: "header-setup", fixture: "setup-ready", region: HEADER },
   { name: "header-lighting", fixture: "lighting-populated", region: HEADER },
@@ -333,6 +340,7 @@ const CHROME = [
   { name: "header-cameras-lost-mid-take", fixture: "cameras-lost-mid-take", region: HEADER },
   { name: "header-desk-offline", fixture: "audio-offline", region: HEADER },
   { name: "header-start-failed", fixture: "bootstrap-failed", region: HEADER },
+  { name: "footer-session", fixture: "session-choose", region: FOOTER },
   { name: "footer-overview", fixture: "overview-take", region: FOOTER },
   { name: "footer-setup", fixture: "setup-ready", region: FOOTER },
   { name: "footer-lighting", fixture: "lighting-populated", region: FOOTER },

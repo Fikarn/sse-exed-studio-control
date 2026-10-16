@@ -64,6 +64,10 @@ const NO_CHIPS: AudioChannelGroupSelections = { "hardware-inputs": [], "software
 /** The Rooms come in once after a start of the app, not at every return to the page. */
 let enteredSinceStart = false;
 
+/** With reduced motion the Rooms stand at rest at once, and no entrance waits to end. */
+const prefersReducedMotion = () =>
+  typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 /** What an action answers: the hardware link's sentence, when it gives one. */
 function sentenceOf(result: JsonValue): string | null {
   return result && typeof result === "object" && !Array.isArray(result) && typeof result.sentence === "string"
@@ -95,7 +99,7 @@ function SessionWorkspaceRoot({
 }: SessionWorkspaceProps) {
   const toast = useToast();
   const now = usePageClock();
-  const [entering, setEntering] = useState(() => !enteredSinceStart);
+  const [entering, setEntering] = useState(() => !enteredSinceStart && !prefersReducedMotion());
   useEffect(() => {
     enteredSinceStart = true;
   }, []);

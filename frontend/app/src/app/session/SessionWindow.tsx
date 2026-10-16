@@ -175,7 +175,7 @@ export function SessionWindow({
             data-testid="session-name"
             onChange={(event) => onName(event.target.value)}
           />
-          <div className={styles.last} data-testid="session-last">
+          <div className={styles.last} data-none={last ? undefined : ""} data-testid="session-last">
             {last ? (
               <>
                 <span className={styles.lastFacts}>
