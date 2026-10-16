@@ -113,7 +113,7 @@ Three pull requests (the build plan of 2026-10-15; this section said two until t
   - The opening and closing are Web Animations, with the reduced-motion fade.
 - **Storybook:** the boards "Session" and "Session window, open".
 
-**PR 3: the page** (#TBD). No review.
+**PR 3: the page** (#353). No review.
 
 - **The shell:**
   - `session` joins `WorkspaceId`, `workspaceChunks`, `WORKSPACE_IDS` and `deriveWorkspace`;
