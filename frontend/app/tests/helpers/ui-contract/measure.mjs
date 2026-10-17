@@ -128,8 +128,10 @@ export function summarize(c, contrast) {
     radiiOff: c.radiiOff,
     contrastMeasured: contrast === null ? null : contrast.measured,
     contrastFails: contrast === null ? null : contrast.fails.length,
-    // Reported, not judged: the texts out of sight that the sampler skips.
+    // Reported, not judged: the texts out of sight that the sampler skips,
+    // and those under an open modal layer's scrim.
     contrastClippedOut: c.clippedOutTexts,
+    contrastCovered: c.coveredTexts,
     shadows: c.light.shadows,
     shadowNegative: c.light.outerNegativeOffset,
     blurOver8: c.light.outerBlurOver8,

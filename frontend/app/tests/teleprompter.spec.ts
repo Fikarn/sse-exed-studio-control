@@ -30,12 +30,13 @@ const state = (page: Page) => page.getByTestId("teleprompter-state-display");
 test.describe("the Teleprompter page (new pages S6a)", () => {
   test("is the last tab, and shows the script on the glass with its place and time", async ({ page }) => {
     await openTeleprompter(page);
-    // The skylight (D48): the pages on their platter, the Overview first (D47),
-    // then Setup / Support on the system's.
+    // The skylight (D48): the pages on their platter, the Session page first
+    // (D51), then the Overview (D47), then Setup / Support on the system's.
     const tabs = page.locator('[data-region="header"] [data-nav-id]');
     // The shell (overhaul 3): a tab carries its page's word, outside its name.
-    await expect(tabs).toHaveCount(6);
+    await expect(tabs).toHaveCount(7);
     for (const [index, name] of [
+      "Session",
       "Overview",
       "Lighting",
       "Audio",

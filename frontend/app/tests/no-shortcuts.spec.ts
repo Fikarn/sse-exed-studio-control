@@ -62,7 +62,7 @@ async function settle(page: Page) {
   await page.waitForTimeout(150);
 }
 
-type Workspace = "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+type Workspace = "session" | "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
 
 async function open(page: Page, fixture: string, workspace: Workspace) {
   await openFixture(page, fixture);
@@ -214,6 +214,43 @@ test.describe("No key does anything (new pages S3, D6)", () => {
       "Enter",
       "Escape",
     ]);
+  });
+
+  // The Session page (D51): the Rooms are keys, and nothing chooses one but a
+  // press; Enter begins nothing. A Room's window closes on Esc (one Esc, one
+  // layer: DESIGN.md section 9), and nothing else moves.
+  test("the Session page: Enter, Space, the digits, the arrows and Esc; Esc closes a Room's window and nothing else", async ({
+    page,
+  }) => {
+    await open(page, "session-choose", "session");
+    await expectNoKeyGlyphs(page, "the Session page");
+    await expectKeysDoNothing(page, "session-choose", "session", [
+      "Enter",
+      "Space",
+      "1",
+      "2",
+      "3",
+      "ArrowLeft",
+      "ArrowRight",
+      "b",
+      "n",
+      "Control+k",
+      "?",
+      "Escape",
+    ]);
+
+    await open(page, "session-choose", "session");
+    const before = await readScreenState(page);
+    await page.getByTestId("session-room-podcast").click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expectNoKeyGlyphs(page, "a Room's window");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await settle(page);
+    const after = await readScreenState(page);
+    // The focus went back to the Room the window came from; nothing else moved.
+    expect(after.focus).toBe("session-room-podcast");
+    expect({ ...after, focus: before.focus }).toEqual(before);
   });
 
   // The keys a camera program usually binds: R and Space to record, 1 to 3

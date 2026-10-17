@@ -323,7 +323,7 @@ describe("the header on each page", () => {
 
   it("keeps REC in its own slot on every page, Cameras included", () => {
     const items = buildMonitorItems(recording as never, { lightingSceneDrift: false, audioSolo: false });
-    for (const page of ["overview", "setup", "lighting", "audio", "cameras", "teleprompter"]) {
+    for (const page of ["session", "overview", "setup", "lighting", "audio", "cameras", "teleprompter"]) {
       const header = headerItems(items, page);
       expect(header.rec?.id, page).toBe("latched:rec");
       expect(ids(header.lamps), page).not.toContain("latched:rec");
@@ -356,6 +356,22 @@ describe("the header on each page", () => {
     expect(ids(headerItems(items, "setup").lamps)).toEqual(
       expect.arrayContaining(["latched:scene-drift", "latched:solo"])
     );
+  });
+
+  // The Session page (D51) has no latch slot: its header shows every latch, as Setup's does.
+  it("keeps every latch and lamp on the Session page's header", () => {
+    const items = buildMonitorItems(
+      recording as never,
+      { lightingSceneDrift: true, audioSolo: true },
+      {
+        lighting: { tone: "attention", winsTies: true, word: "held" },
+      }
+    );
+    const header = headerItems(items, "session");
+    expect(ids(header.lamps)).toEqual(
+      expect.arrayContaining(["latched:scene-drift", "latched:solo", "lighting", "audio", "cameras", "surface"])
+    );
+    expect(header.rec?.id).toBe("latched:rec");
   });
 
   // The polish (2026-10-05): on Lighting, which has a Solo of its own, the

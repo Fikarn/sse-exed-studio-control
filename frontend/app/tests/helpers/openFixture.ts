@@ -15,9 +15,10 @@ export async function openFixture(
   fixtureId: string,
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
-    crash?: "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
-    /** D47: open as the app does, on the Overview unless the setup is not
-     *  done; without it the page opens on the fixture's saved page. */
+    crash?: "session" | "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
+    /** D51 (D47 amended): open as the app does, on the Session page unless
+     *  the setup is not done; without it the page opens on the fixture's
+     *  saved page. */
     landing?: boolean;
   }
 ) {
@@ -45,6 +46,8 @@ export async function openFixture(
 // Each mark is an element only the mounted workspace draws: never its loading
 // surface, never the shell's `workspace-loading`.
 const WORKSPACE_MARKS = {
+  // The Session page (D51): its three Rooms.
+  session: "session-rooms",
   // The Overview (D47): its bay, drawn once the page has the snapshots.
   overview: "overview-bay",
   setup: "setup-workspace",

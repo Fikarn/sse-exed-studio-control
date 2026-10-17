@@ -72,6 +72,7 @@ function workspaceChunk<Props>(load: () => Promise<ComponentType<Props>>) {
 }
 
 export const workspaceChunks = {
+  session: workspaceChunk(() => import("./session/SessionWorkspace").then((module) => module.SessionWorkspace)),
   overview: workspaceChunk(() => import("./overview/OverviewWorkspace").then((module) => module.OverviewWorkspace)),
   setup: workspaceChunk(() => import("./setup/SetupSupportPilot").then((module) => module.SetupSupportPilot)),
   lighting: workspaceChunk(() =>
@@ -85,6 +86,7 @@ export const workspaceChunks = {
 };
 
 export const WORKSPACE_IDS: readonly WorkspaceId[] = [
+  "session",
   "overview",
   "setup",
   "lighting",

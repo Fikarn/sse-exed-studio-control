@@ -424,6 +424,7 @@ test("the crash hook is absent unless the fixture URL asks for it", async ({ pag
 // again its marker moves into the entry script and this fails. (New pages
 // program, Slice 1: Planning and its chunk are gone.)
 const WORKSPACE_CHUNKS = {
+  SessionWorkspace: "session-rooms",
   OverviewWorkspace: "overview-bay",
   LightingWorkspace: "lighting-scenes-section",
   AudioWorkspace: "audio-monitor-bar",
@@ -501,7 +502,7 @@ test("no tab moves when the page changes", async ({ page }) => {
       [...element.querySelectorAll("[data-nav-id]")].map((tab) => Math.round(tab.getBoundingClientRect().left))
     );
   const first = await lefts();
-  for (const label of ["Overview", "Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"]) {
+  for (const label of ["Session", "Overview", "Lighting", "Audio", "Cameras", "Teleprompter", "Setup / Support"]) {
     await header.getByRole("button", { name: label, exact: true }).click();
     await expect(header.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
     expect(await lefts(), `the tabs on ${label}`).toEqual(first);
@@ -574,8 +575,9 @@ test.describe("the header, the skylight", () => {
         headerClipped: header.scrollWidth > header.clientWidth,
       };
     });
-    // The Overview (D47) first, a tab with no lamp: the page shows every page.
-    expect(row.pageTabs).toEqual(["overview", "lighting", "audio", "cameras", "teleprompter"]);
+    // The Session page (D51) first, then the Overview (D47), two tabs with no
+    // lamp: the one begins a session, the other shows every page.
+    expect(row.pageTabs).toEqual(["session", "overview", "lighting", "audio", "cameras", "teleprompter"]);
     expect(row.pageWords).toEqual([
       "shell-lamp-lighting",
       "shell-lamp-audio",

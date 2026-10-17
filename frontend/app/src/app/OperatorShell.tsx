@@ -44,9 +44,12 @@ export type ShellEnvironment = Awaited<ReturnType<typeof createShellEnvironment>
 // workspaces. They print no key hint — Studio Control binds no key of its own.
 // The skylight (D48): Setup / Support is the system's own page, so its tab
 // stands on the system's platter at the header's right, beside the deck's
-// lamp, the backup and the latches. The Overview (D47) is the first page: the
-// app opens on it, and it shows every page's key facts at once.
+// lamp, the backup and the latches. The Session page (D51) is the first page:
+// the app opens on it, and every session begins there. The Overview (D47)
+// follows it: it shows every page's key facts at once, and Begin, Continue
+// and every return key open it.
 const WORKSPACES = [
+  { id: "session", label: "Session" },
   { id: "overview", label: "Overview" },
   { id: "setup", label: "Setup / Support", system: true },
   { id: "lighting", label: "Lighting" },
@@ -269,7 +272,9 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
     String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
   const tabsDisabled = shellExperience !== "ready";
   const disabledWorkspaces =
-    !tabsDisabled && !operatorModeUnlocked ? ["overview", "lighting", "audio", "cameras", "teleprompter"] : [];
+    !tabsDisabled && !operatorModeUnlocked
+      ? ["session", "overview", "lighting", "audio", "cameras", "teleprompter"]
+      : [];
   // The lamps, the chips and the latches: what the header shows, and what the
   // Overview ranks to find the worst page (D47), so the two never disagree.
   // Kept between renders (the audit of 2026-10-12): the Overview takes the
@@ -312,8 +317,11 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   // Console's, the rig's and Support's left the bay for the shell's plate.
   // The screens before ready fill the cluster and the plate too (their state
   // display stands where every page's does); they have no footer, because
-  // there is nothing to report yet.
-  const workspaceRegions = "slot" as const;
+  // there is nothing to report yet. The Session page (D51) is the one page
+  // without the cluster and the plate: the frame draws the bay alone there,
+  // and the footer. A screen drawn in its place (the area's loading or its
+  // fault) draws the two columns itself, as it does without the shell.
+  const workspaceRegions = shellExperience === "ready" && activeWorkspace === "session" ? undefined : ("slot" as const);
   const footerRegion = shellExperience === "ready" ? ("slot" as const) : undefined;
 
   // What the workspace boundary calls the area it wraps (Slice 9).
@@ -324,6 +332,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         ? "Recovery"
         : "Startup";
 
+  const SessionSurface = workspaceChunks.session.Surface;
   const OverviewSurface = workspaceChunks.overview.Surface;
   const SetupSurface = workspaceChunks.setup.Surface;
   const LightingSurface = workspaceChunks.lighting.Surface;
@@ -359,6 +368,21 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         healthSnapshot={shellState.healthSnapshot}
         liveTransportRequested={environment.liveTransportRequested}
         onRequestRestart={requestRestart}
+        store={environment.store}
+        supportSnapshot={deferredSupportSnapshot}
+      />
+    );
+  } else if (activeWorkspace === "session") {
+    surface = (
+      <SessionSurface
+        appSnapshot={shellState.appSnapshot}
+        audioSnapshot={deferredAudioSnapshot}
+        camerasSnapshot={shellState.camerasSnapshot}
+        healthSnapshot={shellState.healthSnapshot}
+        lamps={monitorItems}
+        lightingSnapshot={deferredLightingSnapshot}
+        prompterSnapshot={shellState.prompterSnapshot}
+        sessionSnapshot={shellState.sessionSnapshot}
         store={environment.store}
         supportSnapshot={deferredSupportSnapshot}
       />
@@ -407,7 +431,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       />
     );
   } else {
-    // The Console. Setup is drawn above in every shell state, and the Overview,
+    // The Console. Setup is drawn above in every shell state, and the Session page, the Overview,
     // Lighting, the Cameras and the Teleprompter just above, so Audio is the one workspace left to reach
     // this branch (new pages program, D1: a page saved while Planning was open
     // reads as the Console).

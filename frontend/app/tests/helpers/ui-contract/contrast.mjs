@@ -122,8 +122,9 @@ export function sampleContrast(png, texts) {
     if (!fg || t.w <= 0 || t.h <= 0) continue;
     // A text its clipping ancestors hide (a scrolled field's lines out of
     // sight) is not on screen to read; one partly hidden is sampled on the
-    // part that is (the census's `visibleBox`).
-    if (t.clippedOut) continue;
+    // part that is (the census's `visibleBox`). One an open modal layer
+    // covers is not there to read either (the census's `coveredByModal`).
+    if (t.clippedOut || t.covered) continue;
     if (t.x < 0 || t.y < 0 || t.x + t.w > png.width || t.y + t.h > png.height) continue;
     if ((t.opacity ?? 1) < 0.9 || t.disabled) continue;
     const bg = t.bgSelf ? interiorMode(png, t.x, t.y, t.w, t.h) : ringMedian(png, t.x, t.y, t.w, t.h);

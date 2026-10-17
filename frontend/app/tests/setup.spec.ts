@@ -58,8 +58,9 @@ test("walks the fixture-backed commissioning runner and support actions", async 
   await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
 
   await page.getByRole("button", { name: "Publish setup" }).click();
-  // D47 (2026-10-09): Publish opens the Overview, the page the app opens on.
-  // Old: the Console (new pages program, Slice 1, D1), and Planning before it.
+  // D47 (2026-10-09): Publish opens the Overview; D51 keeps it so, though the
+  // app opens on the Session page. Old: the Console (new pages program,
+  // Slice 1, D1), and Planning before it.
   await expectWorkspaceMounted(page, "overview");
 });
 
@@ -187,8 +188,9 @@ test.describe("a published setup unpublishes only at a second press", () => {
     await step.click();
     await page.clock.resume();
     await expect(audioNav(page)).toHaveAttribute("aria-disabled", "true");
-    // D47: the Overview locks with them, as the sentence says.
+    // D47 and D51: the Overview and the Session page lock with them, as the sentence says.
     await expect(page.locator('[data-nav-id="overview"]')).toHaveAttribute("aria-disabled", "true");
+    await expect(page.locator('[data-nav-id="session"]')).toHaveAttribute("aria-disabled", "true");
   });
 
   test("the arm lapses after 3 s and nothing is unpublished", async ({ page }) => {
