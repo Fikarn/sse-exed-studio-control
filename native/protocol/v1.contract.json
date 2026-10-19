@@ -119,7 +119,8 @@
     "cameras.pictures.showing",
     "session.snapshot",
     "session.begin",
-    "session.end"
+    "session.end",
+    "session.settings.update"
   ],
   "events": [
     "app.changed",

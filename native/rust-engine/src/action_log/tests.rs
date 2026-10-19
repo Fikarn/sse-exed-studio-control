@@ -303,7 +303,27 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             json!({}),
             json!({ "ended": session_value("webinar", "Spring launch", Some(SESSION_NOON)) }),
         ),
+        // Setup's settings for the session's folder (D52).
+        (
+            "session.settings.update",
+            json!({ "root": r"D:\Sessions" }),
+            json!({ "settings": session_settings() }),
+        ),
     ]
+}
+
+/// The session's settings as `session.settings.update` answers them.
+fn session_settings() -> Value {
+    json!({
+        "root": r"D:\Sessions",
+        "subfolders": {
+            "green-screen": ["Video", "vMix Recording", "Script", "Exports"],
+            "podcast": ["Audio", "Video", "vMix Recording", "Exports"],
+            "webinar": []
+        },
+        "lowBelowGb": 200,
+        "nearlyFullBelowGb": 50
+    })
 }
 
 const SESSION_MORNING: &str = "2026-10-15T07:16:00.000Z";
@@ -400,6 +420,96 @@ fn the_session_rows_are_its_end_and_its_begin_in_that_order() {
         Some(UiMethodClass::NotAnAction)
     );
     assert!(rows("session.snapshot", json!({ "current": null, "last": [] })).is_empty());
+
+    // D52: a begin's row names its folder, and says when the begin made it;
+    // the end's is as it was.
+    let made = r"D:\Sessions\Morning take (2026-10-18)";
+    assert_eq!(
+        rows(
+            "session.begin",
+            json!({
+                "session": session_value("podcast", "Morning take", None),
+                "ended": session_value("webinar", "", Some(SESSION_NOON)),
+                "folder": { "path": made, "made": true }
+            })
+        ),
+        vec![
+            row("ended", "webinar", "Session ended: Webinar"),
+            row(
+                "begun",
+                "podcast",
+                r"Session begun: Podcast Recording · Morning take, in a new folder D:\Sessions\Morning take (2026-10-18)"
+            ),
+        ]
+    );
+    assert_eq!(
+        rows(
+            "session.begin",
+            json!({
+                "session": session_value("webinar", "", None),
+                "ended": null,
+                "folder": { "path": r"D:\All\Series (2026-10-01)", "made": false }
+            })
+        ),
+        vec![row(
+            "begun",
+            "webinar",
+            r"Session begun: Webinar, in D:\All\Series (2026-10-01)"
+        )]
+    );
+}
+
+// D52: Setup's settings for the session's folder leave a row for each part a
+// request gave, named from the answer.
+#[test]
+fn the_session_settings_rows_say_what_the_settings_hold_now() {
+    let rows = |params: Value| {
+        ui_actions(
+            "session.settings.update",
+            &params,
+            &json!({ "settings": session_settings() }),
+            false,
+        )
+        .into_iter()
+        .map(|entry| {
+            assert_eq!(
+                (entry.source, entry.domain, entry.action),
+                (ActionSource::Ui, DOMAIN_SESSION, "settings")
+            );
+            (entry.target, entry.detail)
+        })
+        .collect::<Vec<_>>()
+    };
+    let row = |target: &str, detail: &str| (String::from(target), String::from(detail));
+    assert_eq!(
+        rows(json!({ "root": r"d:/Sessions" })),
+        vec![row("root", r"Sessions' folder set to D:\Sessions.")]
+    );
+    assert_eq!(
+        rows(json!({ "subfolders": { "webinar": [], "podcast": ["Audio"] } })),
+        vec![
+            row(
+                "subfolders",
+                "Podcast Recording's subfolders: Audio, Video, vMix Recording, Exports."
+            ),
+            row("subfolders", "Webinar's subfolders: none."),
+        ]
+    );
+    assert_eq!(
+        rows(json!({ "nearlyFullBelowGb": 50 })),
+        vec![row(
+            "thresholds",
+            "The disk reads Low under 200 GB and Nearly full under 50 GB."
+        )]
+    );
+    assert_eq!(
+        rows(json!({ "root": r"D:\Sessions", "lowBelowGb": 200, "subfolders": { "green-screen": [] } }))
+            .into_iter()
+            .map(|(target, _)| target)
+            .collect::<Vec<_>>(),
+        ["root", "subfolders", "thresholds"]
+    );
+    assert!(rows(json!({ "root": null })).is_empty());
 }
 
 // New pages program, Slice 8: the cameras' rows are under the cameras, the

@@ -60,14 +60,28 @@ describe("the Session page's fixtures", () => {
             name: "Leading Through Change — episode 2",
             begunAt: "2026-04-22T12:02:00.000Z",
             endedAt: "2026-04-22T13:16:00.000Z",
+            folder: "D:\\Sessions\\Leading Through Change — episode 2 (2026-04-22)",
           },
           {
             kind: "green-screen",
             name: "Strategy in Practice — lecture 3",
             begunAt: "2026-04-21T08:30:00.000Z",
             endedAt: "2026-04-21T09:52:00.000Z",
+            folder: "D:\\Sessions\\Strategy in Practice — lecture 3 (2026-04-21)",
           },
         ],
+        // The settings' defaults (D52), and the studio's places.
+        settings: {
+          root: "D:\\Sessions",
+          subfolders: {
+            "green-screen": ["Video", "vMix Recording", "Script", "Exports"],
+            podcast: ["Audio", "Video", "vMix Recording", "Exports"],
+            webinar: ["Slides", "vMix Recording", "Exports"],
+          },
+          lowBelowGb: 200,
+          nearlyFullBelowGb: 50,
+        },
+        places: { root: "D:\\Sessions", simulated: false },
       });
       expect(await read("audio.snapshot")).toMatchObject({
         consoleStateConfidence: "assumed",
@@ -86,8 +100,15 @@ describe("the Session page's fixtures", () => {
         name: "Leading Through Change — episode 3",
         begunAt: "2026-04-23T06:46:00.000Z",
         endedAt: null,
+        folder: "D:\\Sessions\\Leading Through Change — episode 3 (2026-04-23)",
       });
       expect((session.last as JsonObject[]).map((last) => last.kind)).toEqual(["podcast", "green-screen", "webinar"]);
+      expect((session.last as JsonObject[]).map((last) => last.folder)).toEqual([
+        "D:\\Sessions\\Leading Through Change — episode 2 (2026-04-22)",
+        "D:\\Sessions\\Strategy in Practice — lecture 3 (2026-04-21)",
+        "D:\\Sessions\\Markets Outlook, spring (2026-04-17)",
+      ]);
+      expect(session.places).toEqual({ root: "D:\\Sessions", simulated: false });
       expect(await read("audio.snapshot")).toMatchObject({
         verified: true,
         meteringState: "live",

@@ -355,6 +355,69 @@ describe("the fixture double's action log", () => {
       { session: { kind: "interview", name: "A", begunAt: "2026-10-15T07:16:00.000Z", endedAt: null }, ended: null },
       [],
     ],
+    // D52: a begin's row names its folder, and says when the begin made it.
+    [
+      "session.begin",
+      { kind: "podcast", name: "Morning take" },
+      {
+        session: {
+          kind: "podcast",
+          name: "Morning take",
+          begunAt: "2026-10-15T07:16:00.000Z",
+          endedAt: null,
+          folder: "D:\\Sessions\\Morning take (2026-10-15)",
+        },
+        ended: null,
+        folder: { path: "D:\\Sessions\\Morning take (2026-10-15)", made: true },
+      },
+      [
+        row(
+          "session",
+          "begun",
+          "podcast",
+          "Session begun: Podcast Recording · Morning take, in a new folder D:\\Sessions\\Morning take (2026-10-15)"
+        ),
+      ],
+    ],
+    [
+      "session.begin",
+      { kind: "webinar", folder: { mode: "existing", path: "D:\\All\\Series (2026-10-01)" } },
+      {
+        session: {
+          kind: "webinar",
+          name: "",
+          begunAt: "2026-10-15T07:16:00.000Z",
+          endedAt: null,
+          folder: "D:\\All\\Series (2026-10-01)",
+        },
+        ended: null,
+        folder: { path: "D:\\All\\Series (2026-10-01)", made: false },
+      },
+      [row("session", "begun", "webinar", "Session begun: Webinar, in D:\\All\\Series (2026-10-01)")],
+    ],
+    // Setup's settings for the session's folder (D52): a row for each part given.
+    [
+      "session.settings.update",
+      { root: "d:/Sessions", subfolders: { webinar: [], podcast: ["Audio"] }, nearlyFullBelowGb: 50 },
+      {
+        settings: {
+          root: "D:\\Sessions",
+          subfolders: {
+            "green-screen": ["Video", "vMix Recording", "Script", "Exports"],
+            podcast: ["Audio"],
+            webinar: [],
+          },
+          lowBelowGb: 200,
+          nearlyFullBelowGb: 50,
+        },
+      },
+      [
+        row("session", "settings", "root", "Sessions' folder set to D:\\Sessions."),
+        row("session", "settings", "subfolders", "Podcast Recording's subfolders: Audio."),
+        row("session", "settings", "subfolders", "Webinar's subfolders: none."),
+        row("session", "settings", "thresholds", "The disk reads Low under 200 GB and Nearly full under 50 GB."),
+      ],
+    ],
   ];
 
   it.each(cases)("%s %j writes the hardware link's rows", (method, params, result, expected) => {

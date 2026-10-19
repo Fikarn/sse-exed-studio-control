@@ -11,6 +11,7 @@ use crate::health::{
 use crate::lighting::{
     lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
 };
+use crate::session::places::{sessions_simulated, SESSIONS_SIMULATED_ENV};
 use crate::storage::{
     checkpoint_database, initialize_database, list_settings_by_prefix, set_settings_owned_and,
     EngineResult, StorageBootstrap, StorageError, STORAGE_SCHEMA_VERSION,
@@ -52,6 +53,11 @@ pub struct RuntimePaths {
     /// (D33): only `npm run app -- --vmix-pictures` sets it, for a hardware
     /// test the owner attends. A studio build never reads it.
     pub vmix_pictures: bool,
+    /// The sessions' folders are made beside the saved data (D52): always in
+    /// a development build, and in a studio build started with
+    /// `SSE_SESSIONS_SIMULATED=1`, as the release's trial is
+    /// (`session::places`).
+    pub sessions_simulated: bool,
 }
 
 pub struct RuntimeContext {
@@ -71,6 +77,9 @@ pub struct RuntimeContext {
     /// The cameras are the simulated ones (`SSE_CAMERAS_SIMULATED=1`, read at
     /// the start; new pages program, Slice 8).
     pub cameras_simulated: bool,
+    /// The sessions' folders are made beside the saved data (D52; read at the
+    /// start, `RuntimePaths::sessions_simulated`).
+    pub sessions_simulated: bool,
 }
 
 pub const STARTUP_CODE_BOOTSTRAP_FAILED: &str = "BOOTSTRAP_FAILED";
@@ -188,6 +197,10 @@ where
     let vmix_pictures = development_build()
         && env_string(VMIX_PICTURES_ENV, &mut get_env)
             .is_some_and(|value| vmix_pictures_requested(&value));
+    let sessions_simulated = sessions_simulated(
+        development_build(),
+        env_string(SESSIONS_SIMULATED_ENV, &mut get_env).as_deref(),
+    );
 
     Ok(RuntimePaths {
         protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
@@ -200,6 +213,7 @@ where
         safe_start,
         cameras_simulated,
         vmix_pictures,
+        sessions_simulated,
     })
 }
 
@@ -382,6 +396,7 @@ pub(crate) fn bootstrap_runtime_from_paths(
         control_surface_bridge,
         control_surface_token,
         cameras_simulated: runtime_paths.cameras_simulated,
+        sessions_simulated: runtime_paths.sessions_simulated,
     })
 }
 
@@ -440,6 +455,7 @@ pub(crate) fn recovery_runtime_context(runtime_paths: &RuntimePaths) -> RuntimeC
         },
         control_surface_token: String::new(),
         cameras_simulated: runtime_paths.cameras_simulated,
+        sessions_simulated: runtime_paths.sessions_simulated,
     }
 }
 
@@ -1008,6 +1024,7 @@ mod tests {
             safe_start: false,
             cameras_simulated: true,
             vmix_pictures: false,
+            sessions_simulated: true,
             app_data_dir,
         }
     }
@@ -1603,6 +1620,29 @@ mod tests {
                 "{value:?}"
             );
         }
+    }
+
+    // D52: a test build is a development build, so its sessions' folders are
+    // its scratch folder's whatever `SSE_SESSIONS_SIMULATED` holds
+    // (`session::places` tests a studio build's reading), and the start hands
+    // that on.
+    #[test]
+    fn a_development_build_keeps_its_sessions_beside_its_saved_data() {
+        let (base_name, base_value) = host_platform_base();
+        for entries in [
+            vec![(base_name, base_value)],
+            vec![(base_name, base_value), ("SSE_SESSIONS_SIMULATED", "0")],
+            vec![(base_name, base_value), ("SSE_SESSIONS_SIMULATED", "1")],
+        ] {
+            let paths =
+                resolve_runtime_paths_from(current_runtime_platform(), env_fixture(&entries))
+                    .expect("paths should resolve");
+            assert!(paths.sessions_simulated, "{entries:?}");
+        }
+        let test_dir = TestDir::new("sessions-simulated");
+        let runtime = bootstrap_runtime_from_paths(runtime_paths_for(&test_dir))
+            .expect("a simulated start boots");
+        assert!(runtime.sessions_simulated);
     }
 
     // `SSE_SAFE_START=1` — read through the injected reader, like every

@@ -62,7 +62,7 @@ use crate::protocol::{
     EVENT_ENGINE_READY, EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SESSION_CHANGED,
     EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
-use crate::session::{handle_session_request, SessionError};
+use crate::session::{handle_session_request, Places, SessionError};
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
 use crate::storage::{list_settings_by_prefix, set_settings, EngineResult};
 use crate::support::{
@@ -574,11 +574,13 @@ impl EngineApp {
 
             // -------------------------------------------------------------
             // The session (the Session page, 2026-10-15): what the studio
-            // is making, kept in two settings (`session.rs`).
+            // is making, kept in settings of its own, and its folder (D52;
+            // `session.rs`).
             // -------------------------------------------------------------
             "session.snapshot" => self.dispatch_session(request),
             "session.begin" => self.dispatch_session(request),
             "session.end" => self.dispatch_session(request),
+            "session.settings.update" => self.dispatch_session(request),
 
             // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
@@ -947,12 +949,14 @@ impl EngineApp {
     }
 
     /// A `session.*` request: its reply, and `session.changed { reason }`
-    /// when a session began or ended. The rows of a begin and an end are
+    /// when a session began or ended or the settings changed. The rows are
     /// written after the reply, as every screen action's are
-    /// (`record_ui_actions`).
+    /// (`record_ui_actions`). A simulated run makes its sessions' folders in
+    /// `<its saved data>\Sessions` (D52, `session::places`).
     fn dispatch_session(&self, request: RequestEnvelope) -> EngineReply {
         match handle_session_request(
             &self.runtime.db_path,
+            &Places::new(self.runtime.sessions_simulated, &self.runtime.app_data_dir),
             &request.method,
             &request.params,
             SystemTime::now(),

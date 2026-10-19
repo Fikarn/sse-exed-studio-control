@@ -7,7 +7,7 @@ import { bindFixtureCameras, handleFixtureCamerasRequest } from "./fixture/camer
 import { seedFixtureCameras } from "./fixture/camerasSeed";
 import { seedFixturePrompter } from "./fixture/prompterSeed";
 import { handleFixtureSessionRequest } from "./fixture/sessionRequests";
-import { seedFixtureSession } from "./fixture/sessionState";
+import { seedFixtureSession } from "./fixture/sessionSeed";
 import { disposeFixturePrompter } from "./fixture/prompterState";
 import type { FixtureScenario, EngineTransport } from "../types";
 import {
@@ -59,7 +59,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
   // `checks.cameras`.
   seedFixtureCameras(state, scenario.cameras);
   // The Session page (2026-10-15): the running session and the last of each kind the
-  // scenario starts with; without a seed, none.
+  // scenario starts with, and its settings, places and folders (D52); without a seed, none
+  // and the defaults.
   seedFixtureSession(state, scenario.session);
   const audioMeteringActive = scenario.audioMeteringActive === true;
   const startupDelayMs = typeof scenario.startupDelayMs === "number" ? scenario.startupDelayMs : 0;

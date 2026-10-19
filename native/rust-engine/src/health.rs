@@ -934,6 +934,7 @@ mod tests {
             },
             control_surface_token: String::from("bridge-token-for-tests"),
             cameras_simulated: true,
+            sessions_simulated: true,
             control_surface_bridge: ControlSurfaceBridgeInfo {
                 base_url: String::from("http://127.0.0.1:38201"),
                 port: 38201,

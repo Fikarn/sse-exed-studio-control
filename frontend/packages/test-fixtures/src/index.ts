@@ -343,6 +343,8 @@ function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
 // the webinar was never made. While a session runs the desk is the take's, read at the
 // morning's Sync, so every page reads READY and a window's one note is the session its Begin
 // would end. The sessions' names are made up, as the boards' are: the repository is public.
+// Each session has its folder on the studio's sessions' folder, `D:\Sessions` (D52), named by
+// its day, and the folders are on the double's disk.
 //
 // - choose, window: no session runs; `window` is the podcast Room's window, which the layout
 //   gate's step opens (`BOARD_STEPS`).
@@ -351,12 +353,13 @@ function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
 //   running session's own window.
 type SessionMoment = "choose" | "window" | "running" | "running-window";
 
-/** The running session: begun 25 minutes before the captures' 09:11 (06:46 UTC). */
+/** The running session: begun 25 minutes before the captures' 09:11 (06:46 UTC), in the folder its Begin made (D52). */
 const SESSION_RUNNING = {
   kind: "podcast",
   name: "Leading Through Change — episode 3",
   begunAt: "2026-04-23T06:46:00.000Z",
   endedAt: null,
+  folder: "D:\\Sessions\\Leading Through Change — episode 3 (2026-04-23)",
 };
 
 /** The last session of each kind, newest first: Wednesday's podcast, Tuesday's lecture, a webinar of the week before. */
@@ -366,20 +369,34 @@ const SESSION_LAST = [
     name: "Leading Through Change — episode 2",
     begunAt: "2026-04-22T12:02:00.000Z",
     endedAt: "2026-04-22T13:16:00.000Z",
+    folder: "D:\\Sessions\\Leading Through Change — episode 2 (2026-04-22)",
   },
   {
     kind: "green-screen",
     name: "Strategy in Practice — lecture 3",
     begunAt: "2026-04-21T08:30:00.000Z",
     endedAt: "2026-04-21T09:52:00.000Z",
+    folder: "D:\\Sessions\\Strategy in Practice — lecture 3 (2026-04-21)",
   },
   {
     kind: "webinar",
     name: "Markets Outlook, spring",
     begunAt: "2026-04-17T13:00:00.000Z",
     endedAt: "2026-04-17T14:05:00.000Z",
+    folder: "D:\\Sessions\\Markets Outlook, spring (2026-04-17)",
   },
 ];
+
+/** The session's seed: the sessions given, on the studio's sessions' folder, each folder on the double's disk. */
+function sessionSeed(current: typeof SESSION_RUNNING | null, last: typeof SESSION_LAST) {
+  const sessions = current === null ? last : [current, ...last];
+  return {
+    ...(current === null ? {} : { current }),
+    last,
+    places: { root: "D:\\Sessions", simulated: false },
+    folders: sessions.map((session) => session.folder),
+  };
+}
 
 function buildSessionFixture(moment: SessionMoment): FixtureScenarioRecord {
   const running = moment === "running" || moment === "running-window";
@@ -393,8 +410,11 @@ function buildSessionFixture(moment: SessionMoment): FixtureScenarioRecord {
     },
     ...(running ? { audioSnapshot: take.audioSnapshot, audioMeteringActive: true } : {}),
     session: running
-      ? { current: SESSION_RUNNING, last: SESSION_LAST }
-      : { last: SESSION_LAST.filter((session) => session.kind !== "webinar") },
+      ? sessionSeed(SESSION_RUNNING, SESSION_LAST)
+      : sessionSeed(
+          null,
+          SESSION_LAST.filter((session) => session.kind !== "webinar")
+        ),
   };
   return scenario as FixtureScenarioRecord;
 }
