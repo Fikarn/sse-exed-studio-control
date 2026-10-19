@@ -88,9 +88,17 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
     let app = app_for(&test_dir);
 
     let read = request(&app, "session.snapshot", json!({}));
+    let snapshot = read.response.result.clone().expect("a result");
     assert_eq!(
-        read.response.result,
-        Some(json!({ "current": null, "last": [] }))
+        (&snapshot["current"], &snapshot["last"]),
+        (&Value::Null, &json!([]))
+    );
+    // A test is a simulated run: its sessions' folders go beside its saved
+    // data (D52).
+    let scratch = app.runtime.app_data_dir.join("Sessions");
+    assert_eq!(
+        snapshot["places"],
+        json!({ "root": scratch.display().to_string(), "simulated": true })
     );
     assert!(read.events.is_empty(), "a read raises nothing");
 
@@ -112,6 +120,15 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
     assert_eq!(answer["session"]["name"], "Morning take");
     assert_eq!(answer["session"]["endedAt"], Value::Null);
     assert_eq!(answer["ended"], Value::Null);
+    assert_eq!(answer["folder"]["made"], true);
+    let podcast_folder = answer["folder"]["path"]
+        .as_str()
+        .expect("a path")
+        .to_string();
+    assert!(
+        std::path::Path::new(&podcast_folder).starts_with(&scratch),
+        "{podcast_folder}"
+    );
 
     let instead = request(&app, "session.begin", json!({ "kind": "webinar" }));
     assert_eq!(
@@ -125,6 +142,10 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
     let answer = instead.response.result.clone().expect("a result");
     assert_eq!(answer["ended"]["name"], "Morning take");
     assert_eq!(answer["ended"]["endedAt"], answer["session"]["begunAt"]);
+    let webinar_folder = answer["folder"]["path"]
+        .as_str()
+        .expect("a path")
+        .to_string();
 
     let ended = request(&app, "session.end", json!({}));
     assert_eq!(
@@ -135,20 +156,69 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
         )]
     );
 
-    let expected = vec![
+    // The settings' update (D52) raises the event with its own reason.
+    let updated = request(
+        &app,
+        "session.settings.update",
+        json!({ "lowBelowGb": 300 }),
+    );
+    assert!(updated.response.ok, "{:?}", updated.response.error);
+    assert_eq!(
+        events(&updated),
+        vec![(
+            String::from("session.changed"),
+            json!({ "reason": "settings" })
+        )]
+    );
+
+    let mut expected = vec![
         row(
             "begun",
             "podcast",
-            "Session begun: Podcast Recording · Morning take",
+            &format!(
+                "Session begun: Podcast Recording · Morning take, in a new folder {podcast_folder}"
+            ),
         ),
         row(
             "ended",
             "podcast",
             "Session ended: Podcast Recording · Morning take",
         ),
-        row("begun", "webinar", "Session begun: Webinar"),
+        row(
+            "begun",
+            "webinar",
+            &format!("Session begun: Webinar, in a new folder {webinar_folder}"),
+        ),
         row("ended", "webinar", "Session ended: Webinar"),
+        row(
+            "settings",
+            "thresholds",
+            "The disk reads Low under 300 GB and Nearly full under 50 GB.",
+        ),
     ];
+    assert_eq!(session_rows(&app), expected);
+
+    // A second begin of the podcast's name on the same day uses its folder.
+    let again = result(
+        &app,
+        "session.begin",
+        json!({ "kind": "podcast", "name": "Morning take" }),
+    );
+    assert_eq!(
+        again["folder"],
+        json!({ "path": podcast_folder, "made": false })
+    );
+    expected.push(row(
+        "begun",
+        "podcast",
+        &format!("Session begun: Podcast Recording · Morning take, in {podcast_folder}"),
+    ));
+    result(&app, "session.end", json!({}));
+    expected.push(row(
+        "ended",
+        "podcast",
+        "Session ended: Podcast Recording · Morning take",
+    ));
     assert_eq!(session_rows(&app), expected);
 
     for (method, params, refusal) in [
@@ -164,6 +234,17 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
             "SESSION_NAME_TOO_LONG",
         ),
         ("session.begin", json!({}), "INVALID_PARAMS"),
+        (
+            "session.begin",
+            json!({ "kind": "podcast", "folder": { "mode": "new", "parent": app.runtime.app_data_dir.display().to_string() } }),
+            "SESSION_FOLDER_OUTSIDE_SCRATCH",
+        ),
+        (
+            "session.settings.update",
+            json!({ "lowBelowGb": 10 }),
+            "SESSION_THRESHOLDS_INVALID",
+        ),
+        ("session.settings.update", json!({}), "INVALID_PARAMS"),
     ] {
         let refused = request(&app, method, params);
         assert!(!refused.response.ok, "{method}");
@@ -196,13 +277,19 @@ fn the_session_page_is_a_saved_page_and_not_the_default() {
 }
 
 // The session's settings stand outside the archive: an archive does not
-// carry them, and its restore leaves the running session and the last of
-// each kind as they were, raising no `session.changed`.
+// carry them, and its restore leaves the running session, the last of each
+// kind and the folders' settings (D52) as they were, raising no
+// `session.changed`.
 #[test]
 fn an_archive_neither_carries_the_session_nor_brings_one_back() {
     let test_dir = TestDir::new("session-restore");
     let app = app_for(&test_dir);
     let _forget = Forget(&app);
+    result(
+        &app,
+        "session.settings.update",
+        json!({ "root": r"E:\Archived 4418", "subfolders": { "webinar": [] } }),
+    );
     result(
         &app,
         "session.begin",
@@ -224,11 +311,20 @@ fn an_archive_neither_carries_the_session_nor_brings_one_back() {
         !archive.contains("on purpose 4417"),
         "the session's name is not in it"
     );
+    assert!(
+        !archive.contains("Archived 4418"),
+        "nor the sessions' folder"
+    );
 
     result(
         &app,
         "session.begin",
         json!({ "kind": "webinar", "name": "After the archive" }),
+    );
+    result(
+        &app,
+        "session.settings.update",
+        json!({ "root": r"E:\After the archive" }),
     );
     let reply = request(&app, "support.backup.restore", json!({ "path": path }));
     assert!(reply.response.ok, "{:?}", reply.response.error);
@@ -242,4 +338,6 @@ fn an_archive_neither_carries_the_session_nor_brings_one_back() {
     let snapshot = result(&app, "session.snapshot", json!({}));
     assert_eq!(snapshot["current"]["name"], "After the archive");
     assert_eq!(snapshot["last"][0]["name"], "Archived on purpose 4417");
+    assert_eq!(snapshot["settings"]["root"], r"E:\After the archive");
+    assert_eq!(snapshot["settings"]["subfolders"]["webinar"], json!([]));
 }

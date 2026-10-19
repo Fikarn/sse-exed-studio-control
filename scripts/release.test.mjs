@@ -150,6 +150,10 @@ test("the trial start names no data folder and moves the platform's base", async
   );
   assert.equal(env.SSE_SAFE_START, "1");
   assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
+  // The trial is a studio build whose app data looks like the studio's: the
+  // switch, not the folder, keeps its sessions' folders beside its scratch
+  // data (D52).
+  assert.equal(env.SSE_SESSIONS_SIMULATED, "1");
 });
 
 test("a lane starts with no variable of the app's left in its environment", () => {

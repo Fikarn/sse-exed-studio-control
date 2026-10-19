@@ -1,0 +1,34 @@
+{
+  "description": "The name a new session's folder takes (D52, v1.md's Session): the session's name as kept (trimmed), or the kind's name when there is none; each character Windows does not take in a name (\\ / : * ? \" < > | and every control character) becomes a dash; the dots and spaces at its end go, and a name of nothing else takes the kind's name; then the local day it began. The hardware link (session/folder.rs folder_leaf), the fixture double and the page are held to these cases.",
+  "cases": [
+    { "name": "Morning take", "kind": "podcast", "day": "2026-10-18", "leaf": "Morning take (2026-10-18)" },
+    { "name": "", "kind": "podcast", "day": "2026-10-18", "leaf": "Podcast Recording (2026-10-18)" },
+    { "name": "", "kind": "green-screen", "day": "2026-04-23", "leaf": "Green Screen Recording (2026-04-23)" },
+    { "name": "", "kind": "webinar", "day": "2026-12-31", "leaf": "Webinar (2026-12-31)" },
+    {
+      "name": "a\\b/c:d*e?f\"g<h>i|j",
+      "kind": "podcast",
+      "day": "2026-10-18",
+      "leaf": "a-b-c-d-e-f-g-h-i-j (2026-10-18)"
+    },
+    { "name": "Why?", "kind": "webinar", "day": "2026-10-18", "leaf": "Why- (2026-10-18)" },
+    { "name": "Take\u0007one", "kind": "podcast", "day": "2026-10-18", "leaf": "Take-one (2026-10-18)" },
+    { "name": "Take\tone", "kind": "podcast", "day": "2026-10-18", "leaf": "Take-one (2026-10-18)" },
+    { "name": "Take\u0085two", "kind": "podcast", "day": "2026-10-18", "leaf": "Take-two (2026-10-18)" },
+    { "name": "Ep. 3. . .", "kind": "podcast", "day": "2026-10-18", "leaf": "Ep. 3 (2026-10-18)" },
+    { "name": "Ep. 3 ...", "kind": "green-screen", "day": "2026-10-18", "leaf": "Ep. 3 (2026-10-18)" },
+    { "name": "...", "kind": "podcast", "day": "2026-10-18", "leaf": "Podcast Recording (2026-10-18)" },
+    { "name": ". . .", "kind": "webinar", "day": "2026-10-18", "leaf": "Webinar (2026-10-18)" },
+    { "name": ".hidden take", "kind": "podcast", "day": "2026-10-18", "leaf": ".hidden take (2026-10-18)" },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "podcast",
+      "day": "2026-10-18",
+      "leaf": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-10-18)"
+    },
+    { "name": "Café — Ep. 3", "kind": "webinar", "day": "2026-10-18", "leaf": "Café — Ep. 3 (2026-10-18)" },
+    { "name": "😀 Launch", "kind": "webinar", "day": "2026-10-18", "leaf": "😀 Launch (2026-10-18)" },
+    { "name": "Q&A: 10/18", "kind": "podcast", "day": "2026-10-18", "leaf": "Q&A- 10-18 (2026-10-18)" },
+    { "name": "Live: Q&A?.", "kind": "webinar", "day": "2026-10-18", "leaf": "Live- Q&A- (2026-10-18)" }
+  ]
+}

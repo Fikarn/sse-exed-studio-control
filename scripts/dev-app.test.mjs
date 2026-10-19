@@ -29,6 +29,7 @@ test("a development run has its own data and port and reaches no device", () => 
   assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
+  assert.equal(env.SSE_SESSIONS_SIMULATED, "1", "its sessions' folders beside its own saved data (D52)");
   assert.equal(env[DEV_RUN_RELEASE_ENV], "0");
   assert.equal(env.SSE_VMIX_PICTURES, "0", "no run takes vMix's pictures unasked");
   assert.equal(env.SSE_CAMERA_BLUETOOTH, "0", "no run opens Bluetooth unasked");
@@ -45,6 +46,8 @@ test("a development run keeps its folders and switches whatever the caller's env
       SSE_LIGHTS_SIMULATED: "0",
       SSE_AUDIO_SIMULATED_INPUT_MODE: "0",
       SSE_CAMERAS_SIMULATED: "0",
+      SSE_SESSIONS_SIMULATED: "0",
+      sse_sessions_simulated: "0",
       [DEV_RUN_RELEASE_ENV]: "1",
       // The marker that makes a studio build of a release build is never
       // handed on (`npm run release` refuses to start with it set).
@@ -199,6 +202,7 @@ test("`--bluetooth` makes CAM 1 the real Pocket over Windows' Bluetooth, and the
   );
   assert.equal(env.SSE_CAMERA_BLUETOOTH, "1");
   assert.equal(env.SSE_CAMERAS_SIMULATED, "0", "CAM 1 is the real camera; CAM 2 and CAM 3 have no link");
+  assert.equal(env.SSE_SESSIONS_SIMULATED, "1", "its sessions' folders stay beside its own saved data");
   assert.equal(env.SSE_SAFE_START, "1");
   assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");

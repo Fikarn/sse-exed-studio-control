@@ -827,6 +827,7 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
   assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
+  assert.equal(env.SSE_SESSIONS_SIMULATED, "1");
   assert.equal(laneEnvRefusal({ ...env, ...folders }, { liveConsole: false }), null);
 
   // The live console lane keeps the real console and nothing else: its
@@ -837,6 +838,7 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
   assert.equal(live.SSE_AUDIO_SIMULATED_INPUT_MODE, "0");
   assert.equal(live.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(live.SSE_CAMERAS_SIMULATED, "1");
+  assert.equal(live.SSE_SESSIONS_SIMULATED, "1");
   assert.equal(laneEnvRefusal(live, { liveConsole: true }), null);
   assert.match(laneEnvRefusal(live, { liveConsole: false }), /SSE_AUDIO_SIMULATED_INPUT_MODE/);
   assert.match(
@@ -849,6 +851,7 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
   assert.equal(acceptance.SSE_AUDIO_SIMULATED_INPUT_MODE, LIVE_CONSOLE ? "0" : "1");
   assert.equal(acceptance.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(acceptance.SSE_CAMERAS_SIMULATED, "1");
+  assert.equal(acceptance.SSE_SESSIONS_SIMULATED, "1");
   assert.equal(laneEnvRefusal({ ...acceptance, ...folders }), null);
 
   const hardened = {
@@ -858,6 +861,7 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
     SSE_LIGHTS_SIMULATED: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
     SSE_CAMERAS_SIMULATED: "1",
+    SSE_SESSIONS_SIMULATED: "1",
   };
   assert.equal(laneEnvRefusal(hardened, { liveConsole: false }), null);
   const refused = {
@@ -878,6 +882,9 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
     "the real cameras": { ...hardened, SSE_CAMERAS_SIMULATED: undefined },
     "the real cameras, asked for by name": { ...hardened, SSE_CAMERAS_SIMULATED: "0" },
     "simulated cameras the engine does not read": { ...hardened, SSE_CAMERAS_SIMULATED: "true" },
+    "the studio's sessions' folder": { ...hardened, SSE_SESSIONS_SIMULATED: undefined },
+    "the studio's sessions' folder, asked for by name": { ...hardened, SSE_SESSIONS_SIMULATED: "0" },
+    "a scratch folder the engine does not read": { ...hardened, SSE_SESSIONS_SIMULATED: "yes" },
   };
   for (const [label, candidate] of Object.entries(refused)) {
     assert.notEqual(laneEnvRefusal(candidate, { liveConsole: false }), null, label);
@@ -1179,6 +1186,32 @@ test("every lane uses the simulated cameras, and only the harness names them", a
     );
   }
   assert.doesNotThrow(() => laneProcessEnv(env, { SSE_CAMERAS_SIMULATED: " 1 " }, { label: "A lane" }));
+});
+
+// D52: every lane makes its sessions' folders beside its own saved data,
+// never in the studio's sessions' folder. A development build does so
+// whatever the switch holds; a studio build, as the release's trial is, only
+// with it. Only the harness names it, and an environment without it is
+// refused before anything is spawned.
+test("every lane keeps its sessions' folders beside its own saved data, and only the harness names the switch", async () => {
+  const namers = ALL_LANES.filter((lane) => /\bSSE_SESSIONS_SIMULATED\b/.test(withoutComments(read(lane))));
+  assert.deepEqual(namers, [HARNESS], "a lane that names the sessions' switch itself");
+  assert.equal(
+    withoutComments(classText(read(HARNESS), "EngineHarness")).includes("SSE_SESSIONS_SIMULATED"),
+    false,
+    "the harness's engine start takes the lanes' hardening as it is"
+  );
+
+  const env = { ...(await hardenedLaneEnv()), ...scratchFolders() };
+  assert.equal(laneEnvRefusal(env, { liveConsole: false }), null);
+  for (const value of [undefined, "", "0", "on", "yes", "TRUE"]) {
+    assert.throws(
+      () => laneProcessEnv(env, { SSE_SESSIONS_SIMULATED: value }, { label: "A planted lane" }),
+      /A planted lane was not started: SSE_SESSIONS_SIMULATED must be 1: a lane makes its sessions' folders in its own scratch folder\./,
+      String(value)
+    );
+  }
+  assert.doesNotThrow(() => laneProcessEnv(env, { SSE_SESSIONS_SIMULATED: " 1 " }, { label: "A lane" }));
 });
 
 // D33: vMix's pictures are a hardware test the owner attends, under

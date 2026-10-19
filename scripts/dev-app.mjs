@@ -144,6 +144,10 @@ export function developmentEnv(
     SSE_LIGHTS_SIMULATED: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
     SSE_CAMERAS_SIMULATED: bluetooth ? "0" : "1",
+    // The sessions' folders beside the run's own saved data (D52): a
+    // development build keeps them there whatever this says, and a
+    // `--release` run is one too.
+    SSE_SESSIONS_SIMULATED: "1",
     [DEV_RUN_RELEASE_ENV]: release ? "1" : "0",
     [VMIX_PICTURES_ENV]: vmixPictures ? "1" : "0",
     [CAMERA_BLUETOOTH_ENV]: bluetooth ? "1" : "0",

@@ -21,14 +21,29 @@ static SAID: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(Hash
 /// `value`, saved under `key`, as `T`; `None` when it does not read, with a
 /// WARN line the first time for that key.
 pub(crate) fn parse_saved_json<T: DeserializeOwned>(key: &str, value: &str) -> Option<T> {
-    match serde_json::from_str::<T>(value) {
+    parse_checked_saved_json(key, value, Ok)
+}
+
+/// `parse_saved_json`, then `check`, which may also put the value in its
+/// kept form: a value that reads and fails the check is `None` as well, said
+/// the same way with the check's reason (the session's settings, D52, whose
+/// update refuses what this refuses).
+pub(crate) fn parse_checked_saved_json<T: DeserializeOwned>(
+    key: &str,
+    value: &str,
+    check: impl FnOnce(T) -> Result<T, String>,
+) -> Option<T> {
+    let outcome = serde_json::from_str::<T>(value)
+        .map_err(|error| error.to_string())
+        .and_then(check);
+    match outcome {
         Ok(parsed) => Some(parsed),
-        Err(error) => {
+        Err(why) => {
             if first_complaint(key) {
                 log_event(
                     LogLevel::Warn,
                     &format!(
-                        "The saved value {key} could not be read ({error}); its default is used until it is written again. If the saved data should have it, restore a backup from Setup / Support."
+                        "The saved value {key} could not be read ({why}); its default is used until it is written again. If the saved data should have it, restore a backup from Setup / Support."
                     ),
                 );
             }
@@ -74,5 +89,28 @@ mod tests {
         assert!(second.is_none());
         assert!(complained_about("app.test.damaged"));
         assert!(!complained_about("app.test.other"));
+    }
+
+    #[test]
+    fn a_value_that_reads_and_fails_its_check_is_none_and_said() {
+        let even = |value: i64| {
+            if value % 2 == 0 {
+                Ok(value / 2)
+            } else {
+                Err(format!("{value} is odd"))
+            }
+        };
+        assert_eq!(
+            parse_checked_saved_json("app.test.even", "8", even),
+            Some(4)
+        );
+        assert!(!complained_about("app.test.even"));
+        assert_eq!(parse_checked_saved_json("app.test.odd", "7", even), None);
+        assert!(complained_about("app.test.odd"));
+        assert_eq!(
+            parse_checked_saved_json("app.test.text", "\"8\"", even),
+            None
+        );
+        assert!(complained_about("app.test.text"));
     }
 }

@@ -152,11 +152,12 @@ export async function reserveLocalPort(host = "127.0.0.1") {
 /**
  * The variables that harden a process a lane starts: a reserved bridge port,
  * a safe start, the simulated lights and cameras (every lane, the live
- * console lane too: new pages program, Slice 8 — D15 rules 1–2) and, unless
- * `simulatedAudio` is false (the live console lane only), the simulated
- * console. The live console lane names the real console (`0`): a development
- * build takes the simulated one when nothing is set (the engine's
- * development.rs).
+ * console lane too: new pages program, Slice 8 — D15 rules 1–2), the
+ * sessions' folders beside the lane's own saved data (D52; the release's
+ * trial, a studio build, takes this set too) and, unless `simulatedAudio` is
+ * false (the live console lane only), the simulated console. The live console
+ * lane names the real console (`0`): a development build takes the simulated
+ * one when nothing is set (the engine's development.rs).
  */
 export async function hardenedLaneEnv({ simulatedAudio = true } = {}) {
   return {
@@ -164,16 +165,17 @@ export async function hardenedLaneEnv({ simulatedAudio = true } = {}) {
     SSE_SAFE_START: "1",
     SSE_LIGHTS_SIMULATED: "1",
     SSE_CAMERAS_SIMULATED: "1",
+    SSE_SESSIONS_SIMULATED: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: simulatedAudio ? "1" : "0",
   };
 }
 
-// The engine's own readings of the five variables (control_surface.rs
+// The engine's own readings of the six variables (control_surface.rs
 // `resolve_control_surface_port`, bootstrap.rs `safe_start_requested`,
 // audio/helpers.rs `resolve_audio_config`, cameras.rs
 // `simulated_cameras_requested`, lighting_sacn_output.rs
-// `simulated_lights_requested`): a port a studio build cannot parse falls
-// back to the live app's.
+// `simulated_lights_requested`, session/places.rs `sessions_simulated`): a
+// port a studio build cannot parse falls back to the live app's.
 function bridgePortOf(value) {
   const text = String(value ?? "").trim();
   if (!/^\d{1,5}$/.test(text)) {
@@ -202,6 +204,12 @@ function simulatedCamerasRequested(value) {
 
 // The simulated lights are asked for the same way.
 function simulatedLightsRequested(value) {
+  return String(value ?? "").trim() === "1";
+}
+
+// And the sessions' folders beside the saved data (a studio build reads it;
+// a development build keeps them there whatever it holds).
+function simulatedSessionsRequested(value) {
   return String(value ?? "").trim() === "1";
 }
 
@@ -285,6 +293,11 @@ export function laneEnvRefusal(
   // run with the real cameras is `npm run app -- --bluetooth` (D41).
   if (!bluetooth && !simulatedCamerasRequested(env.SSE_CAMERAS_SIMULATED)) {
     return "SSE_CAMERAS_SIMULATED must be 1: a lane uses the simulated cameras.";
+  }
+  // Every lane, and `npm run app`, makes its sessions' folders beside its own
+  // saved data, never in the studio's sessions' folder (D52).
+  if (!simulatedSessionsRequested(env.SSE_SESSIONS_SIMULATED)) {
+    return "SSE_SESSIONS_SIMULATED must be 1: a lane makes its sessions' folders in its own scratch folder.";
   }
   // No lane opens vMix's pictures: that is a hardware test the owner attends (D33).
   if (!vmixPictures && switchSet(env, VMIX_PICTURES_ENV)) {

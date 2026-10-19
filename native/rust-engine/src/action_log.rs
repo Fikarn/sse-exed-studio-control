@@ -367,9 +367,10 @@ const RECORDED_UI_METHODS: &[&str] = &[
     "prompter.putOn",
     "prompter.update",
     // The session (2026-10-15): a begin, which may end the running one
-    // first, and an end.
+    // first, and an end; and Setup's settings for its folder (D52).
     "session.begin",
     "session.end",
+    "session.settings.update",
     "support.backup.restore",
 ];
 
@@ -942,7 +943,8 @@ pub(crate) fn ui_actions(
         // a session runs ends that one first, so its row comes first. The
         // kind's id is the target; the sentence names the kind and the
         // session as the operator reads them, since Recent actions show the
-        // sentence alone, and leaves out a name not given.
+        // sentence alone, and leaves out a name not given. A begin's names
+        // its folder too (D52), and says when it made it.
         "session.begin" | "session.end" => {
             let row = |action: &'static str, session: &str| {
                 let kind =
@@ -952,10 +954,19 @@ pub(crate) fn ui_actions(
                 } else {
                     "Session ended"
                 };
-                let detail = match text(result, &format!("{session}/name")) {
+                let mut detail = match text(result, &format!("{session}/name")) {
                     Some(name) => format!("{what}: {} · {name}", kind.name()),
                     None => format!("{what}: {}", kind.name()),
                 };
+                if action == "begun" {
+                    if let Some(folder) = text(result, "/folder/path") {
+                        if flag(&result["folder"], "made") == Some(true) {
+                            detail.push_str(&format!(", in a new folder {folder}"));
+                        } else {
+                            detail.push_str(&format!(", in {folder}"));
+                        }
+                    }
+                }
                 Some(ActionRecord::new(
                     ActionSource::Ui,
                     DOMAIN_SESSION,
@@ -970,6 +981,63 @@ pub(crate) fn ui_actions(
                 None
             };
             row("ended", "/ended").into_iter().chain(begun).collect()
+        }
+        // Setup's settings for the session's folder (D52): one row for each
+        // part the request gave, named from what the answer holds.
+        "session.settings.update" => {
+            let setting = |target: &'static str, detail: String| {
+                ActionRecord::new(ActionSource::Ui, DOMAIN_SESSION, "settings", target, detail)
+            };
+            let given = |key: &str| params.get(key).is_some_and(|value| !value.is_null());
+            let mut rows = Vec::new();
+            if given("root") {
+                if let Some(root) = text(result, "/settings/root") {
+                    rows.push(setting("root", format!("Sessions' folder set to {root}.")));
+                }
+            }
+            if let Some(subfolders) = params.get("subfolders") {
+                for kind in SessionKind::ALL {
+                    if subfolders
+                        .get(kind.id())
+                        .is_some_and(|names| !names.is_null())
+                    {
+                        let Some(names) = result
+                            .pointer(&format!("/settings/subfolders/{}", kind.id()))
+                            .and_then(Value::as_array)
+                        else {
+                            continue;
+                        };
+                        let names: Vec<&str> = names.iter().filter_map(Value::as_str).collect();
+                        let list = if names.is_empty() {
+                            String::from("none")
+                        } else {
+                            names.join(", ")
+                        };
+                        rows.push(setting(
+                            "subfolders",
+                            format!("{}'s subfolders: {list}.", kind.name()),
+                        ));
+                    }
+                }
+            }
+            if given("lowBelowGb") || given("nearlyFullBelowGb") {
+                let level = |key: &str| {
+                    result
+                        .pointer(&format!("/settings/{key}"))
+                        .and_then(Value::as_u64)
+                };
+                if let (Some(low), Some(nearly_full)) =
+                    (level("lowBelowGb"), level("nearlyFullBelowGb"))
+                {
+                    rows.push(setting(
+                        "thresholds",
+                        format!(
+                            "The disk reads Low under {low} GB and Nearly full under {nearly_full} GB."
+                        ),
+                    ));
+                }
+            }
+            rows
         }
         _ => Vec::new(),
     }

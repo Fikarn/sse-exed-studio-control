@@ -1,11 +1,15 @@
 //! The session's requests on saved data of their own: what a begin and an
 //! end write and answer, the refusals, the name, a damaged value, and the
-//! settings across a start.
+//! settings across a start. Every begin makes its folder in the test's own
+//! scratch folder, a simulated run's (`tests_folder.rs` has the folder's
+//! own tests).
 
 use super::commands::{
     handle_session_request, CURRENT_KEY, LAST_KEY, SESSION_KIND_UNKNOWN, SESSION_NAME_TOO_LONG,
     SESSION_NOT_RUNNING,
 };
+use super::folder::{folder_leaf, local_day};
+use super::places::Places;
 use super::snapshot::SessionKind;
 use super::{SessionError, SessionReply};
 use crate::cameras::runtime::utc_time;
@@ -18,17 +22,21 @@ use std::path::PathBuf;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const MORNING: &str = "2026-10-15T07:16:00.000Z";
-const NOON: &str = "2026-10-15T10:02:30.250Z";
-const EVENING: &str = "2026-10-15T16:40:00.000Z";
+pub(super) const MORNING: &str = "2026-10-15T07:16:00.000Z";
+pub(super) const NOON: &str = "2026-10-15T10:02:30.250Z";
+pub(super) const EVENING: &str = "2026-10-15T16:40:00.000Z";
 
-struct TestSession {
-    root: PathBuf,
-    db_path: PathBuf,
+/// Saved data of its own in a temp folder, removed at the end, and the
+/// places of a simulated run there: the sessions' folders go in its
+/// `Sessions` folder and nowhere else.
+pub(super) struct TestSession {
+    pub(super) root: PathBuf,
+    pub(super) db_path: PathBuf,
+    pub(super) places: Places,
 }
 
 impl TestSession {
-    fn new(label: &str) -> Self {
+    pub(super) fn new(label: &str) -> Self {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
@@ -40,27 +48,42 @@ impl TestSession {
         fs::create_dir_all(&root).expect("test dir should be created");
         let db_path = root.join("studio-control.sqlite3");
         initialize_test_database(&db_path).expect("database should initialize");
-        Self { root, db_path }
+        let places = Places::new(true, &root);
+        Self {
+            root,
+            db_path,
+            places,
+        }
     }
 
-    fn request(&self, method: &str, params: Value, at: &str) -> Result<SessionReply, SessionError> {
+    pub(super) fn request(
+        &self,
+        method: &str,
+        params: Value,
+        at: &str,
+    ) -> Result<SessionReply, SessionError> {
         handle_session_request(
             &self.db_path,
+            &self.places,
             method,
             &params,
             utc_time(at).expect("a time"),
         )
     }
 
-    fn begin(&self, kind: &str, name: &str, at: &str) -> Value {
+    pub(super) fn begin(&self, kind: &str, name: &str, at: &str) -> Value {
+        self.begin_with(json!({ "kind": kind, "name": name }), at)
+    }
+
+    pub(super) fn begin_with(&self, params: Value, at: &str) -> Value {
         let reply = self
-            .request("session.begin", json!({ "kind": kind, "name": name }), at)
+            .request("session.begin", params, at)
             .expect("the begin is answered");
         assert_eq!(reply.event, Some("begun"));
         reply.result
     }
 
-    fn end(&self, at: &str) -> Value {
+    pub(super) fn end(&self, at: &str) -> Value {
         let reply = self
             .request("session.end", json!({}), at)
             .expect("the end is answered");
@@ -68,7 +91,7 @@ impl TestSession {
         reply.result
     }
 
-    fn snapshot(&self) -> Value {
+    pub(super) fn snapshot(&self) -> Value {
         let reply = self
             .request("session.snapshot", json!({}), MORNING)
             .expect("the read is answered");
@@ -76,8 +99,14 @@ impl TestSession {
         reply.result
     }
 
+    /// The running session and the last of each kind, as the snapshot says.
+    pub(super) fn sessions(&self) -> Value {
+        let snapshot = self.snapshot();
+        json!({ "current": snapshot["current"], "last": snapshot["last"] })
+    }
+
     /// A setting as the database holds it, read past the hardware link.
-    fn setting(&self, key: &str) -> Option<Value> {
+    pub(super) fn setting(&self, key: &str) -> Option<Value> {
         open_connection(&self.db_path)
             .expect("the database opens")
             .query_row(
@@ -90,11 +119,32 @@ impl TestSession {
             .map(|raw| serde_json::from_str(&raw).expect("the setting is JSON"))
     }
 
-    fn refusal(&self, method: &str, params: Value) -> SessionError {
+    pub(super) fn refusal(&self, method: &str, params: Value) -> SessionError {
         match self.request(method, params, NOON) {
             Ok(reply) => panic!("{method} should be refused: {:?}", reply.result),
             Err(error) => error,
         }
+    }
+
+    /// The folder a begin of `kind` named `name` at `begun_at` makes on the
+    /// scratch folder.
+    pub(super) fn folder(&self, kind: &str, name: &str, begun_at: &str) -> PathBuf {
+        let kind = SessionKind::from_id(kind).expect("a kind");
+        let day = local_day(utc_time(begun_at).expect("a time")).expect("the day");
+        self.places.scratch_root.join(folder_leaf(name, kind, &day))
+    }
+
+    /// A session begun here, with its folder.
+    pub(super) fn session(
+        &self,
+        kind: &str,
+        name: &str,
+        begun_at: &str,
+        ended_at: Option<&str>,
+    ) -> Value {
+        let mut session = saved_session(kind, name, begun_at, ended_at);
+        session["folder"] = json!(self.folder(kind, name, begun_at).display().to_string());
+        session
     }
 }
 
@@ -104,26 +154,46 @@ impl Drop for TestSession {
     }
 }
 
-fn session(kind: &str, name: &str, begun_at: &str, ended_at: Option<&str>) -> Value {
+/// A session as step 1 saved it, without a folder.
+pub(super) fn saved_session(
+    kind: &str,
+    name: &str,
+    begun_at: &str,
+    ended_at: Option<&str>,
+) -> Value {
     json!({ "kind": kind, "name": name, "begunAt": begun_at, "endedAt": ended_at })
+}
+
+/// A session saved without a folder, as it reads back: with none.
+fn read_back(saved: Value) -> Value {
+    let mut session = saved;
+    session["folder"] = Value::Null;
+    session
 }
 
 #[test]
 fn new_saved_data_has_no_session_and_no_last() {
     let test = TestSession::new("empty");
-    assert_eq!(test.snapshot(), json!({ "current": null, "last": [] }));
+    assert_eq!(test.sessions(), json!({ "current": null, "last": [] }));
 }
 
 #[test]
 fn a_begin_writes_the_running_session_and_answers_it() {
     let test = TestSession::new("begin");
     let reply = test.begin("podcast", "Morning take", MORNING);
-    let running = session("podcast", "Morning take", MORNING, None);
-    assert_eq!(reply, json!({ "session": running, "ended": null }));
+    let running = test.session("podcast", "Morning take", MORNING, None);
+    assert_eq!(
+        reply,
+        json!({
+            "session": running,
+            "ended": null,
+            "folder": { "path": running["folder"], "made": true }
+        })
+    );
     assert_eq!(test.setting(CURRENT_KEY), Some(running.clone()));
     // Nothing ended, so nothing became a kind's last.
     assert_eq!(test.setting(LAST_KEY), None);
-    assert_eq!(test.snapshot(), json!({ "current": running, "last": [] }));
+    assert_eq!(test.sessions(), json!({ "current": running, "last": [] }));
 }
 
 #[test]
@@ -131,17 +201,17 @@ fn a_begin_over_a_running_session_ends_it_as_its_kinds_last() {
     let test = TestSession::new("begin-over");
     test.begin("podcast", "Morning take", MORNING);
     let reply = test.begin("webinar", "Spring launch", NOON);
-    let ended = session("podcast", "Morning take", MORNING, Some(NOON));
-    let running = session("webinar", "Spring launch", NOON, None);
+    let ended = test.session("podcast", "Morning take", MORNING, Some(NOON));
+    let running = test.session("webinar", "Spring launch", NOON, None);
     assert_eq!(
-        reply,
-        json!({ "session": running, "ended": ended }),
+        (&reply["session"], &reply["ended"]),
+        (&running, &ended),
         "the one ended and the one begun share the moment"
     );
     assert_eq!(test.setting(CURRENT_KEY), Some(running.clone()));
     assert_eq!(test.setting(LAST_KEY), Some(json!([ended.clone()])));
     assert_eq!(
-        test.snapshot(),
+        test.sessions(),
         json!({ "current": running, "last": [ended] })
     );
 }
@@ -150,11 +220,15 @@ fn a_begin_over_a_running_session_ends_it_as_its_kinds_last() {
 fn an_end_removes_the_running_session_and_a_second_end_is_refused() {
     let test = TestSession::new("end");
     test.begin("green-screen", "", MORNING);
-    let ended = session("green-screen", "", MORNING, Some(EVENING));
+    let ended = test.session("green-screen", "", MORNING, Some(EVENING));
     assert_eq!(test.end(EVENING), json!({ "ended": ended }));
     assert_eq!(test.setting(CURRENT_KEY), None, "the setting is removed");
     assert_eq!(test.setting(LAST_KEY), Some(json!([ended.clone()])));
-    assert_eq!(test.snapshot(), json!({ "current": null, "last": [ended] }));
+    assert_eq!(test.sessions(), json!({ "current": null, "last": [ended] }));
+    assert!(
+        test.folder("green-screen", "", MORNING).is_dir(),
+        "an end leaves the folder as it is"
+    );
 
     assert_eq!(
         test.refusal("session.end", json!({})),
@@ -181,13 +255,13 @@ fn the_last_holds_one_session_of_each_kind_newest_first() {
     assert_eq!(
         test.snapshot()["last"],
         json!([
-            session(
+            test.session(
                 "podcast",
                 "Second podcast",
                 "2026-10-14T09:00:00.000Z",
                 Some("2026-10-14T12:30:00.000Z")
             ),
-            session(
+            test.session(
                 "green-screen",
                 "Studio intro",
                 "2026-10-13T11:00:00.000Z",
@@ -196,14 +270,15 @@ fn the_last_holds_one_session_of_each_kind_newest_first() {
         ])
     );
 
-    // A list saved with a kind twice reads with its first, the newest.
+    // A list saved with a kind twice reads with its first, the newest; a
+    // session saved before sessions had folders reads with none.
     set_settings(
         &test.db_path,
         &[(
             LAST_KEY,
             json!([
-                session("webinar", "Newer", NOON, Some(EVENING)),
-                session("webinar", "Older", MORNING, Some(NOON)),
+                saved_session("webinar", "Newer", NOON, Some(EVENING)),
+                saved_session("webinar", "Older", MORNING, Some(NOON)),
             ])
             .to_string(),
         )],
@@ -211,7 +286,12 @@ fn the_last_holds_one_session_of_each_kind_newest_first() {
     .expect("the setting is written");
     assert_eq!(
         test.snapshot()["last"],
-        json!([session("webinar", "Newer", NOON, Some(EVENING))])
+        json!([read_back(saved_session(
+            "webinar",
+            "Newer",
+            NOON,
+            Some(EVENING)
+        ))])
     );
 }
 
@@ -237,6 +317,14 @@ fn the_name_is_trimmed_may_be_empty_and_has_at_most_eighty_characters() {
     assert_eq!(with_null.result["session"]["name"], "");
 
     // Eighty characters, each two bytes in UTF-8: characters are counted.
+    // The test's temp folder is deep, so the podcast's folder is kept to
+    // itself to stay under the paths' 200 characters (`tests_folder.rs`).
+    test.request(
+        "session.settings.update",
+        json!({ "subfolders": { "podcast": [] } }),
+        NOON,
+    )
+    .expect("the update is answered");
     let eighty = "é".repeat(80);
     assert_eq!(
         test.begin("podcast", &format!(" {eighty} "), EVENING)["session"]["name"],
@@ -297,7 +385,11 @@ fn a_kind_the_hardware_link_does_not_know_is_refused() {
         ),
         SessionError::Invalid(String::from("name must be a string"))
     );
-    assert_eq!(test.snapshot(), json!({ "current": null, "last": [] }));
+    assert_eq!(test.sessions(), json!({ "current": null, "last": [] }));
+    assert!(
+        !test.places.scratch_root.exists(),
+        "a refused begin makes nothing"
+    );
 
     assert_eq!(
         SessionKind::ALL.map(SessionKind::id),
@@ -313,6 +405,7 @@ fn a_kind_the_hardware_link_does_not_know_is_refused() {
 #[test]
 fn a_damaged_running_session_reads_as_none_and_is_said_in_the_log() {
     let test = TestSession::new("damaged");
+    let kept = saved_session("webinar", "Kept", MORNING, Some(NOON));
     set_settings(
         &test.db_path,
         &[
@@ -320,19 +413,13 @@ fn a_damaged_running_session_reads_as_none_and_is_said_in_the_log() {
                 CURRENT_KEY,
                 String::from("{\"kind\": \"podcast\", \"name\""),
             ),
-            (
-                LAST_KEY,
-                json!([session("webinar", "Kept", MORNING, Some(NOON))]).to_string(),
-            ),
+            (LAST_KEY, json!([kept.clone()]).to_string()),
         ],
     )
     .expect("the settings are written");
     assert_eq!(
-        test.snapshot(),
-        json!({
-            "current": null,
-            "last": [session("webinar", "Kept", MORNING, Some(NOON))]
-        })
+        test.sessions(),
+        json!({ "current": null, "last": [read_back(kept.clone())] })
     );
     assert!(complained_about(CURRENT_KEY));
     // A session of a kind this build does not know does not read either.
@@ -340,7 +427,7 @@ fn a_damaged_running_session_reads_as_none_and_is_said_in_the_log() {
         &test.db_path,
         &[(
             CURRENT_KEY,
-            session("interview", "Later", MORNING, None).to_string(),
+            saved_session("interview", "Later", MORNING, None).to_string(),
         )],
     )
     .expect("the setting is written");
@@ -353,11 +440,11 @@ fn a_damaged_running_session_reads_as_none_and_is_said_in_the_log() {
     test.begin("podcast", "Fresh", EVENING);
     assert_eq!(
         test.setting(CURRENT_KEY),
-        Some(session("podcast", "Fresh", EVENING, None))
+        Some(test.session("podcast", "Fresh", EVENING, None))
     );
     assert_eq!(
         test.snapshot()["last"],
-        json!([session("webinar", "Kept", MORNING, Some(NOON))]),
+        json!([read_back(kept)]),
         "a begin that ended nothing leaves the last as they were"
     );
 }
@@ -373,7 +460,7 @@ fn a_damaged_last_reads_as_none_and_the_next_end_writes_it_again() {
     test.end(NOON);
     assert_eq!(
         test.setting(LAST_KEY),
-        Some(json!([session("podcast", "", MORNING, Some(NOON))]))
+        Some(json!([test.session("podcast", "", MORNING, Some(NOON))]))
     );
 }
 
@@ -386,10 +473,10 @@ fn the_session_is_kept_across_a_start() {
     // leave the session's settings as they are.
     initialize_test_database(&test.db_path).expect("the database opens again");
     assert_eq!(
-        test.snapshot(),
+        test.sessions(),
         json!({
-            "current": session("podcast", "Morning take", NOON, None),
-            "last": [session("green-screen", "Studio intro", MORNING, Some(NOON))]
+            "current": test.session("podcast", "Morning take", NOON, None),
+            "last": [test.session("green-screen", "Studio intro", MORNING, Some(NOON))]
         })
     );
 }
