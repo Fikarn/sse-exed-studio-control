@@ -768,6 +768,16 @@ fn main() -> io::Result<()> {
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
     );
+    // The sessions' watch (D52): the drives, the sessions' folder and, in
+    // the studio's build alone, vMix's recording, read off the request loop
+    // so a session's read never waits on a disk.
+    session::spawn_session_watch(
+        planned_paths.db_path.clone(),
+        session::Places::new(
+            planned_paths.sessions_simulated,
+            &planned_paths.app_data_dir,
+        ),
+    );
     // The camera pictures' helper (D28): in the studio's build with the real
     // cameras, vMix's outputs (D34); in a development build with the
     // simulated cameras, the test card, or vMix's outputs under

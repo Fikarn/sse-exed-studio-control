@@ -71,6 +71,12 @@ pub struct Session {
     /// whose saved form has none.
     #[serde(default)]
     pub folder: Option<String>,
+    /// Its folder's size in bytes, as the sessions' watch measured it
+    /// (`watch.rs`): while it runs, the latest measure; once it ended, the
+    /// last measure before its end, kept with it. `null` when none was taken.
+    #[serde(rename = "folderBytes", default)]
+    #[cfg_attr(feature = "ts-rs", ts(type = "number | null"))]
+    pub folder_bytes: Option<u64>,
 }
 
 /// Each kind's subfolders, which a Begin makes in a new session's folder
@@ -126,6 +132,7 @@ pub struct SessionSettings {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "camelCase")]
 pub struct SessionPlaces {
     /// The sessions' folder a new session's folder goes on: the setting's
     /// root in the studio's build, else the run's own scratch folder.
@@ -133,13 +140,116 @@ pub struct SessionPlaces {
     /// The run keeps its sessions' folders beside its own saved data: a
     /// development build, a test, a lane and the release's trial.
     pub simulated: bool,
+    /// The sessions' folder was there at the watch's last read; `false`
+    /// before its first read, and until the first Begin makes it.
+    pub root_exists: bool,
 }
 
-/// `session.snapshot`: the running session, the last of each kind, the
-/// settings and the places.
+/// How a drive's free space reads (D52): Low under `lowBelowGb`, Nearly full
+/// under `nearlyFullBelowGb`, in Explorer's units (1 GB = 1024³ bytes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "kebab-case")]
+pub enum SessionDiskLevel {
+    Ok,
+    Low,
+    NearlyFull,
+}
+
+/// A lettered drive, as the sessions' watch last read it (`drives.rs`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionDrive {
+    /// Its letter, in capitals: `D`.
+    pub letter: String,
+    /// Its name as Explorer shows it, without the letter: `Storage 1`, or
+    /// `Public` for a mapped share (its server left out). Empty for a drive
+    /// that has not answered since the hardware link started.
+    pub name: String,
+    /// A share mapped to the letter.
+    pub mapped: bool,
+    /// It answered the last read within its 2 s. One that did not keeps its
+    /// name, and its space is `null`.
+    pub answering: bool,
+    #[cfg_attr(feature = "ts-rs", ts(type = "number | null"))]
+    pub free_bytes: Option<u64>,
+    #[cfg_attr(feature = "ts-rs", ts(type = "number | null"))]
+    pub total_bytes: Option<u64>,
+    /// How its free space reads; `null` while it does not answer.
+    pub level: Option<SessionDiskLevel>,
+}
+
+/// A folder on the sessions' folder (`recent`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionFolderEntry {
+    /// Its name, `Morning take (2026-10-18)`.
+    pub name: String,
+    /// Its path, as Windows writes it.
+    pub path: String,
+    /// When it was made, UTC.
+    pub created_at: String,
+    /// Its size; `null` when the walk was cut (over 1 s or 100,000 entries)
+    /// or has not run yet.
+    #[cfg_attr(feature = "ts-rs", ts(type = "number | null"))]
+    pub bytes: Option<u64>,
+}
+
+/// What the hardware link knows of vMix's API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "kebab-case")]
+pub enum SessionVmixState {
+    /// This run never reads vMix: a development build, a test, a lane, the
+    /// release's trial.
+    Simulated,
+    /// The studio's build has not read it yet.
+    NotRead,
+    Answering,
+    NotAnswering,
+}
+
+/// vMix's recording, as its API last said it (`vmix.rs`), and where the
+/// running session's recordings go.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionVmix {
+    pub state: SessionVmixState,
+    /// vMix records now.
+    pub recording: bool,
+    /// The file vMix names: the one it records to, or its last recording's.
+    /// `null` when it has not recorded since it started, or does not answer.
+    pub file: Option<String>,
+    /// `file` is inside the running session's folder (capitals aside, `\`
+    /// and `/` alike); `null` with no file or no running session's folder.
+    pub in_folder: Option<bool>,
+    /// How fast the file grows while vMix records, once two looks are 10 s
+    /// apart; `null` otherwise.
+    #[cfg_attr(feature = "ts-rs", ts(type = "number | null"))]
+    pub bytes_per_second: Option<u64>,
+    /// The folder vMix should record to: the running session's folder's
+    /// first subfolder whose name holds `vmix` (any case), as it stands on
+    /// the disk, else the folder itself; `null` with no running session's
+    /// folder, or before the watch has read it.
+    pub recording_folder: Option<String>,
+}
+
+/// `session.snapshot`: the running session, the last of each kind, the
+/// settings and the places; and what the sessions' watch read (D52): the
+/// sessions' folder's newest folders, the drives, vMix. Nothing in it reads
+/// the disk: the watch reads, and the snapshot carries its last report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "camelCase")]
 pub struct SessionSnapshot {
     /// The running session; `null` when none runs.
     pub current: Option<Session>,
@@ -148,6 +258,18 @@ pub struct SessionSnapshot {
     pub last: Vec<Session>,
     pub settings: SessionSettings,
     pub places: SessionPlaces,
+    /// The sessions' folder's six newest folders, newest first, by the time
+    /// each was made; empty before the watch's first read.
+    pub recent: Vec<SessionFolderEntry>,
+    /// The lettered drives C: to Z: that answered the last read, or did not
+    /// answer it in time, in their letters' order.
+    pub drives: Vec<SessionDrive>,
+    /// The letter of the session's drive: the running session's folder's,
+    /// else the sessions' folder's.
+    pub session_drive: Option<String>,
+    pub vmix: SessionVmix,
+    /// When the watch last read the disks, UTC; `null` before its first read.
+    pub read_at: Option<String>,
 }
 
 /// `session.begin`'s `folder` (D52): a new folder, on the sessions' folder

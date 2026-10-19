@@ -25,4 +25,10 @@ export type Session = {
    * whose saved form has none.
    */
   folder: string | null;
+  /**
+   * Its folder's size in bytes, as the sessions' watch measured it
+   * (`watch.rs`): while it runs, the latest measure; once it ended, the
+   * last measure before its end, kept with it. `null` when none was taken.
+   */
+  folderBytes: number | null;
 };

@@ -16,8 +16,10 @@ use crate::session::folder::{local_day, make_folder, plan_folder};
 use crate::session::places::Places;
 use crate::session::settings::{read_settings, update_settings};
 use crate::session::snapshot::{
-    Session, SessionBeginReply, SessionEndReply, SessionFolderChoice, SessionKind, SessionSnapshot,
+    Session, SessionBeginReply, SessionEndReply, SessionFolderChoice, SessionKind, SessionSettings,
+    SessionSnapshot,
 };
+use crate::session::watch::{snapshot_of, WatchReport};
 use crate::session::{SessionError, SessionReply};
 use crate::storage::{apply_settings, list_settings_by_prefix};
 use serde_json::Value;
@@ -50,23 +52,26 @@ pub(crate) const REASON_ENDED: &str = "ended";
 const KIND_REFUSAL: &str = "kind must be one of: green-screen, podcast, webinar";
 
 /// Answers one `session.*` request. `places` says where this run makes the
-/// sessions' folders; `now` is the time a begin or an end is stamped with.
+/// sessions' folders; `watch` is the sessions' watch's last report (`None`
+/// before its first pass); `now` is the time a begin or an end is stamped
+/// with.
 pub(crate) fn handle_session_request(
     db_path: &Path,
     places: &Places,
+    watch: Option<&WatchReport>,
     method: &str,
     params: &Value,
     now: SystemTime,
 ) -> Result<SessionReply, SessionError> {
     match method {
         "session.snapshot" => Ok(SessionReply {
-            result: serde_json::to_value(read_session(db_path, places)?)?,
+            result: serde_json::to_value(read_session(db_path, places, watch)?)?,
             event: None,
         }),
-        "session.begin" => begin(db_path, places, params, now),
-        "session.end" => end(db_path, places, now),
+        "session.begin" => begin(db_path, places, watch, params, now),
+        "session.end" => end(db_path, watch, now),
         "session.settings.update" => {
-            update_settings(db_path, read_session(db_path, places)?.settings, params)
+            update_settings(db_path, read_saved(db_path)?.settings, params)
         }
         other => Err(SessionError::Invalid(format!(
             "Unsupported method: {other}"
@@ -74,16 +79,21 @@ pub(crate) fn handle_session_request(
     }
 }
 
-/// What the settings hold: the running session, the last of each kind and
-/// the settings, with the places. A session that does not read is absent,
-/// and the log says so once for its key (`saved_json`): `session.current` is
-/// written again by the next begin (an end is refused, since none reads as
-/// running), `session.last` when a session next ends. Nothing here reads the
-/// disk.
-pub(crate) fn read_session(
-    db_path: &Path,
-    places: &Places,
-) -> Result<SessionSnapshot, SessionError> {
+/// What the session's settings hold: the running session, the last of each
+/// kind and Setup's settings.
+#[derive(Debug, Clone)]
+pub(crate) struct Saved {
+    pub current: Option<Session>,
+    pub last: Vec<Session>,
+    pub settings: SessionSettings,
+}
+
+/// The saved part. A session that does not read is absent, and the log
+/// says so once for its key (`saved_json`): `session.current` is written
+/// again by the next begin (an end is refused, since none reads as
+/// running), `session.last` when a session next ends. Nothing here reads
+/// the disk.
+pub(crate) fn read_saved(db_path: &Path) -> Result<Saved, SessionError> {
     let saved = list_settings_by_prefix(db_path, SESSION_SETTINGS_PREFIX)?;
     let current = saved
         .get(CURRENT_KEY)
@@ -92,14 +102,35 @@ pub(crate) fn read_session(
         .get(LAST_KEY)
         .and_then(|raw| parse_saved_json::<Vec<Session>>(LAST_KEY, raw))
         .unwrap_or_default();
-    let settings = read_settings(&saved);
-    let places = places.snapshot(&settings.root);
-    Ok(SessionSnapshot {
+    Ok(Saved {
         current,
         last: one_of_each_kind(last),
-        settings,
-        places,
+        settings: read_settings(&saved),
     })
+}
+
+/// `session.snapshot`: the saved part, the places, and what the sessions'
+/// watch last read (`watch::snapshot_of`). Nothing here reads the disk.
+pub(crate) fn read_session(
+    db_path: &Path,
+    places: &Places,
+    watch: Option<&WatchReport>,
+) -> Result<SessionSnapshot, SessionError> {
+    Ok(snapshot_of(read_saved(db_path)?, places, watch))
+}
+
+/// A session ending now: its end, and its folder's last measure kept with
+/// it, the watch's when it has one.
+fn ending(running: Session, at: String, watch: Option<&WatchReport>) -> Session {
+    let measured = running
+        .folder
+        .as_deref()
+        .and_then(|folder| watch.and_then(|watch| watch.size_of(folder)));
+    Session {
+        ended_at: Some(at),
+        folder_bytes: measured.or(running.folder_bytes),
+        ..running
+    }
 }
 
 /// The begin's `folder`: a new folder on the sessions' folder when it is
@@ -114,11 +145,12 @@ fn folder_choice(params: &Value) -> Result<SessionFolderChoice, SessionError> {
 
 /// `session.begin { kind, name?, folder? }`: the session's folder is made or
 /// chosen, then the session begins now, and a running one ends at the same
-/// moment and becomes its kind's last. Both settings are written in one
-/// transaction, after the folder.
+/// moment and becomes its kind's last, with its folder's last measure. Both
+/// settings are written in one transaction, after the folder.
 fn begin(
     db_path: &Path,
     places: &Places,
+    watch: Option<&WatchReport>,
     params: &Value,
     now: SystemTime,
 ) -> Result<SessionReply, SessionError> {
@@ -147,12 +179,11 @@ fn begin(
     }
     let choice = folder_choice(params)?;
 
-    let SessionSnapshot {
+    let Saved {
         current,
         last,
         settings,
-        ..
-    } = read_session(db_path, places)?;
+    } = read_saved(db_path)?;
     let plan = plan_folder(
         &choice,
         kind,
@@ -161,20 +192,19 @@ fn begin(
         &settings.root,
         settings.subfolders.of(kind),
         places,
+        &watch.map(WatchReport::not_answering).unwrap_or_default(),
     )?;
     let folder = make_folder(plan)?;
 
     let at = utc_text(now);
-    let ended = current.map(|running| Session {
-        ended_at: Some(at.clone()),
-        ..running
-    });
+    let ended = current.map(|running| ending(running, at.clone(), watch));
     let session = Session {
         kind,
         name: String::from(name),
         begun_at: at,
         ended_at: None,
         folder: Some(folder.path.clone()),
+        folder_bytes: None,
     };
     let mut writes = vec![(CURRENT_KEY, serde_json::to_string(&session)?)];
     if let Some(ended) = &ended {
@@ -216,21 +246,23 @@ fn unsaved_after_making(error: SessionError, folder: &str) -> SessionError {
     }
 }
 
-/// `session.end`: the running session ends now and becomes its kind's last;
-/// `session.current` is removed in the same transaction. Its folder is left
-/// as it is.
-fn end(db_path: &Path, places: &Places, now: SystemTime) -> Result<SessionReply, SessionError> {
-    let SessionSnapshot { current, last, .. } = read_session(db_path, places)?;
+/// `session.end`: the running session ends now and becomes its kind's last,
+/// with its folder's last measure (no walk runs here: the watch's measure
+/// is taken); `session.current` is removed in the same transaction. Its
+/// folder is left as it is.
+fn end(
+    db_path: &Path,
+    watch: Option<&WatchReport>,
+    now: SystemTime,
+) -> Result<SessionReply, SessionError> {
+    let Saved { current, last, .. } = read_saved(db_path)?;
     let Some(running) = current else {
         return Err(SessionError::Refused(
             SESSION_NOT_RUNNING,
             String::from("No session is running, so there is none to end."),
         ));
     };
-    let ended = Session {
-        ended_at: Some(utc_text(now)),
-        ..running
-    };
+    let ended = ending(running, utc_text(now), watch);
     apply_settings(
         db_path,
         &[(LAST_KEY, serde_json::to_string(&with_last(last, &ended))?)],

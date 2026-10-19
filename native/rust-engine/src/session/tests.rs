@@ -11,12 +11,14 @@ use super::commands::{
 use super::folder::{folder_leaf, local_day};
 use super::places::Places;
 use super::snapshot::SessionKind;
+use super::watch::WatchReport;
 use super::{SessionError, SessionReply};
 use crate::cameras::runtime::utc_time;
 use crate::saved_json::complained_about;
 use crate::storage::{initialize_test_database, open_connection, set_settings};
 use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
+use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -28,11 +30,14 @@ pub(super) const EVENING: &str = "2026-10-15T16:40:00.000Z";
 
 /// Saved data of its own in a temp folder, removed at the end, and the
 /// places of a simulated run there: the sessions' folders go in its
-/// `Sessions` folder and nowhere else.
+/// `Sessions` folder and nowhere else. `watch` is the sessions' watch's
+/// report its requests read, the test's own (none to begin with): no test
+/// here touches the hardware link's board.
 pub(super) struct TestSession {
     pub(super) root: PathBuf,
     pub(super) db_path: PathBuf,
     pub(super) places: Places,
+    pub(super) watch: RefCell<Option<WatchReport>>,
 }
 
 impl TestSession {
@@ -53,6 +58,7 @@ impl TestSession {
             root,
             db_path,
             places,
+            watch: RefCell::new(None),
         }
     }
 
@@ -65,6 +71,7 @@ impl TestSession {
         handle_session_request(
             &self.db_path,
             &self.places,
+            self.watch.borrow().as_ref(),
             method,
             &params,
             utc_time(at).expect("a time"),
@@ -134,7 +141,8 @@ impl TestSession {
         self.places.scratch_root.join(folder_leaf(name, kind, &day))
     }
 
-    /// A session begun here, with its folder.
+    /// A session begun here, with its folder, and no measure of it (no
+    /// watch has measured it).
     pub(super) fn session(
         &self,
         kind: &str,
@@ -144,6 +152,7 @@ impl TestSession {
     ) -> Value {
         let mut session = saved_session(kind, name, begun_at, ended_at);
         session["folder"] = json!(self.folder(kind, name, begun_at).display().to_string());
+        session["folderBytes"] = Value::Null;
         session
     }
 }
@@ -164,10 +173,12 @@ pub(super) fn saved_session(
     json!({ "kind": kind, "name": name, "begunAt": begun_at, "endedAt": ended_at })
 }
 
-/// A session saved without a folder, as it reads back: with none.
+/// A session saved without a folder, as it reads back: with none, and no
+/// measure.
 fn read_back(saved: Value) -> Value {
     let mut session = saved;
     session["folder"] = Value::Null;
+    session["folderBytes"] = Value::Null;
     session
 }
 

@@ -14,4 +14,9 @@ export type SessionPlaces = {
    * development build, a test, a lane and the release's trial.
    */
   simulated: boolean;
+  /**
+   * The sessions' folder was there at the watch's last read; `false`
+   * before its first read, and until the first Begin makes it.
+   */
+  rootExists: boolean;
 };

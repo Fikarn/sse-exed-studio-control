@@ -86,11 +86,13 @@ impl Places {
         }
     }
 
-    /// What `session.snapshot` says of the places.
-    pub(crate) fn snapshot(&self, root_setting: &str) -> SessionPlaces {
+    /// What `session.snapshot` says of the places; `root_exists` is the
+    /// sessions' watch's word (`watch.rs`).
+    pub(crate) fn snapshot(&self, root_setting: &str, root_exists: bool) -> SessionPlaces {
         SessionPlaces {
             root: self.effective_root(root_setting).display().to_string(),
             simulated: self.simulated,
+            root_exists,
         }
     }
 }
@@ -130,10 +132,11 @@ mod tests {
             app_data.join("Sessions")
         );
         assert_eq!(
-            simulated.snapshot(r"D:\Sessions"),
+            simulated.snapshot(r"D:\Sessions", false),
             SessionPlaces {
                 root: app_data.join("Sessions").display().to_string(),
-                simulated: true
+                simulated: true,
+                root_exists: false
             }
         );
         assert!(simulated.may_make(&app_data.join("Sessions")));
@@ -148,10 +151,11 @@ mod tests {
             PathBuf::from(r"D:\Sessions")
         );
         assert_eq!(
-            studio.snapshot(r"D:\Sessions"),
+            studio.snapshot(r"D:\Sessions", true),
             SessionPlaces {
                 root: String::from(r"D:\Sessions"),
-                simulated: false
+                simulated: false,
+                root_exists: true
             }
         );
         assert!(studio.may_make(&app_data.join("Elsewhere")));

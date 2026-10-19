@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use crate::prompter::clock::PrompterAnchor;
 use crate::protocol::{
     event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_CAMERAS_CHANGED,
-    EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED,
+    EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SESSION_CHANGED,
 };
 
 static ENGINE_EVENT_SENDER: OnceLock<Sender<Value>> = OnceLock::new();
@@ -79,6 +79,12 @@ pub(crate) fn emit_lighting_changed(reason: &str) {
             json!({ "reason": reason }),
         ));
     }
+}
+
+/// Emits `session.changed { reason }` from outside the request loop: the
+/// sessions' watch's report moved (`reason: "read"`, D52).
+pub(crate) fn emit_session_changed(reason: &str) {
+    emit_event(EVENT_SESSION_CHANGED, json!({ "reason": reason }));
 }
 
 /// `prompter.changed { reason, anchor }`, the payload the IPC replies carry
