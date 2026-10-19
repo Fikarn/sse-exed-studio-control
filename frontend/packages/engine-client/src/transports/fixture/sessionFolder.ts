@@ -189,9 +189,16 @@ export function planFolder(
     chosen = reading.path;
   }
 
-  // Its drive there; a folder that exists is used as it is, and nothing is made in it.
+  // Its drive there, one that did not answer the last read refused at once; a folder that
+  // exists is used as it is, and nothing is made in it.
   if (choice.mode === "existing" && chosen !== null) {
     const letter = chosen.charAt(0);
+    if (disk.drives.get(letter)?.answering === false) {
+      throw refused(
+        "SESSION_DRIVE_MISSING",
+        `${letter}: does not answer, so ${chosen} cannot be used. Choose another folder.`
+      );
+    }
     if (!disk.drives.has(letter)) {
       throw refused(
         "SESSION_DRIVE_MISSING",
@@ -206,6 +213,12 @@ export function planFolder(
   const root = chosen === null ? (places.simulated ? places.scratchRoot : rootSetting) : null;
   const parent = chosen ?? root ?? rootSetting;
   const letter = /^[A-Z]:/u.test(parent) ? parent.charAt(0) : null;
+  if (letter !== null && disk.drives.get(letter)?.answering === false) {
+    throw refused(
+      "SESSION_DRIVE_MISSING",
+      `${letter}: does not answer, so the session's folder cannot be made there. Choose a folder on another drive, or set another sessions' folder in Setup / Support.`
+    );
+  }
   if (letter !== null && !disk.drives.has(letter)) {
     throw refused(
       "SESSION_DRIVE_MISSING",

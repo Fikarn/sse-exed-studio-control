@@ -22,6 +22,7 @@ import type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScrip
 import type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
 import type { Session } from "./generated/snapshots/Session";
 import type { SessionFolderChoice } from "./generated/snapshots/SessionFolderChoice";
+import type { SessionFolderEntry } from "./generated/snapshots/SessionFolderEntry";
 import type { SessionKind } from "./generated/snapshots/SessionKind";
 import type { SessionPlaces } from "./generated/snapshots/SessionPlaces";
 import type { SessionSettings } from "./generated/snapshots/SessionSettings";
@@ -465,14 +466,39 @@ export interface FixtureCamerasSeed {
  * none runs and no kind has a last. Since step 2 (D52): the settings (any part; the rest are
  * the defaults), the places (the studio's, the settings' root, without them; `simulated:
  * true` names a scratch folder), and the folders on the double's disk, which a begin's
- * checks read (the folders a begin makes join them). Paths as Windows writes them.
+ * checks read (the folders a begin makes join them). Paths as Windows writes them. And what
+ * the hardware link's watch reads: the sessions' folder's newest folders, newest first (they
+ * join the folders), the drives (in place of the studio PC's four), vMix's word (answering,
+ * not recording and naming no file without it).
  */
 export interface FixtureSessionSeed {
   current?: Session;
   last?: Session[];
   settings?: Partial<SessionSettings>;
-  places?: SessionPlaces;
+  places?: Pick<SessionPlaces, "root" | "simulated">;
   folders?: string[];
+  recent?: SessionFolderEntry[];
+  drives?: FixtureSessionDriveSeed[];
+  vmix?: FixtureSessionVmixSeed;
+}
+
+/** A drive of the double's disk (`FixtureSessionSeed.drives`): `mapped` false and
+ *  `answering` true unless given. */
+export interface FixtureSessionDriveSeed {
+  letter: string;
+  name: string;
+  mapped?: boolean;
+  answering?: boolean;
+  freeBytes: number;
+  totalBytes: number;
+}
+
+/** vMix's word, as the studio's build last read it (`FixtureSessionSeed.vmix`). */
+export interface FixtureSessionVmixSeed {
+  state?: "not-read" | "answering" | "not-answering";
+  recording?: boolean;
+  file?: string | null;
+  bytesPerSecond?: number | null;
 }
 
 export interface FixtureScenario {

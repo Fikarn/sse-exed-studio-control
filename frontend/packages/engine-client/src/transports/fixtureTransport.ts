@@ -32,6 +32,8 @@ export { calculateNextFixturePeakHold } from "./fixture/audioMetering";
 // camera's body, a camera that stops answering and answers again.
 export { simulatedCameras, type SimulatedCameraHooks } from "./fixture/camerasRequests";
 export { fixturePicturesLink } from "./fixture/picturesDouble";
+// The session's hooks (D52): vMix's word and a drive's space, as the watch's next read finds them.
+export { simulatedSession, type SimulatedSessionHooks } from "./fixture/sessionWatch";
 
 // The domains, in the order the requests are offered to them. The snapshot
 // reads stay in `handleRequest` below; everything that changes the double is

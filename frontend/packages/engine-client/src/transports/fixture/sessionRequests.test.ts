@@ -4,11 +4,13 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import type { Session } from "../../generated/snapshots/Session";
+import type { SessionDrive } from "../../generated/snapshots/SessionDrive";
 import type { FixtureSessionSeed } from "../../types";
 import { EngineRequestError } from "../engineRequestError";
-import { createFixtureTransport } from "../fixtureTransport";
+import { createFixtureTransport, simulatedSession } from "../fixtureTransport";
 import { folderLeaf, localDay } from "./sessionFolder";
-import { defaultSessionSettings, trimmedName } from "./sessionState";
+import { FIXTURE_DRIVES, GIB, defaultSessionSettings, trimmedName } from "./sessionState";
+import { inFolder, levelOf, onRoot } from "./sessionWatch";
 
 // The fixture double's `session.*` requests (the Session page, 2026-10-15; D52), held to what
 // the hardware link answers (`native/rust-engine/src/session/tests.rs`, `tests_folder.rs`;
@@ -38,6 +40,36 @@ const session = (kind: Session["kind"], name: string, begunAt: string, endedAt: 
   begunAt,
   endedAt,
   folder: folderOf(kind, name, begunAt),
+  folderBytes: null,
+});
+
+/** The studio PC's four drives as the double's watch reads them, each well above Low. */
+const studioDrives = (): SessionDrive[] =>
+  Object.entries(FIXTURE_DRIVES).map(([letter, drive]) => ({
+    letter,
+    name: drive.name,
+    mapped: drive.mapped,
+    answering: true,
+    freeBytes: drive.freeBytes,
+    totalBytes: drive.totalBytes,
+    level: "ok",
+  }));
+
+/** What the double's watch reads with no seed of it: the studio's drives, no folder on the
+ *  sessions' folder, vMix answering with nothing named, read at the double's start. */
+const unseededWatch = (readAt: string) => ({
+  recent: [],
+  drives: studioDrives(),
+  sessionDrive: "D",
+  vmix: {
+    state: "answering",
+    recording: false,
+    file: null,
+    inFolder: null,
+    bytesPerSecond: null,
+    recordingFolder: null,
+  },
+  readAt,
 });
 
 /** A double on `setup-ready` with the session `seed` says, and what a test does with it. */
@@ -77,7 +109,7 @@ function openSessionDouble(seed?: FixtureSessionSeed) {
       .reverse();
   };
 
-  return { call, at, sessions, refused, rows, events };
+  return { call, at, sessions, refused, rows, events, hooks: simulatedSession(transport) };
 }
 
 describe("the fixture double's session", () => {
@@ -88,7 +120,8 @@ describe("the fixture double's session", () => {
       current: null,
       last: [],
       settings: defaultSessionSettings(),
-      places: { root: "D:\\Sessions", simulated: false },
+      places: { root: "D:\\Sessions", simulated: false, rootExists: false },
+      ...unseededWatch(MORNING),
     });
     expect(events).toEqual([]);
   });
@@ -330,7 +363,11 @@ describe("the fixture double's session folder (D52)", () => {
   it("makes a simulated run's folders in its scratch folder alone", async () => {
     const scratch = "C:\\Users\\operator\\AppData\\Roaming\\Dev\\Sessions";
     const { call, refused } = openSessionDouble({ places: { root: scratch, simulated: true }, folders: ["D:\\All"] });
-    expect(((await call("session.snapshot")) as JsonObject).places).toEqual({ root: scratch, simulated: true });
+    expect(((await call("session.snapshot")) as JsonObject).places).toEqual({
+      root: scratch,
+      simulated: true,
+      rootExists: false,
+    });
     expect(await call("session.begin", { kind: "webinar" })).toMatchObject({
       folder: { path: `${scratch}\\${folderLeaf("", "webinar", localDay(new Date(MORNING)))}`, made: true },
     });
@@ -371,6 +408,7 @@ describe("the fixture double's session settings (D52)", () => {
     expect(((await call("session.snapshot")) as JsonObject).places).toEqual({
       root: "E:\\Studio\\Sessions 2026",
       simulated: false,
+      rootExists: false,
     });
     await call("session.settings.update", { subfolders: { webinar: [" Slides ", "Q&A"], podcast: null } });
     await call("session.settings.update", { lowBelowGb: 120, nearlyFullBelowGb: 20 });
@@ -470,7 +508,8 @@ describe("the fixture double's session seed", () => {
       current: running,
       last,
       settings: { ...defaultSessionSettings(), lowBelowGb: 300 },
-      places: { root: "D:\\Sessions", simulated: false },
+      places: { root: "D:\\Sessions", simulated: false, rootExists: false },
+      ...unseededWatch(MORNING),
     });
     expect(
       await call("session.begin", {
@@ -502,9 +541,218 @@ describe("the fixture double's session seed", () => {
       [{ places: { root: "E:\\Sessions", simulated: false } }, "session: places.root is the settings' root"],
       [{ places: { root: "E:\\Sessions" } }, "session: places.simulated must be true or false."],
       [{ folders: ["D:/All"] }, "session: folders[0] must be a folder's path"],
+      [{ current: { ...running, folderBytes: -1 } }, "session: current's folderBytes must be a whole number"],
+      [
+        { current: { ...running, folder: null, folderBytes: 5 } },
+        "session: current has a folder's size and no folder.",
+      ],
+      [{ recent: "D:\\Sessions" }, "session: recent must be a list."],
+      [
+        { recent: [{ name: "Other", path: "D:\\Sessions\\Take", createdAt: MORNING, bytes: 0 }] },
+        "session: recent[0]'s name is its path's last part.",
+      ],
+      [
+        { recent: [{ name: "Take", path: "D:\\Sessions\\Take", createdAt: "now", bytes: 0 }] },
+        "session: recent[0]'s createdAt must be a UTC time.",
+      ],
+      [{ drives: [{ letter: "A", name: "Floppy", freeBytes: 0, totalBytes: 1 }] }, "session: drives[0]'s letter"],
+      [
+        { drives: [{ letter: "D", name: "Storage 1", freeBytes: 2, totalBytes: 1 }] },
+        "session: drives[0]'s space is whole bytes",
+      ],
+      [
+        {
+          drives: [
+            { letter: "D", name: "Storage 1", freeBytes: 1, totalBytes: 2 },
+            { letter: "D", name: "Again", freeBytes: 1, totalBytes: 2 },
+          ],
+        },
+        "session: drives[1]: D: is there twice.",
+      ],
+      [{ vmix: { state: "simulated" } }, "session: vmix.state is not-read, answering or not-answering"],
+      [{ vmix: { recordnig: true } }, "session: vmix has recordnig, which a seed does not have."],
     ];
     for (const [seed, message] of mistakes) {
       expect(() => openSessionDouble(seed as FixtureSessionSeed), message).toThrow(message);
     }
+  });
+});
+
+describe("the fixture double's sessions' watch (D52)", () => {
+  const ROOT = "D:\\Sessions";
+  const LAST_FOLDER = `${ROOT}\\Spring launch (2026-10-14)`;
+  const seeded = (): FixtureSessionSeed => ({
+    current: { ...session("podcast", "Morning take", MORNING), folderBytes: 18 * GIB },
+    last: [
+      {
+        ...session("webinar", "Spring launch", "2026-10-14T09:00:00.000Z", "2026-10-14T10:00:00.000Z"),
+        folder: LAST_FOLDER,
+        folderBytes: 22 * GIB,
+      },
+    ],
+    folders: [
+      folderOf("podcast", "Morning take", MORNING),
+      `${folderOf("podcast", "Morning take", MORNING)}\\Audio`,
+      `${folderOf("podcast", "Morning take", MORNING)}\\vMix Recording`,
+    ],
+    recent: [
+      {
+        name: folderOf("podcast", "Morning take", MORNING).slice(ROOT.length + 1),
+        path: folderOf("podcast", "Morning take", MORNING),
+        createdAt: MORNING,
+        bytes: 18 * GIB,
+      },
+      { name: "Spring launch (2026-10-14)", path: LAST_FOLDER, createdAt: "2026-10-14T09:00:00.000Z", bytes: 23 * GIB },
+    ],
+    drives: [
+      { letter: "C", name: "Local Disk", freeBytes: 1_600 * GIB, totalBytes: 3_900 * GIB },
+      { letter: "D", name: "Storage 1", freeBytes: 140 * GIB, totalBytes: 3_815 * GIB },
+      { letter: "Z", name: "Public", mapped: true, answering: false, freeBytes: 0, totalBytes: 0 },
+    ],
+    vmix: {
+      recording: true,
+      file: `${folderOf("podcast", "Morning take", MORNING)}\\vMix Recording\\capture.avi`,
+      bytesPerSecond: 13 * 1024 * 1024,
+    },
+  });
+
+  it("answers the seeded drives with their levels, the newest folders, vMix and where it should record", async () => {
+    const { call } = openSessionDouble(seeded());
+    const snapshot = (await call("session.snapshot")) as JsonObject;
+    const folder = folderOf("podcast", "Morning take", MORNING);
+    expect((snapshot.current as JsonObject).folderBytes).toBe(18 * GIB);
+    expect((snapshot.last as JsonObject[])[0]?.folderBytes).toBe(22 * GIB);
+    expect(snapshot.places).toEqual({ root: ROOT, simulated: false, rootExists: true });
+    expect((snapshot.recent as JsonObject[]).map((entry) => entry.path)).toEqual([folder, LAST_FOLDER]);
+    expect(snapshot.drives).toEqual([
+      {
+        letter: "C",
+        name: "Local Disk",
+        mapped: false,
+        answering: true,
+        freeBytes: 1_600 * GIB,
+        totalBytes: 3_900 * GIB,
+        level: "ok",
+      },
+      {
+        letter: "D",
+        name: "Storage 1",
+        mapped: false,
+        answering: true,
+        freeBytes: 140 * GIB,
+        totalBytes: 3_815 * GIB,
+        level: "low",
+      },
+      { letter: "Z", name: "Public", mapped: true, answering: false, freeBytes: null, totalBytes: null, level: null },
+    ]);
+    expect(snapshot.sessionDrive).toBe("D");
+    expect(snapshot.vmix).toEqual({
+      state: "answering",
+      recording: true,
+      file: `${folder}\\vMix Recording\\capture.avi`,
+      inFolder: true,
+      bytesPerSecond: 13 * 1024 * 1024,
+      recordingFolder: `${folder}\\vMix Recording`,
+    });
+    expect(snapshot.readAt).toBe(MORNING);
+  });
+
+  it("changes vMix and a drive through its hooks, each a read that raises session.changed { read }", async () => {
+    const { call, at, events, hooks } = openSessionDouble(seeded());
+    const read = async () => (await call("session.snapshot")) as JsonObject;
+    events.length = 0;
+    at(NOON);
+    hooks.setVmix({ recording: false, file: "D:\\All\\Old take (2026-10-01)\\capture.avi" });
+    expect(events).toEqual([["session.changed", { reason: "read" }]]);
+    expect((await read()).vmix).toMatchObject({ recording: false, inFolder: false, bytesPerSecond: null });
+    expect((await read()).readAt).toBe(NOON);
+    hooks.setVmix({ state: "not-answering" });
+    expect((await read()).vmix).toMatchObject({ state: "not-answering", file: null, inFolder: null });
+    hooks.setDrive("D", 28 * GIB);
+    expect(((await read()).drives as JsonObject[])[1]).toMatchObject({ freeBytes: 28 * GIB, level: "nearly-full" });
+    hooks.setDrive("D", "not-answering");
+    expect(((await read()).drives as JsonObject[])[1]).toMatchObject({ answering: false, level: null });
+    hooks.setDrive("Z", 3_000 * GIB);
+    expect(((await read()).drives as JsonObject[])[2]).toMatchObject({ answering: true, level: "ok" });
+    hooks.setDrive("E", "not-there");
+    hooks.setDrive("Z", "not-there");
+    expect(((await read()).drives as JsonObject[]).map((drive) => drive.letter)).toEqual(["C", "D"]);
+    expect(events).toHaveLength(7);
+    expect(() => hooks.setDrive("Q", 5)).toThrow("The double has no drive Q:.");
+    expect(() => hooks.setVmix({ state: "simulated" as "answering" })).toThrow("vMix's state is one of");
+  });
+
+  it("refuses at once a begin on a drive that did not answer, as the hardware link does", async () => {
+    const { refused, sessions } = openSessionDouble({
+      drives: [{ letter: "D", name: "Storage 1", answering: false, freeBytes: 0, totalBytes: 0 }],
+      folders: ["D:\\All\\Series (2026-10-01)"],
+    });
+    expect(await refused("session.begin", { kind: "podcast", name: "Take" })).toEqual({
+      code: "SESSION_DRIVE_MISSING",
+      sentence:
+        "D: does not answer, so the session's folder cannot be made there. Choose a folder on another drive, or set another sessions' folder in Setup / Support.",
+    });
+    expect(
+      await refused("session.begin", {
+        kind: "podcast",
+        folder: { mode: "existing", path: "D:\\All\\Series (2026-10-01)" },
+      })
+    ).toEqual({
+      code: "SESSION_DRIVE_MISSING",
+      sentence: "D: does not answer, so D:\\All\\Series (2026-10-01) cannot be used. Choose another folder.",
+    });
+    expect(await sessions()).toEqual({ current: null, last: [] });
+  });
+
+  it("puts a begin's new folder first among the newest, and an end keeps the running session's measure", async () => {
+    const { call, at } = openSessionDouble(seeded());
+    const kept = ((await call("session.snapshot")) as { recent: JsonObject[] }).recent;
+    at(NOON);
+    const reply = (await call("session.begin", { kind: "webinar", name: "Launch" })) as {
+      ended: Session;
+      session: Session;
+    };
+    expect(reply.ended.folderBytes, "the measure the running session had").toBe(18 * GIB);
+    expect(reply.session.folderBytes).toBeNull();
+    const recent = ((await call("session.snapshot")) as { recent: JsonObject[] }).recent;
+    expect(recent[0]).toEqual({
+      name: folderLeaf("Launch", "webinar", localDay(new Date(NOON))),
+      path: folderOf("webinar", "Launch", NOON),
+      createdAt: new Date(NOON).toISOString(),
+      bytes: 0,
+    });
+    expect(recent.slice(1)).toEqual(kept);
+    // A folder made elsewhere, or one that was there, is not the sessions' folder's newest.
+    await call("session.begin", { kind: "podcast", folder: { mode: "existing", path: LAST_FOLDER } });
+    expect(((await call("session.snapshot")) as { recent: JsonObject[] }).recent).toEqual(recent);
+    expect(((await call("session.end")) as { ended: Session }).ended.folderBytes).toBeNull();
+  });
+
+  it("never says what vMix said in a simulated run", async () => {
+    const scratch = "C:\\Users\\operator\\AppData\\Roaming\\Dev\\Sessions";
+    const { call, hooks } = openSessionDouble({ places: { root: scratch, simulated: true } });
+    hooks.setVmix({ recording: true, file: "D:\\a.avi" });
+    expect(((await call("session.snapshot")) as JsonObject).vmix).toEqual({
+      state: "simulated",
+      recording: false,
+      file: null,
+      inFolder: null,
+      bytesPerSecond: null,
+      recordingFolder: null,
+    });
+    expect(((await call("session.snapshot")) as JsonObject).sessionDrive).toBe("C");
+  });
+
+  it("holds its levels, its folders and its paths to the hardware link's rules", () => {
+    expect(levelOf(200 * GIB, 200, 50)).toBe("ok");
+    expect(levelOf(200 * GIB - 1, 200, 50)).toBe("low");
+    expect(levelOf(50 * GIB - 1, 200, 50)).toBe("nearly-full");
+    expect(inFolder("d:/sessions/TAKE/a.avi", "D:\\Sessions\\Take")).toBe(true);
+    expect(inFolder("D:\\Sessions\\Take", "D:\\Sessions\\Take")).toBe(false);
+    expect(inFolder("D:\\Sessions\\Take 2\\a.avi", "D:\\Sessions\\Take")).toBe(false);
+    expect(onRoot("D:\\Sessions\\Take", "D:\\Sessions")).toBe(true);
+    expect(onRoot("d:\\sessions\\Take", "D:\\Sessions\\")).toBe(true);
+    expect(onRoot("D:\\Sessions\\Series\\Take", "D:\\Sessions")).toBe(false);
+    expect(onRoot("E:\\Take", "E:\\")).toBe(true);
   });
 });
