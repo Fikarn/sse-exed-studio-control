@@ -226,19 +226,32 @@ pub(crate) fn in_folder(file: &str, folder: &str) -> bool {
 /// The folder vMix should record to in a session's folder: its first
 /// subfolder, by name, whose name holds `vmix` in any case, as the disk
 /// writes it (`vMix Recording`), else the folder itself. `None` when the
-/// folder cannot be listed.
-pub(crate) fn recording_folder_in(folder: &Path) -> Option<String> {
-    let mut names: Vec<String> = fs::read_dir(folder)
-        .ok()?
-        .filter_map(Result::ok)
-        .filter(|entry| {
-            entry
-                .file_type()
-                .is_ok_and(|kind| kind.is_dir() && !kind.is_symlink())
-        })
-        .filter_map(|entry| entry.file_name().to_str().map(String::from))
-        .filter(|name| name.to_lowercase().contains("vmix"))
-        .collect();
+/// folder cannot be listed, or not within `budget` and `max_entries` (the
+/// walk's bounds; the review of #355).
+pub(crate) fn recording_folder_in(
+    folder: &Path,
+    budget: Duration,
+    max_entries: u64,
+) -> Option<String> {
+    let deadline = Instant::now() + budget;
+    let mut names: Vec<String> = Vec::new();
+    for (count, entry) in fs::read_dir(folder).ok()?.enumerate() {
+        if count as u64 >= max_entries || Instant::now() >= deadline {
+            return None;
+        }
+        let Ok(entry) = entry else { continue };
+        if !entry
+            .file_type()
+            .is_ok_and(|kind| kind.is_dir() && !kind.is_symlink())
+        {
+            continue;
+        }
+        if let Some(name) = entry.file_name().to_str() {
+            if name.to_lowercase().contains("vmix") {
+                names.push(String::from(name));
+            }
+        }
+    }
     names.sort_by_key(|name| name.to_lowercase());
     Some(match names.first() {
         Some(name) => folder.join(name).display().to_string(),
@@ -518,6 +531,7 @@ mod tests {
             "studio-control-vmix-folder-{}-{unique}",
             std::process::id()
         ));
+        let within = |folder: &Path| recording_folder_in(folder, Duration::from_secs(5), 100);
         let folder = root.join("Morning take (2026-10-18)");
         for subfolder in ["Audio", "Exports", "vMix Recording", "Video"] {
             fs::create_dir_all(folder.join(subfolder)).expect("a subfolder is made");
@@ -525,7 +539,7 @@ mod tests {
         // A file whose name holds vmix is no folder.
         fs::write(folder.join("vmix notes.txt"), b"").expect("a file is written");
         assert_eq!(
-            recording_folder_in(&folder),
+            within(&folder),
             Some(folder.join("vMix Recording").display().to_string())
         );
 
@@ -534,18 +548,22 @@ mod tests {
             fs::create_dir_all(other.join(subfolder)).expect("a subfolder is made");
         }
         assert_eq!(
-            recording_folder_in(&other),
+            within(&other),
             Some(other.join("older vmix").display().to_string()),
             "the first by name"
         );
 
         let plain = root.join("Plain");
         fs::create_dir_all(plain.join("Audio")).expect("a subfolder is made");
+        assert_eq!(within(&plain), Some(plain.display().to_string()));
+        assert_eq!(within(&root.join("Not there")), None);
+        // Over the bounds, nothing is said: five entries are over four, and
+        // no time is no time to list.
         assert_eq!(
-            recording_folder_in(&plain),
-            Some(plain.display().to_string())
+            recording_folder_in(&folder, Duration::from_secs(5), 4),
+            None
         );
-        assert_eq!(recording_folder_in(&root.join("Not there")), None);
+        assert_eq!(recording_folder_in(&folder, Duration::ZERO, 100), None);
         let _ = fs::remove_dir_all(&root);
     }
 

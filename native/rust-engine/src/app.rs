@@ -62,6 +62,7 @@ use crate::protocol::{
     EVENT_ENGINE_READY, EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SESSION_CHANGED,
     EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
+use crate::session::folder::SESSION_DRIVE_MISSING;
 use crate::session::{
     handle_session_request, session_watch_report, wake_session_watch, Places, SessionError,
 };
@@ -982,6 +983,13 @@ impl EngineApp {
             },
             Err(SessionError::Invalid(message)) => Self::reply(invalid_params(request.id, message)),
             Err(SessionError::Refused(code, message)) => {
+                // A begin refused for its drive: the watch reads the drives
+                // again at once, so a drive that answers now is found by the
+                // next begin rather than after the watch's next interval
+                // (the review of #355).
+                if code == SESSION_DRIVE_MISSING {
+                    wake_session_watch();
+                }
                 Self::reply(error_response(request.id, code, message))
             }
             Err(SessionError::Storage(message)) => {

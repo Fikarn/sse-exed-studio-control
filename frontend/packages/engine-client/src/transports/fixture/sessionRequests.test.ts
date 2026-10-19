@@ -43,6 +43,10 @@ const session = (kind: Session["kind"], name: string, begunAt: string, endedAt: 
   folderBytes: null,
 });
 
+/** A session in a folder its begin made, once the watch has measured it: empty. A begin's
+ *  answer carries the session as saved, unmeasured; a read and an end carry the measure. */
+const measured = (made: Session): Session => ({ ...made, folderBytes: 0 });
+
 /** The studio PC's four drives as the double's watch reads them, each well above Low. */
 const studioDrives = (): SessionDrive[] =>
   Object.entries(FIXTURE_DRIVES).map(([letter, drive]) => ({
@@ -136,7 +140,7 @@ describe("the fixture double's session", () => {
       folder: { path: running.folder, made: true },
     });
     expect(events).toEqual([["session.changed", { reason: "begun" }]]);
-    expect(await sessions()).toEqual({ current: running, last: [] });
+    expect(await sessions()).toEqual({ current: measured(running), last: [] });
     expect(await rows()).toEqual([
       ["ui", "begun", "podcast", `Session begun: Podcast Recording · Morning take, in a new folder ${running.folder}`],
     ]);
@@ -147,7 +151,7 @@ describe("the fixture double's session", () => {
     await call("session.begin", { kind: "podcast", name: "Morning take" });
     at(NOON);
     events.length = 0;
-    const ended = session("podcast", "Morning take", MORNING, NOON);
+    const ended = measured(session("podcast", "Morning take", MORNING, NOON));
     const running = session("webinar", "Spring launch", NOON);
     expect(await call("session.begin", { kind: "webinar", name: "Spring launch" })).toEqual({
       session: running,
@@ -155,7 +159,7 @@ describe("the fixture double's session", () => {
       folder: { path: running.folder, made: true },
     });
     expect(events, "one event for the end and the begin").toEqual([["session.changed", { reason: "begun" }]]);
-    expect(await sessions()).toEqual({ current: running, last: [ended] });
+    expect(await sessions()).toEqual({ current: measured(running), last: [ended] });
     expect(await rows()).toEqual([
       ["ui", "begun", "podcast", `Session begun: Podcast Recording · Morning take, in a new folder ${ended.folder}`],
       ["ui", "ended", "podcast", "Session ended: Podcast Recording · Morning take"],
@@ -168,7 +172,7 @@ describe("the fixture double's session", () => {
     await call("session.begin", { kind: "green-screen" });
     at(EVENING);
     events.length = 0;
-    const ended = session("green-screen", "", MORNING, EVENING);
+    const ended = measured(session("green-screen", "", MORNING, EVENING));
     expect(await call("session.end")).toEqual({ ended });
     expect(events).toEqual([["session.changed", { reason: "ended" }]]);
     expect(await sessions()).toEqual({ current: null, last: [ended] });
@@ -196,8 +200,8 @@ describe("the fixture double's session", () => {
     at("2026-10-14T12:30:00.000Z");
     await call("session.end");
     expect(((await call("session.snapshot")) as JsonObject).last).toEqual([
-      session("podcast", "Second podcast", "2026-10-14T09:00:00.000Z", "2026-10-14T12:30:00.000Z"),
-      session("green-screen", "Studio intro", "2026-10-13T11:00:00.000Z", "2026-10-14T09:00:00.000Z"),
+      measured(session("podcast", "Second podcast", "2026-10-14T09:00:00.000Z", "2026-10-14T12:30:00.000Z")),
+      measured(session("green-screen", "Studio intro", "2026-10-13T11:00:00.000Z", "2026-10-14T09:00:00.000Z")),
     ]);
   });
 
@@ -722,10 +726,30 @@ describe("the fixture double's sessions' watch (D52)", () => {
       bytes: 0,
     });
     expect(recent.slice(1)).toEqual(kept);
-    // A folder made elsewhere, or one that was there, is not the sessions' folder's newest.
-    await call("session.begin", { kind: "podcast", folder: { mode: "existing", path: LAST_FOLDER } });
+    // A folder that was there is not the sessions' folder's newest; the session a begin or
+    // an end ends keeps the watch's measure of its folder, as the hardware link's does.
+    const over = (await call("session.begin", {
+      kind: "podcast",
+      folder: { mode: "existing", path: LAST_FOLDER },
+    })) as { ended: Session };
+    expect(over.ended.folderBytes, "the new folder, nothing in it yet").toBe(0);
     expect(((await call("session.snapshot")) as { recent: JsonObject[] }).recent).toEqual(recent);
-    expect(((await call("session.end")) as { ended: Session }).ended.folderBytes).toBeNull();
+    expect(((await call("session.end")) as { ended: Session }).ended.folderBytes).toBe(23 * GIB);
+  });
+
+  it("reads no folder of the sessions' folder while its drive does not answer or is gone", async () => {
+    const { call, hooks } = openSessionDouble(seeded());
+    const read = async () => (await call("session.snapshot")) as JsonObject;
+    hooks.setDrive("D", "not-answering");
+    expect((await read()).places).toEqual({ root: ROOT, simulated: false, rootExists: false });
+    expect((await read()).recent).toEqual([]);
+    expect(((await read()).current as JsonObject).folderBytes, "the watch's last measure stands").toBe(18 * GIB);
+    hooks.setDrive("D", 140 * GIB);
+    expect((await read()).places).toMatchObject({ rootExists: true });
+    expect((await read()).recent).toHaveLength(2);
+    hooks.setDrive("D", "not-there");
+    expect((await read()).places).toMatchObject({ rootExists: false });
+    expect((await read()).recent).toEqual([]);
   });
 
   it("never says what vMix said in a simulated run", async () => {

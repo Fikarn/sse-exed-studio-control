@@ -14,10 +14,15 @@
 //!
 //! Its drive there: a drive the sessions' watch's last read found not
 //! answering is refused at once, without asking it (`watch.rs`), so the
-//! request loop never waits on a share that hangs; any other is asked
-//! whether its top is there, as before the watch's first read. A drive
-//! that was not there at the last read is asked too: a missing letter
-//! answers at once, and one plugged in since is found.
+//! request loop does not wait on a share the watch found hanging; any other
+//! is asked whether its top is there, as before the watch's first read. A
+//! drive that was not there at the last read is asked too: a missing letter
+//! answers at once, and one plugged in since is found. So a begin can still
+//! wait on the request loop for Windows' own timeout on a share that hangs
+//! where the watch has not found it so: before the watch's first report, on
+//! a drive the last read found answering or did not find (until the next
+//! read, about 30 s with the passes' own time), and in the begin's own
+//! checks and acts on the chosen folder.
 
 use std::collections::BTreeSet;
 use std::fs;

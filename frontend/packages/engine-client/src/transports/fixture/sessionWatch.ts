@@ -80,11 +80,32 @@ function vmixOf(session: FixtureSession, folder: string | null): SessionVmix {
   };
 }
 
-/** `session.snapshot`: the session as kept, and what the watch reads (`snapshot_of`). */
+/** The watch's measure of a folder (`WatchReport::size_of`): its entry's among the newest. */
+export function measuredSize(session: FixtureSession, path: string | null): number | null {
+  if (path === null) return null;
+  return session.recent.find((entry) => entry.path.toLowerCase() === path.toLowerCase())?.bytes ?? null;
+}
+
+/**
+ * `session.snapshot`: the session as kept, and what the watch reads (`snapshot_of`). The
+ * sessions' folder and its newest folders are read only while its drive answers; the running
+ * session's folder takes the watch's measure of it, a last session the measure kept at its
+ * end, else the watch's.
+ */
 export function sessionSnapshotOf(session: FixtureSession): SessionSnapshot {
   const { settings } = session;
   const root = session.simulated ? session.scratchRoot : settings.root;
   const folder = session.current?.folder ?? null;
+  const rootLetter = letterOf(root);
+  const rootRead = rootLetter !== null && session.disk.drives.get(rootLetter)?.answering === true;
+  const current = session.current && {
+    ...session.current,
+    folderBytes: measuredSize(session, session.current.folder) ?? session.current.folderBytes,
+  };
+  const last = oneOfEachKind(session.last).map((ended) => ({
+    ...ended,
+    folderBytes: ended.folderBytes ?? measuredSize(session, ended.folder),
+  }));
   const drives: SessionDrive[] = [...session.disk.drives.entries()]
     .sort(([one], [other]) => one.localeCompare(other))
     .map(([letter, drive]) => ({
@@ -97,11 +118,11 @@ export function sessionSnapshotOf(session: FixtureSession): SessionSnapshot {
       level: drive.answering ? levelOf(drive.freeBytes, settings.lowBelowGb, settings.nearlyFullBelowGb) : null,
     }));
   return {
-    current: session.current,
-    last: oneOfEachKind(session.last),
+    current,
+    last,
     settings,
-    places: { root, simulated: session.simulated, rootExists: folderThere(session.disk, root) },
-    recent: session.recent.filter((entry) => onRoot(entry.path, root)),
+    places: { root, simulated: session.simulated, rootExists: rootRead && folderThere(session.disk, root) },
+    recent: rootRead ? session.recent.filter((entry) => onRoot(entry.path, root)) : [],
     drives,
     sessionDrive: letterOf(folder ?? root),
     vmix: vmixOf(session, folder),

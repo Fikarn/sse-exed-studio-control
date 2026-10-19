@@ -20,7 +20,7 @@ import {
   trimmedName,
   type FixtureSession,
 } from "./sessionState";
-import { sessionSnapshotOf } from "./sessionWatch";
+import { measuredSize, sessionSnapshotOf } from "./sessionWatch";
 
 // The session's requests (the Session page, 2026-10-15; D52;
 // `native/rust-engine/src/session/commands.rs`): the read, a begin, which makes or chooses its
@@ -86,7 +86,7 @@ function begin(context: FixtureRequestContext, session: FixtureSession, params: 
       RECENT_FOLDERS
     );
   }
-  const ended: Session | null = session.current ? { ...session.current, endedAt: at } : null;
+  const ended: Session | null = session.current ? ending(session, session.current, at) : null;
   const begun: Session = { kind, name: trimmed, begunAt: at, endedAt: null, folder: folder.path, folderBytes: null };
   if (ended) session.last = oneOfEachKind([ended, ...session.last]);
   session.current = begun;
@@ -94,12 +94,18 @@ function begin(context: FixtureRequestContext, session: FixtureSession, params: 
   return { session: begun, ended, folder };
 }
 
+/** A session ending at `endedAt`, with the watch's last measure of its folder kept with it
+ *  (`ending` in `commands.rs`). */
+function ending(session: FixtureSession, running: Session, endedAt: string): Session {
+  return { ...running, endedAt, folderBytes: measuredSize(session, running.folder) ?? running.folderBytes };
+}
+
 /** `session.end`: the running session ends now and becomes its kind's last. */
 function end(context: FixtureRequestContext, session: FixtureSession): SessionEndReply {
   if (!session.current) {
     throw new EngineRequestError("SESSION_NOT_RUNNING", "No session is running, so there is none to end.");
   }
-  const ended: Session = { ...session.current, endedAt: new Date().toISOString() };
+  const ended = ending(session, session.current, new Date().toISOString());
   session.last = oneOfEachKind([ended, ...session.last]);
   session.current = null;
   context.emit("session.changed", { reason: "ended" });

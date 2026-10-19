@@ -18,13 +18,19 @@
 //! The watch only reads: it makes no folder, writes no setting and opens no
 //! file to write. Every wait has a bound: the drives' 2 s, a walk's 1 s (or
 //! its 100,000 entries), vMix's 500 ms to connect and 1 s to answer. A
-//! folder is read only on a drive that answered the pass's read, so a share
-//! that hangs holds neither the snapshot nor the request loop; one that
-//! dies between the drives' read and a walk can still hold this thread for
-//! Windows' own timeout, and the liveness watch says so after 60 s.
+//! folder is read only on a drive that answered the pass's read. The
+//! snapshot never waits on a disk, and a begin is refused at once on a drive
+//! the last read found not answering (`folder.rs`). What a hang can still
+//! reach: a begin before the watch's first report, or on a drive the last
+//! read found answering or did not find, asks that drive itself, as before
+//! the watch, on the request loop; and a share that dies between the
+//! drives' read and a walk can hold this thread for Windows' own timeout,
+//! which the liveness watch says after 60 s, the board keeping its last
+//! report meanwhile.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant, SystemTime};
@@ -238,14 +244,18 @@ pub(crate) struct Change {
     pub log_lines: Vec<(LogLevel, String)>,
 }
 
-/// The watch: its places, its readers, the write rate, its last report and
-/// the board it puts its reports on.
+/// The session's drive's level the log said last, with the drive's letter.
+pub(crate) type SaidLevel = Option<(char, SessionDiskLevel)>;
+
+/// The watch: its places, its readers, the write rate, its last report, the
+/// level the log said last, and the board it puts its reports on.
 pub(crate) struct Watch {
     places: Places,
     drives: Drives,
     vmix: VmixReader,
     rate: WriteRate,
     report: WatchReport,
+    said_level: SaidLevel,
     board: &'static Board,
 }
 
@@ -262,14 +272,17 @@ impl Watch {
             vmix,
             rate: WriteRate::default(),
             report: WatchReport::default(),
+            said_level: None,
             board,
         }
     }
 
-    /// One pass: the disks when `disks_due`, vMix in the studio's places,
-    /// then the report on the board, the log's lines and the event. A read
-    /// of the saved data that fails leaves the report as it was, and is
-    /// tried again at the next pass.
+    /// One pass: vMix in the studio's places, the disks when `disks_due`,
+    /// then the report on the board, the log's lines and the event. vMix
+    /// comes first, so its file's size is read at `at`, not after the
+    /// disks' seconds (the review of #355). A read of the saved data that
+    /// fails leaves the report as it was, and is tried again at the next
+    /// pass (`None`).
     pub(crate) fn pass(
         &mut self,
         db_path: &Path,
@@ -279,15 +292,16 @@ impl Watch {
     ) -> Option<Change> {
         let saved = read_saved(db_path).ok()?;
         let mut read = self.report.clone();
-        if disks_due {
-            self.read_disks(&mut read, &saved, now);
-        }
         if !self.places.simulated {
             read.vmix = self.look_at_vmix(&read.drives, at);
+        }
+        if disks_due {
+            self.read_disks(&mut read, &saved, now);
         }
         let change = apply_read(
             &self.report,
             &read,
+            &mut self.said_level,
             session_letter(&saved, &self.places),
             saved.settings.low_below_gb,
             saved.settings.nearly_full_below_gb,
@@ -348,7 +362,8 @@ impl Watch {
             .and_then(|session| session.folder.clone());
         let recording_folder = running.and_then(|folder| {
             if answers(Path::new(&folder)) {
-                recording_folder_in(Path::new(&folder)).map(|inside| (folder, inside))
+                recording_folder_in(Path::new(&folder), WALK_BUDGET, WALK_MAX_ENTRIES)
+                    .map(|inside| (folder, inside))
             } else {
                 read.recording_folder
                     .clone()
@@ -404,10 +419,21 @@ fn session_letter(saved: &Saved, places: &Places) -> Option<char> {
     }
 }
 
+/// Windows' hidden and system attributes: a drive's own `System Volume
+/// Information` and `$RECYCLE.BIN` carry them.
+const HIDDEN_OR_SYSTEM: u32 = 0x2 | 0x4;
+
+/// Whether a folder with Windows' `attributes` is one the sessions' folder
+/// lists: not hidden, not the system's.
+pub(crate) fn listed(attributes: u32) -> bool {
+    attributes & HIDDEN_OR_SYSTEM == 0
+}
+
 /// The sessions' folder: whether it is there, and its newest folders by the
 /// time each was made, newest first (a folder Windows cannot name in
-/// Unicode, a link and a junction left out). The listing stops at the
-/// walk's bounds.
+/// Unicode, a link, a junction, and a hidden or a system folder left out, so
+/// a sessions' folder at a drive's top lists none of the drive's own; the
+/// review of #355). The listing stops at the walk's bounds.
 pub(crate) fn read_root(root: &Path) -> RootRead {
     let path = root.display().to_string();
     let Ok(listing) = fs::read_dir(root) else {
@@ -430,9 +456,15 @@ pub(crate) fn read_root(root: &Path) -> RootRead {
         if !kind.is_dir() || kind.is_symlink() {
             continue;
         }
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if !listed(metadata.file_attributes()) {
+            continue;
+        }
         let (Some(name), Ok(created)) = (
             entry.file_name().to_str().map(String::from),
-            entry.metadata().and_then(|metadata| metadata.created()),
+            metadata.created(),
         ) else {
             continue;
         };
@@ -467,12 +499,17 @@ pub(crate) fn read_root(root: &Path) -> RootRead {
 /// subfolder that cannot be listed adds nothing. Each file's size is read
 /// from the file, not from the folder's listing: Windows updates a listing
 /// lazily, and a recording that is still being written reads short there.
+/// The time is looked at before each folder is listed as well as at each
+/// entry, so a tree of empty folders is cut too (the review of #355).
 pub(crate) fn folder_size(folder: &Path, budget: Duration, max_entries: u64) -> Option<u64> {
     let deadline = Instant::now() + budget;
     let mut bytes: u64 = 0;
     let mut entries: u64 = 0;
     let mut waiting: Vec<PathBuf> = vec![folder.to_path_buf()];
     while let Some(next) = waiting.pop() {
+        if Instant::now() >= deadline {
+            return None;
+        }
         let listing = match fs::read_dir(&next) {
             Ok(listing) => listing,
             Err(_) if next == folder => return None,
@@ -508,9 +545,14 @@ pub(crate) fn folder_size(folder: &Path, budget: Duration, max_entries: u64) -> 
 /// vMix starting or stopping to answer (`INFO`), a drive that stops
 /// answering (`WARN`) or answers again (`INFO`), the session's drive
 /// turning Low or Nearly full (`WARN`) or reading above Low again (`INFO`).
+/// The session's drive's level is held to `said`, the level the log said
+/// last and its drive, not to the report before, so a drive that misses a
+/// read in between, or a session moved to a drive already low, is said too
+/// (the review of #355); `said` is moved on.
 pub(crate) fn apply_read(
     previous: &WatchReport,
     read: &WatchReport,
+    said: &mut SaidLevel,
     session_drive: Option<char>,
     low_below_gb: u32,
     nearly_full_below_gb: u32,
@@ -558,35 +600,45 @@ pub(crate) fn apply_read(
         }
     }
 
-    if let Some(letter) = session_drive {
-        let level = |report: &WatchReport| {
-            report
-                .drive(letter)
-                .and_then(|drive| drive.level(low_below_gb, nearly_full_below_gb))
+    // A drive that does not answer has no level: the level said stands.
+    let session = session_drive.and_then(|letter| {
+        let drive = read.drive(letter)?;
+        Some((
+            letter,
+            drive,
+            drive.level(low_below_gb, nearly_full_below_gb)?,
+        ))
+    });
+    if let Some((letter, drive, now)) = session {
+        let before = match *said {
+            Some((said_letter, level)) if said_letter == letter => Some(level),
+            _ => None,
         };
-        let (before, now) = (level(previous), level(read));
-        if let (true, Some(now), Some(drive)) = (before != now, now, read.drive(letter)) {
+        if before != Some(now) {
             let free = drive.space.map_or(0, |space| space.free_bytes) / GIB;
-            let said = drive.said();
+            let name = drive.said();
             match now {
                 SessionDiskLevel::Low => log_lines.push((
                     LogLevel::Warn,
-                    format!("The session's drive {said} is low: {free} GB free, under {low_below_gb} GB."),
+                    format!(
+                        "The session's drive {name} is low: {free} GB free, under {low_below_gb} GB."
+                    ),
                 )),
                 SessionDiskLevel::NearlyFull => log_lines.push((
                     LogLevel::Warn,
                     format!(
-                        "The session's drive {said} is nearly full: {free} GB free, under {nearly_full_below_gb} GB."
+                        "The session's drive {name} is nearly full: {free} GB free, under {nearly_full_below_gb} GB."
                     ),
                 )),
                 SessionDiskLevel::Ok if before.is_some() => log_lines.push((
                     LogLevel::Info,
                     format!(
-                        "The session's drive {said} has {free} GB free again, above Low ({low_below_gb} GB)."
+                        "The session's drive {name} has {free} GB free again, above Low ({low_below_gb} GB)."
                     ),
                 )),
                 SessionDiskLevel::Ok => {}
             }
+            *said = Some((letter, now));
         }
     }
     Change { moved, log_lines }
@@ -707,6 +759,14 @@ fn vmix_of(report: Option<&WatchReport>, places: &Places, folder: Option<&str>) 
     }
 }
 
+/// Whether the next pass reads the disks: when woken, at every sixth look,
+/// and again after a pass that was to and could not read the saved data
+/// (`missed`), so a failed first pass or a woken one is not put off for
+/// 30 s (the review of #355).
+pub(crate) fn disks_due_next(missed: bool, woken: bool, ticks: u32) -> bool {
+    missed || woken || ticks.is_multiple_of(DISK_EVERY_TICKS)
+}
+
 /// Starts the watch, in every build: a simulated run reads the drives and
 /// its scratch folder, and never vMix. Watched (`liveness`): a panic, an
 /// end, or a pass that stops beating is laid on an entry of its own,
@@ -732,10 +792,12 @@ pub(crate) fn spawn_session_watch(db_path: PathBuf, places: Places) {
             let mut disks_due = true;
             loop {
                 beat.beat();
-                let _ = watch.pass(&db_path, disks_due, SystemTime::now(), Instant::now());
+                let passed = watch
+                    .pass(&db_path, disks_due, SystemTime::now(), Instant::now())
+                    .is_some();
                 let woken = WAKE.wait(WATCH_TICK);
                 ticks = ticks.wrapping_add(1);
-                disks_due = woken || ticks.is_multiple_of(DISK_EVERY_TICKS);
+                disks_due = disks_due_next(disks_due && !passed, woken, ticks);
             }
         },
     );

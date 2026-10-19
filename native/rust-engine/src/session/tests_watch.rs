@@ -10,12 +10,12 @@ use super::drives::{DriveOutcome, DriveRead, DriveReader, Drives, Space, GIB};
 use super::folder::{drive_letter, read_drive_path, SESSION_DRIVE_MISSING};
 use super::places::Places;
 use super::settings::read_settings;
-use super::snapshot::{Session, SessionKind};
+use super::snapshot::{Session, SessionDiskLevel, SessionKind};
 use super::tests::{TestSession, MORNING, NOON};
 use super::vmix::VmixRecording;
 use super::watch::{
-    apply_read, folder_size, read_root, snapshot_of, Board, Change, FolderRead, RootRead, VmixRead,
-    VmixReader, Wake, Watch, WatchReport, RECENT_FOLDERS,
+    apply_read, disks_due_next, folder_size, listed, read_root, snapshot_of, Board, Change,
+    FolderRead, RootRead, VmixRead, VmixReader, Wake, Watch, WatchReport, RECENT_FOLDERS,
 };
 use super::SessionError;
 use crate::cameras::runtime::utc_text;
@@ -94,7 +94,15 @@ fn a_drive_that_stops_answering_is_said_once_and_its_return_too() {
             answering('Z', "Public", 3_700),
         ],
     );
-    let change = apply_read(&WatchReport::default(), &first, Some('D'), 200, 50);
+    let mut said = None;
+    let change = apply_read(
+        &WatchReport::default(),
+        &first,
+        &mut said,
+        Some('D'),
+        200,
+        50,
+    );
     assert_eq!(
         change,
         Change {
@@ -106,7 +114,7 @@ fn a_drive_that_stops_answering_is_said_once_and_its_return_too() {
     // The same again later: only the time of reading moved.
     let again = read_of(30, first.drives.clone());
     assert_eq!(
-        apply_read(&first, &again, Some('D'), 200, 50),
+        apply_read(&first, &again, &mut said, Some('D'), 200, 50),
         Change::default()
     );
 
@@ -115,7 +123,7 @@ fn a_drive_that_stops_answering_is_said_once_and_its_return_too() {
         vec![answering('D', "Storage 1", 2_048), silent('Z', "Public")],
     );
     assert_eq!(
-        apply_read(&again, &lost, Some('D'), 200, 50),
+        apply_read(&again, &lost, &mut said, Some('D'), 200, 50),
         Change {
             moved: true,
             log_lines: vec![line(
@@ -126,12 +134,12 @@ fn a_drive_that_stops_answering_is_said_once_and_its_return_too() {
     );
     let still = read_of(90, lost.drives.clone());
     assert_eq!(
-        apply_read(&lost, &still, Some('D'), 200, 50),
+        apply_read(&lost, &still, &mut said, Some('D'), 200, 50),
         Change::default()
     );
     let back = read_of(120, first.drives.clone());
     assert_eq!(
-        apply_read(&still, &back, Some('D'), 200, 50).log_lines,
+        apply_read(&still, &back, &mut said, Some('D'), 200, 50).log_lines,
         vec![line(LogLevel::Info, "Z: (Public) answers again.")]
     );
 
@@ -139,7 +147,15 @@ fn a_drive_that_stops_answering_is_said_once_and_its_return_too() {
     // letter when it never answered with a name.
     let from_the_start = read_of(0, vec![silent('Z', "")]);
     assert_eq!(
-        apply_read(&WatchReport::default(), &from_the_start, None, 200, 50).log_lines,
+        apply_read(
+            &WatchReport::default(),
+            &from_the_start,
+            &mut None,
+            None,
+            200,
+            50
+        )
+        .log_lines,
         vec![line(
             LogLevel::Warn,
             "Z: does not answer in 2 s: its space is not read, and a Begin there is refused until it answers."
@@ -158,15 +174,22 @@ fn the_sessions_drive_turning_low_or_nearly_full_is_said_once() {
             ],
         )
     };
+    let mut said = None;
     let plenty = at(0, 2_048);
-    assert!(
-        apply_read(&WatchReport::default(), &plenty, Some('D'), 200, 50)
-            .log_lines
-            .is_empty()
-    );
+    assert!(apply_read(
+        &WatchReport::default(),
+        &plenty,
+        &mut said,
+        Some('D'),
+        200,
+        50
+    )
+    .log_lines
+    .is_empty());
+    assert_eq!(said, Some(('D', SessionDiskLevel::Ok)));
     let low = at(30, 140);
     assert_eq!(
-        apply_read(&plenty, &low, Some('D'), 200, 50).log_lines,
+        apply_read(&plenty, &low, &mut said, Some('D'), 200, 50).log_lines,
         vec![line(
             LogLevel::Warn,
             "The session's drive D: (Storage 1) is low: 140 GB free, under 200 GB."
@@ -174,7 +197,7 @@ fn the_sessions_drive_turning_low_or_nearly_full_is_said_once() {
     );
     let lower = at(60, 120);
     assert_eq!(
-        apply_read(&low, &lower, Some('D'), 200, 50),
+        apply_read(&low, &lower, &mut said, Some('D'), 200, 50),
         Change {
             moved: true,
             log_lines: Vec::new()
@@ -183,7 +206,7 @@ fn the_sessions_drive_turning_low_or_nearly_full_is_said_once() {
     );
     let full = at(90, 28);
     assert_eq!(
-        apply_read(&lower, &full, Some('D'), 200, 50).log_lines,
+        apply_read(&lower, &full, &mut said, Some('D'), 200, 50).log_lines,
         vec![line(
             LogLevel::Warn,
             "The session's drive D: (Storage 1) is nearly full: 28 GB free, under 50 GB."
@@ -191,7 +214,7 @@ fn the_sessions_drive_turning_low_or_nearly_full_is_said_once() {
     );
     let freed = at(120, 210);
     assert_eq!(
-        apply_read(&full, &freed, Some('D'), 200, 50).log_lines,
+        apply_read(&full, &freed, &mut said, Some('D'), 200, 50).log_lines,
         vec![line(
             LogLevel::Info,
             "The session's drive D: (Storage 1) has 210 GB free again, above Low (200 GB)."
@@ -200,14 +223,79 @@ fn the_sessions_drive_turning_low_or_nearly_full_is_said_once() {
     // Z: has 10 GB, and is not the session's drive: nothing is said of it.
     // A first read that finds the session's drive low says so.
     assert_eq!(
-        apply_read(&WatchReport::default(), &low, Some('D'), 200, 50)
+        apply_read(&WatchReport::default(), &low, &mut None, Some('D'), 200, 50)
             .log_lines
             .len(),
         1
     );
-    assert!(apply_read(&WatchReport::default(), &low, Some('Z'), 5, 1)
+    assert!(
+        apply_read(&WatchReport::default(), &low, &mut None, Some('Z'), 5, 1)
+            .log_lines
+            .is_empty()
+    );
+}
+
+// The review of #355: the level is held to what the log said last, not to
+// the report before.
+#[test]
+fn a_level_is_said_after_a_missed_read_and_for_a_drive_the_session_moves_to() {
+    // D: was said low, misses a read, and answers above Low.
+    let mut said = Some(('D', SessionDiskLevel::Low));
+    let low = read_of(0, vec![answering('D', "Storage 1", 140)]);
+    let missed = read_of(30, vec![silent('D', "Storage 1")]);
+    apply_read(&low, &missed, &mut said, Some('D'), 200, 50);
+    assert_eq!(
+        said,
+        Some(('D', SessionDiskLevel::Low)),
+        "a drive that does not answer leaves the level said"
+    );
+    let freed = read_of(60, vec![answering('D', "Storage 1", 250)]);
+    assert_eq!(
+        apply_read(&missed, &freed, &mut said, Some('D'), 200, 50).log_lines,
+        vec![
+            line(LogLevel::Info, "D: (Storage 1) answers again."),
+            line(
+                LogLevel::Info,
+                "The session's drive D: (Storage 1) has 250 GB free again, above Low (200 GB)."
+            )
+        ]
+    );
+
+    // A begin moves the session to E:, which was already low.
+    let both = read_of(
+        90,
+        vec![
+            answering('D', "Storage 1", 2_048),
+            answering('E', "A015", 140),
+        ],
+    );
+    let mut said = Some(('D', SessionDiskLevel::Ok));
+    assert_eq!(
+        apply_read(&both, &both, &mut said, Some('E'), 200, 50).log_lines,
+        vec![line(
+            LogLevel::Warn,
+            "The session's drive E: (A015) is low: 140 GB free, under 200 GB."
+        )]
+    );
+    assert_eq!(said, Some(('E', SessionDiskLevel::Low)));
+    // Moved back to D:, which is fine: nothing to say, and D:'s level is held.
+    assert!(apply_read(&both, &both, &mut said, Some('D'), 200, 50)
         .log_lines
         .is_empty());
+    assert_eq!(said, Some(('D', SessionDiskLevel::Ok)));
+}
+
+// A pass that was to read the disks and could not read the saved data
+// leaves them due; otherwise they are read when woken and at every sixth
+// look.
+#[test]
+fn the_disks_are_read_when_woken_every_sixth_look_and_again_after_a_missed_pass() {
+    assert!(disks_due_next(false, true, 1), "woken");
+    assert!(disks_due_next(false, false, 6), "the sixth look");
+    assert!(disks_due_next(false, false, 12));
+    assert!(!disks_due_next(false, false, 7));
+    assert!(disks_due_next(true, false, 7), "missed");
+    assert!(!disks_due_next(false, false, 1));
 }
 
 #[test]
@@ -222,7 +310,10 @@ fn vmix_starting_and_stopping_to_answer_is_said_once() {
         bytes_per_second: None,
     });
     let silent = with(VmixRead::NotAnswering);
-    let first = apply_read(&WatchReport::default(), &idle, None, 200, 50);
+    let read = |previous: &WatchReport, read: &WatchReport| {
+        apply_read(previous, read, &mut None, None, 200, 50)
+    };
+    let first = read(&WatchReport::default(), &idle);
     assert!(first.moved);
     assert_eq!(
         first.log_lines,
@@ -231,20 +322,17 @@ fn vmix_starting_and_stopping_to_answer_is_said_once() {
             "vMix answers on 127.0.0.1:8088: the Session page reads where it records."
         )]
     );
-    assert_eq!(apply_read(&idle, &idle, None, 200, 50), Change::default());
+    assert_eq!(read(&idle, &idle), Change::default());
     assert_eq!(
-        apply_read(&idle, &silent, None, 200, 50).log_lines,
+        read(&idle, &silent).log_lines,
         vec![line(
             LogLevel::Info,
             "vMix does not answer on 127.0.0.1:8088: the Session page cannot say where it records."
         )]
     );
+    assert_eq!(read(&silent, &silent), Change::default());
     assert_eq!(
-        apply_read(&silent, &silent, None, 200, 50),
-        Change::default()
-    );
-    assert_eq!(
-        apply_read(&silent, &idle, None, 200, 50).log_lines,
+        read(&silent, &idle).log_lines,
         vec![line(
             LogLevel::Info,
             "vMix answers again on 127.0.0.1:8088: the Session page reads where it records."
@@ -259,7 +347,7 @@ fn vmix_starting_and_stopping_to_answer_is_said_once() {
         })
     };
     assert_eq!(
-        apply_read(&recording(13), &recording(14), None, 200, 50),
+        read(&recording(13), &recording(14)),
         Change {
             moved: true,
             log_lines: Vec::new()
@@ -652,6 +740,13 @@ fn a_folders_size_is_its_files_and_a_walk_over_its_bounds_measures_nothing() {
         folder_size(&folder.join("Exports"), Duration::from_secs(5), 100),
         Some(0)
     );
+    // The time is looked at before each folder is listed, so an empty folder
+    // with no time left is cut too (the review of #355): a tree of empty
+    // folders cannot run past the walk's second.
+    assert_eq!(
+        folder_size(&folder.join("Exports"), Duration::ZERO, 100),
+        None
+    );
     assert_eq!(
         folder_size(&root.join("Not there"), Duration::from_secs(5), 100),
         None
@@ -690,6 +785,18 @@ fn the_sessions_folders_newest_six_are_read_newest_first() {
     let missing = read_root(&root.join("Sessions"));
     assert_eq!((missing.exists, missing.recent.len()), (false, 0));
     let _ = fs::remove_dir_all(&root);
+
+    // A hidden or a system folder is not listed, as a drive's own `System
+    // Volume Information` and `$RECYCLE.BIN` are not (the review of #355);
+    // Windows' attributes: 0x10 a folder, 0x2 hidden, 0x4 system.
+    assert!(listed(0x10));
+    assert!(
+        listed(0x10 | 0x20 | 0x1),
+        "archived and read-only are listed"
+    );
+    assert!(!listed(0x10 | 0x2));
+    assert!(!listed(0x10 | 0x4));
+    assert!(!listed(0x10 | 0x2 | 0x4));
 }
 
 /// A stand-in for the drives' read: `answering` answers with its space,
@@ -907,20 +1014,21 @@ fn the_studios_watch_reads_vmix_at_each_pass_and_its_files_rate() {
         LogLevel::Info,
         "vMix answers on 127.0.0.1:8088: the Session page reads where it records."
     )));
-    watch.pass(
-        &test.db_path,
-        false,
-        SystemTime::now(),
-        start + Duration::from_secs(5),
-    );
+    // vMix is looked at before the disks, so the first pass knows no drive
+    // yet and reads no size: the file's looks begin at the second.
+    let look = |watch: &mut Watch, seconds: u64| {
+        watch.pass(
+            &test.db_path,
+            false,
+            SystemTime::now(),
+            start + Duration::from_secs(seconds),
+        )
+    };
+    look(&mut watch, 5);
+    look(&mut watch, 10);
     fs::write(&file, vec![0_u8; 1_000 + 10 * 2_000]).expect("the file grows");
-    watch.pass(
-        &test.db_path,
-        false,
-        SystemTime::now(),
-        start + Duration::from_secs(10),
-    );
-    assert_eq!(vmix_reads.load(Ordering::SeqCst), 3, "at every pass");
+    look(&mut watch, 15);
+    assert_eq!(vmix_reads.load(Ordering::SeqCst), 4, "at every pass");
     let report = board.report().expect("a report");
     assert_eq!(
         report.vmix,
@@ -941,14 +1049,7 @@ fn the_studios_watch_reads_vmix_at_each_pass_and_its_files_rate() {
 
     // vMix stops answering: said once, and the rate starts again.
     *answer.lock().expect("the answer") = None;
-    let change = watch
-        .pass(
-            &test.db_path,
-            false,
-            SystemTime::now(),
-            start + Duration::from_secs(15),
-        )
-        .expect("a pass");
+    let change = look(&mut watch, 20).expect("a pass");
     assert_eq!(
         change.log_lines,
         vec![line(

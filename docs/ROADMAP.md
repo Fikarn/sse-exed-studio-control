@@ -339,6 +339,10 @@ Ask the owner first: does taking a BGH1 back at a start disturb LUMIX Tether?
 
 ## Found, to check
 
+Found in the review of #355 (the sessions' watch, 2026-10-19), not tried:
+
+- [ ] **Windows' "There is no disk in the drive" box.** The sessions' watch opens every lettered drive, C: to Z:, every 30 s and in every run. A Win32 call on an empty removable slot (a multi-card reader's) raises that box in a process that has not set Windows' error mode (`SEM_FAILCRITICALERRORS`), and neither the shell nor the engine sets it (the engine cannot: `unsafe` is forbidden there). Whether WinRT's `StorageFolder` raises it is not known: the check of 2026-10-19 covered C:, D:, E:, Z: and a missing letter, not an empty slot, and the studio PC has no card reader plugged in. Check with a reader whose slot is empty and a development run for a minute; if the box comes, the shell sets the error mode before it starts the engine, which inherits it (one function in the shell's `unsafe` list).
+
 Found on the studio walk of 2026-10-01:
 
 - [x] **The Console's snapshots and channel names are not TotalMix's.** The app kept snapshots of its own: Default, Panel and Broadcast held nothing and loaded nothing in TotalMix, and the channels carried the app's names. A recall of a captured snapshot could leave sends unconfirmed and the Console `ASSUMED` when two read-backs of one mix overlapped, a fault since #201. The owner decided: the snapshots are TotalMix's eight, loaded in TotalMix at a second press; the names come from TotalMix; storing and renaming happen in TotalMix only. The upgrade itself changed no audio data. Fixed in #282:
