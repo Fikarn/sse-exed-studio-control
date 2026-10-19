@@ -154,8 +154,10 @@ const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {
   // The Overview (D47) shows every page's facts: the lamps' health, the
   // backups and the day's log for its footer, and each page's own snapshot.
   // Not the deck's page model: its row reads the deck's lamp, which is health.
-  overview: ["health", "support", ...LIGHTING_DOMAINS, "audio", "prompter", "cameras"],
-  setup: ["health", "commissioning", "support", "controlSurface"],
+  // The session's too (D52): its footer says the disk the session's folder is
+  // on, and Setup has the sessions' settings.
+  overview: ["health", "support", ...LIGHTING_DOMAINS, "audio", "prompter", "cameras", "session"],
+  setup: ["health", "commissioning", "support", "controlSurface", "session"],
   lighting: LIGHTING_DOMAINS,
   audio: ["audio"],
   teleprompter: ["prompter"],

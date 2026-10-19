@@ -21,8 +21,12 @@ import type { PrompterPlace } from "./generated/snapshots/PrompterPlace";
 import type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScriptSnapshot";
 import type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
 import type { Session } from "./generated/snapshots/Session";
+import type { SessionFolderChoice } from "./generated/snapshots/SessionFolderChoice";
 import type { SessionKind } from "./generated/snapshots/SessionKind";
+import type { SessionPlaces } from "./generated/snapshots/SessionPlaces";
+import type { SessionSettings } from "./generated/snapshots/SessionSettings";
 import type { SessionSnapshot } from "./generated/snapshots/SessionSnapshot";
+import type { SessionSubfolders } from "./generated/snapshots/SessionSubfolders";
 
 /** The pages, in the tab order (D4); the Session page first since D51, then the Overview (D47). */
 export type WorkspaceId = "session" | "overview" | "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
@@ -194,6 +198,17 @@ export interface CameraSetupUpdateRequest {
   camera: CameraNumber;
   address?: string | null;
   vmixInput?: number;
+}
+
+/**
+ * `session.settings.update` (D52): the sessions' folder, a list of subfolders for any of the
+ * kinds, and either level of the disk, in whole GB; at least one of them.
+ */
+export interface SessionSettingsUpdateRequest {
+  root?: string;
+  subfolders?: Partial<SessionSubfolders>;
+  lowBelowGb?: number;
+  nearlyFullBelowGb?: number;
 }
 
 export interface AudioClipClearRequest {
@@ -444,14 +459,20 @@ export interface FixtureCamerasSeed {
 }
 
 /**
- * The session a scenario starts with (the Session page, 2026-10-15; `fixture/sessionState.ts`):
+ * The session a scenario starts with (the Session page, 2026-10-15; `fixture/sessionSeed.ts`):
  * the running one, its `endedAt` null, and the last of each kind, newest first, each ended.
  * Times are UTC as the hardware link writes them (`2026-10-15T07:16:00.000Z`). Without it,
- * none runs and no kind has a last.
+ * none runs and no kind has a last. Since step 2 (D52): the settings (any part; the rest are
+ * the defaults), the places (the studio's, the settings' root, without them; `simulated:
+ * true` names a scratch folder), and the folders on the double's disk, which a begin's
+ * checks read (the folders a begin makes join them). Paths as Windows writes them.
  */
 export interface FixtureSessionSeed {
   current?: Session;
   last?: Session[];
+  settings?: Partial<SessionSettings>;
+  places?: SessionPlaces;
+  folders?: string[];
 }
 
 export interface FixtureScenario {
@@ -720,11 +741,15 @@ export interface ShellStore {
   // session is read again.
   /**
    * `session.begin`: the session begins now, with a name the hardware link
-   * trims (empty for none); a running one ends at the same moment.
+   * trims (empty for none); a running one ends at the same moment. Its
+   * folder (D52) is made or chosen first: a new one on the sessions' folder
+   * without `folder`.
    */
-  beginSession(kind: SessionKind, name: string): Promise<JsonValue>;
+  beginSession(kind: SessionKind, name: string, folder?: SessionFolderChoice): Promise<JsonValue>;
   /** `session.end`: the running session ends now. */
   endSession(): Promise<JsonValue>;
+  /** `session.settings.update` (D52): Setup's settings for the sessions' folders. */
+  updateSessionSettings(request: SessionSettingsUpdateRequest): Promise<JsonValue>;
   refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;

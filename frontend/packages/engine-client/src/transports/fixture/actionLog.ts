@@ -3,7 +3,7 @@
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import { cameraModel } from "./camerasModel";
 import { asArray, asBoolean, asNumber, asRecord } from "./json";
-import { SESSION_KIND_NAMES, isSessionKind, trimmedName } from "./sessionState";
+import { SESSION_KINDS, SESSION_KIND_NAMES, isSessionKind, trimmedName } from "./sessionState";
 import type { MutableFixtureState } from "./state";
 
 // The action log as the hardware link keeps it for the screen
@@ -47,9 +47,11 @@ export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "prompter.clear",
   "prompter.putOn",
   "prompter.update",
-  // The session (2026-10-15): a begin, which may end the running one first, and an end.
+  // The session (2026-10-15): a begin, which may end the running one first, and an end;
+  // and Setup's settings for its folder (D52).
   "session.begin",
   "session.end",
+  "session.settings.update",
   "support.backup.restore",
 ];
 
@@ -431,8 +433,9 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
 
     // The session (2026-10-15): a begin and an end; a begin while a session runs ends it
     // first, so the end's row comes first. The kind's id is the target, and the sentence
-    // names the kind and the session, leaving out a name not given. Trimmed as Rust's
-    // `text` trims (`sessionText`): a name may hold what JavaScript's own trim would take.
+    // names the kind and the session, leaving out a name not given; a begin's names its
+    // folder too (D52), and says when it made it. Trimmed as Rust's `text` trims
+    // (`sessionText`): a name may hold what JavaScript's own trim would take.
     case "session.begin":
     case "session.end": {
       const row = (action: "begun" | "ended", key: "session" | "ended"): UiActionRow[] => {
@@ -440,11 +443,57 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
         if (!isSessionKind(kind)) return [];
         const what = action === "begun" ? "Session begun" : "Session ended";
         const name = sessionText(result, [key, "name"]);
-        const detail =
+        let detail =
           name === null ? `${what}: ${SESSION_KIND_NAMES[kind]}` : `${what}: ${SESSION_KIND_NAMES[kind]} · ${name}`;
+        const folder = action === "begun" ? sessionText(result, ["folder", "path"]) : null;
+        if (folder !== null) {
+          detail +=
+            flag(asRecord(result)?.folder ?? null, "made") === true ? `, in a new folder ${folder}` : `, in ${folder}`;
+        }
         return [{ domain: "session", action, target: kind, detail }];
       };
       return [...row("ended", "ended"), ...(method === "session.begin" ? row("begun", "session") : [])];
+    }
+    // Setup's settings for the session's folder (D52): a row for each part the request gave,
+    // named from what the answer holds.
+    case "session.settings.update": {
+      const settings = asRecord(asRecord(result)?.settings ?? null);
+      if (settings === null) return [];
+      const row = (target: "root" | "subfolders" | "thresholds", detail: string): UiActionRow => ({
+        domain: "session",
+        action: "settings",
+        target,
+        detail,
+      });
+      const request = asRecord(params) ?? {};
+      const given = (key: string) => request[key] !== undefined && request[key] !== null;
+      const rows: UiActionRow[] = [];
+      const root = sessionText(settings, ["root"]);
+      if (given("root") && root !== null) rows.push(row("root", `Sessions' folder set to ${root}.`));
+      const subfolders = asRecord(request.subfolders ?? null);
+      for (const kind of SESSION_KINDS) {
+        if (subfolders === null || subfolders[kind] === undefined || subfolders[kind] === null) continue;
+        const names = asRecord(settings.subfolders ?? null)?.[kind];
+        if (!Array.isArray(names)) continue;
+        const list = names.filter((entry): entry is string => typeof entry === "string");
+        rows.push(
+          row(
+            "subfolders",
+            `${SESSION_KIND_NAMES[kind]}'s subfolders: ${list.length === 0 ? "none" : list.join(", ")}.`
+          )
+        );
+      }
+      const { lowBelowGb, nearlyFullBelowGb } = settings;
+      if (
+        (given("lowBelowGb") || given("nearlyFullBelowGb")) &&
+        typeof lowBelowGb === "number" &&
+        typeof nearlyFullBelowGb === "number"
+      ) {
+        rows.push(
+          row("thresholds", `The disk reads Low under ${lowBelowGb} GB and Nearly full under ${nearlyFullBelowGb} GB.`)
+        );
+      }
+      return rows;
     }
     default:
       return [];

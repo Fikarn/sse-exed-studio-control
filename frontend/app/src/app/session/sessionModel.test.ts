@@ -34,8 +34,24 @@ const session = (over: Partial<Session> = {}): Session => ({
   name: "Leading Through Change — episode 3",
   begunAt: at(15, 9, 16),
   endedAt: null,
+  folder: "D:\\Sessions\\Leading Through Change — episode 3 (2026-10-15)",
   ...over,
 });
+
+/** What the session's read holds beside the sessions (D52): the settings' defaults and the studio's places. */
+const READ: Pick<SessionSnapshot, "settings" | "places"> = {
+  settings: {
+    root: "D:\\Sessions",
+    subfolders: {
+      "green-screen": ["Video", "vMix Recording", "Script", "Exports"],
+      podcast: ["Audio", "Video", "vMix Recording", "Exports"],
+      webinar: ["Slides", "vMix Recording", "Exports"],
+    },
+    lowBelowGb: 200,
+    nearlyFullBelowGb: 50,
+  },
+  places: { root: "D:\\Sessions", simulated: false },
+};
 
 describe("the kinds", () => {
   it("are the owner's three, in the page's order, each with its tone and line", () => {
@@ -97,11 +113,12 @@ describe("the session read", () => {
       session({ kind: "podcast", name: "Episode 2", begunAt: at(14, 14, 2), endedAt: at(14, 15, 30) }),
       session({ kind: "green-screen", name: "Lecture 3", begunAt: at(13, 10, 0), endedAt: at(13, 11, 0) }),
     ],
+    ...READ,
   };
 
   it("reads the running session and the last of each kind", () => {
     expect(runningOf(snapshot)?.name).toBe("Leading Through Change — episode 3");
-    expect(runningOf({ current: null, last: [] })).toBeNull();
+    expect(runningOf({ current: null, last: [], ...READ })).toBeNull();
     expect(lastOf(snapshot, "podcast")?.name).toBe("Episode 2");
     expect(lastOf(snapshot, "green-screen")?.name).toBe("Lecture 3");
     expect(lastOf(snapshot, "webinar")).toBeNull();

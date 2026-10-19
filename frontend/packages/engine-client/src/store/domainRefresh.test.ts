@@ -86,12 +86,14 @@ describe("domainRefresh", () => {
       "lighting",
       "lightingDmxMonitor",
     ]);
+    // Setup has the sessions' settings (D52).
     expect(domainsForMethod("settings.update", { workspace: "setup" })).toEqual([
       "app",
       "health",
       "commissioning",
       "support",
       "controlSurface",
+      "session",
     ]);
     expect(domainsForMethod("settings.update", { workspace: "somewhere new" })).toEqual(["app"]);
     // A page the front end no longer has adds nothing either (new pages program, Slice 1).
@@ -126,6 +128,7 @@ describe("domainRefresh", () => {
     expect(domainsForEvent("cameras.changed")).toEqual({ domains: ["cameras"], known: true });
     expect(domainsForMethod("settings.update", { workspace: "cameras" })).toEqual(["app", "cameras"]);
     // The Overview (D47) shows every page's facts, but not the deck's page model.
+    // And the session's, for the disk its footer says (D52).
     expect(domainsForMethod("settings.update", { workspace: "overview" })).toEqual([
       "app",
       "health",
@@ -135,11 +138,12 @@ describe("domainRefresh", () => {
       "audio",
       "prompter",
       "cameras",
+      "session",
     ]);
   });
 
-  it("reads the session again after a begin, an end and its event, and with the Overview's facts when its page opens", () => {
-    for (const method of ["session.begin", "session.end", "session.snapshot"]) {
+  it("reads the session again after a begin, an end, an update of its settings and its event, and with the Overview's facts when its page opens", () => {
+    for (const method of ["session.begin", "session.end", "session.snapshot", "session.settings.update"]) {
       expect(domainsForMethod(method), method).toEqual(["session"]);
     }
     expect(domainsForEvent("session.changed")).toEqual({ domains: ["session"], known: true });

@@ -78,6 +78,7 @@ export type {
   PrompterTextSizeRequest,
   RecoveryState,
   RunnerStage,
+  SessionSettingsUpdateRequest,
   ShellState,
   ShellTalentMark,
   ShellStore,
@@ -173,5 +174,11 @@ export type { PrompterVersionSummary } from "./generated/snapshots/PrompterVersi
 export type { Session } from "./generated/snapshots/Session";
 export type { SessionBeginReply } from "./generated/snapshots/SessionBeginReply";
 export type { SessionEndReply } from "./generated/snapshots/SessionEndReply";
+export type { SessionFolderChoice } from "./generated/snapshots/SessionFolderChoice";
+export type { SessionFolderMade } from "./generated/snapshots/SessionFolderMade";
 export type { SessionKind } from "./generated/snapshots/SessionKind";
+export type { SessionPlaces } from "./generated/snapshots/SessionPlaces";
+export type { SessionSettings } from "./generated/snapshots/SessionSettings";
+export type { SessionSettingsReply } from "./generated/snapshots/SessionSettingsReply";
 export type { SessionSnapshot } from "./generated/snapshots/SessionSnapshot";
+export type { SessionSubfolders } from "./generated/snapshots/SessionSubfolders";

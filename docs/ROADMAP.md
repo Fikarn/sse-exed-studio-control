@@ -299,6 +299,17 @@ A new page and the landing page: every session begins there, with a choice of Gr
 
 Then, on the owner's word: `npm run release`, the walk with the page's CHECKLIST lines, `release:verified`. The deck's profile does not change.
 
+### The Session page, step 2: the folder and the disk (2026-10-18)
+
+A session gets its folder, which `Begin` makes on a new sessions' folder, `D:\Sessions` (or in a series' folder, or an existing folder used as it is), named `<name> (YYYY-MM-DD)` with each kind's subfolders; the window shows the drive's free space, and the disk reads Low under 200 GB and Nearly full under 50 GB. The design is board 3 (`docs/design/boards/session-3.html`), its note `docs/design/session-3.md`; the owner answered its questions on 2026-10-18 (every recommendation but the root's). Four pull requests, in this order:
+
+- [x] The folder (the hardware link): the settings `session.root`, `session.subfolders` and `session.thresholds` under `session.`, outside the archive, and `session.settings.update`; where a run makes its folders (the studio's build on the setting's root, every other run beside its own saved data, `SSE_SESSIONS_SIMULATED=1` for the lanes and the release's trial); `session.begin`'s `folder`, its checks in order and what it makes; the folder's name held to one case table with the pages; the rows; the store and the test double. Nothing on screen changes yet.
+- [ ] The watch (the hardware link): the drives' free space through Windows, the sessions' folder's newest folders and their sizes, vMix's recording file, read on a thread of its own.
+- [ ] The shell's folder dialog and `Open the folder`, and the window's parts (a level bar, a footer item's tone).
+- [ ] The page: the window at 1680 × 620 with the folder and the disk, the running session's folder and vMix line, the footer's and the header's `Disk`, Setup / Support's Sessions screen, D52.
+
+Then, on the owner's word: `npm run release`, the walk with the new CHECKLIST lines, `release:verified`.
+
 ### The BGH1s over the network (was Slice 13)
 
 It starts once the owner has read the SDK's licence (under "Waiting on the owner").

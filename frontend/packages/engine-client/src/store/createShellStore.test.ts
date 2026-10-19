@@ -653,11 +653,13 @@ describe("createShellStore scoped refresh", () => {
     expect(await after(() => store.setWorkspace("audio"))).toEqual(["app.snapshot", "audio.snapshot"]);
     expect(store.getSnapshot().activeWorkspace).toBe("audio");
     expect(await after(() => store.setWorkspace("lighting"))).toEqual(["app.snapshot", ...lighting]);
+    // Setup has the sessions' settings (D52).
     expect(await after(() => store.setWorkspace("setup"))).toEqual([
       "app.snapshot",
       "commissioning.snapshot",
       "controlSurface.snapshot",
       "health.snapshot",
+      "session.snapshot",
       "support.snapshot",
     ]);
 
@@ -697,9 +699,14 @@ describe("createShellStore scoped refresh", () => {
     expect(await after(() => store.pairCamera(1))).toEqual(cameras);
     expect(await after(() => store.forgetCamera(1))).toEqual(cameras);
     expect(await after(() => store.refreshCamerasSnapshot())).toEqual(cameras);
-    // The session (2026-10-15): a begin and an end read its snapshot again, and nothing else.
+    // The session (2026-10-15): a begin, an end and an update of its settings (D52) read its
+    // snapshot again, and nothing else.
     expect(await after(() => store.beginSession("podcast", "Morning take"))).toEqual(["session.snapshot"]);
+    expect(
+      await after(() => store.beginSession("podcast", "Morning take", { mode: "existing", path: "D:\\All\\Series" }))
+    ).toEqual(["session.snapshot"]);
     expect(await after(() => store.endSession())).toEqual(["session.snapshot"]);
+    expect(await after(() => store.updateSessionSettings({ lowBelowGb: 300 }))).toEqual(["session.snapshot"]);
     // Setup / Support opened on a section is one request, and reads what Setup shows.
     answer("app.snapshot", {
       shell: { workspace: "setup", setup: { activeSection: "cameras" } },
@@ -710,6 +717,7 @@ describe("createShellStore scoped refresh", () => {
       "commissioning.snapshot",
       "controlSurface.snapshot",
       "health.snapshot",
+      "session.snapshot",
       "support.snapshot",
     ]);
     expect(calls.filter((call) => call === "request:settings.update")).toHaveLength(1);
@@ -1367,21 +1375,42 @@ describe("createShellStore the cameras", () => {
 // and after the store's own begin and end, which go out as the contract
 // names them.
 describe("createShellStore the session", () => {
-  const session = { kind: "podcast", name: "Morning take", begunAt: "2026-10-15T07:16:00.000Z", endedAt: null };
+  const session = {
+    kind: "podcast",
+    name: "Morning take",
+    begunAt: "2026-10-15T07:16:00.000Z",
+    endedAt: null,
+    folder: "D:\\Sessions\\Morning take (2026-10-15)",
+  };
+  // The settings and the places the read holds beside the sessions (D52).
+  const read = {
+    settings: {
+      root: "D:\\Sessions",
+      subfolders: { "green-screen": [], podcast: ["Audio"], webinar: [] },
+      lowBelowGb: 200,
+      nearlyFullBelowGb: 50,
+    },
+    places: { root: "D:\\Sessions", simulated: false },
+  };
 
   it("reads the session at the start and again when it changes", async () => {
     const { answer, calls, emit, snapshotRequests, transport } = supervisedTransport();
-    answer("session.snapshot", { current: null, last: [] });
+    answer("session.snapshot", { current: null, last: [], ...read });
     const store = createShellStore(transport);
     await store.initialize();
-    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: null, last: [] });
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: null, last: [], ...read });
 
     calls.length = 0;
-    answer("session.snapshot", { current: session, last: [] });
+    answer("session.snapshot", { current: session, last: [], ...read });
     emit({ type: "event", event: "session.changed", payload: { reason: "begun" } });
     await tick();
     expect(snapshotRequests()).toEqual(["session.snapshot"]);
-    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [] });
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [], ...read });
+    // The settings' update raises it with its own reason (D52).
+    calls.length = 0;
+    emit({ type: "event", event: "session.changed", payload: { reason: "settings" } });
+    await tick();
+    expect(snapshotRequests()).toEqual(["session.snapshot"]);
     await store.dispose();
   });
 
@@ -1397,44 +1426,70 @@ describe("createShellStore the session", () => {
 
   it("refuses a reply that is not the session's and keeps the last good one", async () => {
     const { answer, transport } = supervisedTransport();
-    answer("session.snapshot", { current: session, last: [] });
+    answer("session.snapshot", { current: session, last: [], ...read });
     const store = createShellStore(transport);
     await store.initialize();
 
-    answer("session.snapshot", { current: "podcast", last: [] });
+    answer("session.snapshot", { current: "podcast", last: [], ...read });
     await store.endSession();
-    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [] });
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [], ...read });
     expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
       context: "reply refused",
       message: "session.snapshot: current is not an object",
     });
-    answer("session.snapshot", { current: null });
+    answer("session.snapshot", { current: null, ...read });
     await store.endSession();
     expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
       message: "session.snapshot: last is not a list",
     });
+    // A read without the settings or the places is refused too (D52).
+    answer("session.snapshot", { current: null, last: [], places: read.places });
+    await store.endSession();
+    expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
+      message: "session.snapshot: settings is not an object",
+    });
+    answer("session.snapshot", { current: null, last: [], settings: read.settings });
+    await store.endSession();
+    expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
+      message: "session.snapshot: places is not an object",
+    });
+    expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [], ...read });
     await store.dispose();
   });
 
-  it("sends a begin and an end as the contract names them", async () => {
+  it("sends a begin, an end and an update of the settings as the contract names them", async () => {
     const { transport } = supervisedTransport();
     const sent: Array<[string, unknown]> = [];
     const store = createShellStore({
       ...transport,
       request: (method, params) => {
-        if (method === "session.begin" || method === "session.end") sent.push([method, params ?? {}]);
+        if (method.startsWith("session.") && method !== "session.snapshot") sent.push([method, params ?? {}]);
         return transport.request(method, params);
       },
     });
     await store.initialize();
     await store.beginSession("green-screen", "  Studio intro ");
     await store.beginSession("webinar", "");
+    // The folder (D52): sent only when given; without it the hardware link makes a new one
+    // on the sessions' folder.
+    await store.beginSession("podcast", "Episode 4", { mode: "new", parent: "D:\\All\\Leadership series" });
+    await store.beginSession("podcast", "Episode 4", { mode: "existing", path: "D:\\All\\Series (2026-10-01)" });
     await store.endSession();
+    await store.updateSessionSettings({ subfolders: { webinar: [] }, lowBelowGb: 300 });
     expect(sent).toEqual([
       // The hardware link trims the name; the store sends it as given.
       ["session.begin", { kind: "green-screen", name: "  Studio intro " }],
       ["session.begin", { kind: "webinar", name: "" }],
+      [
+        "session.begin",
+        { kind: "podcast", name: "Episode 4", folder: { mode: "new", parent: "D:\\All\\Leadership series" } },
+      ],
+      [
+        "session.begin",
+        { kind: "podcast", name: "Episode 4", folder: { mode: "existing", path: "D:\\All\\Series (2026-10-01)" } },
+      ],
       ["session.end", {}],
+      ["session.settings.update", { subfolders: { webinar: [] }, lowBelowGb: 300 }],
     ]);
     await store.dispose();
   });

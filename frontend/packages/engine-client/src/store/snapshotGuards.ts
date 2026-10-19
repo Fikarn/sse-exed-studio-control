@@ -111,10 +111,13 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
         value.recent === null ? null : listProblem(value, "recent", { ids: false })
       );
     case "session":
-      // The Session page (2026-10-15): the running session or `null`, and the last of each kind.
+      // The Session page (2026-10-15): the running session or `null`, and the last of each kind;
+      // since step 2 (D52) the settings and the places too.
       return firstProblem(
         objectProblem(value, "current", { nullable: true }),
-        listProblem(value, "last", { ids: false })
+        listProblem(value, "last", { ids: false }),
+        objectProblem(value, "settings"),
+        objectProblem(value, "places")
       );
     default:
       return null;

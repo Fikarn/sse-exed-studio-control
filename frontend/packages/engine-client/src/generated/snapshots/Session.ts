@@ -19,4 +19,10 @@ export type Session = {
    * When it ended, in the same shape; `null` while it runs.
    */
   endedAt: string | null;
+  /**
+   * Its folder, as Windows writes the path (D52): the one its Begin made
+   * or chose. `null` for a session begun before sessions had folders,
+   * whose saved form has none.
+   */
+  folder: string | null;
 };

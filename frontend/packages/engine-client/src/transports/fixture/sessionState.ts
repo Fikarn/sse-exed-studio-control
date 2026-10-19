@@ -2,17 +2,32 @@
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { Session } from "../../generated/snapshots/Session";
 import type { SessionKind } from "../../generated/snapshots/SessionKind";
-import type { FixtureSessionSeed } from "../../types";
+import type { SessionSettings } from "../../generated/snapshots/SessionSettings";
 import type { MutableFixtureState } from "./state";
 
 // The session as the hardware link keeps it (the Session page, 2026-10-15;
-// `native/rust-engine/src/session.rs`): the running session, and the last of each kind,
-// newest first. The hardware link keeps them in two settings outside the archive; the
-// double keeps them beside its state, so an archive's restore leaves them alone here too.
+// `native/rust-engine/src/session.rs`): the running session, the last of each kind, newest
+// first, and since step 2 (D52) the settings for the sessions' folders, the places, and the
+// double's own disk, which is data: the folders it knows are there, and the drives. The
+// hardware link keeps the session in settings outside the archive; the double keeps it
+// beside its state, so an archive's restore leaves it alone here too. The other session
+// modules import this one, and it imports none of them.
+
+/** The double's disk: the folders it knows are there, by their paths in lower case (Windows
+ *  does not tell capitals apart), and the drives by their letters. */
+export interface FixtureDisk {
+  folders: Map<string, string>;
+  drives: Set<string>;
+}
 
 export interface FixtureSession {
   current: Session | null;
   last: Session[];
+  settings: SessionSettings;
+  /** The run keeps its sessions' folders in `scratchRoot` (`places.simulated`). */
+  simulated: boolean;
+  scratchRoot: string;
+  disk: FixtureDisk;
 }
 
 /** The kinds, in the page's order (`SessionKind::ALL`). */
@@ -27,6 +42,23 @@ export const SESSION_KIND_NAMES: Readonly<Record<SessionKind, string>> = {
 
 /** The most characters a session's name has, after trimming (`NAME_MAX_CHARACTERS`). */
 export const SESSION_NAME_MAX_CHARACTERS = 80;
+
+/** The drives of the double's disk, by their letters: the studio PC's. */
+export const FIXTURE_DRIVES: readonly string[] = ["C", "D", "E", "Z"];
+
+/** The settings as new saved data reads them (`settings.rs`' defaults, D52). */
+export function defaultSessionSettings(): SessionSettings {
+  return {
+    root: "D:\\Sessions",
+    subfolders: {
+      "green-screen": ["Video", "vMix Recording", "Script", "Exports"],
+      podcast: ["Audio", "Video", "vMix Recording", "Exports"],
+      webinar: ["Slides", "vMix Recording", "Exports"],
+    },
+    lowBelowGb: 200,
+    nearlyFullBelowGb: 50,
+  };
+}
 
 // Rust's `str::trim`: the characters with Unicode's White_Space property. JavaScript's own
 // `trim` differs by two (it takes U+FEFF and leaves U+0085), so the double spells them out.
@@ -59,60 +91,23 @@ export function oneOfEachKind(sessions: readonly Session[]): Session[] {
 
 const sessions = new WeakMap<MutableFixtureState, FixtureSession>();
 
-/** The double's session, made the first time a scenario's double asks for it: none running, no last. */
+/**
+ * The double's session, made the first time a scenario's double asks for it: none running,
+ * no last, the default settings, the studio's places (`places.simulated` false: the pages
+ * show what the studio's build shows), and a disk with the studio PC's drives and no folder.
+ */
 export function fixtureSession(state: MutableFixtureState): FixtureSession {
   let session = sessions.get(state);
   if (!session) {
-    session = { current: null, last: [] };
+    session = {
+      current: null,
+      last: [],
+      settings: defaultSessionSettings(),
+      simulated: false,
+      scratchRoot: "",
+      disk: { folders: new Map(), drives: new Set(FIXTURE_DRIVES) },
+    };
     sessions.set(state, session);
   }
   return session;
-}
-
-// The scenario's session is checked as the hardware link would read its settings, and a
-// session it would not read is the scenario's mistake, and says so.
-const mistake = (message: string) => new Error(`session: ${message}`);
-
-const SEED_KEYS = ["current", "last"] as const;
-const SESSION_KEYS = ["kind", "name", "begunAt", "endedAt"] as const;
-
-function onlyKeys(object: object, known: readonly string[], where: string) {
-  const unknown = Object.keys(object).filter((key) => !known.includes(key));
-  if (unknown.length > 0) throw mistake(`${where} has ${unknown.join(", ")}, which a seed does not have.`);
-}
-
-/** A time as the hardware link writes it: UTC, `2026-10-15T07:16:00.000Z`. */
-function isUtcText(value: unknown): value is string {
-  return typeof value === "string" && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString() === value;
-}
-
-function checkedSession(value: unknown, where: string, ended: boolean): Session {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw mistake(`${where} must be an object.`);
-  onlyKeys(value, SESSION_KEYS, where);
-  const { kind, name, begunAt, endedAt } = value as Record<string, unknown>;
-  if (!isSessionKind(kind)) throw mistake(`${where}'s kind must be one of ${SESSION_KINDS.join(", ")}.`);
-  if (typeof name !== "string" || trimmedName(name) !== name) throw mistake(`${where}'s name must be trimmed text.`);
-  if (nameCharacters(name) > SESSION_NAME_MAX_CHARACTERS) {
-    throw mistake(`${where}'s name has more than ${SESSION_NAME_MAX_CHARACTERS} characters.`);
-  }
-  if (!isUtcText(begunAt)) throw mistake(`${where}'s begunAt must be a UTC time as the hardware link writes it.`);
-  if (ended ? !isUtcText(endedAt) : endedAt !== null && endedAt !== undefined) {
-    throw mistake(ended ? `${where}'s endedAt must be a UTC time.` : `${where} runs: its endedAt is null.`);
-  }
-  return { kind, name, begunAt, endedAt: ended ? (endedAt as string) : null };
-}
-
-/** Builds the scenario's session on the double, before its first read. */
-export function seedFixtureSession(state: MutableFixtureState, seed: FixtureSessionSeed | undefined) {
-  if (seed === undefined) return;
-  if (seed === null || typeof seed !== "object" || Array.isArray(seed)) throw mistake("the seed must be an object.");
-  onlyKeys(seed, SEED_KEYS, "the seed");
-  const session = fixtureSession(state);
-  if (seed.current !== undefined) session.current = checkedSession(seed.current, "current", false);
-  if (seed.last !== undefined) {
-    if (!Array.isArray(seed.last)) throw mistake("last must be a list.");
-    const last = seed.last.map((entry, index) => checkedSession(entry, `last[${index}]`, true));
-    if (oneOfEachKind(last).length !== last.length) throw mistake("last holds one session of each kind at most.");
-    session.last = last;
-  }
 }

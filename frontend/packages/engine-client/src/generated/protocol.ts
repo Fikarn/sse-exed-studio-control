@@ -100,6 +100,7 @@ export const REQUEST_METHODS = [
   "session.snapshot",
   "session.begin",
   "session.end",
+  "session.settings.update",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];
 

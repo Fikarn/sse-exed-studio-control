@@ -13,6 +13,7 @@ import type { PrompterAnchor } from "../generated/snapshots/PrompterAnchor";
 import type { PrompterSnapshot } from "../generated/snapshots/PrompterSnapshot";
 import type { PrompterParagraph } from "../generated/snapshots/PrompterParagraph";
 import type { PrompterScriptSnapshot } from "../generated/snapshots/PrompterScriptSnapshot";
+import type { SessionFolderChoice } from "../generated/snapshots/SessionFolderChoice";
 import type { SessionKind } from "../generated/snapshots/SessionKind";
 import { transitionStartupState } from "../machines/startupMachine";
 import { noteAnchorArrival } from "../prompter/anchorArrival";
@@ -69,6 +70,7 @@ import type {
   LightingSceneCreateRequest,
   LightingSceneUpdateRequest,
   LightingSettingsUpdateRequest,
+  SessionSettingsUpdateRequest,
   ShellState,
   ShellStore,
   StartupFailure,
@@ -1838,11 +1840,17 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       }
       await refreshDomains(["cameras"]);
     },
-    beginSession(kind: SessionKind, name: string) {
-      return performRequest("session.begin", { kind, name });
+    beginSession(kind: SessionKind, name: string, folder?: SessionFolderChoice) {
+      return performRequest(
+        "session.begin",
+        folder === undefined ? { kind, name } : { kind, name, folder: folder as unknown as JsonObject }
+      );
     },
     endSession() {
       return performRequest("session.end");
+    },
+    updateSessionSettings(request: SessionSettingsUpdateRequest) {
+      return performRequest("session.settings.update", request as unknown as JsonObject);
     },
     async refreshControlSurfaceSnapshot() {
       if (state.lifecycle !== "ready") {
