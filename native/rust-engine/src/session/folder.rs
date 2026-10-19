@@ -38,10 +38,13 @@ pub(crate) const SESSION_FOLDER_NOT_MADE: &str = "SESSION_FOLDER_NOT_MADE";
 /// beside the control characters.
 const FORBIDDEN: [char; 9] = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
 
-/// The names Windows keeps for its devices, with or without an extension.
-const RESERVED: [&str; 22] = [
-    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
-    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+/// The names Windows keeps for its devices, with or without an extension:
+/// its naming rules' list (the superscript digits count as digits there),
+/// and the console's two.
+const RESERVED: [&str; 32] = [
+    "CON", "PRN", "AUX", "NUL", "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+    "COM8", "COM9", "COM¹", "COM²", "COM³", "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6",
+    "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³", "CONIN$", "CONOUT$",
 ];
 
 fn forbidden(character: char) -> bool {
@@ -149,7 +152,7 @@ pub(crate) fn read_drive_path(text: &str) -> Result<DrivePath, PathProblem> {
     let written = text.replace('/', "\\");
     if written.starts_with(r"\\?\") || written.starts_with(r"\\.\") {
         return Err(PathProblem::Shape(format!(
-            "{text} is written for Windows' own use: write the folder's path as Explorer shows it, such as D:\\Sessions."
+            "\"{text}\" is written for Windows' own use: write the folder's path as Explorer shows it, such as D:\\Sessions."
         )));
     }
     if written.starts_with(r"\\") {
@@ -169,11 +172,13 @@ pub(crate) fn read_drive_path(text: &str) -> Result<DrivePath, PathProblem> {
     if !rest.is_empty() {
         for part in rest.split('\\') {
             if part.is_empty() {
-                return Err(PathProblem::Shape(format!("{text} has two \\ together.")));
+                return Err(PathProblem::Shape(format!(
+                    "\"{text}\" has two \\ together."
+                )));
             }
             if part == "." || part == ".." {
                 return Err(PathProblem::Shape(format!(
-                    "{text} has a . or a .. in it: write the folder's own path."
+                    "\"{text}\" has a . or a .. in it: write the folder's own path."
                 )));
             }
             if let Some(problem) = name_problem(part) {
@@ -306,10 +311,7 @@ pub(crate) fn plan_folder(
     if !places.may_make(&folder) {
         return Err(refused(
             SESSION_FOLDER_OUTSIDE_SCRATCH,
-            format!(
-                "This run makes its folders only in {}, beside its own saved data.",
-                places.scratch_root.display()
-            ),
+            places.outside_sentence(),
         ));
     }
 

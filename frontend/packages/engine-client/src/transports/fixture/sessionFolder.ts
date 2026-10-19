@@ -23,7 +23,12 @@ const RESERVED = new Set([
   "PRN",
   "AUX",
   "NUL",
-  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((digit) => [`COM${digit}`, `LPT${digit}`]),
+  ...["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "¹", "²", "³"].flatMap((digit) => [
+    `COM${digit}`,
+    `LPT${digit}`,
+  ]),
+  "CONIN$",
+  "CONOUT$",
 ]);
 
 function forbidden(character: string): boolean {
@@ -64,7 +69,7 @@ export function readDrivePath(text: string): DrivePathReading {
   const written = text.replaceAll("/", "\\");
   if (written.startsWith("\\\\?\\") || written.startsWith("\\\\.\\")) {
     return {
-      shape: `${text} is written for Windows' own use: write the folder's path as Explorer shows it, such as D:\\Sessions.`,
+      shape: `"${text}" is written for Windows' own use: write the folder's path as Explorer shows it, such as D:\\Sessions.`,
     };
   }
   if (written.startsWith("\\\\")) return { share: true };
@@ -77,9 +82,9 @@ export function readDrivePath(text: string): DrivePathReading {
   const parts: string[] = [];
   if (rest !== "") {
     for (const part of rest.split("\\")) {
-      if (part === "") return { shape: `${text} has two \\ together.` };
+      if (part === "") return { shape: `"${text}" has two \\ together.` };
       if (part === "." || part === "..")
-        return { shape: `${text} has a . or a .. in it: write the folder's own path.` };
+        return { shape: `"${text}" has a . or a .. in it: write the folder's own path.` };
       const problem = nameProblem(part);
       if (problem) return { shape: problem };
       parts.push(part);

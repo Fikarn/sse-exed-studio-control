@@ -19,7 +19,7 @@ use super::tests::{TestSession, EVENING, MORNING, NOON};
 use super::SessionError;
 use crate::cameras::runtime::utc_time;
 use crate::saved_json::complained_about;
-use crate::storage::set_settings;
+use crate::storage::{open_connection, set_settings};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
@@ -381,6 +381,45 @@ fn every_refusal_says_why_and_comes_in_its_order() {
     assert_eq!(test.snapshot()["current"], Value::Null, "nothing began");
 }
 
+// The review of #354: a begin that made its folder and then cannot write the
+// session says that the folder stays, and begins nothing. A trigger in the
+// test's own saved data stands in for a write the saved data refuses.
+#[test]
+fn a_begin_that_cannot_save_the_session_says_its_folder_stays() {
+    let test = TestSession::new("folder-unsaved");
+    open_connection(&test.db_path)
+        .expect("the database opens")
+        .execute_batch(
+            "CREATE TRIGGER refuse_the_session BEFORE INSERT ON app_settings \
+             WHEN NEW.key = 'session.current' \
+             BEGIN SELECT RAISE(ABORT, 'the saved data refused it'); END;",
+        )
+        .expect("the trigger is made");
+    let folder = test.folder("podcast", "Take", NOON);
+    match test.refusal(
+        "session.begin",
+        json!({ "kind": "podcast", "name": "Take" }),
+    ) {
+        SessionError::Storage(sentence) => {
+            assert!(sentence.contains("the saved data refused it"), "{sentence}");
+            assert!(
+                sentence.ends_with(&format!(
+                    ". {} was made, and is left as it is.",
+                    text(&folder)
+                )),
+                "{sentence}"
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(
+        listing(&folder).len(),
+        4,
+        "the folder and its subfolders stay"
+    );
+    assert_eq!(test.snapshot()["current"], Value::Null, "nothing began");
+}
+
 // A failure after the folder was made leaves what was made, and the
 // sentence says which; the checks would refuse such a list, so the acts are
 // given it directly.
@@ -511,6 +550,17 @@ fn a_name_windows_does_not_take_is_said() {
             "\"Lpt3 .wav\" is a name Windows keeps for itself."
         ))
     );
+    // Windows' whole list (the review of #354): the digit 0, the superscript
+    // digits, and the console's two.
+    for reserved in ["COM0", "lpt0", "COM¹", "lpt³.txt", "CONIN$", "conout$"] {
+        assert_eq!(
+            name_problem(reserved),
+            Some(format!(
+                "\"{reserved}\" is a name Windows keeps for itself."
+            )),
+            "{reserved}"
+        );
+    }
     assert_eq!(
         name_problem(".."),
         Some(String::from("\"..\" is not a folder's name."))

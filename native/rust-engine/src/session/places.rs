@@ -56,12 +56,34 @@ impl Places {
         }
     }
 
+    /// Whether the saved data sits at a drive's top (`D:\`): the scratch
+    /// folder would then be the drive's own `Sessions`, the studio's
+    /// sessions' folder by default, so a simulated run there makes no folder.
+    /// Read from the path as written, without asking the drive.
+    pub(crate) fn scratch_at_a_drives_top(&self) -> bool {
+        self.scratch_root.parent().and_then(Path::parent).is_none()
+    }
+
     /// Whether this run may make `path`, a folder: anywhere in the studio's
     /// build, and only inside its scratch folder in a simulated run, as the
     /// file system resolves the path (a junction or a detour by `..` that
-    /// leads out of it is out of it).
+    /// leads out of it is out of it), and nowhere when that folder is a
+    /// drive's own `Sessions`.
     pub(crate) fn may_make(&self, path: &Path) -> bool {
-        !self.simulated || same_or_inside(path, &self.scratch_root)
+        !self.simulated
+            || (!self.scratch_at_a_drives_top() && same_or_inside(path, &self.scratch_root))
+    }
+
+    /// Why a simulated run refuses a new folder.
+    pub(crate) fn outside_sentence(&self) -> String {
+        let scratch = self.scratch_root.display();
+        if self.scratch_at_a_drives_top() {
+            format!(
+                "This run keeps its saved data at the top of a drive, where its sessions' folder, {scratch}, could be the studio's: it makes no session's folder. Start it with saved data in a folder of its own."
+            )
+        } else {
+            format!("This run makes its folders only in {scratch}, beside its own saved data.")
+        }
     }
 
     /// What `session.snapshot` says of the places.
@@ -133,5 +155,31 @@ mod tests {
             }
         );
         assert!(studio.may_make(&app_data.join("Elsewhere")));
+        assert!(!simulated.scratch_at_a_drives_top());
+        assert_eq!(
+            simulated.outside_sentence(),
+            format!(
+                "This run makes its folders only in {}, beside its own saved data.",
+                app_data.join("Sessions").display()
+            )
+        );
+    }
+
+    // The review of #354: saved data at a drive's top would make the scratch
+    // folder that drive's `Sessions`, the studio's sessions' folder by
+    // default. All of it is read from the paths as written: nothing here
+    // asks a drive (another letter stands in for the studio's D:).
+    #[test]
+    fn a_run_whose_saved_data_is_at_a_drives_top_makes_no_folder() {
+        let top = Places::new(true, Path::new(r"Q:\"));
+        assert_eq!(top.scratch_root, PathBuf::from(r"Q:\Sessions"));
+        assert!(top.scratch_at_a_drives_top());
+        assert!(!top.may_make(Path::new(r"Q:\Sessions\Take (2026-10-18)")));
+        assert_eq!(
+            top.outside_sentence(),
+            r"This run keeps its saved data at the top of a drive, where its sessions' folder, Q:\Sessions, could be the studio's: it makes no session's folder. Start it with saved data in a folder of its own."
+        );
+        // The studio's build takes the setting's root, wherever its saved data is.
+        assert!(Places::new(false, Path::new(r"Q:\")).may_make(Path::new(r"Q:\Sessions\Take")));
     }
 }

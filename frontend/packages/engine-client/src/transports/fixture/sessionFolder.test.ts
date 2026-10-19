@@ -64,6 +64,11 @@ describe("a path as Windows writes it", () => {
     );
     expect(nameProblem("aux")).toBe('"aux" is a name Windows keeps for itself.');
     expect(nameProblem("Lpt3 .wav")).toBe('"Lpt3 .wav" is a name Windows keeps for itself.');
+    // Windows' whole list (the review of #354): the digit 0, the superscript digits, and the
+    // console's two.
+    for (const reserved of ["COM0", "lpt0", "COM¹", "lpt³.txt", "CONIN$", "conout$"]) {
+      expect(nameProblem(reserved), reserved).toBe(`"${reserved}" is a name Windows keeps for itself.`);
+    }
     expect(nameProblem("..")).toBe('".." is not a folder\'s name.');
     expect(nameProblem("Audio/Video")).toContain("a control character");
   });

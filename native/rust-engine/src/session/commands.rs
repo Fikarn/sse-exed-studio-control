@@ -10,6 +10,7 @@
 //! made.
 
 use crate::cameras::runtime::utc_text;
+use crate::diagnostics::{log_event, LogLevel};
 use crate::saved_json::parse_saved_json;
 use crate::session::folder::{local_day, make_folder, plan_folder};
 use crate::session::places::Places;
@@ -179,7 +180,14 @@ fn begin(
     if let Some(ended) = &ended {
         writes.push((LAST_KEY, serde_json::to_string(&with_last(last, ended))?));
     }
-    apply_settings(db_path, &writes, &[])?;
+    apply_settings(db_path, &writes, &[]).map_err(|error| {
+        let error = SessionError::from(error);
+        if folder.made {
+            unsaved_after_making(error, &folder.path)
+        } else {
+            error
+        }
+    })?;
     Ok(SessionReply {
         result: serde_json::to_value(SessionBeginReply {
             session,
@@ -188,6 +196,24 @@ fn begin(
         })?,
         event: Some(REASON_BEGUN),
     })
+}
+
+/// A begin that made its folder and then could not write the session: the
+/// sentence and the log say that the folder stays (the review of #354).
+fn unsaved_after_making(error: SessionError, folder: &str) -> SessionError {
+    match error {
+        SessionError::Storage(message) => {
+            log_event(
+                LogLevel::Warn,
+                &format!("A Begin made {folder} and then could not save the session: {message}"),
+            );
+            SessionError::Storage(format!(
+                "{}. {folder} was made, and is left as it is.",
+                message.trim_end_matches('.')
+            ))
+        }
+        other => other,
+    }
 }
 
 /// `session.end`: the running session ends now and becomes its kind's last;

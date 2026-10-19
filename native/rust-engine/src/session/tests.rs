@@ -317,17 +317,21 @@ fn the_name_is_trimmed_may_be_empty_and_has_at_most_eighty_characters() {
     assert_eq!(with_null.result["session"]["name"], "");
 
     // Eighty characters, each two bytes in UTF-8: characters are counted.
-    // The test's temp folder is deep, so the podcast's folder is kept to
-    // itself to stay under the paths' 200 characters (`tests_folder.rs`).
-    test.request(
-        "session.settings.update",
-        json!({ "subfolders": { "podcast": [] } }),
-        NOON,
-    )
-    .expect("the update is answered");
+    // The test's temp folder is deep, and a new folder of this name could
+    // pass the paths' 200 characters there (the review of #354): this begin
+    // uses a folder that exists, which is not measured (`tests_folder.rs`
+    // has the length's own test).
     let eighty = "é".repeat(80);
+    let existing = test.root.display().to_string();
     assert_eq!(
-        test.begin("podcast", &format!(" {eighty} "), EVENING)["session"]["name"],
+        test.begin_with(
+            json!({
+                "kind": "podcast",
+                "name": format!(" {eighty} "),
+                "folder": { "mode": "existing", "path": existing }
+            }),
+            EVENING
+        )["session"]["name"],
         eighty.as_str()
     );
     let eighty_one = "a".repeat(81);
