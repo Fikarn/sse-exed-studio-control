@@ -26,6 +26,7 @@ import { camerasArmedWords, STOP_ARM_KEY, useCamerasArming } from "../cameras/us
 import { countRender } from "../shared/renderCounts";
 import { useToast } from "../shared/toastContext";
 import { useLiveCallback } from "../shared/useLiveCallback";
+import type { DiskWord } from "../session/sessionDisk";
 import { getSupportBackups, formatShortTimestamp, type HeaderItem } from "../shellData";
 import type { PrompterGlassLayoutReport } from "../teleprompter/glass/PrompterGlass";
 import { usePrompterElapsed, usePrompterTimeLeft } from "../teleprompter/prompterTime";
@@ -61,6 +62,8 @@ export interface OverviewWorkspaceProps {
   appSnapshot: JsonObject | null;
   audioSnapshot: AudioSnapshot | null;
   camerasSnapshot: CamerasSnapshot | null;
+  /** The footer's `Disk` (D52): the session's drive, as `footerDiskWord` says it. */
+  disk: DiskWord;
   healthSnapshot: JsonObject | null;
   /** The header's lamps, chips and latches before the header leaves any out
    *  (`buildMonitorItems`): the Overview ranks them for the worst page. */
@@ -87,6 +90,7 @@ function OverviewWorkspaceRoot({
   appSnapshot,
   audioSnapshot,
   camerasSnapshot,
+  disk,
   healthSnapshot,
   lamps,
   lightingSnapshot,
@@ -280,6 +284,7 @@ function OverviewWorkspaceRoot({
         <OverviewFooter
           audio={audioSnapshot}
           backup={latestBackup ? formatShortTimestamp(latestBackup.modifiedAt) : null}
+          disk={disk}
           now={now}
           takesToday={camerasSnapshot?.takesToday}
         />

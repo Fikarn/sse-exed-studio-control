@@ -854,7 +854,7 @@ test.describe("Setup / Support after the visual overhaul", () => {
     await openSetupPage(page, "setup-ready");
     const cluster = page.getByTestId("setup-cluster");
     await expect(cluster.getByRole("tab", { selected: true })).toHaveAttribute("data-testid", "setup-step-publish");
-    for (const mode of ["support", "cameras", "console"]) {
+    for (const mode of ["support", "cameras", "console", "sessions"]) {
       await cluster.getByTestId(`setup-mode-${mode}`).click();
       await expect(cluster.getByTestId(`setup-mode-${mode}`)).toHaveAttribute("aria-pressed", "true");
       await expect(cluster.getByRole("tab", { selected: true })).toHaveCount(0);
@@ -963,4 +963,165 @@ test("the Console screen lists the strips, and a press puts one on the list Tota
   const room = await measureRoom(page);
   expect(room.scrolls, "nothing scrolls").toEqual([]);
   expect(room.cut, "no line is cut").toEqual([]);
+});
+
+// The Session page's step 2 (D52): Setup / Support's fifth screen, Sessions,
+// built without a board (the owner's answer of 2026-10-19): the sessions'
+// folder with Change… and Open, each kind's subfolders, the two levels through
+// the number dialog, and the drives. Its results land in the feedback line;
+// nothing on it makes, moves or deletes a folder. On `setup-sessions` the
+// sessions' folder holds the last sessions' folders, and D: reads Low.
+test.describe("the Sessions screen", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
+    });
+    await openFixture(page, "setup-sessions");
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("setup-screen-sessions")).toBeVisible();
+  });
+
+  const settingsUpdates = (page: Page) =>
+    page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["session.settings.update"] ?? 0);
+
+  test("names the sessions' folder, the subfolders, the levels and the drives, with five mode keys", async ({
+    page,
+  }) => {
+    await expect(page.getByTestId("setup-mode-sessions")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("setup-sessions-root")).toHaveText("D:\\Sessions");
+    await expect(page.getByTestId("setup-sessions-simulated")).toHaveCount(0);
+    await expect(page.getByTestId("setup-sessions-subfolders-green-screen")).toHaveValue(
+      "Video, vMix Recording, Script, Exports"
+    );
+    await expect(page.getByTestId("setup-sessions-subfolders-podcast")).toHaveValue(
+      "Audio, Video, vMix Recording, Exports"
+    );
+    await expect(page.getByTestId("setup-sessions-subfolders-webinar")).toHaveValue("Slides, vMix Recording, Exports");
+    await expect(page.getByTestId("setup-sessions-low")).toHaveText("200 GB");
+    await expect(page.getByTestId("setup-sessions-nearly-full")).toHaveText("50 GB");
+
+    await expect(page.getByTestId("setup-sessions-drives")).toContainText("4 drives");
+    const storage = page.getByTestId("setup-sessions-drive-D");
+    await expect(storage).toContainText("Storage 1 (D:)");
+    await expect(storage).toContainText("sessions' folder");
+    await expect(storage).toContainText("Low");
+    await expect(storage).toContainText("140 GB free of 3.73 TB");
+    await expect(storage.getByRole("meter")).toHaveAttribute("data-tone", "attention");
+    await expect(page.getByTestId("setup-sessions-drive-C")).toContainText("Local Disk (C:)");
+    await expect(page.getByTestId("setup-sessions-drive-Z")).toContainText("3.70 TB free of 17.4 TB");
+    await expect(page.getByTestId("setup-sessions-drive-Z")).not.toContainText("sessions' folder");
+
+    // The fifth mode key fits the row: nothing is cut.
+    const modes = page.getByTestId("setup-mode-switch");
+    await expect(modes.getByRole("button")).toHaveText(["Runner", "Support", "Cameras", "Console", "Sessions"]);
+    expect(await modes.evaluate((row) => row.scrollWidth <= row.clientWidth)).toBe(true);
+    for (const key of await modes.getByRole("button").all()) {
+      expect(await key.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
+    const room = await measureRoom(page);
+    expect(room.scrolls, "nothing scrolls").toEqual([]);
+    expect(room.cut, "no line is cut").toEqual([]);
+  });
+
+  test("Change… sets the sessions' folder from Windows' dialog, and Open opens it in Explorer", async ({ page }) => {
+    await page.evaluate(() => {
+      const asked: [string | null, string][] = [];
+      (window as unknown as { __SSE_TEST_FOLDER_DIALOG__: typeof asked }).__SSE_TEST_FOLDER_DIALOG__ = asked;
+      window.__SSE_TEST_SHELL__ = {
+        pickFolder: (start, purpose) => {
+          asked.push([start, purpose]);
+          return asked.length === 1 ? null : "E:\\Studio Sessions";
+        },
+      };
+    });
+    // The sessions' folder is there: Open opens it.
+    await page.getByTestId("setup-sessions-root-open").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText("Opened D:\\Sessions in Explorer.");
+    expect(await page.evaluate(() => window.__SSE_TEST_SHELL__?.opened)).toEqual(["root"]);
+
+    // A cancel changes nothing.
+    await page.getByTestId("setup-sessions-root-change").click();
+    await expect(page.getByTestId("setup-sessions-root")).toHaveText("D:\\Sessions");
+    expect(await settingsUpdates(page)).toBe(0);
+
+    await page.getByTestId("setup-sessions-root-change").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      "The sessions' folder is E:\\Studio Sessions now: the next Begin makes its folder there."
+    );
+    await expect(page.getByTestId("setup-sessions-root")).toHaveText("E:\\Studio Sessions");
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __SSE_TEST_FOLDER_DIALOG__: [string | null, string][] }).__SSE_TEST_FOLDER_DIALOG__
+      )
+    ).toEqual([
+      ["D:\\Sessions", "root"],
+      ["D:\\Sessions", "root"],
+    ]);
+    expect(await settingsUpdates(page)).toBe(1);
+    // The new sessions' folder is not there until a Begin makes it.
+    await expect(page.getByTestId("setup-sessions-root-open")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("setup-sessions-root-open")).toHaveAttribute(
+      "title",
+      "E:\\Studio Sessions is not there yet: the first Begin makes it."
+    );
+    await expect(page.getByTestId("setup-sessions-drive-E")).toContainText("sessions' folder");
+  });
+
+  test("a kind's subfolders: Save waits for a change, and a refusal changes nothing", async ({ page }) => {
+    const podcast = page.getByTestId("setup-sessions-subfolders-podcast");
+    const save = page.getByTestId("setup-sessions-subfolders-podcast-save");
+    await expect(save).toHaveAttribute("aria-disabled", "true");
+
+    await podcast.fill("Audio, audio");
+    await expect(save).not.toHaveAttribute("aria-disabled", "true");
+    await save.click();
+    await expect(page.getByTestId("setup-feedback")).toHaveAttribute("data-tone", "error");
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      'Podcast Recording has "Audio" and "audio", which Windows takes for one name.'
+    );
+    await expect(podcast).toHaveValue("Audio, audio");
+
+    await podcast.fill("Audio, Video, vMix Recording, Exports, Notes");
+    await save.click();
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      "Podcast Recording's subfolders: Audio, Video, vMix Recording, Exports, Notes. Begin makes them in a new session's folder."
+    );
+    await expect(podcast).toHaveValue("Audio, Video, vMix Recording, Exports, Notes");
+    await expect(save).toHaveAttribute("aria-disabled", "true");
+
+    await page.getByTestId("setup-sessions-subfolders-webinar").fill("");
+    await page.getByTestId("setup-sessions-subfolders-webinar-save").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      "Webinar has no subfolders now: Begin makes its folder alone."
+    );
+    expect(await settingsUpdates(page)).toBe(3);
+    // Each is a row in Recent actions, on the plate.
+    await expect(page.getByTestId("support-recent-actions")).toContainText("Webinar's subfolders");
+  });
+
+  test("the levels are set through the number dialog, and the drives read them at once", async ({ page }) => {
+    await page.getByTestId("setup-sessions-nearly-full-change").click();
+    const dialog = page.getByRole("dialog", { name: "The disk reads Nearly full under" });
+    await dialog.getByLabel("Nearly full under").fill("150");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      "The disk reads Low under 200 GB and Nearly full under 150 GB."
+    );
+    await expect(page.getByTestId("setup-sessions-nearly-full")).toHaveText("150 GB");
+    // D:'s 140 GB is under 150 now: nearly full, in the row and in the header's chip.
+    await expect(page.getByTestId("setup-sessions-drive-D")).toContainText("Nearly full");
+    await expect(page.getByTestId("shell-lamp-disk")).toContainText("full");
+
+    await page.getByTestId("setup-sessions-low-change").click();
+    const low = page.getByRole("dialog", { name: "The disk reads Low under" });
+    await low.getByLabel("Low under").fill("120");
+    await low.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByTestId("setup-feedback")).toHaveAttribute("data-tone", "error");
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      "Low must be above Nearly full: Low under 120 GB, Nearly full under 150 GB."
+    );
+    await expect(page.getByTestId("setup-sessions-low")).toHaveText("200 GB");
+    expect(await settingsUpdates(page)).toBe(2);
+  });
 });

@@ -1,10 +1,17 @@
 import { type SnapshotRecord, type StatusToneLike, asRecord, getCommissioningChecks } from "../shellData";
-import type { AudioSnapshot, CamerasSnapshot, JsonValue, SetupSection, ShellStore } from "@sse/engine-client";
+import type {
+  AudioSnapshot,
+  CamerasSnapshot,
+  JsonValue,
+  SessionSnapshot,
+  SetupSection,
+  ShellStore,
+} from "@sse/engine-client";
 
 export const APP_VERSION = `v${__APP_VERSION__}`;
 
-/** Setup / Support's screens: the runner's steps, Support, the cameras' setup and the Console's setup (2026-10-08). */
-export type SetupMode = "runner" | "support" | "cameras" | "console";
+/** Setup / Support's screens: the runner's steps, Support, the cameras' setup, the Console's setup (2026-10-08) and the sessions' (D52). */
+export type SetupMode = "runner" | "support" | "cameras" | "console" | "sessions";
 
 /** The section the hardware link saves for each mode (`setup.activeSection`). */
 export const SETUP_MODE_SECTIONS: Record<SetupMode, SetupSection> = {
@@ -12,6 +19,7 @@ export const SETUP_MODE_SECTIONS: Record<SetupMode, SetupSection> = {
   support: "support",
   cameras: "cameras",
   console: "console",
+  sessions: "sessions",
 };
 export type RunnerStepId = "import" | "probe" | "map" | "verify" | "publish";
 
@@ -64,6 +72,8 @@ export interface SetupSupportPilotProps {
   lightOutputsArmed: boolean | null;
   liveTransportRequested: boolean;
   onRequestRestart: () => void;
+  /** The sessions' folder, the subfolders, the levels and the drives (D52); `null` until it was read. */
+  sessionSnapshot: SessionSnapshot | null;
   store: ShellStore;
   supportSnapshot: SnapshotRecord | null;
 }
@@ -200,7 +210,9 @@ export function normalizeSetupMode(appSnapshot: SnapshotRecord | null): SetupMod
   const shell = asRecord(appSnapshot?.shell);
   const setup = asRecord(shell?.setup);
   const section = setup?.activeSection;
-  return section === "support" || section === "cameras" || section === "console" ? section : "runner";
+  return section === "support" || section === "cameras" || section === "console" || section === "sessions"
+    ? section
+    : "runner";
 }
 
 export function normalizeRunnerStage(snapshot: SnapshotRecord | null): RunnerStepId | null {

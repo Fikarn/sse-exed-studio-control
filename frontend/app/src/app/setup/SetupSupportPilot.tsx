@@ -9,6 +9,7 @@ import { SetupMapVerifyStep } from "./steps/SetupMapVerifyStep";
 import { SetupPublishStep } from "./steps/SetupPublishStep";
 import { SetupCamerasScreen } from "./support/SetupCamerasScreen";
 import { SetupConsoleScreen } from "./support/SetupConsoleScreen";
+import { SetupSessionsScreen } from "./support/SetupSessionsScreen";
 import { SetupSupportScreen } from "./support/SetupSupportScreen";
 import { SetupWorkstationPlate } from "./support/SetupWorkstationPlate";
 import { SetupFooter } from "./components/SetupFooter";
@@ -75,6 +76,8 @@ function SetupSupportPilotRoot(props: SetupSupportPilotProps) {
             <SetupCamerasScreen editor={editor} camerasSnapshot={props.camerasSnapshot} />
           ) : mode === "console" ? (
             <SetupConsoleScreen editor={editor} audioSnapshot={props.audioSnapshot} />
+          ) : mode === "sessions" ? (
+            <SetupSessionsScreen editor={editor} sessionSnapshot={props.sessionSnapshot} />
           ) : (
             <SetupSupportScreen editor={editor} />
           )}

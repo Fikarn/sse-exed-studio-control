@@ -8,17 +8,20 @@ export const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 const fixtureMap = JSON.parse(
   readFileSync(new URL("../../../../packages/test-fixtures/src/fixtures.json", import.meta.url), "utf8")
 );
-// The Overview's three moments (D47) and the Session page's four (D51) are
-// built in code (test-fixtures' `index.ts`), not in `fixtures.json`, so they
-// are named here to be measured.
+// The Overview's three moments (D47), the Session page's six (D51, D52) and
+// Setup's Sessions screen (D52) are built in code (test-fixtures' `index.ts`),
+// not in `fixtures.json`, so they are named here to be measured.
 export const CODE_BOARDS = [
   "overview-take",
   "overview-landing",
   "overview-fault",
   "session-choose",
   "session-window",
+  "session-window-existing",
+  "session-window-low",
   "session-running",
   "session-running-window",
+  "setup-sessions",
 ];
 export const FIXTURES = [...Object.keys(fixtureMap), ...CODE_BOARDS];
 
@@ -45,6 +48,15 @@ export function isLoading(fixture) {
 // Room's window opens from its Room (D51).
 export const BOARD_STEPS = {
   "session-window": {
+    presses: ["session-room-podcast"],
+    ready: "[data-testid=session-window][role=dialog]",
+  },
+  // The same window on `An existing one` (D52).
+  "session-window-existing": {
+    presses: ["session-room-podcast", "session-folder-existing"],
+    ready: "[data-testid=session-folder][data-mode=existing]",
+  },
+  "session-window-low": {
     presses: ["session-room-podcast"],
     ready: "[data-testid=session-window][role=dialog]",
   },
@@ -155,6 +167,8 @@ export const EXCEPTIONS = {
   // and the footer.
   "session-choose": { regionsPresent: 2 },
   "session-window": { regionsPresent: 2 },
+  "session-window-existing": { regionsPresent: 2 },
+  "session-window-low": { regionsPresent: 2 },
   "session-running": { regionsPresent: 2 },
   "session-running-window": { regionsPresent: 2 },
 };

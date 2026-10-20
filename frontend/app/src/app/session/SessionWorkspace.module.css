@@ -116,8 +116,10 @@
 }
 
 /* ---------------------------------------------------------------------------
-   The window (SessionWindow.tsx): the form at the sheet's right, board 2's
-   step 1. Its keys at the bottom right, the primary at the right.
+   The window (SessionWindow.tsx): the form at the sheet's right, board 3's
+   step 2 (D52), 1680 × 620. Two columns 48 apart, the session at the left and
+   where it goes at the right; the notes and the keys across both; the keys at
+   the bottom right, the primary at the right.
    --------------------------------------------------------------------------- */
 
 .form {
@@ -127,6 +129,40 @@
   height: 100%;
   min-width: 0;
   padding: 52px 56px 48px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 48px;
+  margin-top: 44px;
+}
+
+/* The running session's own window: its name level with the folder's head. */
+.columns[data-running] {
+  margin-top: 28px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A column's head: its name, and the folder's switch at its right. */
+.columnHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+.folderSwitch {
+  flex: none;
+  margin-left: auto;
 }
 
 .kicker {
@@ -153,12 +189,6 @@
 
 .kickerDay {
   font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
-  color: var(--text-text2);
-}
-
-.label {
-  margin-top: 44px;
-  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   color: var(--text-text2);
 }
 
@@ -225,12 +255,19 @@
   text-overflow: ellipsis;
 }
 
-/* What needs the operator before the session begins, if anything. */
+/* What needs the operator before the session begins, if anything: 28 px under
+   the columns, and as little as 8 when the window holds its fullest form (an
+   existing folder, a two-line disk row and both notes), so the keys never move:
+   the keys keep their 10 px over them (`.spacer`). */
+.notesGap {
+  flex: 0 1 28px;
+  min-height: 8px;
+}
+
 .notes {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 28px;
 }
 
 .note {
@@ -258,6 +295,7 @@
 
 .spacer {
   flex: 1;
+  min-height: 10px;
 }
 
 .keys {
@@ -271,8 +309,10 @@
   width: 180px;
 }
 
+/* Wide enough for its longest hint: `ends the green screen recording · makes
+   the folder · opens the Overview`. */
 .begin {
-  width: 360px;
+  width: 480px;
 }
 
 .end {
@@ -290,7 +330,6 @@
 
 /* The running session's own window: its name and when it began. */
 .runningName {
-  margin-top: 28px;
   font: var(--font-weight-bold) var(--font-size-readout) / 1.2 var(--font-family-ui);
   color: var(--text-text);
   white-space: nowrap;
@@ -302,4 +341,262 @@
   margin-top: 12px;
   font: var(--font-weight-regular) var(--font-size-body) / 1.3 var(--font-family-ui);
   color: var(--text-text2);
+}
+
+/* ---------------------------------------------------------------------------
+   The folder's column (SessionFolder.tsx; D52, board 3): where the session's
+   folder goes, and the drive it is on.
+   --------------------------------------------------------------------------- */
+
+/* The folder: where it will stand in the quiet ink, its name following the
+   session's in the ink, and the key that changes where. */
+.well {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 64px;
+  margin-top: 12px;
+  padding: 0 12px 0 18px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-control);
+  background: var(--material-well);
+}
+
+.path {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.parent {
+  overflow: hidden;
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.leaf {
+  overflow: hidden;
+  font: var(--font-weight-bold) var(--font-size-body) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A session from before sessions had folders. */
+.wellQuiet {
+  font: var(--font-weight-regular) var(--font-size-body) / 1.3 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+/* The kind's subfolders, made at Begin; or the key to another folder. */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  margin-top: 12px;
+}
+
+.tag {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-control);
+  background: var(--material-key);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+.when {
+  margin-left: 6px;
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+/* The folders that exist: one list of rows 40 high, a radio mark for the
+   one chosen. */
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  outline: 1px solid var(--material-line);
+  outline-offset: -1px;
+  background: var(--material-key);
+  box-shadow: var(--elevation-edge-light);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.row + .row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 14px;
+  height: 1px;
+  background: var(--material-line);
+}
+
+.row:hover {
+  background: var(--material-hover);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.radio {
+  position: relative;
+  box-sizing: border-box;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--text-text3);
+  border-radius: var(--radius-pill);
+}
+
+.radio[data-on] {
+  border: 2px solid var(--accent);
+}
+
+.radio[data-on]::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.rowName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--font-weight-bold);
+  text-overflow: ellipsis;
+}
+
+.rowSize {
+  flex: none;
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.noFolder {
+  margin: 12px 0 0;
+  font: var(--font-weight-regular) var(--font-size-body) / 1.3 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+/* The drive the folder is on: its name and free space, its level, and how
+   long the space lasts. Low and nearly full say so in the row itself. */
+.disk {
+  margin-top: 16px;
+}
+
+.diskTop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.diskName {
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.diskSpace {
+  margin-left: auto;
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.diskSpace b {
+  font-weight: var(--font-weight-bold);
+  color: var(--text-text);
+}
+
+.diskSpace b[data-tone="attention"] {
+  color: var(--role-yellow-text);
+}
+
+.diskSpace b[data-tone="error"] {
+  color: var(--role-coral-text);
+}
+
+.diskBar {
+  margin-top: 10px;
+}
+
+.diskLine,
+.diskQuiet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0;
+  font: var(--font-weight-regular) var(--font-size-label) / 1.3 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.diskQuiet {
+  margin: 0;
+  gap: 8px;
+}
+
+.diskWord {
+  display: inline-flex;
+  flex: none;
+}
+
+/* vMix's recording, as vMix's API says it: a lamp for its tone, the
+   sentence, and the path to copy when it is not this folder. */
+.vmix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  margin-top: 14px;
+}
+
+.vmixLamp {
+  flex: none;
+}
+
+.vmixSay {
+  flex: 1;
+  min-width: 0;
+  font: var(--font-weight-regular) var(--font-size-label) / 1.3 var(--font-family-ui);
+  color: var(--text-text2);
+  overflow-wrap: anywhere;
+}
+
+.vmixKey {
+  flex: none;
 }

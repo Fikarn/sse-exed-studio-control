@@ -6,10 +6,11 @@ import type { JsonObject, RequestMethod } from "../../generated/protocol";
 import type { EngineTransport } from "../../types";
 import { createFixtureTransport } from "../fixtureTransport";
 
-// The Session page's four fixtures (D51; `@sse/test-fixtures`, `buildSessionFixture`): what
-// the page, its windows and its captures rely on, read from the double as the page reads it.
-// The windows' words (ASSUMED and its Sync, the session Begin would end) are the app's to
-// work out; here are the hardware link's facts they come from.
+// The Session page's fixtures (D51, D52; `@sse/test-fixtures`, `buildSessionFixture`) and
+// Setup's Sessions screen's: what the page, its windows and its captures rely on, read from
+// the double as the page reads it. The windows' words (ASSUMED and its Sync, the session
+// Begin would end, the disk's and vMix's lines) are the app's to work out; here are the
+// hardware link's facts they come from.
 
 /** The captures' moment (`visual-review.spec.ts`'s `FIXTURE_NOW`). */
 const FIXTURE_NOW = Date.parse("2026-04-23T09:11:00+02:00");
@@ -67,14 +68,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const SESSION_FIXTURES = ["session-choose", "session-window", "session-running", "session-running-window"] as const;
+const SESSION_FIXTURES = [
+  "session-choose",
+  "session-window",
+  "session-window-existing",
+  "session-window-low",
+  "session-running",
+  "session-running-window",
+] as const;
 
 const doubles: EngineTransport[] = [];
 afterEach(async () => {
   for (const transport of doubles.splice(0)) await transport.dispose?.();
 });
 
-async function openSession(id: (typeof SESSION_FIXTURES)[number]) {
+async function openSession(id: (typeof SESSION_FIXTURES)[number] | "setup-sessions") {
   const transport = createFixtureTransport(getFixtureScenario(id));
   doubles.push(transport);
   await transport.initialize?.();
@@ -94,7 +102,7 @@ describe("the Session page's fixtures", () => {
     expect((await read("cameras.snapshot")).takesToday).toEqual({ count: 0, recordedSeconds: 0 });
   });
 
-  it.each(["session-choose", "session-window"] as const)(
+  it.each(["session-choose", "session-window", "session-window-existing"] as const)(
     "%s: no session runs, the console is only assumed, and two kinds have a last session",
     async (id) => {
       const { read } = await openSession(id);
@@ -167,6 +175,30 @@ describe("the Session page's fixtures", () => {
     }
   );
 
+  it("session-window-low: D: reads Low, 140 GB free, and is the session's drive", async () => {
+    const { read } = await openSession("session-window-low");
+    const session = await read("session.snapshot");
+    expect(session.current).toBeNull();
+    expect(session.drives).toEqual(
+      STUDIO_DRIVES.map((drive) => (drive.letter === "D" ? { ...drive, freeBytes: 140 * GIB, level: "low" } : drive))
+    );
+    expect(session.sessionDrive).toBe("D");
+  });
+
+  it("setup-sessions: Setup / Support opens on its Sessions screen, the sessions' folder made, D: Low", async () => {
+    const { read } = await openSession("setup-sessions");
+    const shell = (await read("app.snapshot")).shell as JsonObject;
+    expect(shell.workspace).toBe("setup");
+    expect((shell.setup as JsonObject).activeSection).toBe("sessions");
+    const session = await read("session.snapshot");
+    expect(session.places).toEqual({ root: "D:\\Sessions", simulated: false, rootExists: true });
+    expect((session.drives as JsonObject[]).find((drive) => drive.letter === "D")).toMatchObject({
+      freeBytes: 140 * GIB,
+      level: "low",
+    });
+    expect((session.last as JsonObject[]).map((last) => last.kind)).toEqual(["podcast", "green-screen", "webinar"]);
+  });
+
   it.each(["session-running", "session-running-window"] as const)(
     "%s: the podcast recording runs since 06:46 UTC, each kind has a last session, and the desk is the take's",
     async (id) => {
@@ -197,16 +229,28 @@ describe("the Session page's fixtures", () => {
       ]);
       expect(session.drives).toEqual(STUDIO_DRIVES);
       expect(session.sessionDrive).toBe("D");
-      // vMix records nothing, and its last file is not in the running session's folder,
-      // whose vMix Recording is where it should record.
-      expect(session.vmix).toEqual({
-        state: "answering",
-        recording: false,
-        file: VMIX_LAST_FILE,
-        inFolder: false,
-        bytesPerSecond: null,
-        recordingFolder: `${running}\\vMix Recording`,
-      });
+      // On the page vMix records nothing, and its last file is not in the running session's
+      // folder, whose vMix Recording is where it should record; in the running session's own
+      // window it records, at 13 MB/s, into the old sessions' folder.
+      expect(session.vmix).toEqual(
+        id === "session-running"
+          ? {
+              state: "answering",
+              recording: false,
+              file: VMIX_LAST_FILE,
+              inFolder: false,
+              bytesPerSecond: null,
+              recordingFolder: `${running}\\vMix Recording`,
+            }
+          : {
+              state: "answering",
+              recording: true,
+              file: "D:\\All\\Leading Through Change — episode 1 (2026-04-15)\\vMix Recording\\capture - 23 April 2026 - 08-47-02 am.avi",
+              inFolder: false,
+              bytesPerSecond: 13 * 1024 ** 2,
+              recordingFolder: `${running}\\vMix Recording`,
+            }
+      );
       expect(await read("audio.snapshot")).toMatchObject({
         verified: true,
         meteringState: "live",

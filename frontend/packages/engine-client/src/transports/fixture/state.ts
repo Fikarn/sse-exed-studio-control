@@ -829,7 +829,9 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
  * bridge's state from `control_surface.rs`; the deck's check never says
  * whether the deck was verified). The words are worked out from the probes and
  * the bridge address on every sync, never kept from an earlier one; so is the
- * Prompter XL's check, and its part of the whole status.
+ * Prompter XL's check, and its part of the whole status. The hardware link's
+ * own entries (`checks.engine`: the light output, the backups) are the
+ * scenario's, kept through every sync: the double runs neither.
  */
 function applyHealthChecks(
   state: MutableFixtureState,
@@ -841,7 +843,9 @@ function applyHealthChecks(
 ) {
   const lightingStatus = rigStatusWord(state, lightingProbe);
   const audioStatus = consoleStatusWord(audioProbe);
+  const engine = asRecord(asRecord(state.healthSnapshot.checks)?.engine);
   state.healthSnapshot.checks = {
+    ...(engine ? { engine } : {}),
     lighting: {
       ok: lightingStatus === "ready",
       status: lightingStatus,

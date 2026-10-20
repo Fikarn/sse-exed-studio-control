@@ -65,6 +65,7 @@ function PilotOnStore({
         lightOutputsArmed={state.lightingSnapshot ? state.lightingSnapshot.outputArmed !== false : null}
         liveTransportRequested={false}
         onRequestRestart={() => {}}
+        sessionSnapshot={state.sessionSnapshot}
         store={store}
         supportSnapshot={state.supportSnapshot}
       />

@@ -699,14 +699,17 @@ describe("createShellStore scoped refresh", () => {
     expect(await after(() => store.pairCamera(1))).toEqual(cameras);
     expect(await after(() => store.forgetCamera(1))).toEqual(cameras);
     expect(await after(() => store.refreshCamerasSnapshot())).toEqual(cameras);
-    // The session (2026-10-15): a begin, an end and an update of its settings (D52) read its
-    // snapshot again, and nothing else.
+    // The session (2026-10-15): a begin and an end read its snapshot again, and nothing else;
+    // an update of its settings (D52), on Setup's Sessions screen, the list of their rows too.
     expect(await after(() => store.beginSession("podcast", "Morning take"))).toEqual(["session.snapshot"]);
     expect(
       await after(() => store.beginSession("podcast", "Morning take", { mode: "existing", path: "D:\\All\\Series" }))
     ).toEqual(["session.snapshot"]);
     expect(await after(() => store.endSession())).toEqual(["session.snapshot"]);
-    expect(await after(() => store.updateSessionSettings({ lowBelowGb: 300 }))).toEqual(["session.snapshot"]);
+    expect(await after(() => store.updateSessionSettings({ lowBelowGb: 300 }))).toEqual([
+      "session.snapshot",
+      "support.snapshot",
+    ]);
     // Setup / Support opened on a section is one request, and reads what Setup shows.
     answer("app.snapshot", {
       shell: { workspace: "setup", setup: { activeSection: "cameras" } },

@@ -9,12 +9,16 @@ import type {
   LightingSceneFixtureSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
+  SessionDiskLevel,
   ShellState,
 } from "@sse/engine-client";
 // Runtime import through the asset-free subpath: the specs that import app
 // source through Playwright cannot load the package index (it carries the
 // crest PNG), so the shared tone map is reached without it.
 import { toneForSubsystem } from "@sse/design-system/statusTone";
+
+// The session's disk words imports types alone, so the specs load it too.
+import { bytesWord } from "./session/sessionDisk";
 
 export type StatusToneLike = "attention" | "error" | "info" | "ok";
 
@@ -720,12 +724,19 @@ function engineEntry(healthSnapshot: SnapshotRecord | null, id: string) {
 /** A backup older than this is overdue (`BACKUP_WARNING_AGE_SECS`, `health.rs`). */
 const BACKUP_OVERDUE_SECS = 48 * 60 * 60;
 
+/** The session's drive as the header's `Disk` chip reads it (D52): its level and its free space. */
+export interface HeaderDisk {
+  level: SessionDiskLevel | null;
+  freeBytes: number | null;
+}
+
 export function buildMonitorItems(
   healthSnapshot: SnapshotRecord | null,
   latched?: LatchedShellState,
   workspaceTones?: WorkspaceStateTones,
   nowMs: number = Date.now(),
-  unread?: "pending" | "not read"
+  unread?: "pending" | "not read",
+  disk?: HeaderDisk | null
 ) {
   const checks =
     healthSnapshot && typeof healthSnapshot.checks === "object" && healthSnapshot.checks
@@ -848,6 +859,21 @@ export function buildMonitorItems(
       label: "Backup",
       detail: overdue ? "overdue" : "failed",
       status: "attention",
+    });
+  }
+
+  // The Session page's step 2 (D52): the session's drive, only while it reads
+  // low or nearly full, with its free space. Beside the Backup chip and, as it
+  // is, not one of the Overview's ranked lamps: the window's disk row and the
+  // footer's `Disk` say the same in their places. A press opens Setup /
+  // Support's Sessions screen.
+  if ((disk?.level === "low" || disk?.level === "nearly-full") && disk.freeBytes !== null) {
+    items.push({
+      id: "disk",
+      label: "Disk",
+      detail: disk.level === "low" ? "low" : "full",
+      value: bytesWord(disk.freeBytes),
+      status: disk.level === "low" ? "attention" : "error",
     });
   }
 
