@@ -520,7 +520,9 @@ test("no tab moves when the page changes", async ({ page }) => {
 test.describe("the header, the skylight", () => {
   const recChip = (page: Page) => page.getByTestId("shell-lamp-latched-rec");
 
-  test("its fullest row fits: every tab's word, Solo, the prompter playing and REC together", async ({ page }) => {
+  test("its fullest row fits: every tab's word, the Backup and Disk chips, Solo, the prompter playing and REC together", async ({
+    page,
+  }) => {
     await openFixture(page, "every-page");
     await expectWorkspaceMounted(page, "cameras");
     await page.getByTestId("cameras-rec").click();
@@ -586,7 +588,13 @@ test.describe("the header, the skylight", () => {
     ]);
     // Last on the system's platter, so it stays put while the latches change with the page.
     expect(row.systemLast, "Setup / Support ends the system's platter").toBe("setup");
-    expect(row.chips).toEqual(["shell-lamp-surface", "shell-lamp-latched-solo"]);
+    // `every-page`'s backup is overdue and its session's drive reads Low (D52).
+    expect(row.chips).toEqual([
+      "shell-lamp-surface",
+      "shell-lamp-backups",
+      "shell-lamp-disk",
+      "shell-lamp-latched-solo",
+    ]);
     expect(row.headerClipped, "nothing in the header is cut").toBe(false);
     expect(row.pagesClipped, "no tab is cut").toBe(false);
     expect(row.systemClipped, "no chip is cut").toBe(false);
@@ -617,6 +625,40 @@ test.describe("the header, the skylight", () => {
     await expect(recChip(page)).toBeVisible();
     await expect(recChip(page)).toHaveAttribute("data-tone", "error");
     expect(await at(), "nothing in the header moves when REC lights").toEqual(before);
+  });
+
+  // D52: the session's drive is a chip only while it reads low or nearly full,
+  // on every page, and a press opens Setup / Support's Sessions screen.
+  test("the Disk chip shows only while the session's drive reads low, and opens the Sessions screen", async ({
+    page,
+  }) => {
+    const chip = page.getByTestId("shell-lamp-disk");
+    const setDrive = (freeBytes: number) =>
+      page.evaluate((free) => window.__SSE_TEST_SESSION__!.setDrive("D", free), freeBytes);
+    await openFixture(page, "lighting-populated");
+    await expectWorkspaceMounted(page, "lighting");
+    await expect(chip).toHaveCount(0);
+
+    await setDrive(140 * 1024 ** 3);
+    await expect(chip).toContainText("Disk");
+    await expect(chip).toContainText("low");
+    await expect(chip).toContainText("140 GB");
+    await chip.click();
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("setup-screen-sessions")).toBeVisible();
+    await expect(page.getByTestId("setup-mode-sessions")).toHaveAttribute("aria-pressed", "true");
+
+    // On Setup it turns the screen back to Sessions.
+    await page.getByTestId("setup-mode-runner").click();
+    await expect(page.getByTestId("setup-screen-sessions")).toHaveCount(0);
+    await setDrive(28 * 1024 ** 3);
+    await expect(chip).toContainText("full");
+    await expect(chip).toContainText("28 GB");
+    await chip.click();
+    await expect(page.getByTestId("setup-screen-sessions")).toBeVisible();
+
+    await setDrive(2_200_414_797_824);
+    await expect(chip).toHaveCount(0);
   });
 
   test("the footer ends with the product's name, and the header names it nowhere", async ({ page }) => {

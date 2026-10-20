@@ -137,6 +137,10 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   // actions move its `recent`. Their rows reach Setup / Support's list when Setup is opened,
   // as every other row does.
   ["cameras.", ["cameras"]],
+  // The sessions' settings (D52) are set on Setup / Support's Sessions screen,
+  // beside the list of its rows, so the list moves with them, as the armed
+  // switch's does.
+  ["session.settings.update", ["session", "support"]],
   // The session: a begin and an end change its snapshot. Their rows reach
   // Setup / Support's list when Setup is opened, as every other row does.
   ["session.", ["session"]],

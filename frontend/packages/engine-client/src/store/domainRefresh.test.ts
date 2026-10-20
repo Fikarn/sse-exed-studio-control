@@ -143,9 +143,11 @@ describe("domainRefresh", () => {
   });
 
   it("reads the session again after a begin, an end, an update of its settings and its event, and with the Overview's facts when its page opens", () => {
-    for (const method of ["session.begin", "session.end", "session.snapshot", "session.settings.update"]) {
+    for (const method of ["session.begin", "session.end", "session.snapshot"]) {
       expect(domainsForMethod(method), method).toEqual(["session"]);
     }
+    // The settings are set on Setup's Sessions screen, beside the list of their rows (D52).
+    expect(domainsForMethod("session.settings.update")).toEqual(["session", "support"]);
     expect(domainsForEvent("session.changed")).toEqual({ domains: ["session"], known: true });
     // The Session page (2026-10-15): its window says the worst page's note and its footer is
     // the Overview's, so it reads what the Overview reads, and the session.

@@ -225,23 +225,37 @@ function buildAudioNoSendFixture(): FixtureScenarioRecord {
 
 // Every page with something on it, for the header's fullest row: a rig whose
 // scene can drift, the Console's bank with a solo, a script on the prompter and
-// the three cameras held. Built here, not in `fixtures.json`, so it adds no
-// UI-contract board.
+// the three cameras held; and the two chips that only something wrong lights,
+// a backup overdue and the session's drive reading Low (D52). Built here, not
+// in `fixtures.json`, so it adds no UI-contract board.
 function buildEveryPageFixture(): FixtureScenarioRecord {
   const lighting = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
     appSnapshot: Record<string, unknown>;
+    healthSnapshot: Record<string, unknown>;
   };
   const prompter = (fixtureMap["teleprompter-ready"] as { prompter: CompactPrompterRecord }).prompter;
   lighting.appSnapshot.shell = {
     ...((lighting.appSnapshot.shell as Record<string, unknown> | undefined) ?? {}),
     workspace: "cameras",
   };
+  // The last automatic backup two days and an hour before the captures' moment: overdue.
+  const backupAt = Date.parse("2026-04-21T08:11:00+02:00") / 1000;
+  lighting.healthSnapshot = {
+    ...lighting.healthSnapshot,
+    checks: {
+      ...((lighting.healthSnapshot.checks as Record<string, unknown> | undefined) ?? {}),
+      engine: { backups: { state: "warning", at: backupAt } },
+    },
+  };
+  // The hardware link's own health entries and the session's seed are the double's own
+  // shapes, which no record of `fixtures.json` has.
   return {
     ...lighting,
     audioSnapshot: cloneFixture(fixtureMap["audio-populated"].audioSnapshot),
     prompter: expandPrompterRecord("every-page", prompter),
     cameras: expandCamerasRecord("every-page", (fixtureMap["cameras-held"] as { cameras: RawCamerasRecord }).cameras),
-  } as FixtureScenarioRecord;
+    session: { drives: sessionDrives(140 * GIB) },
+  } as unknown as FixtureScenarioRecord;
 }
 
 // The Overview's three moments (D47), board 3's `?state=` (`docs/design/boards/overview-3.html`).
@@ -350,11 +364,14 @@ function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
 // its last file, which went to a folder of the week before.
 //
 // - choose, window: no session runs; `window` is the podcast Room's window, which the layout
-//   gate's step opens (`BOARD_STEPS`).
+//   gate's step opens (`BOARD_STEPS`), on a new folder; `window-existing` the same window on
+//   `An existing one` (D52); `window-low` the same window while D: reads Low, its disk row and
+//   the footer's Disk yellow, the header's Disk chip lit.
 // - running, running-window: the podcast recording runs since 08:46, 25 minutes before the
 //   captures' 09:11 in Stockholm, and each kind has a last session; `running-window` is the
-//   running session's own window.
-type SessionMoment = "choose" | "window" | "running" | "running-window";
+//   running session's own window, while vMix records, into the old sessions' folder and not
+//   the session's, so the window offers the path to copy.
+type SessionMoment = "choose" | "window" | "window-existing" | "window-low" | "running" | "running-window";
 
 const GIB = 1024 ** 3;
 
@@ -407,21 +424,52 @@ const KIND_SUBFOLDERS: Record<string, string[]> = {
 const VMIX_LAST_FILE =
   "D:\\All\\Leading Through Change — episode 1 (2026-04-15)\\vMix Recording\\capture - 15 April 2026 - 02-05-11 pm.avi";
 
+/** vMix recording since a minute after the session began, into the old sessions' folder, at 13 MB/s. */
+const VMIX_RECORDING_ELSEWHERE = {
+  state: "answering",
+  recording: true,
+  file: "D:\\All\\Leading Through Change — episode 1 (2026-04-15)\\vMix Recording\\capture - 23 April 2026 - 08-47-02 am.avi",
+  bytesPerSecond: 13 * 1024 ** 2,
+};
+
+/** The old sessions' folder, `D:\All`, as Windows' folder dialog finds it: the session vMix last recorded into, and a series' folder. */
+const OLD_FOLDERS = [
+  "D:\\All\\Leading Through Change — episode 1 (2026-04-15)\\vMix Recording",
+  "D:\\All\\Leadership series",
+];
+
+/** The studio PC's drives, with D: as the session is begun on it: plenty, or reading Low (140 GB free). */
+function sessionDrives(storage1FreeBytes: number) {
+  return [
+    { letter: "C", name: "Local Disk", freeBytes: 1_628 * GIB, totalBytes: 3_901 * GIB },
+    { letter: "D", name: "Storage 1", freeBytes: storage1FreeBytes, totalBytes: 4_096_787_476_480 },
+    { letter: "E", name: "A015", freeBytes: 308 * GIB, totalBytes: 931 * GIB },
+    { letter: "Z", name: "Public", mapped: true, freeBytes: 3_789 * GIB, totalBytes: 17_818 * GIB },
+  ];
+}
+
 /**
  * The session's seed: the sessions given, on the studio's sessions' folder, each folder and
  * its kind's subfolders on the double's disk, the folders the sessions' folder's newest by
- * the time each Begin made it, and vMix's word.
+ * the time each Begin made it, and vMix's word; D: plenty, unless the board's disk reads Low.
  */
-function sessionSeed(current: typeof SESSION_RUNNING | null, last: typeof SESSION_LAST) {
+function sessionSeed(
+  current: typeof SESSION_RUNNING | null,
+  last: typeof SESSION_LAST,
+  { vmix = { state: "answering", recording: false, file: VMIX_LAST_FILE }, storage1FreeBytes = 2_200_414_797_824 } = {}
+) {
   const sessions = current === null ? last : [current, ...last];
   return {
     ...(current === null ? {} : { current }),
     last,
     places: { root: "D:\\Sessions", simulated: false },
-    folders: sessions.flatMap((session) => [
-      session.folder,
-      ...(KIND_SUBFOLDERS[session.kind] ?? []).map((subfolder) => `${session.folder}\\${subfolder}`),
-    ]),
+    folders: [
+      ...sessions.flatMap((session) => [
+        session.folder,
+        ...(KIND_SUBFOLDERS[session.kind] ?? []).map((subfolder) => `${session.folder}\\${subfolder}`),
+      ]),
+      ...OLD_FOLDERS,
+    ],
     recent: [...sessions]
       .sort((one, other) => other.begunAt.localeCompare(one.begunAt))
       .map((session) => ({
@@ -430,7 +478,8 @@ function sessionSeed(current: typeof SESSION_RUNNING | null, last: typeof SESSIO
         createdAt: session.begunAt,
         bytes: session.folderBytes,
       })),
-    vmix: { state: "answering", recording: false, file: VMIX_LAST_FILE },
+    drives: sessionDrives(storage1FreeBytes),
+    vmix,
   };
 }
 
@@ -446,13 +495,37 @@ function buildSessionFixture(moment: SessionMoment): FixtureScenarioRecord {
     },
     ...(running ? { audioSnapshot: take.audioSnapshot, audioMeteringActive: true } : {}),
     session: running
-      ? sessionSeed(SESSION_RUNNING, SESSION_LAST)
+      ? sessionSeed(
+          SESSION_RUNNING,
+          SESSION_LAST,
+          moment === "running-window" ? { vmix: VMIX_RECORDING_ELSEWHERE } : {}
+        )
       : sessionSeed(
           null,
-          SESSION_LAST.filter((session) => session.kind !== "webinar")
+          SESSION_LAST.filter((session) => session.kind !== "webinar"),
+          moment === "window-low" ? { storage1FreeBytes: 140 * GIB } : {}
         ),
   };
   return scenario as FixtureScenarioRecord;
+}
+
+// Setup / Support on its Sessions screen (D52), on the Console screen's published setup, with
+// the sessions' folder made by the last sessions and D: reading Low, so the header shows its
+// Disk chip.
+function buildSetupSessionsFixture(): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["setup-console"]) as FixtureScenarioRecord & {
+    appSnapshot: Record<string, unknown>;
+  };
+  const shell = scenario.appSnapshot.shell as Record<string, unknown>;
+  scenario.appSnapshot.shell = {
+    ...shell,
+    setup: { ...(shell.setup as Record<string, unknown>), activeSection: "sessions" },
+  };
+  // The session's seed is the double's own shape, which no record of `fixtures.json` has.
+  return {
+    ...scenario,
+    session: sessionSeed(null, SESSION_LAST, { storage1FreeBytes: 140 * GIB }),
+  } as unknown as FixtureScenarioRecord;
 }
 
 // 2026-09-29: the rig as `lighting-populated`, with the bridge watch saying
@@ -524,6 +597,9 @@ const derivedFixtureMap: FixtureMap = {
   "session-running": buildSessionFixture("running"),
   "session-running-window": buildSessionFixture("running-window"),
   "session-window": buildSessionFixture("window"),
+  "session-window-existing": buildSessionFixture("window-existing"),
+  "session-window-low": buildSessionFixture("window-low"),
+  "setup-sessions": buildSetupSessionsFixture(),
 };
 
 export const fixtureScenarios = derivedFixtureMap;
