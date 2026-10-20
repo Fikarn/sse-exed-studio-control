@@ -280,11 +280,16 @@ const STATE_FIXTURES = [
   "overview-landing",
   "overview-fault",
   // The Session page (D51): the three Rooms, the podcast Room's window, a
-  // session running and its own window.
+  // session running and its own window. Its step 2 (D52): the window on a
+  // folder that exists, the window while D: reads Low, and Setup / Support's
+  // Sessions screen.
   "session-choose",
   "session-window",
+  "session-window-existing",
+  "session-window-low",
   "session-running",
   "session-running-window",
+  "setup-sessions",
 ] as const;
 
 // The fixtures no capture draws: their state display says the whole of its
@@ -340,6 +345,8 @@ const CHROME = [
   { name: "header-cameras-lost-mid-take", fixture: "cameras-lost-mid-take", region: HEADER },
   { name: "header-desk-offline", fixture: "audio-offline", region: HEADER },
   { name: "header-start-failed", fixture: "bootstrap-failed", region: HEADER },
+  // D52: the Disk chip, while the session's drive reads Low.
+  { name: "header-disk", fixture: "setup-sessions", region: HEADER },
   { name: "footer-session", fixture: "session-choose", region: FOOTER },
   { name: "footer-overview", fixture: "overview-take", region: FOOTER },
   { name: "footer-setup", fixture: "setup-ready", region: FOOTER },
