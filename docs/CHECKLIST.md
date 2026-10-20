@@ -26,8 +26,21 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] The running Room's window shows the name and when it began; `End session` ends it, the Room's light goes off and the platter goes.
 - [ ] With a session running, another Room's window names it and its key reads `Begin instead`; a press ends the running one and begins the new one.
 - [ ] A restart of the app keeps the running session: it opens on Session with the Room lit and the platter.
-- [ ] Setup / Support's Recent actions show each begin and end (`Session begun: Podcast Recording · …`, `Session ended: …`).
+- [ ] Setup / Support's Recent actions show each begin and end (`Session begun: Podcast Recording · …, in a new folder D:\Sessions\…`, `Session ended: …`).
 - [ ] While the Session page is open the deck stays on the page it was on.
+
+## The Session page: the folder and the disk
+
+- [ ] The window is wider, the session at its left and `Folder` at its right; the folder's name follows the name as it is typed, with today's date, and a `:` or `?` typed becomes a dash.
+- [ ] The first `Begin session` makes `D:\Sessions`, and in it the session's folder with the kind's subfolders (podcast: `Audio`, `Video`, `vMix Recording`, `Exports`); look in Explorer. Nothing else on `D:` changed.
+- [ ] A second session of the same name the same day reads `exists · used as it is`, and its Begin makes nothing new.
+- [ ] `An existing one` offers the kind's last folder and the newest other with their sizes; `Choose another folder…` opens Windows' folder dialog over the studio window (the window waits), and a folder in `D:\All` chosen there is the one the session uses.
+- [ ] `Change…` puts a new folder in a folder of `D:\All`; Cancel in the dialog changes nothing.
+- [ ] The disk row says `Storage 1 (D:)`, its free space as Explorer's `This PC` says it, and how long that lasts at the last session's rate.
+- [ ] The running session's window: `Open the folder` opens Explorer at the folder (note where Windows puts its window); vMix's line says where vMix's last recording went; `Copy the path`, pasted in vMix's Settings › Recording, and a few seconds recorded: the line reads `vMix records into this folder's vMix Recording.`, and the disk says vMix's rate.
+- [ ] The footer of the Session page and the Overview says `Disk … free on Storage 1`.
+- [ ] Setup / Support › `Sessions` shows `D:\Sessions`, the three kinds' subfolders, `Low under 200 GB`, `Nearly full under 50 GB` and the drives, `C:`, `D:` (`sessions' folder`), `E:` when the Pocket's SSD is plugged in and `Z:`; `Open` opens `D:\Sessions`; the fifth mode key is whole.
+- [ ] The header's `Disk` chip shows only while the session's drive has under 200 GB free (not walked unless so).
 
 ## The Overview
 

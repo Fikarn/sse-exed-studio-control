@@ -1,0 +1,2332 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Session · board 3</title>
+    <style>
+      /* =====================================================================================
+   THE SESSION PAGE · board 3 · 2026-10-17: the session's folder and the disk
+   Board 2 (2026-10-15) with what the owner asked next: in a Room's window, create or select a
+   session folder on the PC, where the session's files go (vMix's recording, scripts,
+   PowerPoints), and see the space left on the disk. Step 2's window is the default here;
+   Step 1 is the window as built (#353). Every session and folder name is made up but the
+   root, D:\Sessions: the owner's answer of 2026-10-18 (the studio's sessions go to D:\All today).
+     ?sheet=step2 (default) · step1   ?folder=new · existing   ?disk=plenty · low · full
+     ?vmix=here · elsewhere (the running session's window)
+
+   Board 2's own notes follow.
+   The owner, on board 1: clearer and more concise; present the three choices, and let a
+   window appear with the options of the one chosen; this is the operator's first
+   interaction with the program, so it sets the tone.
+
+   One question and three Rooms. A Room is the SSE brand's own device (Brand Guidelines
+   p.41): a one-point-perspective space, horizontal lines parallel to the format, a few
+   planes in one hue, a skylight. Each holds the studio as that session uses it, drawn in
+   the program's own line (the brand's objects are commissioned artwork and are not
+   imitated). Pressing a Room opens its window: the Room slides into the window's left
+   side and the options unfold beside it; the page dims; the header stays live.
+
+   The corner panel:
+     ?moment=choose (default) · window · session · sessionwindow    ?kind=green · podcast · webinar
+     ?sheet=step1 (default: what step 1 builds) · later (examples of later steps, nothing decided)
+     ?notes=1 numbered notes   ?ui=0 hides the corner   ?still=1 no motion   ?fit=0 keeps 1:1
+   Everything works: the Rooms, the name field, Use this name, Sync from TotalMix, Begin,
+   Cancel, Esc, a press on the dimmed page, Continue, End session.
+   ===================================================================================== */
+      @font-face {
+        font-family: "SSE Adelia";
+        font-weight: 700;
+        src: local("SSE Adelia Bold"), local("SSEAdelia-Bold");
+      }
+      @font-face {
+        font-family: "PT Sans";
+        font-weight: 400;
+        src: local("PT Sans"), local("PTSans-Regular");
+      }
+      @font-face {
+        font-family: "PT Sans";
+        font-weight: 700;
+        src: local("PT Sans Bold"), local("PTSans-Bold");
+      }
+      @font-face {
+        font-family: "PT Serif";
+        font-weight: 400;
+        font-style: italic;
+        src: local("PT Serif Italic"), local("PTSerif-Italic");
+      }
+
+      :root {
+        --sse-green: #99ba92;
+        --sse-dark-green: #004932;
+        --sse-beige: #edebd1;
+        --sse-beige-light: #f6f5e8;
+        --sse-yellow: #f2de6f;
+        --sse-coral: #ff7d55;
+        --material-bg: #0b1311;
+        --material-well: #040706;
+        --raise: #161f1c;
+        --text: #f6f5e8;
+        --text2: #c5c7b9;
+        --text3: #8d9389;
+        --text4: #59625c;
+        --ease-mech: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --bar-top: #18221f;
+        --bar-bottom: #141e1b;
+        --bar-line: #33433d;
+        --edge-light: rgba(246, 245, 232, 0.07);
+        --key: #222d29;
+        --line: #2a3632;
+        --line2: #3d4b45;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        background: var(--material-bg);
+        color: var(--text);
+        font:
+          400 16px/1.25 "PT Sans",
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
+      }
+      p {
+        margin: 0;
+      }
+      .abs {
+        position: absolute;
+      }
+      .sp {
+        flex: 1;
+      }
+
+      /* ---------- lamps and words ---------- */
+      .lamp {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        flex: none;
+      }
+      .lamp.hollow {
+        background: none;
+        border: 1px solid currentColor;
+      }
+      .lw {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      }
+      .lw .cap {
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .lw.ok {
+        color: var(--sse-green);
+      }
+      .lw.att {
+        color: var(--sse-yellow);
+      }
+
+      /* ---------- keys: a raised face with a one-pixel light edge, radius 8 ---------- */
+      .key {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 16px;
+        border-radius: 8px;
+        background: var(--key);
+        border: 0;
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--line2);
+        color: var(--text);
+        font: 700 16px/1 "PT Sans";
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+        flex: none;
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          background 100ms var(--ease-mech);
+      }
+      .key:hover:not(.primary) {
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--text4);
+      }
+      .key:focus-visible,
+      .room:focus-visible,
+      .wfield:focus-within {
+        outline: 2px solid var(--sse-beige);
+        outline-offset: 3px;
+      }
+      .key.small {
+        min-height: 28px;
+        padding: 0 10px;
+        font-size: 14px;
+      }
+      .key.tall {
+        min-height: 64px;
+      }
+      .key.stack {
+        flex-direction: column;
+        gap: 6px;
+      }
+      .key .cap {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .key.primary {
+        background: var(--sse-beige-light);
+        color: #000;
+        box-shadow: none;
+      }
+      .key.primary .hint {
+        color: #000;
+      }
+      .key.primary:hover {
+        background: #fffef6;
+      }
+
+      /* ---------- section heads and the grouped list (the window's later sections) ---------- */
+      .shead {
+        display: flex;
+        align-items: last baseline;
+        gap: 12px;
+        height: 28px;
+        padding-bottom: 4px;
+        border-bottom: 2px solid var(--line2);
+      }
+      .shead .t {
+        font: 700 18px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .shead .d {
+        font: 400 14px/1.2 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .ilist {
+        border-radius: 12px;
+        background: var(--key);
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--line);
+        overflow: hidden;
+      }
+      .ilist .row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 42px;
+        padding: 0 14px;
+        white-space: nowrap;
+      }
+      .ilist .row + .row::before {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 0;
+        top: 0;
+        height: 1px;
+        background: var(--line);
+      }
+      .ilist .lab {
+        color: var(--text2);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ================================ THE HEADER AND THE FOOTER (the skylight, D48) ================================ */
+      .hdr {
+        left: 0;
+        top: 0;
+        width: 2560px;
+        height: 88px;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        padding: 0 32px;
+        gap: 4px;
+        white-space: nowrap;
+        background: linear-gradient(var(--bar-top), var(--bar-bottom));
+        box-shadow:
+          inset 0 -1px 0 var(--bar-line),
+          0 1px 0 rgba(0, 0, 0, 0.6);
+      }
+      .hdr .logo {
+        height: 40px;
+        display: block;
+        flex: none;
+      }
+      .hdr .rule {
+        width: 1px;
+        height: 40px;
+        margin: 0 20px;
+        flex: none;
+        background: rgba(246, 245, 232, 0.12);
+      }
+      .hdr .sp {
+        flex: 1;
+        min-width: 16px;
+      }
+      .tab {
+        position: relative;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        flex: none;
+        border-radius: 8px;
+        color: var(--text2);
+        font: 700 16px/1 "PT Sans";
+        white-space: nowrap;
+      }
+      .tab .st {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 4px;
+      }
+      .tab .w,
+      .chip .w {
+        font: 700 16px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .tab .ok,
+      .chip .ok {
+        color: var(--sse-green);
+      }
+      .tab .att {
+        color: var(--sse-yellow);
+      }
+      .chip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 10px;
+        color: var(--text3);
+        white-space: nowrap;
+        flex: none;
+      }
+      .hstrip {
+        display: inline-flex;
+        align-items: center;
+        height: 48px;
+        padding: 4px;
+        gap: 2px;
+        border-radius: 12px;
+        flex: none;
+        background: #222e29;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.08),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.05),
+          0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      .hstrip > * + *::before {
+        content: "";
+        position: absolute;
+        left: -2px;
+        top: 11px;
+        bottom: 11px;
+        width: 1px;
+        background: rgba(246, 245, 232, 0.09);
+      }
+      .hstrip > .on::before,
+      .hstrip > .on + *::before {
+        display: none;
+      }
+      .hdr .tab.on {
+        background: var(--sse-dark-green);
+        color: var(--sse-beige-light);
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.14),
+          inset 0 0 0 1px rgba(153, 186, 146, 0.22);
+      }
+      .tally {
+        height: 48px;
+        width: 272px;
+        display: flex;
+        flex: none;
+        margin-left: 4px;
+      }
+      .tally > div {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 0 14px;
+        border-radius: 12px;
+        color: var(--text3);
+        background: #222e29;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.08),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.05);
+      }
+      .tally .nm {
+        font: 700 20px/1 "SSE Adelia";
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .clock {
+        font: 700 20px/1 "PT Sans";
+        color: var(--text);
+        margin-left: 24px;
+        flex: none;
+      }
+      .ftr {
+        left: 0;
+        top: 1400px;
+        width: 2560px;
+        height: 40px;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        padding: 0 32px;
+        font: 400 14px/1.35 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+        background: linear-gradient(var(--bar-bottom), var(--bar-top));
+        box-shadow: inset 0 1px 0 var(--bar-line);
+      }
+      .ftr .item {
+        display: inline-flex;
+        gap: 10px;
+      }
+      .ftr .v {
+        color: var(--text2);
+      }
+      .ftr .colophon {
+        margin-left: auto;
+        font: 700 14px/1 "SSE Adelia";
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+
+      /* ================================ THE QUESTION ================================ */
+      .intro {
+        left: 0;
+        width: 2560px;
+        text-align: center;
+        transition: top 200ms var(--ease-mech);
+      }
+      .intro .kick {
+        font: 700 18px/1 "SSE Adelia";
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+      .intro .q {
+        margin-top: 18px;
+        font: 700 40px/1 "SSE Adelia";
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: var(--text);
+      }
+      /* the session that runs: one platter, Continue one press away */
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        height: 56px;
+        margin-top: 28px;
+        padding: 0 10px 0 20px;
+        border-radius: 12px;
+        background: #1b2622;
+        box-shadow:
+          inset 0 1px 0 rgba(246, 245, 232, 0.08),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.06);
+        font: 400 16px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .pill b {
+        color: var(--text);
+      }
+      .pill .lw .cap {
+        font-size: 16px;
+      }
+
+      /* ================================ THE ROOMS ================================ */
+      .rooms {
+        top: 342px;
+        left: 324px;
+        width: 1912px;
+        display: flex;
+        gap: 56px;
+      }
+      .room {
+        position: relative;
+        width: 600px;
+        height: 880px;
+        flex: none;
+        padding: 0;
+        border: 0;
+        border-radius: 12px;
+        overflow: hidden;
+        background: none;
+        cursor: pointer;
+        color: inherit;
+        font: inherit;
+        text-align: center;
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.55),
+          inset 0 1px 0 rgba(246, 245, 232, 0.09);
+      }
+      .room:hover {
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.55),
+          inset 0 0 0 1px rgba(246, 245, 232, 0.16),
+          inset 0 1px 0 rgba(246, 245, 232, 0.14);
+      }
+      .room.away {
+        visibility: hidden;
+      }
+      .art {
+        position: relative;
+        width: 600px;
+        height: 880px;
+        text-align: center;
+        transform-origin: 0 0;
+      }
+      .art svg {
+        position: absolute;
+        inset: 0;
+        display: block;
+      }
+      .art .rname {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 724px;
+        font: 700 28px/1 "SSE Adelia";
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text);
+        white-space: nowrap;
+      }
+      .art .rline {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 768px;
+        font:
+          italic 400 20px/1.2 "PT Serif",
+          serif;
+        color: rgba(246, 245, 232, 0.74);
+        white-space: nowrap;
+      }
+      .art .badge {
+        position: absolute;
+        left: 50%;
+        top: 22px;
+        transform: translateX(-50%);
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+        padding: 0 14px;
+        border-radius: 8px;
+        background: rgba(4, 7, 6, 0.82);
+        box-shadow: inset 0 0 0 1px rgba(246, 245, 232, 0.12);
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .art .badge[hidden] {
+        display: none;
+      }
+      /* the light: the skylight's glow on the back wall and each drawing's own lights; it comes on
+         under the pointer and stays on in the room whose session runs (a colour change, nothing moves) */
+      .art .sky,
+      .art .lt {
+        transition: opacity 160ms ease-out;
+      }
+      .art .sky {
+        opacity: 0.55;
+      }
+      .art .lt {
+        opacity: 0.4;
+      }
+      .room:hover .sky,
+      .room.lit .sky,
+      .win .sky {
+        opacity: 1;
+      }
+      .room:hover .lt,
+      .room.lit .lt,
+      .win .lt {
+        opacity: 1;
+      }
+      .s {
+        fill: none;
+        stroke: var(--draw);
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .s.t {
+        stroke-width: 1.6;
+      }
+      .o {
+        fill: var(--obj);
+      }
+      .o2 {
+        fill: var(--obj2);
+      }
+      .a {
+        fill: var(--accent);
+      }
+      .a2 {
+        fill: var(--accent2);
+      }
+      .shadow {
+        fill: rgba(0, 0, 0, 0.28);
+      }
+      .r-green {
+        --draw: #d9eadb;
+        --obj: #165840;
+        --obj2: #0f4532;
+        --accent: #2f8d59;
+        --accent2: #247349;
+      }
+      .r-umber {
+        --draw: #f2e4cc;
+        --obj: #5a432b;
+        --obj2: #4a3723;
+        --accent: #a9793f;
+        --accent2: #8a6234;
+      }
+      .r-slate {
+        --draw: #dbe7f1;
+        --obj: #2b4864;
+        --obj2: #233c54;
+        --accent: #2f6398;
+        --accent2: #23507e;
+      }
+
+      /* the Rooms come in once, after the start: a rise of 8 px and a fade, one after another */
+      @keyframes enter {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+      }
+      .entering .intro,
+      .entering .room {
+        animation: enter 420ms var(--ease-mech) backwards;
+      }
+      .entering .room:nth-child(2) {
+        animation-delay: 70ms;
+      }
+      .entering .room:nth-child(3) {
+        animation-delay: 140ms;
+      }
+
+      /* ================================ THE WINDOW ================================ */
+      .scrim {
+        left: 0;
+        top: 88px;
+        width: 2560px;
+        height: 1312px;
+        z-index: 20;
+        background: rgba(3, 6, 5, 0.74);
+        display: none;
+      }
+      .scrim.on {
+        display: block;
+      }
+      .win {
+        z-index: 25;
+        display: none;
+      }
+      .win.on {
+        display: block;
+      }
+      .win .frame {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 12px;
+        background: var(--raise);
+        box-shadow:
+          0 0 0 1px #000,
+          inset 0 0 0 1px var(--line2),
+          inset 0 1px 0 rgba(246, 245, 232, 0.09),
+          0 24px 64px rgba(0, 0, 0, 0.6);
+      }
+      .win .wart {
+        position: absolute;
+        left: 0;
+        top: 0;
+        overflow: hidden;
+        border-radius: 12px 0 0 12px;
+        transform-origin: 0 0;
+      }
+      .win .wform {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        padding: 52px 56px 48px;
+        display: flex;
+        flex-direction: column;
+      }
+      .wtop {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        white-space: nowrap;
+      }
+      .wtop .wk {
+        font: 700 18px/1 "SSE Adelia";
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+      .wtop .wd {
+        font: 400 16px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .wlab {
+        margin-top: 44px;
+        font: 700 16px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .wfield {
+        display: flex;
+        align-items: center;
+        height: 64px;
+        margin-top: 12px;
+        padding: 0 18px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line2);
+      }
+      .wfield input {
+        all: unset;
+        flex: 1;
+        min-width: 0;
+        font: 700 28px/1 "PT Sans";
+        color: var(--text);
+      }
+      .wfield input::placeholder {
+        font-weight: 400;
+        color: var(--text3);
+      }
+      /* the last session of this kind, one press from reuse: a series keeps its name */
+      .wlast {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 14px;
+      }
+      .wlast .wl {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .wlast .wl1 {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .wlast .wl2 {
+        font: 700 16px/1.2 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .wname {
+        margin-top: 28px;
+        font: 700 28px/1.2 "PT Sans";
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .wfacts {
+        margin-top: 12px;
+        font: 400 16px/1.3 "PT Sans";
+        color: var(--text2);
+      }
+      .wnote {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 56px;
+        margin-bottom: 20px;
+        padding: 10px 12px 10px 18px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px #1c2622;
+      }
+      .wnote .lw .cap {
+        font-size: 16px;
+      }
+      .wnotes {
+        margin-top: 28px;
+      }
+      .wnotes .wnote {
+        margin-bottom: 0;
+      }
+      .wnotes .wnote + .wnote {
+        margin-top: 10px;
+      }
+      .wnote .say {
+        font:
+          italic 400 16px/1.3 "PT Serif",
+          serif;
+        color: var(--text);
+        flex: 1;
+        min-width: 0;
+      }
+      .wkeys {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .wkeys .cancel {
+        width: 180px;
+      }
+      .wkeys .begin {
+        width: 360px;
+      }
+      .wbegins {
+        margin-bottom: 18px;
+        font: 400 14px/1.4 "PT Sans";
+        color: var(--text3);
+      }
+      .wbegins b {
+        color: var(--text2);
+        font-weight: 400;
+      }
+      .wgrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 40px;
+        margin-top: 4px;
+      }
+      .wgrid .wsec {
+        margin-top: 36px;
+      }
+      .wgrid .wsec:first-child {
+        margin-top: 32px;
+      }
+      .preset .row {
+        height: 60px;
+        cursor: pointer;
+      }
+      .preset .pn {
+        font-weight: 700;
+        color: var(--text);
+      }
+      .preset .pd {
+        font-size: 14px;
+        color: var(--text2);
+      }
+      .preset .ptext {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+      .radio {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px var(--text3);
+        flex: none;
+      }
+      .radio.on {
+        box-shadow: inset 0 0 0 2px var(--sse-beige);
+        background: radial-gradient(circle, var(--sse-beige) 0 4px, transparent 4.5px);
+      }
+      .folder {
+        margin-top: 12px;
+        padding: 14px 16px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .folder .root {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .folder .leaf {
+        margin-top: 8px;
+        font: 700 16px/1.25 "PT Sans";
+        color: var(--text);
+      }
+      .subs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .subs span {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 8px;
+        background: var(--key);
+        box-shadow: inset 0 0 0 1px var(--line2);
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+      }
+
+      /* ================================ STEP 2: THE FOLDER AND THE DISK (board 3) ================================ */
+      .lw.err {
+        color: var(--sse-coral);
+      }
+      .chip .att {
+        color: var(--sse-yellow);
+      }
+      .chip .err {
+        color: var(--sse-coral);
+      }
+      .chip .v {
+        font: 400 16px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .ftr .v.att {
+        color: var(--sse-yellow);
+      }
+      .ftr .v.err {
+        color: var(--sse-coral);
+      }
+      /* two columns: the session at the left, where it goes at the right */
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 48px;
+        margin-top: 44px;
+      }
+      .cols.run {
+        margin-top: 28px;
+      }
+      .col {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .clab {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 28px;
+        font: 700 16px/1 "PT Sans";
+        color: var(--text2);
+        white-space: nowrap;
+      }
+      .clab .seg {
+        margin-left: auto;
+      }
+      .seg {
+        display: inline-flex;
+        gap: 2px;
+        padding: 2px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line);
+      }
+      .seg span {
+        display: inline-flex;
+        align-items: center;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 4px;
+        font: 700 14px/1 "PT Sans";
+        color: var(--text3);
+        cursor: pointer;
+      }
+      .seg span.on {
+        background: var(--key);
+        color: var(--text);
+        box-shadow:
+          inset 0 1px 0 var(--edge-light),
+          inset 0 0 0 1px var(--line2);
+      }
+      .col .wfield {
+        margin-top: 12px;
+      }
+      /* the folder: where it will stand, its name following the session's */
+      .wfold {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: 64px;
+        margin-top: 12px;
+        padding: 0 12px 0 18px;
+        border-radius: 8px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line2);
+      }
+      .wfold .path {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .wfold .root {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+        white-space: nowrap;
+      }
+      .wfold .leaf {
+        font: 700 16px/1.2 "PT Sans";
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .subs2 {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      .subs2 .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 8px;
+        background: var(--key);
+        box-shadow: inset 0 0 0 1px var(--line2);
+        font: 400 14px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .subs2 .when {
+        margin-left: 6px;
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      /* the folders that exist: the root's newest */
+      .dirs {
+        margin-top: 12px;
+      }
+      .dirs .row {
+        height: 40px;
+        cursor: pointer;
+      }
+      .dirs .row .dn {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .dirs .row .dm {
+        font-size: 14px;
+        color: var(--text3);
+      }
+      /* the disk the folder is on */
+      .disk {
+        margin-top: 16px;
+      }
+      .disk .dtop {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        white-space: nowrap;
+      }
+      .disk .dname {
+        font: 700 16px/1 "PT Sans";
+        color: var(--text2);
+      }
+      .disk .dfree {
+        font: 400 14px/1 "PT Sans";
+        color: var(--text3);
+      }
+      .disk .dfree b {
+        font-weight: 700;
+        color: var(--text);
+      }
+      .disk.low .dfree b {
+        color: var(--sse-yellow);
+      }
+      .disk.full .dfree b {
+        color: var(--sse-coral);
+      }
+      .disk .bar {
+        position: relative;
+        height: 6px;
+        margin-top: 10px;
+        border-radius: 999px;
+        background: var(--material-well);
+        box-shadow: inset 0 0 0 1px var(--line);
+        overflow: hidden;
+      }
+      .disk .bar i {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        border-radius: 999px;
+        background: var(--text4);
+      }
+      .disk.low .bar i {
+        background: var(--sse-yellow);
+      }
+      .disk.full .bar i {
+        background: var(--sse-coral);
+      }
+      .disk .dest {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+        font: 400 14px/1.3 "PT Sans";
+        color: var(--text3);
+      }
+      /* vMix's recording, read from vMix: this session's folder or not */
+      .vmix {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 28px;
+        margin-top: 14px;
+      }
+      .vmix .say {
+        flex: 1;
+        min-width: 0;
+        font: 400 14px/1.3 "PT Sans";
+        color: var(--text2);
+      }
+      .wkeys .begin2 {
+        width: 460px;
+      }
+
+      /* ================================ THE BOARD'S CORNER, NOTES, TOAST ================================ */
+      .board {
+        position: absolute;
+        right: 16px;
+        top: 104px;
+        z-index: 50;
+        width: 304px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: rgba(237, 235, 209, 0.97);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        font: 400 14px/1.3 "PT Sans";
+        color: #000;
+      }
+      .board .r1 {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      .board .r1 + .r1 {
+        margin-top: 7px;
+      }
+      .board b {
+        width: 100%;
+        font-weight: 700;
+      }
+      .board button {
+        font: 700 13px/1 "PT Sans";
+        padding: 6px 8px;
+        border: 1px solid #00000040;
+        border-radius: 6px;
+        background: #fff;
+        color: #000;
+        cursor: pointer;
+      }
+      .board button.on {
+        background: #000;
+        color: #edebd1;
+      }
+      .board .hint {
+        margin-top: 8px;
+        color: #333;
+        font-size: 13px;
+      }
+      .pin {
+        position: absolute;
+        z-index: 60;
+        width: 30px;
+        height: 30px;
+        margin: -15px 0 0 -15px;
+        border-radius: 50%;
+        background: var(--sse-beige);
+        color: #000;
+        font: 700 15px/30px "PT Sans";
+        text-align: center;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.65);
+        cursor: help;
+      }
+      .noteb {
+        position: absolute;
+        z-index: 61;
+        max-width: 440px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: var(--sse-beige);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        font: 400 14px/1.35 "PT Sans";
+        color: #000;
+        display: none;
+      }
+      .noteb b {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .toast {
+        position: absolute;
+        left: 1280px;
+        top: 112px;
+        z-index: 70;
+        transform: translateX(-50%);
+        padding: 14px 18px;
+        border-radius: 8px;
+        background: var(--sse-beige);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+        font: 700 16px/1 "PT Sans";
+        color: #000;
+        white-space: nowrap;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="abs hdr" id="hdr"></header>
+
+    <section class="abs intro" id="intro"></section>
+    <div class="abs rooms" id="rooms"></div>
+
+    <div class="abs scrim" id="scrim"></div>
+    <section class="abs win" id="win" role="dialog" aria-modal="true">
+      <div class="frame" id="wframe"></div>
+      <div class="wart" id="wart"></div>
+      <div class="wform" id="wform"></div>
+    </section>
+
+    <footer class="abs ftr" id="footer"></footer>
+
+    <div class="board" id="board">
+      <div class="r1">
+        <b>Moment</b><button data-moment="choose">Choose</button><button data-moment="window">Window</button
+        ><button data-moment="session">In session</button><button data-moment="sessionwindow">Its window</button>
+      </div>
+      <div class="r1">
+        <b>Kind</b><button data-kind="green">Green screen</button><button data-kind="podcast">Podcast</button
+        ><button data-kind="webinar">Webinar</button>
+      </div>
+      <div class="r1">
+        <b>Window</b><button data-sheet="step2">Step 2 · the folder</button
+        ><button data-sheet="step1">Step 1 (built)</button>
+      </div>
+      <div class="r1">
+        <b>Folder</b><button data-cfold="new">New</button><button data-cfold="existing">An existing one</button>
+      </div>
+      <div class="r1">
+        <b>Disk D:</b><button data-disk="plenty">2.05 TB free</button><button data-disk="low">Low</button
+        ><button data-disk="full">Nearly full</button>
+      </div>
+      <div class="r1">
+        <b>vMix</b><button data-vmix="here">Records here</button><button data-vmix="elsewhere">Elsewhere</button>
+      </div>
+      <div class="r1"><button id="bNotes">Notes</button><button id="bReplay">Replay the start</button></div>
+      <div class="hint">Press a Room. Esc, Cancel or a press on the dimmed page closes its window.</div>
+    </div>
+    <div id="notes"></div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      (() => {
+        "use strict";
+        const q = new URLSearchParams(location.search);
+        const $ = (id) => document.getElementById(id);
+        const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
+        const STILL = q.get("still") === "1" || matchMedia("(prefers-reduced-motion: reduce)").matches;
+        let Z = 1;
+        if (q.get("fit") !== "0") {
+          const fit = () => {
+            Z = Math.min(1, innerWidth / 2560);
+            document.documentElement.style.zoom = Z;
+          };
+          fit();
+          addEventListener("resize", fit);
+        }
+        if (q.get("ui") === "0") $("board").style.display = "none";
+
+        /* ------------------------------------------------------------------ the three kinds ------------------------------------------------------------------ */
+        // The owner's three kinds. "Later" shows one way the later steps could fill the window:
+        // examples, nothing decided; every name of a scene, a mix, a preset or a folder is made up.
+        const KINDS = {
+          green: {
+            tone: "r-green",
+            full: "Green Screen Recording",
+            short: "green screen recording",
+            line: "A presenter at the screen, with the prompter.",
+            suggested: "Strategy in Practice — lecture 4",
+            last: ["Strategy in Practice — lecture 3", "Tuesday 13 October"],
+            room: { back: "#0f4533", ceil: "#0c3b2b", lit: "#0d3d2d", shade: "#0a3226", floor: "#0a3025" },
+            presets: [
+              ["Lecture to camera", "CAM 1 · the prompter"],
+              ["Two at the screen", "CAM 1 and CAM 2"],
+              ["Pick-ups", "as the last session"],
+            ],
+            subs: ["Video", "vMix Recording", "Script", "Exports"],
+            checks: [
+              ["The Prompter XL shows the script", "ok", "on screen"],
+              ["CAM 1's card holds an hour", "att", "short", "52 min"],
+              ["The screen is lit evenly", "tick"],
+              ["The microphone on the meter", "tick"],
+            ],
+            begins: ["Lighting recalls <b>Green screen, even</b>", "TotalMix loads <b>Mix 3 · Lavalier</b>"],
+          },
+          podcast: {
+            tone: "r-umber",
+            full: "Podcast Recording",
+            short: "podcast recording",
+            line: "Voices around the table, a camera on each.",
+            suggested: "Leading Through Change — episode 3",
+            last: ["Leading Through Change — episode 2", "Wednesday 14 October"],
+            room: { back: "#45321e", ceil: "#3d2c1a", lit: "#3f2e1b", shade: "#342616", floor: "#322414" },
+            presets: [
+              ["Two voices", "CAM 1 and CAM 2 · SM7B 1 and 2"],
+              ["Three voices", "CAM 1 – 3 · SM7B 1 – 3"],
+              ["With a remote guest", "N-1 on Playback 5/6"],
+            ],
+            subs: ["Audio", "Video", "vMix Recording", "Exports"],
+            checks: [
+              ["The Console verified", "sync"],
+              ["CAM 1 – 3 held", "ok", "held"],
+              ["SM7B 1 – 3 on the meters", "tick"],
+              ["Phones 1 and 2 at the table", "tick"],
+            ],
+            begins: ["Lighting recalls <b>Podcast, warm</b>", "TotalMix loads <b>Mix 2 · Three voices</b>"],
+          },
+          webinar: {
+            tone: "r-slate",
+            full: "Webinar",
+            short: "webinar",
+            line: "Live, to an audience online.",
+            suggested: "Markets Outlook, winter",
+            last: ["Markets Outlook, autumn", "Friday 9 October"],
+            room: { back: "#1f364b", ceil: "#1b3042", lit: "#1c3245", shade: "#172a39", floor: "#162736" },
+            presets: [
+              ["One presenter", "CAM 1"],
+              ["Presenter and slides", "CAM 1 · slides on Playback 9/10"],
+              ["A panel of three", "CAM 1 – 3"],
+            ],
+            subs: ["Slides", "vMix Recording", "Exports"],
+            checks: [
+              ["The Console verified", "sync"],
+              ["The remote audio on N-1 5/6", "tick"],
+              ["The slides on the second screen", "tick"],
+              ["vMix's stream set up", "tick"],
+            ],
+            begins: ["Lighting recalls <b>Webinar</b>", "TotalMix loads <b>Mix 4 · Stream</b>"],
+          },
+        };
+        const ORDER = ["green", "podcast", "webinar"];
+
+        /* ------------------------------------------------------------------ the Rooms (drawn once) ------------------------------------------------------------------ */
+        // A Room in a 600 × 880 frame: the back wall at 90..510 × 100..590, the ceiling, two side walls
+        // and the floor run out to the frame's corners (one-point perspective; every horizontal stays
+        // horizontal). Brand shading: the lit side wall a step under the back wall, the shaded side and
+        // the floor about three quarters of it. A skylight in the ceiling lights the back wall; a fine
+        // grain and a watercolour mottle on the planes, as the brand's Grain and Watercolour textures.
+        const arc = (cx, cy, r, a1, a2) => {
+          const p = (a) => [cx + r * Math.cos((a * Math.PI) / 180), cy + r * Math.sin((a * Math.PI) / 180)];
+          const [x1, y1] = p(a1),
+            [x2, y2] = p(a2);
+          return `M${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+        };
+        const tripod = (x, dir) =>
+          // a camera on its tripod, its lens towards the room's middle (dir 1 faces right, −1 left)
+          `<ellipse class="shadow" cx="${x}" cy="690" rx="34" ry="6"/>` +
+          `<path class="s" d="M${x} 616 L${x} 632 M${x} 632 L${x - 22} 688 M${x} 632 L${x + 22} 688 M${x} 632 L${x} 688"/>` +
+          `<rect class="o s" x="${x - 26}" y="582" width="52" height="34" rx="6"/>` +
+          `<rect class="o2 s" x="${dir > 0 ? x + 26 : x - 42}" y="589" width="16" height="20" rx="4"/>` +
+          `<path class="s t" d="M${x - 14} 582 V574 H${x + 6} V582"/>`;
+        const person = (cx, cy, base) =>
+          `<path class="o s" d="M${cx - 42} ${base} C${cx - 42} ${cy + 58} ${cx - 28} ${cy + 40} ${cx} ${cy + 38} C${cx + 28} ${cy + 40} ${cx + 42} ${cy + 58} ${cx + 42} ${base} Z"/>` +
+          `<circle class="o s" cx="${cx}" cy="${cy}" r="21"/>`;
+
+        const DRAW = {
+          green: () =>
+            // two soft lights at the back corners, their light on the screen
+            [128, 472]
+              .map((x) => {
+                const d = x < 300 ? 1 : -1,
+                  X = (v) => x + v * d;
+                return (
+                  `<path class="lt" fill="url(#beam-green)" d="M${X(24)} 236 L${X(96)} 214 L${X(96)} 346 L${X(24)} 324 Z"/>` +
+                  `<ellipse class="shadow" cx="${x}" cy="612" rx="26" ry="5"/>` +
+                  `<path class="s" d="M${x} 608 L${x} 330 M${x} 596 L${X(-16)} 612 M${x} 596 L${X(16)} 612"/>` +
+                  `<path class="o2 s" d="M${X(-22)} 262 L${X(24)} 236 L${X(24)} 324 L${X(-22)} 300 Z"/>` +
+                  `<path class="s" style="stroke-width:4.5" d="M${X(24)} 238 L${X(24)} 322"/>`
+                );
+              })
+              .join("") +
+            // the screen on its bar, sweeping onto the floor
+            `<path class="s" d="M150 172 H450"/>` +
+            `<path class="a s" d="M156 176 H444 V536 Q444 606 470 640 H130 Q156 606 156 536 Z"/>` +
+            `<path class="a2" d="M156 536 Q156 606 130 640 H470 Q444 606 444 536 Z" opacity="0.9"/>` +
+            `<path class="s t" d="M156 536 H444" opacity="0.45"/>` +
+            // the presenter: arms at the sides, a jacket, two legs
+            `<ellipse class="shadow" cx="300" cy="606" rx="58" ry="8"/>` +
+            `<rect class="o s" x="275" y="476" width="21" height="126" rx="7"/>` +
+            `<rect class="o s" x="304" y="476" width="21" height="126" rx="7"/>` +
+            `<rect class="o s" x="248" y="402" width="16" height="96" rx="8" transform="rotate(6 256 402)"/>` +
+            `<rect class="o s" x="336" y="402" width="16" height="96" rx="8" transform="rotate(-6 344 402)"/>` +
+            `<path class="o s" d="M262 410 C262 398 270 391 284 390 H316 C330 391 338 398 338 410 L332 490 H268 Z"/>` +
+            `<circle class="o s" cx="300" cy="358" r="23"/>` +
+            `<path class="s t" d="M290 391 L300 408 L310 391 M300 408 V488"/>` +
+            // CAM 1 with the prompter's hood, seen from the side, facing the presenter
+            `<ellipse class="shadow" cx="176" cy="690" rx="44" ry="7"/>` +
+            `<path class="s" d="M176 622 L176 636 M176 636 L150 688 M176 636 L202 688 M176 636 L176 688"/>` +
+            `<rect class="o s" x="144" y="590" width="58" height="32" rx="6"/>` +
+            `<rect class="o2 s" x="202" y="597" width="12" height="18" rx="3"/>` +
+            `<path class="o s" d="M214 584 L266 568 L266 640 L214 626 Z"/>` +
+            `<path class="s t" d="M220 622 L260 574"/>` +
+            `<path class="lt s t" d="M226 606 H236 M230 597 H244 M236 588 H250"/>`,
+
+          podcast: () => {
+            const people = [
+              [194, 420],
+              [300, 404],
+              [406, 420],
+            ];
+            let s =
+              // the pendant over the table, and its warm light
+              `<path class="lt" fill="url(#beam-umber)" d="M268 262 L332 262 L452 556 L148 556 Z"/>` +
+              `<path class="s t" d="M300 0 V234"/>` +
+              `<path class="o s" d="M262 264 Q264 236 300 232 Q336 236 338 264 Z"/>` +
+              `<ellipse class="lt" cx="300" cy="266" rx="30" ry="5" fill="#ffe7b0"/>`;
+            for (const [cx, cy] of people) {
+              s += person(cx, cy, 560);
+              s += `<path class="s" d="M${cx - 25} ${cy + 3} A25 25 0 0 1 ${cx + 25} ${cy + 3}"/>`;
+              s += `<rect class="a s t" x="${cx - 30}" y="${cy - 8}" width="10" height="21" rx="4"/>`;
+              s += `<rect class="a s t" x="${cx + 20}" y="${cy - 8}" width="10" height="21" rx="4"/>`;
+            }
+            // the round table: the voices sit behind it
+            s += `<ellipse class="shadow" cx="300" cy="660" rx="120" ry="11"/>`;
+            s += `<ellipse class="o s" cx="300" cy="556" rx="180" ry="23"/>`;
+            s += `<path class="s" d="M300 579 V650"/><ellipse class="o2 s" cx="300" cy="654" rx="56" ry="9"/>`;
+            // a microphone on its arm before each voice
+            for (const [cx, cy] of people) {
+              s += `<path class="s t" d="M${cx + 28} ${cy + 64} L${cx + 52} ${cy + 92} L${cx + 52} 540"/>`;
+              s += `<rect class="a s" x="${cx + 9}" y="${cy + 28}" width="17" height="40" rx="8.5" transform="rotate(-24 ${cx + 17.5} ${cy + 48})"/>`;
+            }
+            return s + tripod(112, 1) + tripod(488, -1);
+          },
+
+          webinar: () => {
+            let s =
+              // the screen with the audience, and the signal over it
+              `<rect class="lt" x="170" y="156" width="260" height="178" rx="14" fill="#9cc4ff" opacity="0.18"/>` +
+              `<rect class="a2 s" x="184" y="168" width="232" height="152" rx="8"/>`;
+            const w = (212 - 12) / 3,
+              h = (132 - 6) / 2;
+            for (let j = 0; j < 2; j++)
+              for (let i = 0; i < 3; i++) {
+                const x0 = 194 + i * (w + 6),
+                  y0 = 178 + j * (h + 6);
+                s += `<rect class="a" x="${x0.toFixed(1)}" y="${y0}" width="${w.toFixed(1)}" height="${h}" rx="4"/>`;
+                s += `<circle class="s t" cx="${(x0 + w / 2).toFixed(1)}" cy="${y0 + 24}" r="9"/>`;
+                s += `<path class="s t" d="M${(x0 + 15).toFixed(1)} ${y0 + 57} Q${(x0 + w / 2).toFixed(1)} ${y0 + 35} ${(x0 + w - 15).toFixed(1)} ${y0 + 57}"/>`;
+              }
+            s += `<circle cx="300" cy="148" r="4" style="fill: var(--draw)"/>`;
+            for (const r of [12, 21, 30]) s += `<path class="s t lt" d="${arc(300, 148, r, 214, 326)}"/>`;
+            // the presenter at the desk, the laptop and a microphone
+            s += person(300, 426, 534);
+            s += `<path class="a2 s" d="M318 488 H384 L378 532 H324 Z"/>`;
+            s += `<rect class="a s" x="230" y="494" width="15" height="28" rx="7.5"/><path class="s t" d="M237.5 522 V532"/>`;
+            s += `<ellipse class="shadow" cx="300" cy="644" rx="150" ry="10"/>`;
+            s += `<rect class="o s" x="166" y="530" width="268" height="16" rx="4"/>`;
+            s += `<rect class="o2 s" x="178" y="546" width="244" height="92"/>`;
+            return s + tripod(486, -1);
+          },
+        };
+
+        function roomSvg(kind) {
+          const R = KINDS[kind].room;
+          const id = kind;
+          return (
+            `<svg viewBox="0 0 600 880" width="600" height="880" aria-hidden="true">` +
+            `<defs>` +
+            `<filter id="grain-${id}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0"/></filter>` +
+            `<filter id="mottle-${id}" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.012" numOctaves="3" seed="${kind.length * 7}"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.32 -0.06"/></filter>` +
+            `<radialGradient id="sky-${id}" cx="300" cy="96" r="420" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fffbea" stop-opacity="0.2"/><stop offset="0.55" stop-color="#fffbea" stop-opacity="0.05"/><stop offset="1" stop-color="#fffbea" stop-opacity="0"/></radialGradient>` +
+            `<linearGradient id="beam-green" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4ffe8" stop-opacity="0.32"/><stop offset="1" stop-color="#f4ffe8" stop-opacity="0"/></linearGradient>` +
+            `<linearGradient id="beam-umber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd98f" stop-opacity="0.32"/><stop offset="1" stop-color="#ffd98f" stop-opacity="0.02"/></linearGradient>` +
+            `<clipPath id="backwall-${id}"><rect x="90" y="100" width="420" height="490"/></clipPath>` +
+            `</defs>` +
+            // the planes
+            `<path fill="${R.ceil}" d="M0 0 H600 L510 100 H90 Z"/>` +
+            `<path fill="${R.lit}" d="M0 0 L90 100 V590 L0 880 Z"/>` +
+            `<path fill="${R.shade}" d="M600 0 V880 L510 590 V100 Z"/>` +
+            `<path fill="${R.floor}" d="M90 590 H510 L600 880 H0 Z"/>` +
+            `<rect fill="${R.back}" x="90" y="100" width="420" height="490"/>` +
+            // the textures: a watercolour mottle on the back wall, a fine grain over everything
+            `<rect x="90" y="100" width="420" height="490" filter="url(#mottle-${id})"/>` +
+            `<rect x="0" y="0" width="600" height="880" filter="url(#grain-${id})"/>` +
+            // the edges where the planes meet, very quiet
+            `<path d="M0 0 L90 100 M600 0 L510 100 M0 880 L90 590 M600 880 L510 590 M90 100 H510 V590 H90 Z" fill="none" stroke="#000" stroke-opacity="0.22" stroke-width="1"/>` +
+            // the skylight and its light on the back wall
+            `<path d="M222 16 H378 L364 76 H236 Z" fill="#fffbea" fill-opacity="0.10" style="stroke: var(--draw)" stroke-opacity="0.35" stroke-width="1.4"/>` +
+            `<path d="M274 16 L270 76 M326 16 L330 76" style="stroke: var(--draw)" stroke-opacity="0.3" stroke-width="1.2"/>` +
+            `<rect class="sky" x="90" y="100" width="420" height="490" fill="url(#sky-${id})" clip-path="url(#backwall-${id})"/>` +
+            DRAW[kind]() +
+            `</svg>`
+          );
+        }
+        function artHtml(kind) {
+          const k = KINDS[kind];
+          return (
+            `<div class="art ${k.tone}">${roomSvg(kind)}` +
+            `<span class="rname">${k.full}</span><span class="rline">${k.line}</span>` +
+            `<span class="badge" data-badge hidden></span></div>`
+          );
+        }
+
+        /* ------------------------------------------------------------------ the state ------------------------------------------------------------------ */
+        const S = {
+          sheet: pick(q.get("sheet"), ["step1", "step2"], "step2"),
+          folder: pick(q.get("folder"), ["new", "existing"], "new"),
+          disk: pick(q.get("disk"), ["plenty", "low", "full"], "plenty"),
+          vmix: pick(q.get("vmix"), ["here", "elsewhere"], "elsewhere"),
+          pick: {},
+          synced: false,
+          running: null,
+          open: null,
+          names: { green: "", podcast: "", webinar: "" },
+          preset: { green: 0, podcast: 1, webinar: 1 },
+          ticks: {},
+          clock: "09:14",
+        };
+        function load(moment, kind) {
+          S.running = null;
+          S.open = null;
+          S.synced = false;
+          S.clock = "09:14";
+          S.names = { green: "", podcast: "", webinar: "" };
+          if (moment === "window") {
+            S.open = kind;
+            S.names[kind] = KINDS[kind].suggested;
+          }
+          if (moment === "session" || moment === "sessionwindow") {
+            S.running = {
+              kind,
+              name: KINDS[kind].suggested,
+              since: "09:16",
+              folder: `${clean(KINDS[kind].suggested)} (${DAY})`,
+            };
+            S.synced = true;
+            S.clock = "09:41";
+            if (moment === "sessionwindow") S.open = kind;
+          }
+        }
+        const moment = () =>
+          S.open
+            ? S.running && S.running.kind === S.open
+              ? "sessionwindow"
+              : "window"
+            : S.running
+              ? "session"
+              : "choose";
+
+        /* ------------------------------------------------------------------ the header, the question, the footer ------------------------------------------------------------------ */
+        function renderHeader() {
+          const tab = (name, st, on = false) =>
+            `<span class="tab${on ? " on" : ""}"><span>${name}</span>${st ? `<span class="st"><span class="lamp ${st[0]}"></span><span class="w ${st[0]}">${st[1]}</span></span>` : ""}</span>`;
+          $("hdr").innerHTML =
+            `<img class="logo" src="sse-exed-horizontal-white.png" alt="SSE Executive Education"><span class="rule"></span>` +
+            `<span class="hstrip">${tab("Session", null, true)}${tab("Overview")}${tab("Lighting", ["ok", "ready"])}${tab("Audio", S.synced ? ["ok", "ready"] : ["att", "assumed"])}${tab("Cameras", ["ok", "ready"])}${tab("Teleprompter", ["ok", "ready"])}</span>` +
+            `<span class="sp"></span><span class="hstrip"><span class="chip">Surface<span class="lamp ok"></span><span class="w ok">ready</span></span>${diskChip()}${tab("Setup / Support")}</span>` +
+            `<div class="tally"><div><span class="lamp hollow"></span><span class="nm">Rec</span></div></div><span class="clock">${S.clock}</span>`;
+        }
+        function renderIntro() {
+          const I = $("intro");
+          const run = S.running;
+          I.style.top = run ? "150px" : "214px";
+          I.innerHTML =
+            `<div class="kick">Saturday 17 October</div><div class="q">What are we making today?</div>` +
+            (run
+              ? `<div class="pill"><span class="lw ok"><span class="lamp"></span><span class="cap">In session</span></span>` +
+                `<span>${KINDS[run.kind].full} · <b>${run.name || "no name"}</b> · since ${run.since}</span>` +
+                `<span class="key primary" id="pillGo">Continue</span></div>`
+              : "");
+          if ($("pillGo"))
+            $("pillGo").addEventListener("click", () => toast("In the app, Continue opens the Overview."));
+        }
+        function renderFooter() {
+          const it = (l, v, tone = "") =>
+            `<span class="item"><span>${l}</span><span class="v ${tone}">${v}</span></span>`;
+          const tone = S.disk === "low" ? "att" : S.disk === "full" ? "err" : "";
+          $("footer").innerHTML =
+            it("Takes today", "none yet · 4 yesterday") +
+            it("Last sync", S.synced ? "09:15" : "none since the start") +
+            it("Backup", "today 09:12") +
+            it("Disk", `${DISK[S.disk].free} free on Storage 1`, tone) +
+            `<span class="colophon">Studio Control</span>`;
+        }
+
+        /* ------------------------------------------------------------------ the Rooms on the page ------------------------------------------------------------------ */
+        function buildRooms() {
+          $("rooms").innerHTML = ORDER.map(
+            (kind) =>
+              `<button class="room" data-room="${kind}" aria-label="${KINDS[kind].full}: open its window">${artHtml(kind)}</button>`
+          ).join("");
+          document
+            .querySelectorAll("[data-room]")
+            .forEach((el) => el.addEventListener("click", () => openWindow(el.dataset.room)));
+        }
+        function markRooms() {
+          document.querySelectorAll("[data-room]").forEach((el) => {
+            const kind = el.dataset.room;
+            const running = S.running && S.running.kind === kind;
+            el.classList.toggle("lit", !!running);
+            el.classList.toggle("away", S.open === kind);
+            // The Room of the running session keeps its light on, and its caption says so.
+            el.querySelector(".rline").innerHTML = running
+              ? `<span class="lw ok"><span class="lamp"></span><span class="cap" style="font-size:16px">In session</span></span><span style="font-style:normal;font-family:'PT Sans';font-size:16px;color:var(--text2)"> · since ${S.running.since}</span>`
+              : KINDS[kind].line;
+          });
+        }
+
+        /* ------------------------------------------------------------------ the window ------------------------------------------------------------------ */
+        function geometry() {
+          const later = S.sheet === "later";
+          const wide = S.sheet === "step2";
+          const W = later || wide ? 1680 : 1200,
+            H = later ? 960 : 620;
+          const k = H / 880;
+          return { W, H, x: (2560 - W) / 2, y: 88 + (1312 - H) / 2, k, artW: Math.round(600 * k) };
+        }
+        function attention() {
+          if (S.synced) return "";
+          return (
+            `<div class="wnote"><span class="lw att"><span class="lamp"></span><span class="cap">Assumed</span></span>` +
+            `<span class="say">Console: the strips may not match TotalMix since the start.</span>` +
+            `<span class="key" id="wSync">Sync from TotalMix</span></div>`
+          );
+        }
+        function formHtml(kind) {
+          if (S.sheet === "step2") return formStep2(kind);
+          const k = KINDS[kind];
+          const later = S.sheet === "later";
+          const isRunning = S.running && S.running.kind === kind;
+          const other = S.running && !isRunning ? KINDS[S.running.kind] : null;
+          let h = "";
+          if (isRunning) {
+            h +=
+              `<div class="wtop"><span class="lw ok"><span class="lamp"></span><span class="cap" style="font-size:18px;letter-spacing:.14em">In session</span></span><span class="wd">since ${S.running.since} today</span></div>` +
+              `<div class="wname">${S.running.name || "No name given"}</div>` +
+              `<div class="wfacts">Begun at ${S.running.since} · ${later ? "2 takes, 14 min" : "no takes yet"}</div>`;
+            if (later) {
+              const p = k.presets[S.preset[kind]];
+              h +=
+                `<div class="wgrid"><div class="wsec"><div class="shead"><span class="t">Preset</span></div>` +
+                `<div class="ilist preset" style="margin-top:12px"><div class="row"><span class="radio on"></span><span class="ptext"><span class="pn">${p[0]}</span><span class="pd">${p[1]}</span></span></div></div></div>` +
+                `<div class="wsec"><div class="shead"><span class="t">Folder</span><span class="d">made at ${S.running.since}</span></div>` +
+                `<div class="folder"><div class="root">D:\\Sessions\\</div><div class="leaf">${S.running.name} (2026-10-15)</div></div>` +
+                `<div class="subs"><span>Open the folder</span></div></div></div>`;
+            }
+            h +=
+              `<div class="sp"></div><div class="wkeys"><span class="key tall" id="wEnd" style="width:180px">End session</span><span class="sp"></span>` +
+              `<span class="key tall" id="wCancel" style="width:140px">Close</span>` +
+              `<span class="key primary tall stack" id="wCont" style="width:300px"><span class="cap">Continue</span><span class="hint">on the Overview</span></span></div>`;
+            return h;
+          }
+          const name = S.names[kind];
+          h += `<div class="wtop"><span class="wk">New session</span><span class="wd">Saturday 17 October</span></div>`;
+          const nameBlock =
+            `<div class="wlab">Name this session</div>` +
+            `<label class="wfield"><input id="wName" maxlength="80" placeholder="A name, optional" value="${name.replace(/"/g, "&quot;")}"></label>` +
+            `<div class="wlast"><span class="wl"><span class="wl1">Last time · ${k.last[1]}</span><span class="wl2">${k.last[0]}</span></span><span class="key small" id="wUse">Use this name</span></div>`;
+          if (!later) {
+            h += nameBlock;
+          } else {
+            const presets = k.presets
+              .map(
+                (p, i) =>
+                  `<div class="row" data-preset="${i}"><span class="radio${i === S.preset[kind] ? " on" : ""}"></span><span class="ptext"><span class="pn">${p[0]}</span><span class="pd">${p[1]}</span></span></div>`
+              )
+              .join("");
+            const checks = k.checks
+              .map(([label, tone, word, value], i) => {
+                let right;
+                if (tone === "sync") right = S.synced ? lwHtml("ok", "verified") : lwHtml("att", "assumed");
+                else if (tone === "tick")
+                  right = `<span class="key small" data-tick="${i}">${S.ticks[`${kind}:${i}`] ? lwHtml("ok", "checked") : "Tick"}</span>`;
+                else right = (value ? `<b style="color:var(--text)">${value}</b>` : "") + lwHtml(tone, word);
+                return `<div class="row"><span class="lab">${label}</span><span class="sp"></span>${right}</div>`;
+              })
+              .join("");
+            const leaf = `${name || k.full} (2026-10-15)`;
+            h +=
+              nameBlock +
+              `<div class="wgrid"><div>` +
+              `<div class="wsec"><div class="shead"><span class="t">Preset</span><span class="d">what it sets up</span></div><div class="ilist preset" style="margin-top:12px">${presets}</div></div></div>` +
+              `<div><div class="wsec"><div class="shead"><span class="t">Folder</span><span class="d">made when it begins</span></div>` +
+              `<div class="folder"><div class="root">D:\\Sessions\\</div><div class="leaf" id="wLeaf">${leaf}</div></div>` +
+              `<div class="subs">${k.subs.map((x) => `<span>${x}</span>`).join("")}</div></div>` +
+              `<div class="wsec"><div class="shead"><span class="t">Before you roll</span><span class="d">checks</span></div><div class="ilist" style="margin-top:12px">${checks}</div></div></div></div>`;
+          }
+          // What needs the operator before a session: a page's way out, or the session this one ends.
+          // Under the name in step 1; over the keys once the window holds the later sections.
+          const notes =
+            attention() +
+            (other
+              ? `<div class="wnote"><span class="lw ok"><span class="lamp"></span><span class="cap">In session</span></span><span class="say">${other.full}, since ${S.running.since}. Beginning this ends it.</span></div>`
+              : "");
+          if (!later && notes) h += `<div class="wnotes">${notes}</div>`;
+          h += `<div class="sp"></div>`;
+          if (later)
+            h +=
+              `<p class="wbegins">When it begins: ${k.begins.join(" · ")} · the folder is made · the Overview opens.</p>` +
+              notes;
+          h +=
+            `<div class="wkeys"><span class="sp"></span><span class="key tall cancel" id="wCancel">Cancel</span>` +
+            `<span class="key primary tall stack begin" id="wBegin"><span class="cap">${other ? "Begin instead" : "Begin session"}</span><span class="hint">${other ? `ends the ${other.short} · opens the Overview` : "opens the Overview"}</span></span></div>`;
+          return h;
+        }
+        const lwHtml = (tone, word) =>
+          `<span class="lw ${tone}"><span class="lamp"></span><span class="cap">${word}</span></span>`;
+
+        function layoutWindow(kind) {
+          const G = geometry();
+          const win = $("win");
+          win.className = `abs win on`;
+          Object.assign(win.style, { left: G.x + "px", top: G.y + "px", width: G.W + "px", height: G.H + "px" });
+          const wart = $("wart");
+          wart.style.width = G.artW + "px";
+          wart.style.height = G.H + "px";
+          wart.innerHTML = artHtml(kind);
+          wart.firstElementChild.style.transform = `scale(${G.k})`;
+          const badge = wart.querySelector("[data-badge]");
+          if (badge) badge.remove();
+          $("wform").style.left = G.artW + "px";
+          $("wform").innerHTML = formHtml(kind);
+          wireForm(kind);
+          return G;
+        }
+        function wireForm(kind) {
+          const nameIn = $("wName");
+          if (nameIn)
+            nameIn.addEventListener("input", () => {
+              S.names[kind] = nameIn.value;
+              if ($("wLeaf")) $("wLeaf").textContent = folderLeaf(kind);
+            });
+          if ($("wUse"))
+            $("wUse").addEventListener("click", () => {
+              S.names[kind] = KINDS[kind].last[0];
+              nameIn.value = S.names[kind];
+              nameIn.focus();
+              nameIn.setSelectionRange(nameIn.value.length, nameIn.value.length);
+              if ($("wLeaf")) $("wLeaf").textContent = folderLeaf(kind);
+            });
+          document.querySelectorAll("[data-preset]").forEach((el) =>
+            el.addEventListener("click", () => {
+              S.preset[kind] = Number(el.dataset.preset);
+              refreshForm(kind);
+            })
+          );
+          document.querySelectorAll("[data-tick]").forEach((el) =>
+            el.addEventListener("click", () => {
+              const key = `${kind}:${el.dataset.tick}`;
+              S.ticks[key] = !S.ticks[key];
+              refreshForm(kind);
+            })
+          );
+          if ($("wSync"))
+            $("wSync").addEventListener("click", () => {
+              S.synced = true;
+              renderHeader();
+              renderFooter();
+              refreshForm(kind);
+            });
+          document.querySelectorAll("#wform [data-fmode]").forEach((el) =>
+            el.addEventListener("click", () => {
+              S.folder = el.dataset.fmode;
+              refreshForm(kind);
+              markBoard();
+              renderNotes();
+            })
+          );
+          document.querySelectorAll("#wform [data-dir]").forEach((el) =>
+            el.addEventListener("click", () => {
+              S.pick[kind] = Number(el.dataset.dir);
+              refreshForm(kind);
+            })
+          );
+          if ($("wWhere"))
+            $("wWhere").addEventListener("click", () =>
+              toast("In the app, Change… opens Windows' folder dialog at D:\\Sessions, for a series' folder.")
+            );
+          if ($("wOther"))
+            $("wOther").addEventListener("click", () => toast("In the app, this opens Windows' folder dialog."));
+          if ($("wOpen"))
+            $("wOpen").addEventListener("click", () =>
+              toast("In the app, the folder opens in Explorer, on the other screen.")
+            );
+          if ($("wCopy"))
+            $("wCopy").addEventListener("click", () =>
+              toast("Copied: this session's vMix Recording path, for vMix's Recording settings.")
+            );
+          if ($("wRoot"))
+            $("wRoot").addEventListener("click", () => toast("In the app, D:\\Sessions opens in Explorer."));
+          if ($("wCancel")) $("wCancel").addEventListener("click", () => closeWindow());
+          if ($("wBegin"))
+            $("wBegin").addEventListener("click", () => {
+              const chosen = S.pick[kind] ?? 0;
+              S.running = {
+                kind,
+                name: S.names[kind],
+                since: "09:16",
+                folder: S.folder === "new" || S.sheet !== "step2" ? folderLeaf(kind) : FOLDERS[kind][chosen][0],
+              };
+              S.clock = "09:16";
+              closeWindow(() => {
+                renderAll();
+                toast("In the app, Begin opens the Overview. The board stays here to show the running session.");
+              });
+            });
+          if ($("wCont")) $("wCont").addEventListener("click", () => toast("In the app, Continue opens the Overview."));
+          if ($("wEnd"))
+            $("wEnd").addEventListener("click", () => {
+              const was = KINDS[S.running.kind].full;
+              S.running = null;
+              closeWindow(() => {
+                renderAll();
+                toast(`${was} ended. The page waits for the next session.`);
+              });
+            });
+        }
+        function refreshForm(kind) {
+          $("wform").innerHTML = formHtml(kind);
+          wireForm(kind);
+        }
+
+        /* ------------------------------------------------------------------ step 2: the folder and the disk (board 3) ------------------------------------------------------------------ */
+        // The session's folder: made at Begin, on the root Setup / Support names (D:\Sessions, the
+        // owner's answer of 2026-10-18; the first Begin makes it), named `<name> (YYYY-MM-DD)` as the studio's folders are, with
+        // the kind's subfolders; or a folder that exists. Then the drive the folder is on, and how long
+        // its space lasts at the rate of the last session of this kind. Every name is made up but the root.
+        const ROOT = "D:\\Sessions\\";
+        const DAY = "2026-10-17";
+        const DRIVE = "Storage 1 (D:)";
+        const DISK = {
+          plenty: { free: "2.05 TB", gb: 2050, used: 46.3, chip: null },
+          low: { free: "140 GB", gb: 140, used: 96.3, chip: ["att", "low", "140 GB"] },
+          full: { free: "28 GB", gb: 28, used: 99.3, chip: ["err", "full", "28 GB"] },
+        };
+        // The folders that exist, for each kind: its last session's folder first, then the root's
+        // newest other one.
+        const EP2 = ["Leading Through Change — episode 2 (2026-10-14)", "Wed 14 Oct", "61 GB"];
+        const LECTURE3 = ["Strategy in Practice — lecture 3 (2026-10-13)", "Tue 13 Oct", "38 GB"];
+        const AUTUMN = ["Markets Outlook, autumn (2026-10-09)", "Fri 9 Oct", "22 GB"];
+        const FOLDERS = { green: [LECTURE3, EP2], podcast: [EP2, LECTURE3], webinar: [AUTUMN, EP2] };
+        // GB an hour, from the last session of each kind: its folder's size over its length.
+        const RATE = {
+          green: [35.1, "the last green screen recording (38 GB in 1 h 05 min)"],
+          podcast: [45.75, "the last podcast recording (61 GB in 1 h 20 min)"],
+          webinar: [24, "the last webinar (22 GB in 55 min)"],
+        };
+        function lasts(kind) {
+          const h = DISK[S.disk].gb / RATE[kind][0];
+          if (h >= 10) return `about ${Math.round(h)} h`;
+          const m = Math.round((h * 60) / 5) * 5;
+          return m >= 60 ? `about ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min` : `about ${m} min`;
+        }
+        // Windows refuses \ / : * ? " < > | in a name, and a trailing dot or space.
+        const clean = (s) => s.replace(/[\\/:*?"<>|]/g, "-").replace(/[. ]+$/, "");
+        const folderLeaf = (kind) => `${clean(S.names[kind] || KINDS[kind].full)} (${DAY})`;
+        const diskChip = () => {
+          const c = DISK[S.disk].chip;
+          return c
+            ? `<span class="chip">Disk<span class="lamp ${c[0]}"></span><span class="w ${c[0]}">${c[1]}</span><span class="v">${c[2]}</span></span>`
+            : "";
+        };
+        function diskHtml(kind, live) {
+          const d = DISK[S.disk];
+          const words = live
+            ? `vMix writes 13 MB/s to it now: ${lasts(kind)} at this rate`
+            : `${lasts(kind)} at the rate of ${RATE[kind][1]}`;
+          // Low and nearly full say so in the row itself, as a lamp and its word.
+          const flag =
+            S.disk === "plenty"
+              ? ""
+              : `<span class="lw ${S.disk === "low" ? "att" : "err"}"><span class="lamp"></span><span class="cap">${S.disk === "low" ? "Low" : "Nearly full"}</span></span>`;
+          return (
+            `<div class="disk ${S.disk}"><div class="dtop"><span class="dname">${DRIVE}</span><span class="sp"></span>` +
+            `<span class="dfree"><b>${d.free}</b> free of 3.82 TB</span></div>` +
+            `<div class="bar"><i style="width:${d.used}%"></i></div>` +
+            `<div class="dest">${flag}<span>${words}</span></div></div>`
+          );
+        }
+        function formStep2(kind) {
+          const k = KINDS[kind];
+          if (S.running && S.running.kind === kind) return runningStep2(kind);
+          const other = S.running ? KINDS[S.running.kind] : null;
+          const name = S.names[kind];
+          const chosen = S.pick[kind] ?? 0;
+          let h = `<div class="wtop"><span class="wk">New session</span><span class="wd">Saturday 17 October</span></div><div class="cols">`;
+          // the session: its name, and the last session of this kind
+          h +=
+            `<div class="col"><div class="clab"><span>Name this session</span></div>` +
+            `<label class="wfield"><input id="wName" maxlength="80" placeholder="A name, optional" value="${name.replace(/"/g, "&quot;")}"></label>` +
+            `<div class="wlast"><span class="wl"><span class="wl1">Last time · ${k.last[1]}</span><span class="wl2">${k.last[0]}</span></span><span class="key small" id="wUse">Use this name</span></div></div>`;
+          // where it goes: a new folder or one that exists, and the drive it is on
+          h +=
+            `<div class="col"><div class="clab"><span>Folder</span><span class="seg">` +
+            `<span data-fmode="new" class="${S.folder === "new" ? "on" : ""}">New folder</span>` +
+            `<span data-fmode="existing" class="${S.folder === "existing" ? "on" : ""}">An existing one</span></span></div>`;
+          if (S.folder === "new") {
+            h +=
+              `<div class="wfold"><span class="path"><span class="root">${ROOT}</span><span class="leaf" id="wLeaf">${folderLeaf(kind)}</span></span><span class="key small" id="wWhere">Change…</span></div>` +
+              `<div class="subs2">${k.subs.map((s) => `<span class="tag">${s}</span>`).join("")}<span class="when">made at Begin</span></div>`;
+          } else {
+            h +=
+              `<div class="ilist dirs">${FOLDERS[kind].map(([n, day, size], i) => `<div class="row" data-dir="${i}"><span class="radio${i === chosen ? " on" : ""}"></span><span class="dn" title="${day}">${n}</span><span class="dm">${size}</span></div>`).join("")}</div>` +
+              `<div class="subs2"><span class="key small" id="wOther">Choose another folder…</span><span class="when">a series' folder, or one on another drive</span></div>`;
+          }
+          h += diskHtml(kind, false) + `</div></div>`;
+          // what needs the operator first: a page, the session this one ends (the disk says its own)
+          const notes =
+            attention() +
+            (other
+              ? `<div class="wnote"><span class="lw ok"><span class="lamp"></span><span class="cap">In session</span></span><span class="say">${other.full}, since ${S.running.since}. Beginning this ends it.</span></div>`
+              : "");
+          if (notes) h += `<div class="wnotes">${notes}</div>`;
+          const makes = S.folder === "new" ? "makes the folder" : "uses the folder";
+          h +=
+            `<div class="sp"></div><div class="wkeys"><span class="sp"></span><span class="key tall cancel" id="wCancel">Cancel</span>` +
+            `<span class="key primary tall stack begin2" id="wBegin"><span class="cap">${other ? "Begin instead" : "Begin session"}</span>` +
+            `<span class="hint">${other ? `ends the ${other.short} · ` : ""}${makes} · opens the Overview</span></span></div>`;
+          return h;
+        }
+        function runningStep2(kind) {
+          const r = S.running;
+          const vmix =
+            S.vmix === "here"
+              ? `<div class="vmix"><span class="lw ok"><span class="lamp"></span></span><span class="say">vMix records into this folder's vMix Recording.</span></div>`
+              : `<div class="vmix"><span class="lw att"><span class="lamp"></span></span><span class="say">vMix records to ${ROOT}${FOLDERS[kind][0][0]}, not here.</span><span class="key small" id="wCopy">Copy the path</span></div>`;
+          let h =
+            `<div class="wtop"><span class="lw ok"><span class="lamp"></span><span class="cap" style="font-size:18px;letter-spacing:.14em">In session</span></span><span class="wd">since ${r.since} today</span></div>` +
+            `<div class="cols run"><div class="col"><div class="wname" style="margin-top:0">${r.name || "No name given"}</div><div class="wfacts">Begun at ${r.since} · no takes yet</div></div>` +
+            `<div class="col"><div class="clab"><span>Folder</span></div>` +
+            `<div class="wfold"><span class="path"><span class="root">${ROOT}</span><span class="leaf">${r.folder}</span></span><span class="key small" id="wOpen">Open the folder</span></div>` +
+            vmix +
+            diskHtml(kind, S.vmix === "here") +
+            `</div></div>`;
+          h +=
+            `<div class="sp"></div><div class="wkeys"><span class="key tall" id="wEnd" style="width:180px">End session</span><span class="sp"></span>` +
+            `<span class="key tall" id="wCancel" style="width:140px">Close</span>` +
+            `<span class="key primary tall stack" id="wCont" style="width:300px"><span class="cap">Continue</span><span class="hint">on the Overview</span></span></div>`;
+          return h;
+        }
+
+        // The window opens from its Room: the Room's picture travels into the window's left side at
+        // the same proportions, the window's face grows from the Room's outline, the options fade in
+        // beside it. Closing runs it back. Under reduced motion it only fades.
+        const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+        function rectOf(el) {
+          const r = el.getBoundingClientRect();
+          return { x: r.left / Z, y: r.top / Z, w: r.width / Z, h: r.height / Z };
+        }
+        function openWindow(kind, animate = true) {
+          if (S.open) return;
+          const roomEl = document.querySelector(`[data-room="${kind}"]`);
+          const from = rectOf(roomEl);
+          S.open = kind;
+          if (!S.names[kind] && !(S.running && S.running.kind === kind)) S.names[kind] = KINDS[kind].suggested;
+          const G = layoutWindow(kind);
+          $("scrim").classList.add("on");
+          markRooms();
+          renderNotes();
+          const name = $("wName");
+          if (name) name.focus({ preventScroll: true });
+          if (!animate || STILL) {
+            if (animate) fade(true);
+            return;
+          }
+          const dx = from.x - G.x,
+            dy = from.y - G.y;
+          // the window's face grows from the Room's outline to its own
+          $("wframe").animate(
+            [
+              { left: `${dx}px`, top: `${dy}px`, width: `${from.w}px`, height: `${from.h}px` },
+              { left: "0px", top: "0px", width: `${G.W}px`, height: `${G.H}px` },
+            ],
+            { duration: 340, easing: EASE }
+          );
+          $("wart").animate(
+            [{ transform: `translate(${dx}px, ${dy}px) scale(${from.h / G.H})` }, { transform: "none" }],
+            { duration: 340, easing: EASE }
+          );
+          $("wform").animate(
+            [
+              { opacity: 0, transform: "translateX(-16px)" },
+              { opacity: 1, transform: "none" },
+            ],
+            { duration: 200, delay: 210, easing: EASE, fill: "backwards" }
+          );
+          $("scrim").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" });
+        }
+        function fade(opening, done) {
+          const els = [$("win"), $("scrim")];
+          const kf = opening ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }];
+          const a = els.map((el) => el.animate(kf, { duration: opening ? 200 : 140, easing: "ease-out" }));
+          if (done) a[0].onfinish = done;
+        }
+        function closeWindow(done) {
+          if (!S.open) return;
+          const kind = S.open;
+          const finish = () => {
+            $("win").className = "abs win";
+            $("scrim").classList.remove("on");
+            S.open = null;
+            markRooms();
+            renderNotes();
+            const roomEl = document.querySelector(`[data-room="${kind}"]`);
+            if (roomEl) roomEl.focus({ preventScroll: true });
+            if (done) done();
+          };
+          if (STILL) return fade(false, finish);
+          const G = geometry();
+          const roomEl = document.querySelector(`[data-room="${kind}"]`);
+          roomEl.classList.remove("away");
+          const to = rectOf(roomEl);
+          roomEl.classList.add("away");
+          const dx = to.x - G.x,
+            dy = to.y - G.y;
+          $("wform").animate([{ opacity: 1 }, { opacity: 0 }], { duration: 100, fill: "forwards" });
+          $("scrim").animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, fill: "forwards" });
+          $("wframe").animate(
+            [
+              { left: "0px", top: "0px", width: `${G.W}px`, height: `${G.H}px` },
+              { left: `${dx}px`, top: `${dy}px`, width: `${to.w}px`, height: `${to.h}px` },
+            ],
+            { duration: 260, easing: EASE, fill: "forwards" }
+          );
+          const a = $("wart").animate(
+            [{ transform: "none" }, { transform: `translate(${dx}px, ${dy}px) scale(${to.h / G.H})` }],
+            { duration: 260, easing: EASE, fill: "forwards" }
+          );
+          a.onfinish = () => {
+            for (const el of [$("wform"), $("scrim"), $("wframe"), $("wart")])
+              el.getAnimations().forEach((x) => x.cancel());
+            finish();
+          };
+        }
+        $("scrim").addEventListener("click", () => closeWindow());
+        addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && S.open) {
+            e.preventDefault();
+            closeWindow();
+          }
+        });
+
+        /* ------------------------------------------------------------------ render, the corner ------------------------------------------------------------------ */
+        function renderAll() {
+          renderHeader();
+          renderIntro();
+          renderFooter();
+          markRooms();
+          markBoard();
+          renderNotes();
+        }
+        function markBoard() {
+          const m = moment();
+          document.querySelectorAll("[data-moment]").forEach((b) => b.classList.toggle("on", b.dataset.moment === m));
+          const kind = S.open || (S.running && S.running.kind);
+          document.querySelectorAll("[data-kind]").forEach((b) => b.classList.toggle("on", b.dataset.kind === kind));
+          document
+            .querySelectorAll("[data-sheet]")
+            .forEach((b) => b.classList.toggle("on", b.dataset.sheet === S.sheet));
+          document
+            .querySelectorAll("[data-cfold]")
+            .forEach((b) => b.classList.toggle("on", b.dataset.cfold === S.folder));
+          document.querySelectorAll("[data-disk]").forEach((b) => b.classList.toggle("on", b.dataset.disk === S.disk));
+          document.querySelectorAll("[data-vmix]").forEach((b) => b.classList.toggle("on", b.dataset.vmix === S.vmix));
+        }
+        function go(m, kind) {
+          if (S.open) {
+            $("win").className = "abs win";
+            $("scrim").classList.remove("on");
+            S.open = null;
+          }
+          load(m, kind);
+          const opened = S.open;
+          S.open = null;
+          renderAll();
+          if (opened) openWindow(opened, false);
+          markBoard();
+        }
+        document
+          .querySelectorAll("[data-moment]")
+          .forEach((b) =>
+            b.addEventListener("click", () =>
+              go(b.dataset.moment, S.open || (S.running && S.running.kind) || "podcast")
+            )
+          );
+        document.querySelectorAll("[data-kind]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const m = moment();
+            go(m === "choose" ? "window" : m, b.dataset.kind);
+          })
+        );
+        document.querySelectorAll("[data-sheet]").forEach((b) =>
+          b.addEventListener("click", () => {
+            S.sheet = b.dataset.sheet;
+            const kind = S.open;
+            if (kind) {
+              $("win").className = "abs win";
+              S.open = null;
+              openWindow(kind, false);
+            }
+            markBoard();
+          })
+        );
+        $("bReplay").addEventListener("click", () => {
+          document.body.classList.remove("entering");
+          void document.body.offsetWidth;
+          document.body.classList.add("entering");
+        });
+
+        // The corner's step-2 switches: the folder's form, the disk's space, where vMix records.
+        function relayout() {
+          renderHeader();
+          renderFooter();
+          const kind = S.open;
+          if (kind) {
+            $("win").className = "abs win";
+            S.open = null;
+            openWindow(kind, false);
+          }
+          markBoard();
+          renderNotes();
+        }
+        for (const [attr, key] of [
+          ["cfold", "folder"],
+          ["disk", "disk"],
+          ["vmix", "vmix"],
+        ])
+          document.querySelectorAll(`[data-${attr}]`).forEach((b) =>
+            b.addEventListener("click", () => {
+              S[key] = b.dataset[attr];
+              relayout();
+            })
+          );
+
+        let toastTimer = 0;
+        function toast(text) {
+          const T = $("toast");
+          T.textContent = text;
+          T.style.display = "block";
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => (T.style.display = "none"), 3400);
+        }
+
+        /* ------------------------------------------------------------------ the notes (numbered as in session.md) ------------------------------------------------------------------ */
+        // [x, y, title, text, when]: "page" while no window is open, "page-low" with it while the disk is
+        // low, "window-…" while step 2's window is open.
+        const NOTES = [
+          [
+            760,
+            1420,
+            "The disk, on every page",
+            "The footer says how much room the session's drive has left, on the Session page and the Overview alike, beside the day's takes, the last sync and the backup.",
+            "page",
+          ],
+          [
+            1720,
+            44,
+            "A chip only when it is low",
+            "As the Backup chip does, a Disk chip stands on the system's platter only while the drive runs low (amber) or nearly full (coral), and opens Setup / Support's drives. With 2 TB free nothing shows.",
+            "page-low",
+          ],
+          [
+            0,
+            0,
+            "Wider, not taller",
+            "Step 2's window is 1680 × 620: step 1's height, so the Room stays at its own size, and wider, the session at the left and where it goes at the right. The later steps' preset and checks would make it taller, as board 2's Later steps shows.",
+            "window-art",
+          ],
+          [
+            0,
+            0,
+            "A folder for the session",
+            "Begin makes it, as it begins the session: choosing makes nothing. It stands on the root Setup / Support names (D:\\Sessions, a new folder of its own, which the first Begin makes), named as the studio's folders are, <name> (YYYY-MM-DD), and follows the name as it is typed; a character Windows refuses becomes a dash. Change… puts it in a series' folder instead.",
+            "window-new",
+          ],
+          [
+            0,
+            0,
+            "Or a folder that exists",
+            "The last session of this kind's folder first, chosen to begin with, for a second day of a shoot or a retake, then the root's newest other one. Choose another folder… opens Windows' folder dialog for anything else: a series' folder, a session in D:\\All from before, or a folder on Public (Z:).",
+            "window-existing",
+          ],
+          [
+            0,
+            0,
+            "Its subfolders",
+            "Each kind makes the folders its files go to, set once in Setup / Support: vMix's recording, CAM 1's clips, the audio, the script or the slides, the exports.",
+            "window-subs",
+          ],
+          [
+            0,
+            0,
+            "How much room",
+            "The drive the folder is on: its free space of its size, and how long that lasts at the rate of the last session of this kind, measured from its folder and its length, so no codec is guessed. It reads Low (amber) and Nearly full (coral) below thresholds the owner sets, and the header's Disk chip says the same on every page.",
+            "window-disk",
+          ],
+          [
+            0,
+            0,
+            "vMix's folder",
+            "vMix's API starts and stops a recording but cannot say where it goes (vMix 29), so the app does not try. vMix reports the file it records to: the window says whether that is this session's folder, and copies the path to paste in vMix's Recording settings.",
+            "window-vmix",
+          ],
+          [
+            0,
+            0,
+            "Begin makes the folder",
+            "The one press that acts: it makes the folder and its subfolders (or takes the one chosen), begins the session and opens the Overview. End session leaves the files alone.",
+            "window-keys",
+          ],
+        ];
+        function renderNotes() {
+          const box = $("notes");
+          box.innerHTML = "";
+          if (!$("bNotes").classList.contains("on")) return;
+          const G = geometry();
+          const colW = (G.W - G.artW - 112 - 48) / 2;
+          const right = G.x + G.artW + 56 + colW + 48;
+          const own = S.open && S.running && S.running.kind === S.open;
+          const at = {
+            "window-art": [G.x, G.y],
+            "window-new": [right, G.y + 186],
+            "window-existing": [right, G.y + 200],
+            "window-subs": [right + colW - 120, G.y + 250],
+            "window-disk": [right + colW - 12, S.folder === "existing" ? G.y + 306 : G.y + 290],
+            "window-vmix": [right, G.y + 228],
+            "window-keys": [G.x + G.W - 56, G.y + G.H - 80],
+          };
+          if (own) at["window-disk"] = [right + colW - 12, G.y + 284];
+          NOTES.forEach(([x, y, title, text, when], i) => {
+            const open = !!S.open;
+            const step2 = S.sheet === "step2";
+            if (when === "page" && open) return;
+            if (when === "page-low" && (open || S.disk === "plenty")) return;
+            if (when.startsWith("window") && (!open || !step2)) return;
+            if (when === "window-new" && (own || S.folder !== "new")) return;
+            if (when === "window-subs" && (own || S.folder !== "new")) return;
+            if (when === "window-existing" && (own || S.folder !== "existing")) return;
+            if (when === "window-vmix" && !own) return;
+            if (at[when]) [x, y] = at[when];
+            const pin = document.createElement("div");
+            pin.className = "pin";
+            pin.style.left = x + "px";
+            pin.style.top = y + "px";
+            pin.textContent = i + 1;
+            const note = document.createElement("div");
+            note.className = "noteb";
+            note.innerHTML = `<b>${i + 1} · ${title}</b>${text}`;
+            note.style.left = Math.min(2560 - 460, x + 20) + "px";
+            note.style.top = Math.min(1440 - 200, y + 20) + "px";
+            pin.addEventListener("mouseenter", () => (note.style.display = "block"));
+            pin.addEventListener("mouseleave", () => (note.style.display = "none"));
+            box.append(pin, note);
+          });
+        }
+        $("bNotes").addEventListener("click", () => {
+          $("bNotes").classList.toggle("on");
+          renderNotes();
+        });
+        if (q.get("notes") === "1") $("bNotes").classList.add("on");
+
+        /* ------------------------------------------------------------------ the report: what is cut ------------------------------------------------------------------ */
+        window.__report = () => {
+          const w = (el) => {
+            const r = document.createRange();
+            r.selectNodeContents(el);
+            return Math.round(r.getBoundingClientRect().width / Z);
+          };
+          const cut = [...document.querySelectorAll("body *")]
+            .filter((el) => {
+              if (el.closest(".board") || el.closest("#notes") || el.closest("svg")) return false;
+              const cs = getComputedStyle(el);
+              if (cs.display === "none" || !el.textContent.trim() || el.children.length) return false;
+              return (
+                (cs.whiteSpace === "nowrap" || cs.textOverflow === "ellipsis") && el.scrollWidth > el.clientWidth + 1
+              );
+            })
+            .map((el) => `${el.className || el.tagName}: ${el.textContent.trim().slice(0, 50)}`);
+          const names = [...document.querySelectorAll(".rooms .rname, .rooms .rline")].map((el) => [
+            el.textContent,
+            w(el),
+          ]);
+          return { moment: moment(), sheet: S.sheet, cut, names };
+        };
+
+        /* ------------------------------------------------------------------ start ------------------------------------------------------------------ */
+        Promise.all(
+          ["700 40px 'SSE Adelia'", "400 16px 'PT Sans'", "700 16px 'PT Sans'", "italic 400 20px 'PT Serif'"].map((f) =>
+            document.fonts.load(f)
+          )
+        )
+          .catch(() => null)
+          .then(() => document.fonts.ready)
+          .then(() => {
+            const m = pick(q.get("moment"), ["choose", "window", "session", "sessionwindow"], "choose");
+            load(m, pick(q.get("kind"), ORDER, "podcast"));
+            const opened = S.open;
+            S.open = null;
+            buildRooms();
+            renderAll();
+            if (opened) openWindow(opened, false);
+            markBoard();
+            if (!STILL && !opened) document.body.classList.add("entering");
+          });
+      })();
+    </script>
+  </body>
+</html>
