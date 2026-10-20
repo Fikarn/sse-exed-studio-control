@@ -74,6 +74,7 @@ const MODES: { mode: SetupMode; label: string }[] = [
   { mode: "support", label: "Support" },
   { mode: "cameras", label: "Cameras" },
   { mode: "console", label: "Console" },
+  { mode: "sessions", label: "Sessions" },
 ];
 
 function stepTone(standing: SetupClusterStep["standing"]) {

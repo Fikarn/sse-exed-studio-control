@@ -135,8 +135,16 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
             : undefined
       );
     case "setSetupSection":
-      if (command.section !== "commissioning" && command.section !== "support" && command.section !== "cameras") {
-        throw new Error("setSetupSection requires section 'commissioning', 'support' or 'cameras'.");
+      if (
+        command.section !== "commissioning" &&
+        command.section !== "support" &&
+        command.section !== "cameras" &&
+        command.section !== "console" &&
+        command.section !== "sessions"
+      ) {
+        throw new Error(
+          "setSetupSection requires section 'commissioning', 'support', 'cameras', 'console' or 'sessions'."
+        );
       }
       return store.setSetupSection(command.section);
     case "setWorkspace":

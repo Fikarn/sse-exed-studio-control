@@ -1,0 +1,151 @@
+/* Setup / Support's Sessions screen (D52): three blocks across the facts'
+   two columns, the sessions' folder, each kind's subfolders and the disk's
+   levels, each a quiet label over rows of a label, a value or a field, and a
+   key at the right edge, as the Cameras screen draws a camera's rows; the
+   drives in the record, a row a drive with its level bar. Nothing is a card. */
+
+.blocks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.blockLabel {
+  margin-bottom: 4px;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.label {
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  white-space: nowrap;
+}
+
+.value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keys {
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* The names a Begin makes, separated by commas: a field on the well, as tall
+   as a key. */
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  outline: none;
+}
+
+.field::placeholder {
+  font-weight: var(--font-weight-regular);
+  color: var(--text-text3);
+  opacity: 1;
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+.field:disabled {
+  color: var(--text-text3);
+}
+
+.line {
+  margin: 6px 0 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+  text-wrap: pretty;
+}
+
+.waiting {
+  margin: 0;
+  color: var(--text-text2);
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+}
+
+/* ---- the record: the drives -------------------------------------------- */
+
+.drive {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.driveTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.driveName {
+  color: var(--text-text);
+  font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.driveTag {
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.driveWord {
+  display: inline-flex;
+  flex: none;
+}
+
+.driveSpace {
+  margin-left: auto;
+  color: var(--text-text3);
+  font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.driveSpace b {
+  color: var(--text-text);
+  font-weight: var(--font-weight-bold);
+}
+
+.driveSpace b[data-tone="attention"],
+.driveSpace[data-tone="attention"] {
+  color: var(--role-yellow-text);
+}
+
+.driveSpace b[data-tone="error"] {
+  color: var(--role-coral-text);
+}

@@ -446,6 +446,41 @@ describe("the header says what fails in the background", () => {
     }
     expect(buildMonitorItems(null, undefined, undefined, NOW_MS)).toHaveLength(5);
   });
+
+  // D52: the session's drive, a chip only while it reads low or nearly full,
+  // with its free space, after the Backup chip; it opens Setup's Sessions screen.
+  it("a session's drive that reads low or nearly full is a Disk chip after the Backup chip", () => {
+    const failedBackup = health({ backups: { state: "warning", at: nowSecs - 60 } });
+    const low = buildMonitorItems(failedBackup, undefined, undefined, NOW_MS, undefined, {
+      level: "low",
+      freeBytes: 140 * 1024 ** 3,
+    });
+    expect(low.map((entry) => entry.id)).toEqual([
+      "lighting",
+      "audio",
+      "cameras",
+      "prompter",
+      "surface",
+      "backups",
+      "disk",
+    ]);
+    expect(item(low, "disk")).toMatchObject({ label: "Disk", detail: "low", value: "140 GB", status: "attention" });
+
+    const full = buildMonitorItems(null, undefined, undefined, NOW_MS, undefined, {
+      level: "nearly-full",
+      freeBytes: 28 * 1024 ** 3,
+    });
+    expect(item(full, "disk")).toMatchObject({ label: "Disk", detail: "full", value: "28 GB", status: "error" });
+
+    for (const disk of [
+      { level: "ok" as const, freeBytes: 2_200_414_797_824 },
+      { level: null, freeBytes: null },
+      null,
+      undefined,
+    ]) {
+      expect(item(buildMonitorItems(null, undefined, undefined, NOW_MS, undefined, disk), "disk")).toBeUndefined();
+    }
+  });
 });
 
 // The polish (2026-10-05): before ready, a check never read is a quiet hollow

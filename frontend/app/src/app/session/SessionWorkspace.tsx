@@ -18,9 +18,25 @@ import { OverviewFooter } from "../overview/OverviewFooter";
 import { overviewState, studioLinks, type OverviewWayOut } from "../overview/overviewModel";
 import { useToast } from "../shared/toastContext";
 import { useLiveCallback } from "../shared/useLiveCallback";
+import { openSessionFolder, pickFolder } from "../shellCommands";
 import { formatShortTimestamp, getSupportBackups, type HeaderItem } from "../shellData";
 import { SESSION_KINDS } from "./kinds";
-import { dayWord, kindName, lastOf, noteOf, runningOf, sinceWord, trimmedName } from "./sessionModel";
+import { footerDiskWord, letterOf } from "./sessionDisk";
+import {
+  NEW_FOLDER,
+  dayWord,
+  existingRows,
+  folderRequest,
+  kindName,
+  lastOf,
+  noteOf,
+  refusalWords,
+  runningOf,
+  samePath,
+  sinceWord,
+  trimmedName,
+  type FolderChoice,
+} from "./sessionModel";
 import { SessionWindow, type SessionWindowView } from "./SessionWindow";
 import styles from "./SessionWorkspace.module.css";
 
@@ -40,8 +56,9 @@ import styles from "./SessionWorkspace.module.css";
 // its Room stays lit and a platter under the question says since when, with
 // Continue to the Overview. The deck stays where it is while the page is
 // open, as on Setup (D5); Begin opens the Overview, which turns it to
-// PROMPTER (D49). In step 1 Begin changes nothing in the studio: it notes
-// the session and opens the Overview.
+// PROMPTER (D49). Since step 2 (D52) Begin also makes the session's folder,
+// or takes one that exists: the window chooses, and makes nothing. Windows'
+// own folder dialog and Explorer are the shell's (`shellCommands.ts`).
 
 export interface SessionWorkspaceProps {
   appSnapshot: JsonObject | null;
@@ -109,6 +126,8 @@ function SessionWorkspaceRoot({
   const [view, setView] = useState<SessionWindowView | null>(null);
   const [open, setOpen] = useState(false);
   const [names, setNames] = useState<Partial<Record<SessionKind, string>>>({});
+  // Each kind's folder as chosen in its window, kept while the page is open, as the names are.
+  const [folders, setFolders] = useState<Partial<Record<SessionKind, FolderChoice>>>({});
   const [busy, setBusy] = useState(false);
 
   const running = runningOf(sessionSnapshot);
@@ -167,17 +186,83 @@ function SessionWorkspaceRoot({
   const close = useLiveCallback(() => setOpen(false));
   const toOverview = useLiveCallback(() => void perform(() => store.setWorkspace("overview")));
 
-  // Begin: the session begins and the Overview opens; the page leaves, and
-  // the window with it. A refusal keeps the window open and says why.
+  const folderOf = (kind: SessionKind) => folders[kind] ?? NEW_FOLDER;
+  const setFolder = (kind: SessionKind, folder: FolderChoice) =>
+    setFolders((chosen) => ({ ...chosen, [kind]: folder }));
+
+  /** Windows' folder dialog; a dialog that did not open says why, and answers nothing. */
+  const askForFolder = async (start: string | null, purpose: "parent" | "existing") => {
+    try {
+      return await pickFolder(start, purpose);
+    } catch (error) {
+      toast.push({ tone: "attention", message: refusalWords(error, "Windows' folder dialog did not open.") });
+      return null;
+    }
+  };
+
+  // `Change…`: a new folder in another folder, a series'. The sessions' folder
+  // chosen again is the sessions' folder.
+  const changeParent = useLiveCallback(async () => {
+    if (!view || busy) return;
+    const kind = view.kind;
+    const root = sessionSnapshot?.places.root ?? null;
+    const answer = await askForFolder(folderOf(kind).parent ?? root, "parent");
+    if (answer === null) return;
+    setFolder(kind, { ...folderOf(kind), parent: root !== null && samePath(answer, root) ? null : answer });
+  });
+
+  // `Choose another folder…`: a folder that exists anywhere, `D:\All`'s
+  // sessions from before among them; it takes the second row's place.
+  const chooseOther = useLiveCallback(async () => {
+    if (!view || busy) return;
+    const kind = view.kind;
+    const letter = letterOf(sessionSnapshot?.places.root);
+    const answer = await askForFolder(letter ? `${letter}:\\` : null, "existing");
+    if (answer === null) return;
+    setFolder(kind, { ...folderOf(kind), other: answer, picked: answer });
+  });
+
+  // `Open the folder`: Explorer, at the folder the hardware link names.
+  const openFolder = useLiveCallback(async () => {
+    try {
+      await openSessionFolder("session");
+    } catch (error) {
+      toast.push({ tone: "attention", message: refusalWords(error, "The folder was not opened.") });
+    }
+  });
+
+  // `Copy the path`: vMix's API cannot set where vMix records, so the
+  // operator pastes the folder into vMix's Settings › Recording.
+  const copyPath = useLiveCallback(async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      toast.push({ tone: "ok", message: `Copied: ${path}. Paste it in vMix's Settings › Recording.` });
+    } catch {
+      toast.push({
+        tone: "attention",
+        message: `The path was not copied. vMix's Settings › Recording takes ${path}.`,
+      });
+    }
+  });
+
+  // Begin: the session's folder is made or taken, the session begins and the
+  // Overview opens; the page leaves, and the window with it. A refusal keeps
+  // the window open and says why.
   const begin = useLiveCallback(async () => {
     if (!view || busy) return;
+    const folder = folderRequest(
+      folderOf(view.kind),
+      existingRows(sessionSnapshot, view.kind, folderOf(view.kind).other)
+    );
+    if (folder === null) return;
     setBusy(true);
-    const begun = await perform(() => store.beginSession(view.kind, trimmedName(names[view.kind] ?? "")));
+    const begun = await perform(() => store.beginSession(view.kind, trimmedName(names[view.kind] ?? ""), folder));
     if (begun === null) {
       setBusy(false);
       return;
     }
     setNames((typed) => ({ ...typed, [view.kind]: "" }));
+    setFolders((chosen) => ({ ...chosen, [view.kind]: NEW_FOLDER }));
     const left = await perform(() => store.setWorkspace("overview"));
     if (left === null) {
       // The session runs; the page stays where it is, and the window closes.
@@ -203,6 +288,7 @@ function SessionWorkspaceRoot({
 
   const since = running ? sinceWord(running.begunAt, now) : null;
   const latestBackup = getSupportBackups(supportSnapshot)[0] ?? null;
+  const disk = footerDiskWord(sessionSnapshot);
 
   return (
     <div
@@ -271,6 +357,7 @@ function SessionWorkspaceRoot({
         <OverviewFooter
           audio={audioSnapshot}
           backup={latestBackup ? formatShortTimestamp(latestBackup.modifiedAt) : null}
+          disk={disk}
           now={now}
           takesToday={camerasSnapshot?.takesToday}
           testId="session-footer"
@@ -285,7 +372,14 @@ function SessionWorkspaceRoot({
           note={note}
           name={names[view.kind] ?? ""}
           now={now}
+          snapshot={sessionSnapshot}
+          folder={folderOf(view.kind)}
           onName={(name) => setNames((typed) => ({ ...typed, [view.kind]: name }))}
+          onFolder={(folder) => setFolder(view.kind, folder)}
+          onChangeParent={() => void changeParent()}
+          onChooseOther={() => void chooseOther()}
+          onOpenFolder={() => void openFolder()}
+          onCopyPath={(path) => void copyPath(path)}
           onBegin={() => void begin()}
           onEnd={() => void end()}
           onContinue={toOverview}

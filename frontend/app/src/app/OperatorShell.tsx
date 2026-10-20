@@ -14,6 +14,7 @@ import { formatDuration, usePrompterTimeLeft } from "./teleprompter/prompterTime
 import { confirmShellClose, onShellCloseRequested } from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
+import { footerDiskWord, sessionDriveOf, type DiskWord } from "./session/sessionDisk";
 import { BackgroundFailureBand } from "./shared/BackgroundFailureBand";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ToastProvider } from "./shared/toastContext";
@@ -184,6 +185,17 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
     void environment.store.setWorkspace(target);
   });
 
+  // The header's `Disk` chip (D52) opens Setup / Support on its Sessions
+  // screen, where the drives and the levels are; on Setup itself it only turns
+  // the screen.
+  const tryOpenSessionsSetup = useLiveCallback(async () => {
+    if (activeWorkspace !== "setup") {
+      const allowed = await attemptLeaveCurrentWorkspace();
+      if (!allowed) return;
+    }
+    void environment.store.openSetupSection("sessions");
+  });
+
   useEffect(() => {
     void environment.store.initialize();
 
@@ -281,6 +293,11 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   // lamps as a prop, and the page roots are memoised, so a fresh array at
   // every render of the shell would render the Overview at every store change.
   const ready = shellExperience === "ready";
+  // The session's drive (D52): the header's `Disk` chip only while it reads
+  // low or nearly full, so its free space counts only then.
+  const sessionDrive = sessionDriveOf(shellState.sessionSnapshot);
+  const diskLevel = sessionDrive?.level ?? null;
+  const diskFree = diskLevel === "low" || diskLevel === "nearly-full" ? (sessionDrive?.freeBytes ?? null) : null;
   const monitorItems = useMemo(
     () =>
       buildMonitorItems(
@@ -292,10 +309,13 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         now.getTime(),
         // Before ready a check never read is quiet: `pending` while the app
         // starts, `not read` after a failed start (the recovery plate's word).
-        ready ? undefined : shellState.startupFailure ? "not read" : "pending"
+        ready ? undefined : shellState.startupFailure ? "not read" : "pending",
+        ready ? { level: diskLevel, freeBytes: diskFree } : null
       ),
     [
       audioSolo,
+      diskFree,
+      diskLevel,
       lightingSceneDrift,
       now,
       prompterPlaying,
@@ -304,6 +324,12 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       shellState.startupFailure,
       workspaceTones,
     ]
+  );
+  // The footer's `Disk` on the Overview, kept between renders while its words stand.
+  const diskWord = footerDiskWord(shellState.sessionSnapshot);
+  const footerDisk = useMemo<DiskWord>(
+    () => ({ word: diskWord.word, ...(diskWord.tone ? { tone: diskWord.tone } : {}) }),
+    [diskWord.word, diskWord.tone]
   );
   // The shell (overhaul 3): the page's own latches stay off the header while
   // it is open, and the REC tally has its own slot (`headerItems`).
@@ -355,6 +381,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         lightOutputsArmed={shellState.lightingSnapshot ? shellState.lightingSnapshot.outputArmed !== false : null}
         liveTransportRequested={environment.liveTransportRequested}
         onRequestRestart={requestRestart}
+        sessionSnapshot={shellState.sessionSnapshot}
         store={environment.store}
         supportSnapshot={deferredSupportSnapshot}
       />
@@ -393,6 +420,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         appSnapshot={shellState.appSnapshot}
         audioSnapshot={deferredAudioSnapshot}
         camerasSnapshot={shellState.camerasSnapshot}
+        disk={footerDisk}
         healthSnapshot={shellState.healthSnapshot}
         lamps={monitorItems}
         lightingSnapshot={deferredLightingSnapshot}
@@ -464,7 +492,12 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         onMonitorItemClick={(item) => {
           // Health chips open Setup / Support; latched chips and the REC
           // tally jump to the workspace that owns the latched state
-          // (same-target clicks no-op). A page's own lamp is its tab.
+          // (same-target clicks no-op). A page's own lamp is its tab. The
+          // `Disk` chip opens Setup / Support on its Sessions screen (D52).
+          if (item.id === "disk") {
+            void tryOpenSessionsSetup();
+            return;
+          }
           const target =
             item.id === "latched:scene-drift"
               ? "lighting"

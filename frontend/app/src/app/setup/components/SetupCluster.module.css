@@ -22,8 +22,11 @@
   flex: none;
 }
 
+/* Five screens since D52 (Sessions): at the keys' own 14 px the words need
+   418 px of the column's 405, so the row's keys pad 12 px a side. */
 .modeSwitch > * {
   flex: 1;
+  padding-inline: 12px;
 }
 
 /* ---- the five steps ----------------------------------------------------- */
