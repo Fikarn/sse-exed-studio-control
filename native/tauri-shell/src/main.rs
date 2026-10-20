@@ -10,8 +10,10 @@
 // - `engine.rs`: the hardware link's process, its pipe and its watcher.
 // - `shell_commands.rs`: the commands the pages call to start, ask and stop
 //   the hardware link, and to close the window.
-// - `shell_paths.rs`: the folders the shell opens for the operator, and the
-//   diagnostics report it writes.
+// - `shell_paths.rs`: the folders the shell opens for the operator, the
+//   session's among them, and the diagnostics report it writes.
+// - `shell_folder_dialog.rs`: Windows' folder dialog, for the session's
+//   folder.
 // - `shell_window_layout.rs`: the display the window is shown on, and the
 //   two window commands.
 // - `shell_displays.rs`: the screens, as Windows' display configuration
@@ -34,6 +36,7 @@ mod shell_browser_keys;
 mod shell_commands;
 mod shell_display_watch;
 mod shell_displays;
+mod shell_folder_dialog;
 mod shell_log;
 mod shell_paths;
 mod shell_picture_layer;
@@ -81,6 +84,7 @@ pub(crate) struct EngineState {
 const SHELL_CLOSE_REQUESTED_EVENT: &str = "shell://close-requested";
 
 fn main() {
+    fail_critical_errors_quietly();
     let args = env::args().collect::<Vec<_>>();
     if args.iter().any(|value| value == "--smoke-test") {
         std::process::exit(run_smoke_test(&args));
@@ -197,7 +201,9 @@ fn main() {
         shell_commands::engine_stop,
         shell_commands::engine_summary,
         shell_paths::shell_open_path,
+        shell_paths::shell_open_session_folder,
         shell_paths::shell_export_diagnostics,
+        shell_folder_dialog::shell_pick_folder,
         shell_window_layout::shell_enter_studio_fullscreen,
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
@@ -217,7 +223,9 @@ fn main() {
         shell_commands::engine_stop,
         shell_commands::engine_summary,
         shell_paths::shell_open_path,
+        shell_paths::shell_open_session_folder,
         shell_paths::shell_export_diagnostics,
+        shell_folder_dialog::shell_pick_folder,
         shell_window_layout::shell_enter_studio_fullscreen,
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
@@ -232,6 +240,26 @@ fn main() {
     }
 
     builder.run(context).expect("failed to run tauri shell");
+}
+
+/// Windows' error mode for the app (D52, the review of #355): a drive with
+/// no disk in it, such as an empty slot of a card reader, answers its caller
+/// with an error instead of Windows' "There is no disk in the drive" box.
+/// Microsoft advises every app to ask for it at its start. It is set first,
+/// before any thread starts. The hardware link inherits it, as the shell
+/// starts it without `CREATE_DEFAULT_ERROR_MODE`, and its sessions' watch
+/// looks at every drive letter, C: to Z:, every 30 s. The flags already set
+/// are kept.
+#[allow(unsafe_code)]
+fn fail_critical_errors_quietly() {
+    use windows::Win32::System::Diagnostics::Debug::{
+        GetErrorMode, SetErrorMode, SEM_FAILCRITICALERRORS, THREAD_ERROR_MODE,
+    };
+    // SAFETY: two calls of kernel32 that read and set the process's error
+    // mode, a number of flags; no pointer is passed and nothing is borrowed.
+    unsafe {
+        SetErrorMode(THREAD_ERROR_MODE(GetErrorMode()) | SEM_FAILCRITICALERRORS);
+    }
 }
 
 /// A development build (`studio_control_protocol::development`) is an app

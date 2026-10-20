@@ -1,15 +1,25 @@
 //! What the shell does with the file system for the operator: it opens a
 //! folder of its own in Explorer, and writes the diagnostics report. Both
-//! stay inside the app data and the logs (finding F15).
+//! stay inside the app data and the logs (finding F15). It also opens the
+//! session's folder, or the sessions' folder, which the hardware link names
+//! and the page does not (D52).
 
-use crate::engine;
+use crate::engine::{self, EngineBridge};
 use crate::shell_commands::off_main_thread;
-use serde_json::Value;
-use std::fs::{canonicalize, create_dir_all, write};
+use crate::EngineState;
+use serde::Deserialize;
+use serde_json::{json, Value};
+use std::ffi::OsString;
+use std::fs::{canonicalize, create_dir_all, metadata, write};
+use std::io::ErrorKind;
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use studio_control_protocol::RequestEnvelope;
 
 /// Error code prefixes answered by `shell_open_path` (finding F15).
 const PATH_OUTSIDE_APP_DATA_CODE: &str = "PATH_OUTSIDE_APP_DATA";
@@ -63,13 +73,149 @@ pub(crate) async fn shell_open_path(path: String) -> Result<(), String> {
 
 /// Hands an allowed path to Explorer. The original spelling is used rather
 /// than the canonical one: Explorer does not take the `\\?\` prefix
-/// `canonicalize` produces on Windows.
+/// `canonicalize` produces on Windows. The path is always quoted: Explorer
+/// ends an unquoted path at a comma (an unquoted `…\a,b` opened `…\a`, tried
+/// on this PC on 2026-10-20), and a folder the operator chose may have one.
+/// Windows never puts a `"` in a path, and Explorer reads `"C:\"` as `C:\`.
 fn open_path_with_system(target: &Path) -> Result<(), String> {
     Command::new("explorer")
-        .arg(target)
+        .raw_arg(quoted(target))
         .spawn()
         .map_err(|error| format!("Failed to open path {}: {error}", target.display()))?;
     Ok(())
+}
+
+/// A path between quotes, for Explorer's command line.
+fn quoted(target: &Path) -> OsString {
+    let mut quoted = OsString::from("\"");
+    quoted.push(target.as_os_str());
+    quoted.push("\"");
+    quoted
+}
+
+/// The code `shell_open_session_folder` refuses with (D52).
+const NO_SESSION_FOLDER_CODE: &str = "NO_SESSION_FOLDER";
+
+/// Which folder `Open the folder` opens: the running session's (its
+/// window), or the sessions' folder (Setup / Support).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum SessionFolderWhich {
+    Session,
+    Root,
+}
+
+/// Opens the running session's folder, or the sessions' folder, in Explorer
+/// (D52). The page names no path: the shell asks the hardware link for the
+/// session's snapshot itself, as it tells it of the Prompter XL, and opens
+/// the folder named there once it finds it there. So `shell_open_path`'s
+/// rule (the app data and the logs alone, F15) stands for every path a page
+/// names. Explorer's window opens where Windows puts it, as `Open the log`'s
+/// does.
+#[tauri::command]
+pub(crate) async fn shell_open_session_folder(
+    state: tauri::State<'_, EngineState>,
+    which: SessionFolderWhich,
+) -> Result<(), String> {
+    let bridge = Arc::clone(&state.bridge);
+    off_main_thread(move || {
+        let snapshot = session_snapshot(&bridge)?;
+        let folder = session_folder_of(&snapshot, which)?;
+        folder_is_there(&folder, which)?;
+        open_path_with_system(&folder)
+    })
+    .await
+}
+
+/// The hardware link's `session.snapshot`, asked by the shell under an id
+/// of its own. Why it did not come is said in `shell.log`; the page gets the
+/// operator's sentence.
+fn session_snapshot(bridge: &EngineBridge) -> Result<Value, String> {
+    static ASKED: AtomicU64 = AtomicU64::new(0);
+    let asked = ASKED.fetch_add(1, Ordering::Relaxed) + 1;
+    let request = RequestEnvelope {
+        kind: String::from("request"),
+        id: json!(format!("shell:session.snapshot:{asked}")),
+        method: String::from("session.snapshot"),
+        params: json!({}),
+    };
+    let answer = match bridge.request(request) {
+        Ok(response) if response.ok => response
+            .result
+            .ok_or_else(|| String::from("it answered nothing")),
+        Ok(response) => Err(response
+            .error
+            .map(|error| error.to_string())
+            .unwrap_or_else(|| String::from("it refused, with no reason"))),
+        Err(error) => Err(error),
+    };
+    answer.map_err(|detail| {
+        bridge.log_shell_line(
+            "SHELL",
+            &format!("Open the folder: the hardware link's session was not read: {detail}"),
+        );
+        format!(
+            "{NO_SESSION_FOLDER_CODE}: The hardware link did not answer, so no folder was opened."
+        )
+    })
+}
+
+/// The folder a session's snapshot names for `which`: the running session's
+/// folder, or the sessions' folder. Refused, in the operator's words, when
+/// there is none.
+fn session_folder_of(snapshot: &Value, which: SessionFolderWhich) -> Result<PathBuf, String> {
+    let named = |value: Option<&Value>| {
+        value
+            .and_then(Value::as_str)
+            .filter(|path| !path.trim().is_empty())
+            .map(PathBuf::from)
+    };
+    match which {
+        SessionFolderWhich::Session => {
+            let current = snapshot
+                .get("current")
+                .filter(|current| current.is_object())
+                .ok_or_else(|| {
+                    format!(
+                        "{NO_SESSION_FOLDER_CODE}: No session runs, so it has no folder to open."
+                    )
+                })?;
+            named(current.get("folder")).ok_or_else(|| {
+                format!("{NO_SESSION_FOLDER_CODE}: This session began before sessions had folders.")
+            })
+        }
+        SessionFolderWhich::Root => {
+            named(snapshot.get("places").and_then(|places| places.get("root"))).ok_or_else(|| {
+                format!("{NO_SESSION_FOLDER_CODE}: The hardware link named no sessions' folder.")
+            })
+        }
+    }
+}
+
+/// The folder is there, and is a folder, before Explorer is given it:
+/// Explorer opens another folder for a path that is not there.
+fn folder_is_there(folder: &Path, which: SessionFolderWhich) -> Result<(), String> {
+    match metadata(folder) {
+        Ok(found) if found.is_dir() => Ok(()),
+        Ok(_) => Err(format!(
+            "{NO_SESSION_FOLDER_CODE}: {} is not a folder.",
+            folder.display()
+        )),
+        Err(error) if error.kind() == ErrorKind::NotFound => Err(match which {
+            SessionFolderWhich::Session => format!(
+                "{NO_SESSION_FOLDER_CODE}: {} is not there any more.",
+                folder.display()
+            ),
+            SessionFolderWhich::Root => format!(
+                "{NO_SESSION_FOLDER_CODE}: {} is not there: the next Begin makes it.",
+                folder.display()
+            ),
+        }),
+        Err(error) => Err(format!(
+            "{NO_SESSION_FOLDER_CODE}: {} cannot be reached: {error}",
+            folder.display()
+        )),
+    }
 }
 
 /// UTC wall-clock time as `YYYY-MM-DDTHH-MM-SS-mmmZ` — the shape the engine's
@@ -332,6 +478,116 @@ mod shell_path_policy_tests {
         let error = write_diagnostics_report(&relative, &report)
             .expect_err("a relative directory is refused");
         assert!(error.contains("absolute"), "{error}");
+    }
+
+    /// A refusal of `Open the folder`: its code, then the operator's words.
+    fn assert_refused<T: std::fmt::Debug>(result: Result<T, String>, words: &str) {
+        let refusal = result.expect_err(words);
+        assert!(
+            refusal.starts_with(&format!("{NO_SESSION_FOLDER_CODE}: ")),
+            "{refusal}"
+        );
+        assert!(refusal.contains(words), "{refusal}");
+    }
+
+    // D52: `Open the folder` opens the folder the hardware link names, the
+    // running session's or the sessions' folder, never a path of the page's;
+    // when there is none it says why. The page's two words are the only
+    // ones it takes.
+    #[test]
+    fn the_folder_to_open_is_the_one_the_hardware_link_names() {
+        use SessionFolderWhich::{Root, Session};
+        let snapshot = json!({
+            "current": {
+                "kind": "podcast",
+                "name": "Morning take",
+                "begunAt": "2026-04-23T06:46:00.000Z",
+                "endedAt": null,
+                "folder": r"D:\Sessions\Morning take (2026-04-23)",
+                "folderBytes": 0
+            },
+            "places": { "root": r"D:\Sessions", "simulated": false, "rootExists": true }
+        });
+        assert_eq!(
+            session_folder_of(&snapshot, Session),
+            Ok(PathBuf::from(r"D:\Sessions\Morning take (2026-04-23)"))
+        );
+        assert_eq!(
+            session_folder_of(&snapshot, Root),
+            Ok(PathBuf::from(r"D:\Sessions"))
+        );
+
+        let idle = json!({ "current": null, "places": { "root": r"D:\Sessions" } });
+        assert_refused(session_folder_of(&idle, Session), "No session runs");
+        assert_eq!(
+            session_folder_of(&idle, Root),
+            Ok(PathBuf::from(r"D:\Sessions"))
+        );
+        // A session begun before sessions had folders has none to open.
+        for folder in [json!(null), json!(""), json!("  ")] {
+            let older = json!({ "current": { "kind": "webinar", "folder": folder } });
+            assert_refused(
+                session_folder_of(&older, Session),
+                "began before sessions had folders",
+            );
+        }
+        assert_refused(session_folder_of(&json!({}), Session), "No session runs");
+        assert_refused(
+            session_folder_of(&json!({}), Root),
+            "named no sessions' folder",
+        );
+
+        for (word, which) in [("session", Session), ("root", Root)] {
+            assert_eq!(
+                serde_json::from_value::<SessionFolderWhich>(json!(word)).expect(word),
+                which
+            );
+        }
+        for word in ["Session", "current", "folder", ""] {
+            assert!(
+                serde_json::from_value::<SessionFolderWhich>(json!(word)).is_err(),
+                "{word:?}"
+            );
+        }
+    }
+
+    // Explorer is given a folder that is there: one gone, one not made yet
+    // and a file are refused, each with its own words.
+    #[test]
+    fn a_session_s_folder_opens_only_once_it_is_there() {
+        use SessionFolderWhich::{Root, Session};
+        let tree = TempTree::new("session-folder");
+        let folder = tree.path("Sessions/Morning take (2026-04-23)");
+        fs::create_dir_all(&folder).expect("the test folder should be creatable");
+        let file = tree.path("Sessions/notes.txt");
+        touch(&file);
+
+        assert_eq!(folder_is_there(&folder, Session), Ok(()));
+        assert_eq!(folder_is_there(&tree.path("Sessions"), Root), Ok(()));
+        assert_refused(
+            folder_is_there(&tree.path("Sessions/Old take (2026-04-22)"), Session),
+            "is not there any more",
+        );
+        assert_refused(
+            folder_is_there(&tree.path("Not made yet"), Root),
+            "is not there: the next Begin makes it",
+        );
+        assert_refused(folder_is_there(&file, Session), "is not a folder");
+    }
+
+    // Explorer ends an unquoted path at a comma, so every path goes to it
+    // quoted, a drive's top among them.
+    #[test]
+    fn explorer_is_given_the_path_quoted() {
+        assert_eq!(
+            quoted(Path::new(r"D:\All\Markets,Outlook")),
+            OsString::from(r#""D:\All\Markets,Outlook""#)
+        );
+        assert_eq!(quoted(Path::new(r"D:\")), OsString::from(r#""D:\""#));
+        assert_eq!(
+            quoted(Path::new(r"C:\Users\Stora Studion\AppData")),
+            OsString::from(r#""C:\Users\Stora Studion\AppData""#)
+        );
     }
 
     #[test]

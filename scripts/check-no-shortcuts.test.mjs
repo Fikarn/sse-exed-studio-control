@@ -273,6 +273,21 @@ const SHELL_UNSAFE = [
     blocks: 1,
     reason,
   })),
+  // The Session page's folder (D52).
+  {
+    file: "src/shell_folder_dialog.rs",
+    item: "fn show_folder_dialog(",
+    blocks: 1,
+    reason:
+      "Windows' folder dialog is COM's: made, shown modal to the studio window and read on a thread of its own, in its own apartment.",
+  },
+  {
+    file: "src/main.rs",
+    item: "fn fail_critical_errors_quietly(",
+    blocks: 1,
+    reason:
+      "Windows' error mode is read and set by two calls of kernel32 at the start, so a drive with no disk in it never raises a box.",
+  },
 ];
 
 // Where the pictures helper may use `unsafe`: the renderer's Direct3D calls (D30) and NDI's
@@ -440,8 +455,13 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
   const everySource = shellSources.map(([, source]) => source).join("\n");
   assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(everySource), "the shell never sets them on");
   assertUnsafeOnlyWhereListed(shellSources, SHELL_UNSAFE);
-  // The shell's crate takes the display calls and the picture layer's from the one windows crate,
-  // by these features and no others.
+  // Windows' error mode is set first, before anything else starts (D52).
+  assert.ok(
+    /\nfn main\(\) \{\n\s*fail_critical_errors_quietly\(\);/.test(main),
+    "main() sets Windows' error mode before anything else"
+  );
+  // The shell's crate takes the display calls, the picture layer's, the folder dialog's and the
+  // error mode's from the one windows crate, by these features and no others.
   assert.deepEqual(
     windowsFeatures("tauri-shell"),
     [
@@ -452,9 +472,13 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
       "Win32_Graphics_DirectComposition",
       "Win32_Graphics_Dxgi",
       "Win32_Security",
+      "Win32_System_Com",
+      "Win32_System_Diagnostics_Debug",
       "Win32_System_Threading",
+      "Win32_UI_Shell",
+      "Win32_UI_Shell_Common",
     ],
-    "the shell's windows crate has the display configuration's features and the picture layer's"
+    "the shell's windows crate has the display configuration's features, the picture layer's, the folder dialog's and the error mode's"
   );
   // The shell's lints are the workspace's, with unsafe_code at deny (a forbid cannot be lifted for one item).
   const workspace = readFileSync(path.join(repoRoot, "native/Cargo.toml"), "utf8");

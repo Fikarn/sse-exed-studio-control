@@ -39,6 +39,11 @@ tauri-plugin-single-instance = "2.4.4"
 # takes DirectComposition, the Direct3D device its device is made on, and the
 # two features a surface handle is made and handed over with. The crate is
 # the one already locked.
+#
+# The Session page's folder (D52): Windows' folder dialog
+# (`shell_folder_dialog.rs`) takes COM and the shell's dialog and items, and
+# the shell sets Windows' error mode at its start (`main.rs`), from the
+# crate's debugging calls. Nothing new is fetched.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38.2"
 windows = { version = "0.61", features = [
@@ -49,12 +54,16 @@ windows = { version = "0.61", features = [
     "Win32_Graphics_DirectComposition",
     "Win32_Graphics_Dxgi",
     "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Diagnostics_Debug",
     "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
 ] }
 
 # The workspace's lints ([workspace.lints] in native/Cargo.toml), with one
 # difference: `unsafe_code` is `deny` here, not `forbid`, because a `forbid`
-# cannot be lifted even for one item. Eight functions carry an
+# cannot be lifted even for one item. Eleven functions carry an
 # `#[allow(unsafe_code)]`, all Windows only, and anything else that uses
 # `unsafe` still fails the build:
 #
@@ -64,9 +73,14 @@ windows = { version = "0.61", features = [
 # - `read_display_paths` in shell_displays.rs: Windows' display configuration
 #   is read through calls of user32 that fill lists and unions.
 # - `create_layer`, `new_surface`, `hand_over`, `let_go_of_helper`,
-#   `release` and `show` in shell_picture_layer.rs: DirectComposition's and
-#   Direct3D's COM calls, and the one handle duplicated into the pictures
-#   helper's process (and closed there when the helper was never told of it).
+#   `release`, `show` and `device_lost` in shell_picture_layer.rs:
+#   DirectComposition's and Direct3D's COM calls, and the one handle
+#   duplicated into the pictures helper's process (and closed there when the
+#   helper was never told of it).
+# - `show_folder_dialog` in shell_folder_dialog.rs: Windows' folder dialog is
+#   COM's, on its own thread in its own apartment (D52).
+# - `fail_critical_errors_quietly` in main.rs: Windows' error mode, set once
+#   at the start (D52).
 #
 # `scripts/check-no-shortcuts.test.mjs` holds the list.
 [lints.rust]
