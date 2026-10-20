@@ -47,6 +47,16 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* A value with a tone (D52): the `Disk` item's free space while the drive
+     reads low or nearly full. */
+  .value.attention {
+    color: var(--role-yellow-text);
+  }
+
+  .value.error {
+    color: var(--role-coral-text);
+  }
+
   /* The action key keeps the right edge. New pages program, Slice 3: the key
      hints that pushed it there left (D6), so the key pushes itself. */
   .action {

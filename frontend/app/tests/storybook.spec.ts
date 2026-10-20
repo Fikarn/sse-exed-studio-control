@@ -16,9 +16,10 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // rest but the header's, the Shell board, which holds those (the tabs, the
 // lamps, the REC tally and the logotype), the Overview board, which holds the
 // Overview's parts (D47: the rooms, the status card, the speed tape), the
-// Session board, which holds the Session page's Rooms (D51), and the boards of
-// the overlays held open (their names end ", open": the menus, and the
-// Session page's window);
+// Session board, which holds the Session page's Rooms (D51), the Disk board,
+// which holds the level bar in the window's disk row and the footer's Disk
+// item at the drive's three levels (D52), and the boards of the overlays held
+// open (their names end ", open": the menus, and the Session page's window);
 // `ui-contract.spec.ts` measures every one of their pages. The shell's page
 // stories are gone (2026-09-28): `visual-review.spec.ts` captures the same
 // boards from the same fixtures. The
@@ -55,6 +56,7 @@ const stories: StoryEntry[] = Object.values(index.entries)
       story.name === "Shell" ||
       story.name === "Overview" ||
       story.name === "Session" ||
+      story.name === "Disk" ||
       story.name.endsWith(", open")
   );
 
