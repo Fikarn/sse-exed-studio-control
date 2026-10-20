@@ -31,6 +31,8 @@ export { Slider, Groove } from "./components/Slider";
 export type { GrooveProps, SliderBaseProps, SliderMark, SliderProps } from "./components/Slider";
 export { Meter } from "./components/Meter";
 export type { MeterProps } from "./components/Meter";
+export { LevelBar } from "./components/LevelBar";
+export type { LevelBarProps, LevelBarTone } from "./components/LevelBar";
 export { PlateHead, Section, Fields, Readouts, ControlRow, Danger } from "./components/Plate";
 export type { ControlRowProps, PlateHeadProps, ReadoutRow, ReadoutsProps, SectionProps } from "./components/Plate";
 export { EmptyLine } from "./components/EmptyLine";

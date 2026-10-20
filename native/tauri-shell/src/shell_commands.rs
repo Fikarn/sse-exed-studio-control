@@ -268,7 +268,9 @@ mod window_gate_tests {
         "engine_stop",
         "engine_summary",
         "shell_open_path",
+        "shell_open_session_folder",
         "shell_export_diagnostics",
+        "shell_pick_folder",
         "shell_enter_studio_fullscreen",
         "shell_reset_window_layout",
         "shell_confirm_close",
@@ -298,6 +300,7 @@ mod window_gate_tests {
                 [
                     "shell_commands",
                     "shell_paths",
+                    "shell_folder_dialog",
                     "shell_window_layout",
                     "shell_prompter_window",
                     "shell_pictures",

@@ -9,11 +9,15 @@ import styles from "./Footer.module.css";
 // the footer prints no key hints; the slot that held them is gone. The
 // skylight (D48): the footer is the header's raised layer, and inside the
 // shell it ends with the product's name as its colophon, the name the header
-// gave up beside the logotype.
+// gave up beside the logotype. The Session page's step 2 (D52): an item's
+// value can take a tone, yellow or coral, as the `Disk` item's free space does
+// while the drive reads low or nearly full; its label stays quiet.
 export interface FooterItem {
   id?: string;
   label: string;
   value: ReactNode;
+  /** Colours the value: `attention` (yellow) or `error` (coral). Quiet without. */
+  tone?: "attention" | "error";
 }
 
 export interface FooterProps {
@@ -33,8 +37,9 @@ export const Footer = ({ items, action, testId, itemsTestId }: FooterProps) => {
     <footer className={styles.footer} data-health-bar="" data-region="footer" data-material="bar" data-testid={testId}>
       <div className={styles.items} data-testid={itemsTestId}>
         {items.map((item, index) => (
-          <span key={item.id ?? `${item.label}:${index}`} className={styles.item}>
-            <span className={styles.label}>{item.label}</span> <b className={styles.value}>{item.value}</b>
+          <span key={item.id ?? `${item.label}:${index}`} className={styles.item} data-tone={item.tone}>
+            <span className={styles.label}>{item.label}</span>{" "}
+            <b className={[styles.value, item.tone ? styles[item.tone] : ""].filter(Boolean).join(" ")}>{item.value}</b>
           </span>
         ))}
       </div>

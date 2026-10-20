@@ -25,4 +25,10 @@ interface Window {
   __SSE_TEST_GLASS__?: {
     request: (method: string, params?: Record<string, never>) => Promise<unknown>;
   };
+  /**
+   * The shell's two folder calls in a browser (D52, `shellCommands.ts`): a
+   * spec sets the folder dialog's answer, and reads what `Open the folder`
+   * asked for.
+   */
+  __SSE_TEST_SHELL__?: import("../../src/app/shellCommands").ShellTestHooks;
 }

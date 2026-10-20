@@ -16,6 +16,7 @@ import { ArmKey, Key, Segmented } from "../components/Key";
 import { Lamp, type LampTone } from "../components/Lamp";
 import { LampChip } from "../components/LampChip";
 import { LampWord, Latch, LatchSlot } from "../components/LampWord";
+import { LevelBar, type LevelBarTone } from "../components/LevelBar";
 import { Menu, type MenuEntry } from "../components/Menu";
 import { MenuButton } from "../components/MenuButton";
 import { Meter } from "../components/Meter";
@@ -46,8 +47,9 @@ import { Field, Readout, Screen } from "../components/Well";
 // scrolling. The page tests measure every board (ui-contract.spec.ts) and
 // capture the Sheet, which holds them all but the header's, the Shell board,
 // which holds those, the board of the menus and overlays open, the Overview
-// board, which holds the Overview's parts at their own widths, and the
-// Session boards, the Rooms and their window open (storybook.spec.ts).
+// board, which holds the Overview's parts at their own widths, the Session
+// boards, the Rooms and their window open, and the Disk board, the level bar
+// in its row and the footer's Disk item (storybook.spec.ts).
 
 /** A card stands at the cluster's inner width (424 less its 24 px gutters). */
 const CARD_WIDTH = 376;
@@ -1372,6 +1374,109 @@ function SessionWindowOpen() {
   );
 }
 
+// The Session page's disk (D52; board 3, `docs/design/session-3.md`): the
+// drive's row as the window's right column holds it, at its three levels, the
+// level bar quiet, yellow and coral and the row saying LOW or NEARLY FULL
+// itself; and the footer's `Disk` item in each tone, beside the Session page's
+// other items. In Explorer's units, as the page writes them: D: is 3.73 TB.
+
+/** The window's right column, as board 3 measures it. */
+const DISK_COLUMN = 549;
+
+/** Storage 1 (D:) in Explorer's GB: 4,096,787,476,480 bytes, read on 2026-10-19. */
+const DISK_GB = 4_096_787_476_480 / 1024 ** 3;
+
+interface DiskLevel {
+  level: string;
+  free: string;
+  freeGb: number;
+  tone: LevelBarTone;
+  word?: string;
+  lasts: string;
+}
+
+const DISK_LEVELS: readonly DiskLevel[] = [
+  { level: "plenty", free: "2.00 TB", freeGb: 2_200_414_797_824 / 1024 ** 3, tone: "quiet", lasts: "about 45 h" },
+  { level: "low", free: "140 GB", freeGb: 140, tone: "attention", word: "Low", lasts: "about 3 h 05 min" },
+  { level: "nearly full", free: "28 GB", freeGb: 28, tone: "error", word: "Nearly full", lasts: "about 35 min" },
+];
+
+const DISK_INK: Record<LevelBarTone, string> = {
+  quiet: "var(--text-text)",
+  attention: "var(--role-yellow-text)",
+  error: "var(--role-coral-text)",
+};
+
+const diskTop: CSSProperties = { display: "flex", alignItems: "baseline", gap: 10, whiteSpace: "nowrap" };
+
+const diskWords = (weight: string, size: string, color: string, lineHeight = "1"): CSSProperties => ({
+  font: `var(${weight}) var(${size}) / ${lineHeight} var(--font-family-ui)`,
+  color: `var(${color})`,
+});
+
+function DiskRow({ free, freeGb, tone, word, lasts }: DiskLevel) {
+  return (
+    <div>
+      <div style={diskTop}>
+        <b style={diskWords("--font-weight-bold", "--font-size-body", "--text-text2")}>Storage 1 (D:)</b>
+        <span
+          style={{ ...diskWords("--font-weight-regular", "--font-size-label", "--text-text3"), marginLeft: "auto" }}
+        >
+          <b style={{ fontWeight: "var(--font-weight-bold)", color: DISK_INK[tone] }}>{free}</b> free of 3.73 TB
+        </span>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <LevelBar used={1 - freeGb / DISK_GB} tone={tone} label="Storage 1 (D:)" />
+      </div>
+      <div
+        style={{
+          ...diskWords("--font-weight-regular", "--font-size-label", "--text-text3", "1.3"),
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 8,
+        }}
+      >
+        {word ? <LampWord tone={tone === "error" ? "error" : "attention"}>{word}</LampWord> : null}
+        <span>{lasts} at the rate of the last podcast recording (61 GB in 1 h 20 min)</span>
+      </div>
+    </div>
+  );
+}
+
+const diskFooterItems = ({ free, tone }: DiskLevel) => [
+  { id: "takes", label: "Takes today", value: "none yet · 4 yesterday" },
+  { id: "sync", label: "Last sync", value: "none since the start" },
+  { id: "backup", label: "Backup", value: "today 09:12" },
+  {
+    id: "disk",
+    label: "Disk",
+    value: `${free} free on Storage 1`,
+    tone: tone === "quiet" ? undefined : tone,
+  },
+];
+
+function DiskCards() {
+  return (
+    <div style={overviewBoard}>
+      <div style={overviewColumn}>
+        {DISK_LEVELS.map((disk) => (
+          <Wide key={disk.level} title={`LevelBar · ${disk.level}, in the window's disk row`} width={DISK_COLUMN}>
+            <DiskRow {...disk} />
+          </Wide>
+        ))}
+      </div>
+      <div style={overviewColumn}>
+        {DISK_LEVELS.map((disk) => (
+          <Wide key={disk.level} title={`Footer · the Disk item, ${disk.level}`} width={1200}>
+            <Footer items={diskFooterItems(disk)} />
+          </Wide>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Sheet() {
   return (
     <>
@@ -1672,5 +1777,6 @@ export const ShellBoard: Story = {
 export const OverviewBoard: Story = { name: "Overview", render: () => <OverviewCards /> };
 export const SessionBoard: Story = { name: "Session", render: () => <SessionCards /> };
 export const SessionWindowOpenBoard: Story = { name: "Session window, open", render: () => <SessionWindowOpen /> };
+export const DiskBoard: Story = { name: "Disk", render: () => <DiskCards /> };
 export const WholeSheet: Story = { name: "Sheet", render: () => <Sheet /> };
 export const MenusAndOverlaysOpenBoard: Story = { name: "Menus and overlays, open", render: () => <OverlaysOpen /> };

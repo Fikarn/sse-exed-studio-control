@@ -192,6 +192,37 @@ describe("Footer", () => {
     render(<Footer items={[{ label: "Console", value: "confirmed" }]} testId="marked-footer" />);
     expect(screen.getByTestId("marked-footer")).toHaveAttribute("data-health-bar");
   });
+
+  // The Session page's step 2 (D52): the `Disk` item's free space takes the
+  // drive's tone, yellow while it reads low and coral while nearly full; its
+  // label stays quiet, and an item without a tone is as it was.
+  it("colours a value by its tone and leaves its label quiet", () => {
+    render(
+      <Footer
+        items={[
+          { id: "backup", label: "Backup", value: "today 09:12" },
+          { id: "low", label: "Disk", value: "140 GB free on Storage 1", tone: "attention" },
+          { id: "full", label: "Disk", value: "28 GB free on Storage 1", tone: "error" },
+        ]}
+      />
+    );
+    const quiet = screen.getByText("today 09:12");
+    const low = screen.getByText("140 GB free on Storage 1");
+    const full = screen.getByText("28 GB free on Storage 1");
+    expect(quiet.className).not.toMatch(/attention|error/);
+    expect(quiet.parentElement).not.toHaveAttribute("data-tone");
+    expect(low.className).toMatch(/attention/);
+    expect(low.parentElement).toHaveAttribute("data-tone", "attention");
+    expect(full.className).toMatch(/error/);
+    expect(full.parentElement).toHaveAttribute("data-tone", "error");
+    for (const value of [low, full]) {
+      expect(value.previousElementSibling).toHaveTextContent("Disk");
+      expect(value.previousElementSibling?.className).not.toMatch(/attention|error/);
+    }
+    const css = cssOf("Footer.module.css");
+    expect(css).toMatch(/\.value\.attention \{\s*color: var\(--role-yellow-text\);/);
+    expect(css).toMatch(/\.value\.error \{\s*color: var\(--role-coral-text\);/);
+  });
 });
 
 describe("AppShellFrame", () => {

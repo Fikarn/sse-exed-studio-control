@@ -6,6 +6,31 @@ import type { JsonValue, PicturePlaces } from "@sse/engine-client";
 /** Raised by the native shell when a window close still needs confirming. */
 export const SHELL_CLOSE_REQUESTED_EVENT = "shell://close-requested";
 
+/** What Windows' folder dialog chooses, which its title says (D52): where a new
+ *  session's folder is made, a session's folder that exists, or the sessions' folder. */
+export type FolderPurpose = "parent" | "existing" | "root";
+
+/** Which folder `Open the folder` opens: the running session's, or the sessions' folder. */
+export type SessionFolderWhich = "session" | "root";
+
+/**
+ * The page tests' stand-in for the shell's two folder calls in a browser (D52),
+ * where no shell runs: the folder dialog's answer, and the folders the page asked
+ * Explorer for.
+ */
+export interface ShellTestHooks {
+  /** The folder dialog's answer: a path, or `null` for a cancel. Unset, it answers `null`. */
+  pickFolder?: (start: string | null, purpose: FolderPurpose) => string | null | Promise<string | null>;
+  /** What each `openSessionFolder` asked for, in order; kept from the first call when unset. */
+  opened?: SessionFolderWhich[];
+}
+
+declare global {
+  interface Window {
+    __SSE_TEST_SHELL__?: ShellTestHooks;
+  }
+}
+
 function tauriAvailable() {
   return "__TAURI_INTERNALS__" in window;
 }
@@ -44,6 +69,48 @@ export async function openShellPath(path: string) {
   }
 
   return normalizedPath;
+}
+
+/**
+ * Windows' own folder dialog, owned by the studio window (D52), started in
+ * `start` when it names a folder there: the chosen folder's path, as Windows
+ * writes it, or `null` when the operator cancelled. A dialog that did not open
+ * rejects with the shell's sentence (`FOLDER_DIALOG_FAILED: …`). In a browser
+ * the page tests' hook answers, else `null`.
+ */
+export async function pickFolder(start: string | null, purpose: FolderPurpose): Promise<string | null> {
+  if (tauriAvailable()) {
+    try {
+      return await invoke<string | null>("shell_pick_folder", { start, purpose });
+    } catch (error) {
+      throw toError(error, "Windows' folder dialog did not open.");
+    }
+  }
+
+  return (await window.__SSE_TEST_SHELL__?.pickFolder?.(start, purpose)) ?? null;
+}
+
+/**
+ * Opens the running session's folder, or the sessions' folder, in Explorer
+ * (D52). The page names no path: the shell asks the hardware link for the
+ * folder. When there is none, or it is not there, the call rejects with the
+ * shell's sentence (`NO_SESSION_FOLDER: …`). In a browser the call is kept in
+ * the page tests' hook.
+ */
+export async function openSessionFolder(which: SessionFolderWhich): Promise<void> {
+  if (tauriAvailable()) {
+    try {
+      await invoke("shell_open_session_folder", { which });
+    } catch (error) {
+      throw toError(error, "The folder was not opened.");
+    }
+    return;
+  }
+
+  const hooks = window.__SSE_TEST_SHELL__;
+  if (hooks) {
+    hooks.opened = [...(hooks.opened ?? []), which];
+  }
 }
 
 /**
