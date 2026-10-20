@@ -112,12 +112,16 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
       );
     case "session":
       // The Session page (2026-10-15): the running session or `null`, and the last of each kind;
-      // since step 2 (D52) the settings and the places too.
+      // since step 2 (D52) the settings and the places too, and what the sessions' watch read:
+      // the sessions' folder's newest folders, the drives and vMix.
       return firstProblem(
         objectProblem(value, "current", { nullable: true }),
         listProblem(value, "last", { ids: false }),
         objectProblem(value, "settings"),
-        objectProblem(value, "places")
+        objectProblem(value, "places"),
+        listProblem(value, "recent", { ids: false }),
+        listProblem(value, "drives", { ids: false }),
+        objectProblem(value, "vmix")
       );
     default:
       return null;

@@ -5,13 +5,13 @@ import type { Session } from "../../generated/snapshots/Session";
 import type { SessionBeginReply } from "../../generated/snapshots/SessionBeginReply";
 import type { SessionEndReply } from "../../generated/snapshots/SessionEndReply";
 import type { SessionSettingsReply } from "../../generated/snapshots/SessionSettingsReply";
-import type { SessionSnapshot } from "../../generated/snapshots/SessionSnapshot";
 import { EngineRequestError } from "../engineRequestError";
 import { cloneJson } from "./json";
 import { NOT_HANDLED, type FixtureRequestContext, type FixtureRequestResult } from "./requestContext";
 import { folderChoice, folderLeaf, localDay, makeFolder, planFolder } from "./sessionFolder";
 import { updatedSettings } from "./sessionSettings";
 import {
+  RECENT_FOLDERS,
   SESSION_NAME_MAX_CHARACTERS,
   fixtureSession,
   isSessionKind,
@@ -20,12 +20,15 @@ import {
   trimmedName,
   type FixtureSession,
 } from "./sessionState";
+import { measuredSize, sessionSnapshotOf } from "./sessionWatch";
 
 // The session's requests (the Session page, 2026-10-15; D52;
 // `native/rust-engine/src/session/commands.rs`): the read, a begin, which makes or chooses its
 // folder on the double's disk, an end, and the settings' update, with the hardware link's
 // checks in its order, its refusals and its sentences. A begin, an end and an update raise
-// `session.changed { reason }`; a read and a refusal raise nothing.
+// `session.changed { reason }`; a read and a refusal raise nothing. What the hardware link's
+// watch reads is the double's data (`sessionWatch.ts`): a running session's folder keeps the
+// measure it was seeded with, and an end keeps it with the session.
 
 export const SESSION_METHODS: ReadonlySet<RequestMethod> = new Set<RequestMethod>([
   "session.snapshot",
@@ -40,21 +43,10 @@ function invalidParams(message: string): EngineRequestError {
   return new EngineRequestError("INVALID_PARAMS", message);
 }
 
-function snapshotOf(session: FixtureSession): SessionSnapshot {
-  return {
-    current: session.current,
-    last: oneOfEachKind(session.last),
-    settings: session.settings,
-    places: {
-      root: session.simulated ? session.scratchRoot : session.settings.root,
-      simulated: session.simulated,
-    },
-  };
-}
-
 /**
  * `session.begin { kind, name?, folder? }`: the folder is made or chosen, then the session
- * begins; a running session ends at the same moment and becomes its kind's last.
+ * begins; a running session ends at the same moment and becomes its kind's last. A new
+ * folder on the sessions' folder is its newest, as the watch's next read finds it.
  */
 function begin(context: FixtureRequestContext, session: FixtureSession, params: JsonObject): SessionBeginReply {
   const { kind, name } = params;
@@ -87,12 +79,25 @@ function begin(context: FixtureRequestContext, session: FixtureSession, params: 
   const folder = makeFolder(session.disk, plan);
 
   const at = now.toISOString();
-  const ended: Session | null = session.current ? { ...session.current, endedAt: at } : null;
-  const begun: Session = { kind, name: trimmed, begunAt: at, endedAt: null, folder: folder.path };
+  if (folder.made && plan.mode === "new" && plan.root !== null) {
+    const leaf = folder.path.slice(folder.path.lastIndexOf("\\") + 1);
+    session.recent = [{ name: leaf, path: folder.path, createdAt: at, bytes: 0 }, ...session.recent].slice(
+      0,
+      RECENT_FOLDERS
+    );
+  }
+  const ended: Session | null = session.current ? ending(session, session.current, at) : null;
+  const begun: Session = { kind, name: trimmed, begunAt: at, endedAt: null, folder: folder.path, folderBytes: null };
   if (ended) session.last = oneOfEachKind([ended, ...session.last]);
   session.current = begun;
   context.emit("session.changed", { reason: "begun" });
   return { session: begun, ended, folder };
+}
+
+/** A session ending at `endedAt`, with the watch's last measure of its folder kept with it
+ *  (`ending` in `commands.rs`). */
+function ending(session: FixtureSession, running: Session, endedAt: string): Session {
+  return { ...running, endedAt, folderBytes: measuredSize(session, running.folder) ?? running.folderBytes };
 }
 
 /** `session.end`: the running session ends now and becomes its kind's last. */
@@ -100,7 +105,7 @@ function end(context: FixtureRequestContext, session: FixtureSession): SessionEn
   if (!session.current) {
     throw new EngineRequestError("SESSION_NOT_RUNNING", "No session is running, so there is none to end.");
   }
-  const ended: Session = { ...session.current, endedAt: new Date().toISOString() };
+  const ended = ending(session, session.current, new Date().toISOString());
   session.last = oneOfEachKind([ended, ...session.last]);
   session.current = null;
   context.emit("session.changed", { reason: "ended" });
@@ -134,6 +139,6 @@ export function handleFixtureSessionRequest(
     case "session.settings.update":
       return cloneJson(updateSettings(context, session, params));
     default:
-      return cloneJson(snapshotOf(session));
+      return cloneJson(sessionSnapshotOf(session));
   }
 }

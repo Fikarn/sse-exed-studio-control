@@ -11,7 +11,20 @@
 //! folder made, the kind's subfolders made in it. A new folder that is there
 //! already (a second session of that name the same day) is used as it is,
 //! and nothing is made in it.
+//!
+//! Its drive there: a drive the sessions' watch's last read found not
+//! answering is refused at once, without asking it (`watch.rs`), so the
+//! request loop does not wait on a share the watch found hanging; any other
+//! is asked whether its top is there, as before the watch's first read. A
+//! drive that was not there at the last read is asked too: a missing letter
+//! answers at once, and one plugged in since is found. So a begin can still
+//! wait on the request loop for Windows' own timeout on a share that hangs
+//! where the watch has not found it so: before the watch's first report, on
+//! a drive the last read found answering or did not find (until the next
+//! read, about 30 s with the passes' own time), and in the begin's own
+//! checks and acts on the chosen folder.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf, Prefix};
@@ -194,7 +207,7 @@ pub(crate) fn read_drive_path(text: &str) -> Result<DrivePath, PathProblem> {
 
 /// The drive a path is on, by its letter; `None` for a path on no lettered
 /// drive.
-fn drive_letter(path: &Path) -> Option<char> {
+pub(crate) fn drive_letter(path: &Path) -> Option<char> {
     match path.components().next() {
         Some(Component::Prefix(prefix)) => match prefix.kind() {
             Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
@@ -231,7 +244,10 @@ fn refused(code: &'static str, sentence: String) -> SessionError {
 /// The checks for a begin's folder, in their order (the module's doc). The
 /// new folder's name is `folder_leaf`'s for `name` on `day`; `subfolders`
 /// are the kind's, as the settings hold them; `root_setting` is the
-/// sessions' folder the settings name, which only the studio's build uses.
+/// sessions' folder the settings name, which only the studio's build uses;
+/// `not_answering` holds the letters whose drive the sessions' watch last
+/// found not answering.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_folder(
     choice: &SessionFolderChoice,
     kind: SessionKind,
@@ -240,6 +256,7 @@ pub(crate) fn plan_folder(
     root_setting: &str,
     subfolders: &[String],
     places: &Places,
+    not_answering: &BTreeSet<char>,
 ) -> Result<FolderPlan, SessionError> {
     // The folder's shape.
     let chosen = match choice {
@@ -259,6 +276,15 @@ pub(crate) fn plan_folder(
     // Its drive there.
     if let (SessionFolderChoice::Existing { .. }, Some(existing)) = (choice, &chosen) {
         let letter = existing.letter();
+        if not_answering.contains(&letter) {
+            return Err(refused(
+                SESSION_DRIVE_MISSING,
+                format!(
+                    "{letter}: does not answer, so {} cannot be used. Choose another folder.",
+                    existing.text
+                ),
+            ));
+        }
         if !drive_there(letter) {
             return Err(refused(
                 SESSION_DRIVE_MISSING,
@@ -296,6 +322,14 @@ pub(crate) fn plan_folder(
         }
     };
     if let Some(letter) = drive_letter(&parent) {
+        if not_answering.contains(&letter) {
+            return Err(refused(
+                SESSION_DRIVE_MISSING,
+                format!(
+                    "{letter}: does not answer, so the session's folder cannot be made there. Choose a folder on another drive, or set another sessions' folder in Setup / Support."
+                ),
+            ));
+        }
         if !drive_there(letter) {
             return Err(refused(
                 SESSION_DRIVE_MISSING,

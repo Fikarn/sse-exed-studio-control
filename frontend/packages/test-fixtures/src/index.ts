@@ -344,7 +344,10 @@ function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
 // morning's Sync, so every page reads READY and a window's one note is the session its Begin
 // would end. The sessions' names are made up, as the boards' are: the repository is public.
 // Each session has its folder on the studio's sessions' folder, `D:\Sessions` (D52), named by
-// its day, and the folders are on the double's disk.
+// its day, with its kind's subfolders, and the folders are on the double's disk; the watch
+// has measured each, and they are the sessions' folder's newest. The drives are the double's
+// own, the studio PC's four with D: well above Low; vMix answers, records nothing, and names
+// its last file, which went to a folder of the week before.
 //
 // - choose, window: no session runs; `window` is the podcast Room's window, which the layout
 //   gate's step opens (`BOARD_STEPS`).
@@ -353,16 +356,19 @@ function buildOverviewFixture(moment: OverviewMoment): FixtureScenarioRecord {
 //   running session's own window.
 type SessionMoment = "choose" | "window" | "running" | "running-window";
 
-/** The running session: begun 25 minutes before the captures' 09:11 (06:46 UTC), in the folder its Begin made (D52). */
+const GIB = 1024 ** 3;
+
+/** The running session: begun 25 minutes before the captures' 09:11 (06:46 UTC), in the folder its Begin made (D52), 18 GB so far. */
 const SESSION_RUNNING = {
   kind: "podcast",
   name: "Leading Through Change — episode 3",
   begunAt: "2026-04-23T06:46:00.000Z",
   endedAt: null,
   folder: "D:\\Sessions\\Leading Through Change — episode 3 (2026-04-23)",
+  folderBytes: 18 * GIB,
 };
 
-/** The last session of each kind, newest first: Wednesday's podcast, Tuesday's lecture, a webinar of the week before. */
+/** The last session of each kind, newest first: Wednesday's podcast, Tuesday's lecture, a webinar of the week before; each folder's size at its end. */
 const SESSION_LAST = [
   {
     kind: "podcast",
@@ -370,6 +376,7 @@ const SESSION_LAST = [
     begunAt: "2026-04-22T12:02:00.000Z",
     endedAt: "2026-04-22T13:16:00.000Z",
     folder: "D:\\Sessions\\Leading Through Change — episode 2 (2026-04-22)",
+    folderBytes: 61 * GIB,
   },
   {
     kind: "green-screen",
@@ -377,6 +384,7 @@ const SESSION_LAST = [
     begunAt: "2026-04-21T08:30:00.000Z",
     endedAt: "2026-04-21T09:52:00.000Z",
     folder: "D:\\Sessions\\Strategy in Practice — lecture 3 (2026-04-21)",
+    folderBytes: 66 * GIB,
   },
   {
     kind: "webinar",
@@ -384,17 +392,45 @@ const SESSION_LAST = [
     begunAt: "2026-04-17T13:00:00.000Z",
     endedAt: "2026-04-17T14:05:00.000Z",
     folder: "D:\\Sessions\\Markets Outlook, spring (2026-04-17)",
+    folderBytes: 21 * GIB,
   },
 ];
 
-/** The session's seed: the sessions given, on the studio's sessions' folder, each folder on the double's disk. */
+/** The subfolders a Begin of each kind made (the settings' defaults, D52). */
+const KIND_SUBFOLDERS: Record<string, string[]> = {
+  "green-screen": ["Video", "vMix Recording", "Script", "Exports"],
+  podcast: ["Audio", "Video", "vMix Recording", "Exports"],
+  webinar: ["Slides", "vMix Recording", "Exports"],
+};
+
+/** vMix's last recording, made a week before in a folder of the old sessions' folder, `D:\All`. */
+const VMIX_LAST_FILE =
+  "D:\\All\\Leading Through Change — episode 1 (2026-04-15)\\vMix Recording\\capture - 15 April 2026 - 02-05-11 pm.avi";
+
+/**
+ * The session's seed: the sessions given, on the studio's sessions' folder, each folder and
+ * its kind's subfolders on the double's disk, the folders the sessions' folder's newest by
+ * the time each Begin made it, and vMix's word.
+ */
 function sessionSeed(current: typeof SESSION_RUNNING | null, last: typeof SESSION_LAST) {
   const sessions = current === null ? last : [current, ...last];
   return {
     ...(current === null ? {} : { current }),
     last,
     places: { root: "D:\\Sessions", simulated: false },
-    folders: sessions.map((session) => session.folder),
+    folders: sessions.flatMap((session) => [
+      session.folder,
+      ...(KIND_SUBFOLDERS[session.kind] ?? []).map((subfolder) => `${session.folder}\\${subfolder}`),
+    ]),
+    recent: [...sessions]
+      .sort((one, other) => other.begunAt.localeCompare(one.begunAt))
+      .map((session) => ({
+        name: session.folder.slice("D:\\Sessions\\".length),
+        path: session.folder,
+        createdAt: session.begunAt,
+        bytes: session.folderBytes,
+      })),
+    vmix: { state: "answering", recording: false, file: VMIX_LAST_FILE },
   };
 }
 

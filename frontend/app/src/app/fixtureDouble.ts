@@ -6,7 +6,9 @@ import {
   createFixtureTransport,
   fixturePicturesLink,
   simulatedCameras,
+  simulatedSession,
   type SimulatedCameraHooks,
+  type SimulatedSessionHooks,
 } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
@@ -17,11 +19,17 @@ declare global {
      * on a camera's body, a camera that stops answering and answers again.
      */
     __SSE_TEST_CAMERAS__?: SimulatedCameraHooks;
+    /**
+     * The page tests' hold on what the double's sessions' watch reads (D52):
+     * vMix's word, and a drive's space, one that stops answering or goes.
+     */
+    __SSE_TEST_SESSION__?: SimulatedSessionHooks;
   }
 }
 
 export function createFixtureDouble(fixtureId: string) {
   const transport = createFixtureTransport(getFixtureScenario(fixtureId));
   window.__SSE_TEST_CAMERAS__ = simulatedCameras(transport);
+  window.__SSE_TEST_SESSION__ = simulatedSession(transport);
   return { transport, pictures: fixturePicturesLink(transport) };
 }

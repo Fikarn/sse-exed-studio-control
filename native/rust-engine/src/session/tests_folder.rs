@@ -587,9 +587,11 @@ fn the_settings_read_their_defaults_and_the_places() {
             "nearlyFullBelowGb": 50
         })
     );
+    // Before the sessions' watch has read, the sessions' folder is not
+    // known to be there (`tests_watch.rs` has the watch's parts).
     assert_eq!(
         snapshot["places"],
-        json!({ "root": text(&test.places.scratch_root), "simulated": true })
+        json!({ "root": text(&test.places.scratch_root), "simulated": true, "rootExists": false })
     );
     let mut keys: Vec<&str> = snapshot
         .as_object()
@@ -598,7 +600,20 @@ fn the_settings_read_their_defaults_and_the_places() {
         .map(String::as_str)
         .collect();
     keys.sort_unstable();
-    assert_eq!(keys, ["current", "last", "places", "settings"]);
+    assert_eq!(
+        keys,
+        [
+            "current",
+            "drives",
+            "last",
+            "places",
+            "readAt",
+            "recent",
+            "sessionDrive",
+            "settings",
+            "vmix"
+        ]
+    );
 }
 
 // Said once for its key: `saved_json`'s own test holds the once.

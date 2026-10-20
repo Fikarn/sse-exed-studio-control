@@ -7,6 +7,8 @@ use super::tests::{app_for, TestDir};
 use super::EngineApp;
 use crate::action_log::{list_recent_actions, DOMAIN_SESSION};
 use crate::cameras::runtime;
+use crate::session::drives::{DriveRead, Space, GIB};
+use crate::session::watch::{hardware_links_board, RootRead, WatchReport};
 use serde_json::{json, Value};
 use studio_control_protocol::RequestEnvelope;
 
@@ -97,9 +99,14 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
     // data (D52).
     let scratch = app.runtime.app_data_dir.join("Sessions");
     assert_eq!(
-        snapshot["places"],
-        json!({ "root": scratch.display().to_string(), "simulated": true })
+        (
+            &snapshot["places"]["root"],
+            &snapshot["places"]["simulated"]
+        ),
+        (&json!(scratch.display().to_string()), &json!(true))
     );
+    // A simulated run never reads vMix.
+    assert_eq!(snapshot["vmix"]["state"], "simulated");
     assert!(read.events.is_empty(), "a read raises nothing");
 
     let begun = request(
@@ -257,6 +264,53 @@ fn a_begin_and_an_end_raise_session_changed_and_leave_their_rows_in_order() {
     let read = request(&app, "session.snapshot", json!({}));
     assert!(read.events.is_empty());
     assert_eq!(session_rows(&app), expected, "neither leaves a row");
+}
+
+// The request reads the sessions' watch's report off the hardware link's
+// board (D52). This is the one test that puts a report there: of its own
+// sessions' folder, with a drive that answers, so no other test's begin is
+// refused by it, and taken off at once.
+#[test]
+fn the_session_snapshot_reads_the_watchs_report_off_its_board() {
+    let test_dir = TestDir::new("session-board");
+    let app = app_for(&test_dir);
+    let scratch = app.runtime.app_data_dir.join("Sessions");
+    let letter = crate::session::folder::drive_letter(&scratch).expect("a lettered drive");
+    let board = hardware_links_board();
+    board.publish(WatchReport {
+        read_at: Some(String::from("2026-10-19T08:00:00.000Z")),
+        drives: vec![DriveRead {
+            letter,
+            name: String::from("Local Disk"),
+            mapped: false,
+            space: Some(Space {
+                free_bytes: 900 * GIB,
+                total_bytes: 3_815 * GIB,
+            }),
+        }],
+        root: Some(RootRead {
+            path: scratch.display().to_string(),
+            exists: true,
+            recent: Vec::new(),
+        }),
+        ..WatchReport::default()
+    });
+    let snapshot = result(&app, "session.snapshot", json!({}));
+    board.clear();
+    assert_eq!(snapshot["readAt"], "2026-10-19T08:00:00.000Z");
+    assert_eq!(snapshot["places"]["rootExists"], true);
+    assert_eq!(
+        snapshot["drives"],
+        json!([{ "letter": letter.to_string(), "name": "Local Disk", "mapped": false,
+                 "answering": true, "freeBytes": 900 * GIB, "totalBytes": 3_815 * GIB,
+                 "level": "ok" }])
+    );
+    assert_eq!(snapshot["sessionDrive"], letter.to_string());
+    assert_eq!(
+        result(&app, "session.snapshot", json!({}))["readAt"],
+        Value::Null,
+        "off the board, nothing is read"
+    );
 }
 
 // The Session page is a page the hardware link keeps, and the default page

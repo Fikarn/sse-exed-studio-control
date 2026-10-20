@@ -35,11 +35,13 @@ const session = (over: Partial<Session> = {}): Session => ({
   begunAt: at(15, 9, 16),
   endedAt: null,
   folder: "D:\\Sessions\\Leading Through Change — episode 3 (2026-10-15)",
+  folderBytes: null,
   ...over,
 });
 
-/** What the session's read holds beside the sessions (D52): the settings' defaults and the studio's places. */
-const READ: Pick<SessionSnapshot, "settings" | "places"> = {
+/** What the session's read holds beside the sessions (D52): the settings' defaults, the
+ *  studio's places, and the watch's parts before its first read. */
+const READ: Omit<SessionSnapshot, "current" | "last"> = {
   settings: {
     root: "D:\\Sessions",
     subfolders: {
@@ -50,7 +52,19 @@ const READ: Pick<SessionSnapshot, "settings" | "places"> = {
     lowBelowGb: 200,
     nearlyFullBelowGb: 50,
   },
-  places: { root: "D:\\Sessions", simulated: false },
+  places: { root: "D:\\Sessions", simulated: false, rootExists: false },
+  recent: [],
+  drives: [],
+  sessionDrive: "D",
+  vmix: {
+    state: "not-read",
+    recording: false,
+    file: null,
+    inFolder: null,
+    bytesPerSecond: null,
+    recordingFolder: null,
+  },
+  readAt: null,
 };
 
 describe("the kinds", () => {

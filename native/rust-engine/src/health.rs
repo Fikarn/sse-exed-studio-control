@@ -39,6 +39,9 @@ pub(crate) const SUBSYSTEM_PROMPTER: &str = "prompter";
 /// The lighting bridge's watch has an entry of its own: a fault of the watch
 /// is not `no output`, which the page reads off `sacn`.
 pub(crate) const SUBSYSTEM_LIGHTING_WATCH: &str = "lighting-watch";
+/// The sessions' watch (D52) has no entry of its own: this is the id its
+/// thread problems are laid on (`session::watch`).
+pub(crate) const SUBSYSTEM_SESSION_WATCH: &str = "session-watch";
 /// A last database backup older than this reads `warning`.
 pub(crate) const BACKUP_WARNING_AGE_SECS: u64 = 48 * 60 * 60;
 /// The `app.changed` reason a health transition carries.

@@ -4,7 +4,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 
 import { EngineRequestError } from "../transports/engineRequestError";
 import { createFixtureTransport } from "../transports/fixtureTransport";
-import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
+import type { EventEnvelope, EventName, JsonObject, JsonValue } from "../generated/protocol";
 import type { EngineTransport, ShellStore } from "../types";
 import { createShellStore, prompterGlassIsStale } from "./createShellStore";
 import { anchorArrival } from "../prompter/anchorArrival";
@@ -1381,8 +1381,10 @@ describe("createShellStore the session", () => {
     begunAt: "2026-10-15T07:16:00.000Z",
     endedAt: null,
     folder: "D:\\Sessions\\Morning take (2026-10-15)",
+    folderBytes: null,
   };
-  // The settings and the places the read holds beside the sessions (D52).
+  // The settings and the places the read holds beside the sessions, and what the sessions'
+  // watch read (D52).
   const read = {
     settings: {
       root: "D:\\Sessions",
@@ -1390,7 +1392,19 @@ describe("createShellStore the session", () => {
       lowBelowGb: 200,
       nearlyFullBelowGb: 50,
     },
-    places: { root: "D:\\Sessions", simulated: false },
+    places: { root: "D:\\Sessions", simulated: false, rootExists: true },
+    recent: [],
+    drives: [],
+    sessionDrive: "D",
+    vmix: {
+      state: "not-read",
+      recording: false,
+      file: null,
+      inFolder: null,
+      bytesPerSecond: null,
+      recordingFolder: null,
+    },
+    readAt: null,
   };
 
   it("reads the session at the start and again when it changes", async () => {
@@ -1453,6 +1467,19 @@ describe("createShellStore the session", () => {
     expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
       message: "session.snapshot: places is not an object",
     });
+    // And one without what the watch read.
+    for (const [part, problem] of [
+      ["recent", "recent is not a list"],
+      ["drives", "drives is not a list"],
+      ["vmix", "vmix is not an object"],
+    ] as const) {
+      const without = Object.fromEntries(Object.entries(read).filter(([key]) => key !== part)) as JsonObject;
+      answer("session.snapshot", { current: null, last: [], ...without });
+      await store.endSession();
+      expect(store.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
+        message: `session.snapshot: ${problem}`,
+      });
+    }
     expect(store.getSnapshot().sessionSnapshot).toEqual({ current: session, last: [], ...read });
     await store.dispose();
   });

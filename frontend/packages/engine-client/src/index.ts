@@ -52,7 +52,9 @@ export type {
   FixturePrompterScriptSeed,
   FixturePrompterSeed,
   FixtureScenario,
+  FixtureSessionDriveSeed,
   FixtureSessionSeed,
+  FixtureSessionVmixSeed,
   AudioClipClearRequest,
   AudioMeterEntry,
   AudioMeterFrame,
@@ -173,8 +175,11 @@ export type { PrompterTextColour } from "./generated/snapshots/PrompterTextColou
 export type { PrompterVersionSummary } from "./generated/snapshots/PrompterVersionSummary";
 export type { Session } from "./generated/snapshots/Session";
 export type { SessionBeginReply } from "./generated/snapshots/SessionBeginReply";
+export type { SessionDiskLevel } from "./generated/snapshots/SessionDiskLevel";
+export type { SessionDrive } from "./generated/snapshots/SessionDrive";
 export type { SessionEndReply } from "./generated/snapshots/SessionEndReply";
 export type { SessionFolderChoice } from "./generated/snapshots/SessionFolderChoice";
+export type { SessionFolderEntry } from "./generated/snapshots/SessionFolderEntry";
 export type { SessionFolderMade } from "./generated/snapshots/SessionFolderMade";
 export type { SessionKind } from "./generated/snapshots/SessionKind";
 export type { SessionPlaces } from "./generated/snapshots/SessionPlaces";
@@ -182,3 +187,5 @@ export type { SessionSettings } from "./generated/snapshots/SessionSettings";
 export type { SessionSettingsReply } from "./generated/snapshots/SessionSettingsReply";
 export type { SessionSnapshot } from "./generated/snapshots/SessionSnapshot";
 export type { SessionSubfolders } from "./generated/snapshots/SessionSubfolders";
+export type { SessionVmix } from "./generated/snapshots/SessionVmix";
+export type { SessionVmixState } from "./generated/snapshots/SessionVmixState";

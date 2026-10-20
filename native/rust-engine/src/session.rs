@@ -18,11 +18,17 @@
 //! subfolders and the disk's levels (`settings.rs`). Where a run makes its
 //! folders is `places.rs`'s. The contract is `v1.md`'s "Session" section.
 //!
+//! What the page shows of the disks and of vMix is read by the sessions'
+//! watch, a thread of its own (`watch.rs`, with `drives.rs` and `vmix.rs`),
+//! and carried in the snapshot from its last report: a request never reads
+//! a drive's space or vMix.
+//!
 //! Every `session.*` request is answered in turn on the request loop (none
 //! runs aside, `main.rs`), and nothing else writes these settings, so a
 //! begin's read and its write cannot cross another's.
 
 pub(crate) mod commands;
+pub(crate) mod drives;
 pub(crate) mod folder;
 pub(crate) mod places;
 pub(crate) mod settings;
@@ -31,9 +37,14 @@ pub(crate) mod snapshot;
 mod tests;
 #[cfg(test)]
 mod tests_folder;
+#[cfg(test)]
+mod tests_watch;
+pub(crate) mod vmix;
+pub(crate) mod watch;
 
 pub(crate) use commands::handle_session_request;
 pub(crate) use places::Places;
+pub(crate) use watch::{session_watch_report, spawn_session_watch, wake_session_watch};
 
 /// A refused or failed `session.*` request.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -304,7 +304,7 @@ Then, on the owner's word: `npm run release`, the walk with the page's CHECKLIST
 A session gets its folder, which `Begin` makes on a new sessions' folder, `D:\Sessions` (or in a series' folder, or an existing folder used as it is), named `<name> (YYYY-MM-DD)` with each kind's subfolders; the window shows the drive's free space, and the disk reads Low under 200 GB and Nearly full under 50 GB. The design is board 3 (`docs/design/boards/session-3.html`), its note `docs/design/session-3.md`; the owner answered its questions on 2026-10-18 (every recommendation but the root's). Four pull requests, in this order:
 
 - [x] The folder (#354, the hardware link): the settings `session.root`, `session.subfolders` and `session.thresholds` under `session.`, outside the archive, and `session.settings.update`; where a run makes its folders (the studio's build on the setting's root, every other run beside its own saved data, `SSE_SESSIONS_SIMULATED=1` for the lanes and the release's trial); `session.begin`'s `folder`, its checks in order and what it makes; the folder's name held to one case table with the pages; the rows; the store and the test double. Nothing on screen changes yet.
-- [ ] The watch (the hardware link): the drives' free space through Windows, the sessions' folder's newest folders and their sizes, vMix's recording file, read on a thread of its own.
+- [x] The watch (#355, the hardware link): a watched thread, `session-watch`, reads the drives' free space through Windows (WinRT, each drive with 2 s to answer), the sessions' folder's six newest folders and the folders' sizes every 30 s and after a begin, an end and an update, and vMix's recording file every 5 s in the studio's build alone (its API, read only); the snapshot carries its last report and never reads a disk; a begin on a drive that did not answer is refused at once; an end keeps its folder's size; `session.changed { reason: "read" }`; the test double's seeds and hooks. Nothing on screen changes yet.
 - [ ] The shell's folder dialog and `Open the folder`, and the window's parts (a level bar, a footer item's tone).
 - [ ] The page: the window at 1680 × 620 with the folder and the disk, the running session's folder and vMix line, the footer's and the header's `Disk`, Setup / Support's Sessions screen, D52.
 
@@ -338,6 +338,10 @@ Ask the owner first: does taking a BGH1 back at a start disturb LUMIX Tether?
 - The studio walk: all of `docs/CHECKLIST.md`.
 
 ## Found, to check
+
+Found in the review of #355 (the sessions' watch, 2026-10-19), not tried:
+
+- [ ] **Windows' "There is no disk in the drive" box.** The sessions' watch opens every lettered drive, C: to Z:, every 30 s and in every run. A Win32 call on an empty removable slot (a multi-card reader's) raises that box in a process that has not set Windows' error mode (`SEM_FAILCRITICALERRORS`), and neither the shell nor the engine sets it (the engine cannot: `unsafe` is forbidden there). Whether WinRT's `StorageFolder` raises it is not known: the check of 2026-10-19 covered C:, D:, E:, Z: and a missing letter, not an empty slot, and the studio PC has no card reader plugged in. Check with a reader whose slot is empty and a development run for a minute; if the box comes, the shell sets the error mode before it starts the engine, which inherits it (one function in the shell's `unsafe` list).
 
 Found on the studio walk of 2026-10-01:
 
